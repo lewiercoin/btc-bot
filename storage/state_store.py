@@ -1,25 +1,35 @@
 from __future__ import annotations
 
 import sqlite3
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from datetime import date, datetime, timezone
 from uuid import uuid4
 
 from core.governance import GovernanceRuntimeState
-from core.models import BotState, ExecutableSignal, SignalCandidate
-from core.risk_engine import RiskRuntimeState
+from core.models import BotState, ExecutableSignal, Position, SignalCandidate
+from core.risk_engine import RiskRuntimeState, SettlementMetrics
 from storage.repositories import (
+    close_position,
+    fetch_open_trade_positions,
     fetch_recent_closed_trade_outcomes,
     fetch_trade_log_rows_for_day,
     get_bot_state,
     get_daily_metrics,
     get_last_closed_loss_at,
     get_latest_position_for_signal,
+    get_open_trade_log_for_position,
     get_open_positions_count,
     insert_trade_log_open,
+    update_trade_log_close,
     upsert_bot_state,
     upsert_daily_metrics,
 )
+
+
+@dataclass(slots=True)
+class OpenTradeRecord:
+    trade_id: str
+    position: Position
 
 
 class StateStore:
@@ -130,6 +140,28 @@ class StateStore:
         )
         self.connection.commit()
 
+    def get_open_trade_records(self) -> list[OpenTradeRecord]:
+        rows = fetch_open_trade_positions(self.connection)
+        records: list[OpenTradeRecord] = []
+        for row in rows:
+            position = Position(
+                position_id=row["position_id"],
+                symbol=row["symbol"],
+                direction=row["direction"],
+                status=row["status"],
+                entry_price=float(row["entry_price"]),
+                size=float(row["size"]),
+                leverage=int(row["leverage"]),
+                stop_loss=float(row["stop_loss"]),
+                take_profit_1=float(row["take_profit_1"]),
+                take_profit_2=float(row["take_profit_2"]),
+                opened_at=datetime.fromisoformat(row["opened_at"]),
+                updated_at=datetime.fromisoformat(row["updated_at"]),
+                signal_id=row["signal_id"],
+            )
+            records.append(OpenTradeRecord(trade_id=row["trade_id"], position=position))
+        return records
+
     def record_trade_open(
         self,
         *,
@@ -170,6 +202,44 @@ class StateStore:
         )
         self.save(updated_state)
         self.sync_daily_metrics(opened_at.astimezone(timezone.utc).date())
+
+    def settle_trade_close(
+        self,
+        *,
+        position_id: str,
+        settlement: SettlementMetrics,
+        closed_at: datetime,
+    ) -> None:
+        open_trade = get_open_trade_log_for_position(self.connection, position_id)
+        if not open_trade:
+            raise RuntimeError(f"No open trade_log row for position_id={position_id}")
+
+        close_position(self.connection, position_id=position_id, closed_at=closed_at)
+        update_trade_log_close(
+            self.connection,
+            trade_id=open_trade["trade_id"],
+            closed_at=closed_at,
+            exit_price=settlement.exit_price,
+            pnl_abs=settlement.pnl_abs,
+            pnl_r=settlement.pnl_r,
+            mae=settlement.mae,
+            mfe=settlement.mfe,
+            exit_reason=settlement.exit_reason,
+        )
+
+        opened_at = datetime.fromisoformat(open_trade["opened_at"])
+        self.sync_daily_metrics(opened_at.astimezone(timezone.utc).date())
+        self.sync_daily_metrics(closed_at.astimezone(timezone.utc).date())
+
+        state = self.load() or self.ensure_initialized()
+        updated_state = replace(
+            state,
+            healthy=True,
+            last_error=None,
+            open_positions_count=self.get_open_positions(),
+            consecutive_losses=self._compute_consecutive_losses(),
+        )
+        self.save(updated_state)
 
     def mark_error(self, message: str) -> None:
         state = self.load() or self.ensure_initialized()
