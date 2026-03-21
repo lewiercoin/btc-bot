@@ -2,7 +2,8 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime
+from datetime import date, datetime
+from typing import Any
 
 from core.models import BotState, ExecutableSignal, SignalCandidate
 
@@ -92,3 +93,160 @@ def get_bot_state(conn: sqlite3.Connection) -> dict | None:
     if not row:
         return None
     return dict(row)
+
+
+def get_open_positions_count(conn: sqlite3.Connection) -> int:
+    row = conn.execute(
+        "SELECT COUNT(*) AS cnt FROM positions WHERE status IN ('OPEN', 'PARTIAL')"
+    ).fetchone()
+    return int(row["cnt"]) if row else 0
+
+
+def get_latest_position_for_signal(conn: sqlite3.Connection, signal_id: str) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT position_id, opened_at, symbol, direction, entry_price, size
+        FROM positions
+        WHERE signal_id = ?
+        ORDER BY opened_at DESC
+        LIMIT 1
+        """,
+        (signal_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def insert_trade_log_open(
+    conn: sqlite3.Connection,
+    *,
+    trade_id: str,
+    signal_id: str,
+    position_id: str,
+    opened_at: datetime,
+    direction: str,
+    regime: str,
+    confluence_score: float,
+    entry_price: float,
+    size: float,
+    features_at_entry_json: dict[str, Any],
+    schema_version: str,
+    config_hash: str,
+) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO trade_log (
+            trade_id, signal_id, position_id, opened_at, closed_at, direction, regime,
+            confluence_score, entry_price, exit_price, size, fees_total, slippage_bps_avg,
+            pnl_abs, pnl_r, mae, mfe, exit_reason, features_at_entry_json, schema_version, config_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            trade_id,
+            signal_id,
+            position_id,
+            opened_at.isoformat(),
+            None,
+            direction,
+            regime,
+            confluence_score,
+            entry_price,
+            None,
+            size,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            None,
+            json.dumps(features_at_entry_json),
+            schema_version,
+            config_hash,
+        ),
+    )
+
+
+def get_daily_metrics(conn: sqlite3.Connection, day: date) -> dict | None:
+    row = conn.execute("SELECT * FROM daily_metrics WHERE date = ?", (day.isoformat(),)).fetchone()
+    return dict(row) if row else None
+
+
+def upsert_daily_metrics(
+    conn: sqlite3.Connection,
+    *,
+    day: date,
+    trades_count: int,
+    wins: int,
+    losses: int,
+    pnl_abs: float,
+    pnl_r_sum: float,
+    daily_dd_pct: float,
+    expectancy_r: float,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO daily_metrics (
+            date, trades_count, wins, losses, pnl_abs, pnl_r_sum, daily_dd_pct, expectancy_r
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(date) DO UPDATE SET
+            trades_count = excluded.trades_count,
+            wins = excluded.wins,
+            losses = excluded.losses,
+            pnl_abs = excluded.pnl_abs,
+            pnl_r_sum = excluded.pnl_r_sum,
+            daily_dd_pct = excluded.daily_dd_pct,
+            expectancy_r = excluded.expectancy_r
+        """,
+        (
+            day.isoformat(),
+            trades_count,
+            wins,
+            losses,
+            pnl_abs,
+            pnl_r_sum,
+            daily_dd_pct,
+            expectancy_r,
+        ),
+    )
+
+
+def fetch_trade_log_rows_for_day(conn: sqlite3.Connection, day: date) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM trade_log
+        WHERE DATE(opened_at) = ?
+        ORDER BY opened_at ASC
+        """,
+        (day.isoformat(),),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def fetch_recent_closed_trade_outcomes(conn: sqlite3.Connection, limit: int = 100) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT closed_at, pnl_abs
+        FROM trade_log
+        WHERE closed_at IS NOT NULL
+        ORDER BY closed_at DESC
+        LIMIT ?
+        """,
+        (limit,),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def get_last_closed_loss_at(conn: sqlite3.Connection) -> datetime | None:
+    row = conn.execute(
+        """
+        SELECT closed_at
+        FROM trade_log
+        WHERE closed_at IS NOT NULL AND pnl_abs < 0
+        ORDER BY closed_at DESC
+        LIMIT 1
+        """
+    ).fetchone()
+    if not row or not row["closed_at"]:
+        return None
+    return datetime.fromisoformat(row["closed_at"])
