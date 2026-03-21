@@ -74,9 +74,9 @@ class RiskEngine:
         runtime = self.state_provider()
         if runtime.consecutive_losses >= self.config.max_consecutive_losses:
             return RiskDecision(False, reason="max_consecutive_losses")
-        if runtime.daily_dd_pct > self.config.daily_dd_limit:
+        if runtime.daily_dd_pct >= self.config.daily_dd_limit:
             return RiskDecision(False, reason="daily_dd_limit")
-        if runtime.weekly_dd_pct > self.config.weekly_dd_limit:
+        if runtime.weekly_dd_pct >= self.config.weekly_dd_limit:
             return RiskDecision(False, reason="weekly_dd_limit")
 
         stop_distance = abs(signal.entry_price - signal.stop_loss)

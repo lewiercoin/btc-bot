@@ -53,9 +53,9 @@ class GovernanceLayer:
         state = self.state_provider()
         notes: list[str] = []
 
-        if state.daily_dd_pct > self.config.daily_dd_limit:
+        if state.daily_dd_pct >= self.config.daily_dd_limit:
             return GovernanceDecision(False, [f"daily_dd_exceeded:{state.daily_dd_pct:.4f}"])
-        if state.weekly_dd_pct > self.config.weekly_dd_limit:
+        if state.weekly_dd_pct >= self.config.weekly_dd_limit:
             return GovernanceDecision(False, [f"weekly_dd_exceeded:{state.weekly_dd_pct:.4f}"])
         if state.consecutive_losses >= self.config.max_consecutive_losses:
             return GovernanceDecision(False, [f"consecutive_losses_limit:{state.consecutive_losses}"])

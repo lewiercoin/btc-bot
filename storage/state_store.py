@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import sqlite3
 from dataclasses import dataclass, replace
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 from core.governance import GovernanceRuntimeState
@@ -10,6 +10,7 @@ from core.models import BotState, ExecutableSignal, Position, SignalCandidate
 from core.risk_engine import RiskRuntimeState, SettlementMetrics
 from storage.repositories import (
     close_position,
+    fetch_closed_trade_pnl_series_between,
     fetch_open_trade_positions,
     fetch_recent_closed_trade_outcomes,
     fetch_trade_log_rows_for_day,
@@ -20,6 +21,7 @@ from storage.repositories import (
     get_open_trade_log_for_position,
     get_open_positions_count,
     insert_trade_log_open,
+    sum_closed_pnl_abs_before,
     update_trade_log_close,
     upsert_bot_state,
     upsert_daily_metrics,
@@ -33,9 +35,10 @@ class OpenTradeRecord:
 
 
 class StateStore:
-    def __init__(self, connection: sqlite3.Connection, mode: str) -> None:
+    def __init__(self, connection: sqlite3.Connection, mode: str, reference_equity: float = 10_000.0) -> None:
         self.connection = connection
         self.mode = mode
+        self.reference_equity = max(reference_equity, 1e-8)
 
     def ensure_initialized(self) -> BotState:
         existing = self.load()
@@ -80,21 +83,14 @@ class StateStore:
 
     def get_governance_state(self, now: datetime | None = None) -> GovernanceRuntimeState:
         ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
-        self.ensure_initialized()
-        self.sync_daily_metrics(ts.date())
-
-        state = self.load()
+        state = self.refresh_runtime_state(ts)
         assert state is not None
         metrics = get_daily_metrics(self.connection, ts.date()) or {}
-        consecutive_losses = self._compute_consecutive_losses()
         last_loss_at = get_last_closed_loss_at(self.connection)
-
-        if state.consecutive_losses != consecutive_losses:
-            self.save(replace(state, consecutive_losses=consecutive_losses))
 
         return GovernanceRuntimeState(
             trades_today=int(metrics.get("trades_count", 0)),
-            consecutive_losses=consecutive_losses,
+            consecutive_losses=state.consecutive_losses,
             daily_dd_pct=state.daily_dd_pct,
             weekly_dd_pct=state.weekly_dd_pct,
             last_trade_at=state.last_trade_at,
@@ -102,15 +98,10 @@ class StateStore:
         )
 
     def get_risk_state(self) -> RiskRuntimeState:
-        self.ensure_initialized()
-        state = self.load()
+        state = self.refresh_runtime_state()
         assert state is not None
-        consecutive_losses = self._compute_consecutive_losses()
-        if state.consecutive_losses != consecutive_losses:
-            self.save(replace(state, consecutive_losses=consecutive_losses))
-            state = self.load() or state
         return RiskRuntimeState(
-            consecutive_losses=consecutive_losses,
+            consecutive_losses=state.consecutive_losses,
             daily_dd_pct=state.daily_dd_pct,
             weekly_dd_pct=state.weekly_dd_pct,
         )
@@ -191,14 +182,14 @@ class StateStore:
             config_hash=config_hash,
         )
 
-        state = self.load() or self.ensure_initialized()
+        state = self.refresh_runtime_state(opened_at)
+        assert state is not None
         updated_state = replace(
             state,
             healthy=True,
             last_error=None,
             open_positions_count=self.get_open_positions(),
             last_trade_at=opened_at,
-            consecutive_losses=self._compute_consecutive_losses(),
         )
         self.save(updated_state)
         self.sync_daily_metrics(opened_at.astimezone(timezone.utc).date())
@@ -231,23 +222,47 @@ class StateStore:
         self.sync_daily_metrics(opened_at.astimezone(timezone.utc).date())
         self.sync_daily_metrics(closed_at.astimezone(timezone.utc).date())
 
-        state = self.load() or self.ensure_initialized()
+        state = self.refresh_runtime_state(closed_at)
+        assert state is not None
         updated_state = replace(
             state,
             healthy=True,
             last_error=None,
             open_positions_count=self.get_open_positions(),
-            consecutive_losses=self._compute_consecutive_losses(),
         )
         self.save(updated_state)
 
     def mark_error(self, message: str) -> None:
-        state = self.load() or self.ensure_initialized()
+        state = self.refresh_runtime_state()
+        assert state is not None
         self.save(replace(state, healthy=False, last_error=message))
 
     def mark_healthy(self) -> None:
-        state = self.load() or self.ensure_initialized()
+        state = self.refresh_runtime_state()
+        assert state is not None
         self.save(replace(state, healthy=True, last_error=None, open_positions_count=self.get_open_positions()))
+
+    def refresh_runtime_state(self, now: datetime | None = None) -> BotState:
+        ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        self.ensure_initialized()
+        self.sync_daily_metrics(ts.date())
+
+        current = self.load()
+        assert current is not None
+        consecutive_losses = self._compute_consecutive_losses()
+        daily_dd_pct = self._compute_daily_dd_pct(ts)
+        weekly_dd_pct = self._compute_weekly_dd_pct(ts)
+
+        refreshed = replace(
+            current,
+            open_positions_count=self.get_open_positions(),
+            consecutive_losses=consecutive_losses,
+            daily_dd_pct=daily_dd_pct,
+            weekly_dd_pct=weekly_dd_pct,
+        )
+        self.save(refreshed)
+        self.sync_daily_metrics(ts.date())
+        return refreshed
 
     def _compute_consecutive_losses(self) -> int:
         outcomes = fetch_recent_closed_trade_outcomes(self.connection, limit=100)
@@ -260,3 +275,33 @@ class StateStore:
             if pnl_abs > 0:
                 break
         return losses
+
+    def _compute_daily_dd_pct(self, now: datetime) -> float:
+        day_start = datetime.combine(now.date(), datetime.min.time(), tzinfo=timezone.utc)
+        day_end = day_start + timedelta(days=1)
+        return self._compute_period_drawdown_pct(day_start, day_end)
+
+    def _compute_weekly_dd_pct(self, now: datetime) -> float:
+        weekday = now.weekday()  # Monday=0
+        week_start_date = now.date() - timedelta(days=weekday)
+        week_start = datetime.combine(week_start_date, datetime.min.time(), tzinfo=timezone.utc)
+        week_end = week_start + timedelta(days=7)
+        return self._compute_period_drawdown_pct(week_start, week_end)
+
+    def _compute_period_drawdown_pct(self, start_ts: datetime, end_ts: datetime) -> float:
+        closed_before = sum_closed_pnl_abs_before(self.connection, start_ts)
+        starting_equity = max(self.reference_equity + closed_before, 1e-8)
+
+        peak_equity = starting_equity
+        current_equity = starting_equity
+        max_drawdown = 0.0
+
+        for row in fetch_closed_trade_pnl_series_between(self.connection, start_ts, end_ts):
+            current_equity += float(row["pnl_abs"])
+            if current_equity > peak_equity:
+                peak_equity = current_equity
+            drawdown = (peak_equity - current_equity) / max(peak_equity, 1e-8)
+            if drawdown > max_drawdown:
+                max_drawdown = drawdown
+
+        return min(max(max_drawdown, 0.0), 1.0)
