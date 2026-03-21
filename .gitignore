@@ -144,6 +144,16 @@ ENV/
 env.bak/
 venv.bak/
 
+# Runtime artifacts
+*.db
+*.sqlite
+*.sqlite3
+logs/
+tmp/
+temp/
+*.tmp
+*.temp
+
 # Spyder project settings
 .spyderproject
 .spyproject
