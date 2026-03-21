@@ -4,12 +4,13 @@ import logging
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from typing import Callable
 
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
-from core.governance import GovernanceConfig, GovernanceLayer
+from core.governance import GovernanceConfig, GovernanceLayer, GovernanceRuntimeState
 from core.models import MarketSnapshot
 from core.regime_engine import RegimeConfig, RegimeEngine
-from core.risk_engine import RiskConfig, RiskEngine
+from core.risk_engine import RiskConfig, RiskEngine, RiskRuntimeState
 from core.signal_engine import SignalConfig, SignalEngine
 from data.market_data import MarketDataAssembler
 from data.rest_client import BinanceFuturesRestClient, RestClientConfig
@@ -19,6 +20,8 @@ from execution.live_execution_engine import LiveExecutionEngine
 from execution.paper_execution_engine import PaperExecutionEngine
 from monitoring.audit_logger import AuditLogger
 from settings import AppSettings, BotMode
+from storage.repositories import save_executable_signal, save_signal_candidate
+from storage.state_store import StateStore
 
 LOG = logging.getLogger(__name__)
 
@@ -34,8 +37,12 @@ class EngineBundle:
     execution_engine: ExecutionEngine
     audit_logger: AuditLogger
 
-
-def build_default_bundle(settings: AppSettings, conn: sqlite3.Connection) -> EngineBundle:
+def build_default_bundle(
+    settings: AppSettings,
+    conn: sqlite3.Connection,
+    governance_state_provider: Callable[[], GovernanceRuntimeState],
+    risk_state_provider: Callable[[], RiskRuntimeState],
+) -> EngineBundle:
     rest_client = BinanceFuturesRestClient(
         RestClientConfig(
             base_url=settings.exchange.futures_rest_base_url,
@@ -89,7 +96,8 @@ def build_default_bundle(settings: AppSettings, conn: sqlite3.Connection) -> Eng
                 max_consecutive_losses=settings.risk.max_consecutive_losses,
                 daily_dd_limit=settings.risk.daily_dd_limit,
                 weekly_dd_limit=settings.risk.weekly_dd_limit,
-            )
+            ),
+            state_provider=governance_state_provider,
         ),
         risk_engine=RiskEngine(
             RiskConfig(
@@ -102,7 +110,8 @@ def build_default_bundle(settings: AppSettings, conn: sqlite3.Connection) -> Eng
                 daily_dd_limit=settings.risk.daily_dd_limit,
                 weekly_dd_limit=settings.risk.weekly_dd_limit,
                 max_hold_hours=settings.risk.max_hold_hours,
-            )
+            ),
+            state_provider=risk_state_provider,
         ),
         execution_engine=execution_engine,
         audit_logger=AuditLogger(connection=conn),
@@ -115,16 +124,28 @@ class BotOrchestrator:
     def __init__(self, settings: AppSettings, conn: sqlite3.Connection, bundle: EngineBundle | None = None) -> None:
         self.settings = settings
         self.conn = conn
-        self.bundle = bundle or build_default_bundle(settings=settings, conn=conn)
+        self.state_store = StateStore(connection=conn, mode=settings.mode.value)
+        self.bundle = bundle or build_default_bundle(
+            settings=settings,
+            conn=conn,
+            governance_state_provider=self.state_store.get_governance_state,
+            risk_state_provider=self.state_store.get_risk_state,
+        )
 
     def start(self) -> None:
         LOG.info("Bot started in %s mode", self.settings.mode.value)
+        self.state_store.ensure_initialized()
         # Full event loop is planned for Phase F.
         self.run_decision_cycle()
 
     def run_decision_cycle(self) -> None:
         timestamp = datetime.now(timezone.utc)
-        snapshot = self._build_snapshot(timestamp)
+        try:
+            snapshot = self._build_snapshot(timestamp)
+        except Exception as exc:
+            self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
+            self.state_store.mark_error(f"snapshot_build_failed:{exc}")
+            return
 
         # 1) Decision logic
         features = self.bundle.feature_engine.compute(
@@ -136,26 +157,45 @@ class BotOrchestrator:
         candidate = self.bundle.signal_engine.generate(features, regime)
         if candidate is None:
             self.bundle.audit_logger.log_info("decision", "No signal candidate.")
+            self.state_store.mark_healthy()
             return
+
+        save_signal_candidate(self.conn, candidate, self.settings.schema_version, self.settings.config_hash)
+        self.conn.commit()
 
         governance_decision = self.bundle.governance.evaluate(candidate)
         if not governance_decision.approved:
             self.bundle.audit_logger.log_info("governance", "Candidate rejected by governance.")
+            self.state_store.mark_healthy()
             return
         executable = self.bundle.governance.to_executable(candidate, governance_decision)
+        save_executable_signal(self.conn, executable)
+        self.conn.commit()
 
         # 2) Risk gate
         risk_decision = self.bundle.risk_engine.evaluate(
             signal=executable,
-            equity=1.0,
-            open_positions=0,
+            equity=10_000.0,
+            open_positions=self.state_store.get_open_positions(),
         )
         if not risk_decision.allowed:
             self.bundle.audit_logger.log_info("risk", f"Trade blocked: {risk_decision.reason}")
+            self.state_store.mark_healthy()
             return
 
         # 3) Execution
-        self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
+        try:
+            self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
+            self.state_store.record_trade_open(
+                candidate=candidate,
+                executable=executable,
+                schema_version=self.settings.schema_version,
+                config_hash=self.settings.config_hash,
+            )
+            self.state_store.mark_healthy()
+        except Exception as exc:
+            self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
+            self.state_store.mark_error(f"execution_failed:{exc}")
 
     def _build_snapshot(self, timestamp: datetime) -> MarketSnapshot:
         return self.bundle.market_data.build_snapshot(
