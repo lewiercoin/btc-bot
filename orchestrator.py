@@ -147,6 +147,15 @@ class BotOrchestrator:
             self.state_store.mark_error(f"snapshot_build_failed:{exc}")
             return
 
+        try:
+            closed_count = self._process_trade_lifecycle(snapshot)
+            if closed_count:
+                self.bundle.audit_logger.log_info("lifecycle", f"Closed trades this cycle: {closed_count}")
+        except Exception as exc:
+            self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
+            self.state_store.mark_error(f"lifecycle_failed:{exc}")
+            return
+
         # 1) Decision logic
         features = self.bundle.feature_engine.compute(
             snapshot=snapshot,
@@ -202,3 +211,51 @@ class BotOrchestrator:
             symbol=self.settings.strategy.symbol,
             timestamp=timestamp,
         )
+
+    def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> int:
+        open_records = self.state_store.get_open_trade_records()
+        if not open_records:
+            return 0
+
+        latest_high = float(snapshot.candles_15m[-1]["high"]) if snapshot.candles_15m else float(snapshot.price)
+        latest_low = float(snapshot.candles_15m[-1]["low"]) if snapshot.candles_15m else float(snapshot.price)
+        latest_close = float(snapshot.candles_15m[-1]["close"]) if snapshot.candles_15m else float(snapshot.price)
+
+        closed = 0
+        for record in open_records:
+            decision = self.bundle.risk_engine.evaluate_exit(
+                record.position,
+                now=snapshot.timestamp,
+                latest_high=latest_high,
+                latest_low=latest_low,
+                latest_close=latest_close,
+            )
+            if not decision.should_close or decision.exit_price is None or decision.reason is None:
+                continue
+
+            candles_path = self._candles_since_open(snapshot.candles_15m, record.position.opened_at)
+            settlement = self.bundle.risk_engine.build_settlement_metrics(
+                record.position,
+                exit_price=decision.exit_price,
+                exit_reason=decision.reason,
+                candles_15m=candles_path,
+            )
+            self.state_store.settle_trade_close(
+                position_id=record.position.position_id,
+                settlement=settlement,
+                closed_at=snapshot.timestamp,
+            )
+            closed += 1
+        return closed
+
+    @staticmethod
+    def _candles_since_open(candles_15m: list[dict], opened_at: datetime) -> list[dict]:
+        result: list[dict] = []
+        for candle in candles_15m:
+            candle_ts = candle.get("open_time")
+            if isinstance(candle_ts, datetime):
+                if candle_ts >= opened_at:
+                    result.append(candle)
+            else:
+                result.append(candle)
+        return result

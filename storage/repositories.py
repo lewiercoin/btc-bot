@@ -116,6 +116,34 @@ def get_latest_position_for_signal(conn: sqlite3.Connection, signal_id: str) -> 
     return dict(row) if row else None
 
 
+def fetch_open_trade_positions(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT
+            p.position_id,
+            p.signal_id,
+            p.symbol,
+            p.direction,
+            p.status,
+            p.entry_price,
+            p.size,
+            p.leverage,
+            p.stop_loss,
+            p.take_profit_1,
+            p.take_profit_2,
+            p.opened_at,
+            p.updated_at,
+            t.trade_id
+        FROM positions p
+        JOIN trade_log t ON t.position_id = p.position_id
+        WHERE p.status IN ('OPEN', 'PARTIAL')
+          AND t.closed_at IS NULL
+        ORDER BY p.opened_at ASC
+        """
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def insert_trade_log_open(
     conn: sqlite3.Connection,
     *,
@@ -162,6 +190,56 @@ def insert_trade_log_open(
             json.dumps(features_at_entry_json),
             schema_version,
             config_hash,
+        ),
+    )
+
+
+def close_position(conn: sqlite3.Connection, *, position_id: str, closed_at: datetime) -> None:
+    conn.execute(
+        """
+        UPDATE positions
+        SET status = 'CLOSED',
+            updated_at = ?
+        WHERE position_id = ?
+        """,
+        (closed_at.isoformat(), position_id),
+    )
+
+
+def update_trade_log_close(
+    conn: sqlite3.Connection,
+    *,
+    trade_id: str,
+    closed_at: datetime,
+    exit_price: float,
+    pnl_abs: float,
+    pnl_r: float,
+    mae: float,
+    mfe: float,
+    exit_reason: str,
+) -> None:
+    conn.execute(
+        """
+        UPDATE trade_log
+        SET closed_at = ?,
+            exit_price = ?,
+            pnl_abs = ?,
+            pnl_r = ?,
+            mae = ?,
+            mfe = ?,
+            exit_reason = ?
+        WHERE trade_id = ?
+          AND closed_at IS NULL
+        """,
+        (
+            closed_at.isoformat(),
+            exit_price,
+            pnl_abs,
+            pnl_r,
+            mae,
+            mfe,
+            exit_reason,
+            trade_id,
         ),
     )
 
@@ -235,6 +313,21 @@ def fetch_recent_closed_trade_outcomes(conn: sqlite3.Connection, limit: int = 10
         (limit,),
     ).fetchall()
     return [dict(row) for row in rows]
+
+
+def get_open_trade_log_for_position(conn: sqlite3.Connection, position_id: str) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT *
+        FROM trade_log
+        WHERE position_id = ?
+          AND closed_at IS NULL
+        ORDER BY opened_at DESC
+        LIMIT 1
+        """,
+        (position_id,),
+    ).fetchone()
+    return dict(row) if row else None
 
 
 def get_last_closed_loss_at(conn: sqlite3.Connection) -> datetime | None:

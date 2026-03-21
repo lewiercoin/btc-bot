@@ -17,11 +17,11 @@ from storage.state_store import StateStore
 
 def reset_runtime_tables(conn) -> None:
     for table in (
-        "positions",
         "executions",
         "trade_log",
-        "signal_candidates",
+        "positions",
         "executable_signals",
+        "signal_candidates",
         "daily_metrics",
         "bot_state",
     ):
