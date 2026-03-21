@@ -120,11 +120,16 @@ def build_default_bundle(
 
 class BotOrchestrator:
     """Coordinates the pipeline. Decision, risk and execution stay in separate layers."""
+    REFERENCE_EQUITY = 10_000.0
 
     def __init__(self, settings: AppSettings, conn: sqlite3.Connection, bundle: EngineBundle | None = None) -> None:
         self.settings = settings
         self.conn = conn
-        self.state_store = StateStore(connection=conn, mode=settings.mode.value)
+        self.state_store = StateStore(
+            connection=conn,
+            mode=settings.mode.value,
+            reference_equity=self.REFERENCE_EQUITY,
+        )
         self.bundle = bundle or build_default_bundle(
             settings=settings,
             conn=conn,
@@ -135,11 +140,13 @@ class BotOrchestrator:
     def start(self) -> None:
         LOG.info("Bot started in %s mode", self.settings.mode.value)
         self.state_store.ensure_initialized()
+        self.state_store.refresh_runtime_state()
         # Full event loop is planned for Phase F.
         self.run_decision_cycle()
 
     def run_decision_cycle(self) -> None:
         timestamp = datetime.now(timezone.utc)
+        self.state_store.refresh_runtime_state(timestamp)
         try:
             snapshot = self._build_snapshot(timestamp)
         except Exception as exc:
@@ -184,7 +191,7 @@ class BotOrchestrator:
         # 2) Risk gate
         risk_decision = self.bundle.risk_engine.evaluate(
             signal=executable,
-            equity=10_000.0,
+            equity=self.REFERENCE_EQUITY,
             open_positions=self.state_store.get_open_positions(),
         )
         if not risk_decision.allowed:

@@ -315,6 +315,56 @@ def fetch_recent_closed_trade_outcomes(conn: sqlite3.Connection, limit: int = 10
     return [dict(row) for row in rows]
 
 
+def sum_closed_pnl_abs_between(conn: sqlite3.Connection, start_ts: datetime, end_ts: datetime) -> float:
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(pnl_abs), 0.0) AS pnl_abs_sum
+        FROM trade_log
+        WHERE closed_at IS NOT NULL
+          AND closed_at >= ?
+          AND closed_at < ?
+        """,
+        (start_ts.isoformat(), end_ts.isoformat()),
+    ).fetchone()
+    if not row:
+        return 0.0
+    return float(row["pnl_abs_sum"] or 0.0)
+
+
+def sum_closed_pnl_abs_before(conn: sqlite3.Connection, before_ts: datetime) -> float:
+    row = conn.execute(
+        """
+        SELECT COALESCE(SUM(pnl_abs), 0.0) AS pnl_abs_sum
+        FROM trade_log
+        WHERE closed_at IS NOT NULL
+          AND closed_at < ?
+        """,
+        (before_ts.isoformat(),),
+    ).fetchone()
+    if not row:
+        return 0.0
+    return float(row["pnl_abs_sum"] or 0.0)
+
+
+def fetch_closed_trade_pnl_series_between(
+    conn: sqlite3.Connection,
+    start_ts: datetime,
+    end_ts: datetime,
+) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT closed_at, pnl_abs
+        FROM trade_log
+        WHERE closed_at IS NOT NULL
+          AND closed_at >= ?
+          AND closed_at < ?
+        ORDER BY closed_at ASC
+        """,
+        (start_ts.isoformat(), end_ts.isoformat()),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_open_trade_log_for_position(conn: sqlite3.Connection, position_id: str) -> dict | None:
     row = conn.execute(
         """
