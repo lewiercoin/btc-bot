@@ -4,16 +4,12 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** AWAITING_DECISION
-**Options (from Cascade audit 2026-03-26, AUDIT_004):**
-
-| # | Option | Rationale | Risk |
-|---|---|---|---|
-| 1 | Phase G — backtest (replay_loader, fill_model, performance, backtest_runner) | Enables strategy validation before going live. Required by DoD §13 (6-12 month backtest with positive expectancy). | Delays paper trading start. |
-| 2 | Start paper trading with current system | Orchestrator is feature-complete. Can gather real-time data while backtest is built later. | No strategy validation yet. |
-| 3 | Fix remaining tech debt (#4, #8, #9) before G | Clean architecture before backtest. Prevents layering issues from compounding in backtest code. | Delays both backtest and live readiness. |
-
-**Decision:** _pending_
+**Status:** ACTIVE
+**Milestone:** Phase G — Backtest (replay_loader, fill_model, performance, backtest_runner)
+**Decision date:** 2026-03-26
+**Decided by:** User (product owner)
+**Scope:** `docs/BLUEPRINT_V1.md` §5.9, §13 — `backtest/replay_loader.py`, `backtest/fill_model.py`, `backtest/performance.py`, `backtest/backtest_runner.py`
+**Handoff:** See Cascade handoff in chat history
 
 ## Phase Status
 
