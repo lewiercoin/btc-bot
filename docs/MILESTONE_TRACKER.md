@@ -4,16 +4,12 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** AWAITING_DECISION
-**Options (from Cascade audit 2026-03-26, AUDIT_003):**
-
-| # | Option | Rationale | Risk |
-|---|---|---|---|
-| 1 | Phase F — orchestracja (orchestrator event loop, health/telegram integration, run_paper.py) | Natural next step. Monitoring modules ready for integration. Completes live-capable bot. | Largest scope remaining. Known issue #4 (exec→storage leak) and #6 (safe_mode=exit) should be addressed here. |
-| 2 | Fix execution→storage layer leak (#4) first, then Phase F | Clean architecture before big integration. Prevents layering issues from compounding. | Delays Phase F delivery. |
-| 3 | Phase G — backtest (replay_loader, fill_model, performance, backtest_runner) | Allows strategy validation before going live. Independent of F. | Delays live readiness. |
-
-**Decision:** _pending_
+**Status:** ACTIVE
+**Milestone:** Phase F — Orchestracja (event loop, health/telegram integration, run_paper.py)
+**Decision date:** 2026-03-26
+**Decided by:** User (product owner)
+**Scope:** `docs/BLUEPRINT_V1.md` §10.1-10.2, §11 — `orchestrator.py`, `main.py`, `scripts/run_paper.py`
+**Handoff:** See Cascade handoff in chat history
 
 ## Phase Status
 
