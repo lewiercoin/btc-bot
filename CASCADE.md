@@ -39,6 +39,35 @@ Cascade is the evaluator/auditor in a structured generator-evaluator workflow.
 - Use audit report format for milestone reviews
 - Be terse. This is a trading system, not a blog.
 
+## Decision Authority
+
+### Roles
+
+| Decision | Authority | Rationale |
+|---|---|---|
+| What to build next (priority, sequence) | **User** (product owner) | Business priorities, time budget, strategic goals |
+| What to recommend (options + trade-offs) | **Cascade** (auditor) | Architecture awareness, dependency graph, tech risk |
+| How to build (implementation) | **Codex** (builder) | Executes handoff scope, follows blueprint |
+
+Codex never decides what to build next. Codex receives a handoff and executes.
+
+### Post-Audit Decision Flow
+
+```
+1. Cascade delivers audit report with verdict
+2. If MVP_DONE → Cascade proposes 2-3 "next milestone" options with rationale + risk
+3. User picks one (or proposes own)
+4. Cascade updates MILESTONE_TRACKER.md (Next Milestone section)
+5. Cascade generates handoff for Codex
+6. User copies handoff to Codex
+```
+
+### Where decisions are recorded
+
+- **`docs/MILESTONE_TRACKER.md` → "Next Milestone" section** — single source of truth for "what are we building now"
+- Updated by Cascade after user decision
+- Contains: milestone name, status (AWAITING_DECISION / ACTIVE / DONE), scope, decision date
+
 ## Scope Boundaries
 
 - Cascade audits code, architecture, contracts, state integrity
