@@ -5,11 +5,11 @@ Last updated: 2026-03-26
 ## Next Milestone
 
 **Status:** ACTIVE
-**Milestone:** Phase D — Execution (live_execution_engine + order_manager)
+**Milestone:** Phase E — Monitoring (audit_logger, telegram_notifier, health, metrics)
 **Decision date:** 2026-03-26
 **Decided by:** User (product owner)
-**Scope:** `docs/BLUEPRINT_V1.md` §5.6 — `live_execution_engine.py`, `order_manager.py`
-**Handoff:** See Cascade handoff below or in chat history
+**Scope:** `docs/BLUEPRINT_V1.md` §5.8 — `audit_logger.py`, `telegram_notifier.py`, `health.py`, `metrics.py`
+**Handoff:** See Cascade handoff in chat history
 
 ## Phase Status
 
@@ -19,7 +19,7 @@ Last updated: 2026-03-26
 | B — dane | rest_client, websocket_client, market_data, bootstrap_history | MVP_DONE | data_audit_phase_b.py | Pending |
 | C — logika | feature_engine, regime_engine, signal_engine, governance, risk_engine | MVP_DONE | smoke_phase_c.py | Pending |
 | D — execution: recovery | recovery.py, orchestrator startup sync | MVP_DONE | smoke_recovery.py | AUDIT_001 ✅ |
-| D — execution: live + orders | live_execution_engine.py, order_manager.py | IN_PROGRESS | — | — |
+| D — execution: live + orders | live_execution_engine.py, order_manager.py | MVP_DONE | smoke_live_execution.py | AUDIT_002 ✅ |
 | E — monitoring | audit_logger, telegram, health, metrics | NOT_STARTED | — | — |
 | F — orchestracja | orchestrator, main, run_paper | NOT_STARTED | — | — |
 | G — backtest | replay_loader, fill_model, performance, backtest_runner | NOT_STARTED | — | — |
@@ -38,8 +38,6 @@ Last updated: 2026-03-26
 
 | File | Class/Method | Target Phase |
 |---|---|---|
-| execution/live_execution_engine.py | LiveExecutionEngine.execute_signal | D |
-| execution/order_manager.py | OrderManager.submit/cancel/amend | D |
 | monitoring/health.py | HealthMonitor.check | E |
 | monitoring/telegram_notifier.py | TelegramNotifier.send | E |
 | backtest/backtest_runner.py | BacktestRunner.run | G |
@@ -53,14 +51,18 @@ Last updated: 2026-03-26
 
 1. **Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines — *tracked since initial audit*
 2. **Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation) — *tracked since initial audit*
-3. **Deprecated API**: `repositories.py:57` uses `datetime.utcnow()` instead of `datetime.now(timezone.utc)` — *tracked since initial audit*
-4. **Layer leak**: `PaperExecutionEngine` writes directly to DB (execution should not know DB schema) — *tracked since initial audit*
-5. **Tech debt**: `rest_client.py` `_signed_request` duplicates retry logic from `_request` — *identified in AUDIT_001*
+3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ — **FIXED in c5f9408** (zero matches in codebase)
+4. **Layer leak**: `PaperExecutionEngine` AND `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage) — *tracked since initial audit, repeated in AUDIT_002*
+5. ~~**Tech debt**: `_signed_request` retry duplication~~ — **FIXED in c5f9408** (unified `_request_with_retry`)
 6. **Safe mode = exit**: orchestrator returns on safe_mode instead of managing existing positions (Phase F scope) — *identified in AUDIT_001*
 7. **Smoke gap**: `smoke_recovery.py` doesn't cover exchange_sync_failed, isolated_mode_mismatch, leverage_mismatch, combined issues — *identified in AUDIT_001*
+8. **Private API as public contract**: `_signed_request` called by OrderManager and LiveExecutionEngine despite underscore prefix — *identified in AUDIT_002*
+9. **Assert in production path**: `order_manager.py:186,190` uses `assert` instead of explicit raises — *identified in AUDIT_002*
+10. **Fees not captured**: `fees=0.0` hardcoded in LiveExecutionEngine — actual Binance fees not extracted — *identified in AUDIT_002*
 
 ## Audit History
 
 | ID | Milestone | Date | Commit | Verdict |
 |---|---|---|---|---|
 | AUDIT_001 | Recovery Startup Sync | 2026-03-26 | 436756b | MVP_DONE |
+| AUDIT_002 | Phase D — Live Execution + Order Manager | 2026-03-26 | c5f9408 | MVP_DONE |
