@@ -15,6 +15,17 @@ class SignalConfig:
     invalidation_offset_atr: float = 0.25
     tp1_atr_mult: float = 2.0
     tp2_atr_mult: float = 3.5
+    weight_sweep_detected: float = 1.25
+    weight_reclaim_confirmed: float = 1.25
+    weight_cvd_divergence: float = 0.75
+    weight_tfi_impulse: float = 0.50
+    weight_force_order_spike: float = 0.40
+    weight_regime_special: float = 0.35
+    weight_ema_trend_alignment: float = 0.25
+    weight_funding_supportive: float = 0.20
+    direction_tfi_threshold: float = 0.05
+    direction_tfi_threshold_inverse: float = -0.05
+    tfi_impulse_threshold: float = 0.10
 
 
 class SignalEngine:
@@ -70,9 +81,9 @@ class SignalEngine:
             return "LONG"
         if features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
             return "SHORT"
-        if features.tfi_60s > 0.05:
+        if features.tfi_60s > self.config.direction_tfi_threshold:
             return "LONG"
-        if features.tfi_60s < -0.05:
+        if features.tfi_60s < self.config.direction_tfi_threshold_inverse:
             return "SHORT"
         return None
 
@@ -81,41 +92,41 @@ class SignalEngine:
         reasons: list[str] = []
 
         if features.sweep_detected:
-            score += 1.25
+            score += self.config.weight_sweep_detected
             reasons.append("liquidity_sweep_detected")
         if features.reclaim_detected:
-            score += 1.25
+            score += self.config.weight_reclaim_confirmed
             reasons.append("reclaim_confirmed")
 
         if direction == "LONG" and features.cvd_bullish_divergence:
-            score += 0.75
+            score += self.config.weight_cvd_divergence
             reasons.append("cvd_bullish_divergence")
         if direction == "SHORT" and features.cvd_bearish_divergence:
-            score += 0.75
+            score += self.config.weight_cvd_divergence
             reasons.append("cvd_bearish_divergence")
 
-        if abs(features.tfi_60s) >= 0.10:
-            score += 0.50
+        if abs(features.tfi_60s) >= self.config.tfi_impulse_threshold:
+            score += self.config.weight_tfi_impulse
             reasons.append("tfi_impulse")
         if features.force_order_spike:
-            score += 0.40
+            score += self.config.weight_force_order_spike
             reasons.append("force_order_spike")
         if regime in (RegimeState.POST_LIQUIDATION, RegimeState.CROWDED_LEVERAGE):
-            score += 0.35
+            score += self.config.weight_regime_special
             reasons.append(f"regime_{regime.value}")
 
         if direction == "LONG" and features.ema50_4h >= features.ema200_4h:
-            score += 0.25
+            score += self.config.weight_ema_trend_alignment
             reasons.append("ema_trend_alignment")
         if direction == "SHORT" and features.ema50_4h <= features.ema200_4h:
-            score += 0.25
+            score += self.config.weight_ema_trend_alignment
             reasons.append("ema_trend_alignment")
 
         if direction == "LONG" and features.funding_8h <= 0:
-            score += 0.20
+            score += self.config.weight_funding_supportive
             reasons.append("funding_supportive")
         if direction == "SHORT" and features.funding_8h >= 0:
-            score += 0.20
+            score += self.config.weight_funding_supportive
             reasons.append("funding_supportive")
 
         return score, reasons

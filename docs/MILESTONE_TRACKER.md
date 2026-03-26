@@ -4,15 +4,14 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** ACTIVE
-**Milestone:** Bugfix (config injection gap) + Phase H — Research (analyze_trades, llm_post_trade_review)
-**Decision date:** 2026-03-26
-**Decided by:** User (product owner) + Cascade + Claude collaborative review
-**Scope:**
-- Bugfix: externalize 11 hardcoded `signal_engine.py` values into `SignalConfig`, wire 16 existing config fields in `orchestrator.py` + `backtest_runner.py`
-- Phase H: `research/analyze_trades.py`, `research/llm_post_trade_review.py` per blueprint §5.10
-**Note:** Autoresearch pattern (v2.0 scope per blueprint §14) deferred until bot is operational and strategy is validated on real data.
-**Handoff:** See Cascade handoff in chat history
+**Status:** AWAITING_DECISION
+**Options:**
+1. Paper trading validation — run bot on live data in PAPER mode to validate end-to-end
+2. Backtest with real data — use bootstrapped Binance data for first real backtest run
+3. Tech debt cleanup — address remaining known issues (#1, #2, #4)
+4. Live deployment preparation — final pre-production hardening
+
+**Note:** All blueprint phases (A-H) are now MVP_DONE. Autoresearch (v2.0) deferred.
 
 ## Phase Status
 
@@ -26,7 +25,7 @@ Last updated: 2026-03-26
 | E — monitoring | audit_logger, telegram, health, metrics | MVP_DONE | smoke_monitoring.py | AUDIT_003 ✅ |
 | F — orchestracja | orchestrator, main, run_paper | MVP_DONE | smoke_orchestrator.py | AUDIT_004 ✅ |
 | G — backtest | replay_loader, fill_model, performance, backtest_runner | MVP_DONE | smoke_backtest.py | AUDIT_005 ✅ |
-| H — research | analyze_trades, llm_post_trade_review | NOT_STARTED | — | — |
+| H — research | analyze_trades, llm_post_trade_review | MVP_DONE | smoke_research.py | AUDIT_006 ✅ |
 
 ## Cross-Cutting Milestones
 
@@ -39,10 +38,7 @@ Last updated: 2026-03-26
 
 ## Stub Inventory (NotImplementedError)
 
-| File | Class/Method | Target Phase |
-|---|---|---|
-| research/analyze_trades.py | (stub file) | H |
-| research/llm_post_trade_review.py | (stub file) | H |
+None — all blueprint stubs implemented.
 
 ## Known Issues
 
@@ -61,7 +57,7 @@ Last updated: 2026-03-26
 13. **Double kill-switch evaluation**: `_evaluate_kill_switch` called both in `run_decision_cycle` finally block and in `_run_event_loop` — redundant `refresh_runtime_state` call — *identified in AUDIT_004*
 14. **ReplayLoader N+1 queries**: 8 SQL queries per 15m bar — ~140k-280k queries for 6-12 month backtest. Functional but slow. Consider batch-loading. — *identified in AUDIT_005*
 15. **Sharpe population variance**: `_daily_sharpe_ratio` uses population variance (/ N) instead of sample variance (/ N-1). Minor statistical difference. — *identified in AUDIT_005*
-16. **Config injection gap**: 16 existing config fields silently ignored in `orchestrator.py:build_default_bundle` and `backtest_runner.py:_build_engines` — RegimeConfig (5/5 fields ignored), SignalConfig (5/6 ignored), GovernanceConfig (5/9 ignored), RiskConfig (1/9 ignored). Plus 11 hardcoded values in `signal_engine.py:79-121` not in any config (8 confluence weights + 3 thresholds). Total: 27 dead parameters. Affects both live and backtest paths. — *identified in Cascade+Claude collaborative review*
+16. ~~**Config injection gap**: 27 dead parameters in orchestrator + backtest_runner + signal_engine~~ — **FIXED in AUDIT_006** (all parameters wired, smoke_config_injection.py validates)
 
 ## Audit History
 
@@ -72,3 +68,4 @@ Last updated: 2026-03-26
 | AUDIT_003 | Phase E — Monitoring | 2026-03-26 | 2e31e33 | MVP_DONE |
 | AUDIT_004 | Phase F — Orchestration | 2026-03-26 | 09a099f | MVP_DONE |
 | AUDIT_005 | Phase G — Backtest | 2026-03-26 | 26fe3d7 | MVP_DONE |
+| AUDIT_006 | Config Injection Bugfix + Phase H Research | 2026-03-26 | (pending) | MVP_DONE |

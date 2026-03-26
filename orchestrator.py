@@ -119,18 +119,48 @@ def build_default_bundle(
                 oi_z_window_days=settings.strategy.oi_z_window_days,
             )
         ),
-        regime_engine=RegimeEngine(RegimeConfig()),
+        regime_engine=RegimeEngine(
+            RegimeConfig(
+                ema_trend_gap_pct=settings.strategy.ema_trend_gap_pct,
+                compression_atr_norm_max=settings.strategy.compression_atr_norm_max,
+                crowded_funding_extreme_pct=settings.strategy.crowded_funding_extreme_pct,
+                crowded_oi_zscore_min=settings.strategy.crowded_oi_zscore_min,
+                post_liq_tfi_abs_min=settings.strategy.post_liq_tfi_abs_min,
+            )
+        ),
         signal_engine=SignalEngine(
             SignalConfig(
                 confluence_min=settings.strategy.confluence_min,
+                min_sweep_depth_pct=settings.strategy.min_sweep_depth_pct,
+                entry_offset_atr=settings.strategy.entry_offset_atr,
+                invalidation_offset_atr=settings.strategy.invalidation_offset_atr,
+                tp1_atr_mult=settings.strategy.tp1_atr_mult,
+                tp2_atr_mult=settings.strategy.tp2_atr_mult,
+                weight_sweep_detected=settings.strategy.weight_sweep_detected,
+                weight_reclaim_confirmed=settings.strategy.weight_reclaim_confirmed,
+                weight_cvd_divergence=settings.strategy.weight_cvd_divergence,
+                weight_tfi_impulse=settings.strategy.weight_tfi_impulse,
+                weight_force_order_spike=settings.strategy.weight_force_order_spike,
+                weight_regime_special=settings.strategy.weight_regime_special,
+                weight_ema_trend_alignment=settings.strategy.weight_ema_trend_alignment,
+                weight_funding_supportive=settings.strategy.weight_funding_supportive,
+                direction_tfi_threshold=settings.strategy.direction_tfi_threshold,
+                direction_tfi_threshold_inverse=settings.strategy.direction_tfi_threshold_inverse,
+                tfi_impulse_threshold=settings.strategy.tfi_impulse_threshold,
             )
         ),
         governance=GovernanceLayer(
             GovernanceConfig(
+                cooldown_minutes_after_loss=settings.risk.cooldown_minutes_after_loss,
+                duplicate_level_tolerance_pct=settings.risk.duplicate_level_tolerance_pct,
+                duplicate_level_window_hours=settings.risk.duplicate_level_window_hours,
                 max_trades_per_day=settings.risk.max_trades_per_day,
                 max_consecutive_losses=settings.risk.max_consecutive_losses,
                 daily_dd_limit=settings.risk.daily_dd_limit,
                 weekly_dd_limit=settings.risk.weekly_dd_limit,
+                session_start_hour_utc=settings.risk.session_start_hour_utc,
+                session_end_hour_utc=settings.risk.session_end_hour_utc,
+                no_trade_windows_utc=settings.risk.no_trade_windows_utc,
             ),
             state_provider=governance_state_provider,
         ),
@@ -145,6 +175,7 @@ def build_default_bundle(
                 daily_dd_limit=settings.risk.daily_dd_limit,
                 weekly_dd_limit=settings.risk.weekly_dd_limit,
                 max_hold_hours=settings.risk.max_hold_hours,
+                high_vol_stop_distance_pct=settings.risk.high_vol_stop_distance_pct,
             ),
             state_provider=risk_state_provider,
         ),

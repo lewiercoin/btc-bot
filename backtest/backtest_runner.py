@@ -243,14 +243,48 @@ class BacktestRunner:
                 oi_z_window_days=strategy.oi_z_window_days,
             )
         )
-        regime_engine = RegimeEngine(RegimeConfig())
-        signal_engine = SignalEngine(SignalConfig(confluence_min=strategy.confluence_min))
+        regime_engine = RegimeEngine(
+            RegimeConfig(
+                ema_trend_gap_pct=strategy.ema_trend_gap_pct,
+                compression_atr_norm_max=strategy.compression_atr_norm_max,
+                crowded_funding_extreme_pct=strategy.crowded_funding_extreme_pct,
+                crowded_oi_zscore_min=strategy.crowded_oi_zscore_min,
+                post_liq_tfi_abs_min=strategy.post_liq_tfi_abs_min,
+            )
+        )
+        signal_engine = SignalEngine(
+            SignalConfig(
+                confluence_min=strategy.confluence_min,
+                min_sweep_depth_pct=strategy.min_sweep_depth_pct,
+                entry_offset_atr=strategy.entry_offset_atr,
+                invalidation_offset_atr=strategy.invalidation_offset_atr,
+                tp1_atr_mult=strategy.tp1_atr_mult,
+                tp2_atr_mult=strategy.tp2_atr_mult,
+                weight_sweep_detected=strategy.weight_sweep_detected,
+                weight_reclaim_confirmed=strategy.weight_reclaim_confirmed,
+                weight_cvd_divergence=strategy.weight_cvd_divergence,
+                weight_tfi_impulse=strategy.weight_tfi_impulse,
+                weight_force_order_spike=strategy.weight_force_order_spike,
+                weight_regime_special=strategy.weight_regime_special,
+                weight_ema_trend_alignment=strategy.weight_ema_trend_alignment,
+                weight_funding_supportive=strategy.weight_funding_supportive,
+                direction_tfi_threshold=strategy.direction_tfi_threshold,
+                direction_tfi_threshold_inverse=strategy.direction_tfi_threshold_inverse,
+                tfi_impulse_threshold=strategy.tfi_impulse_threshold,
+            )
+        )
         governance = GovernanceLayer(
             GovernanceConfig(
+                cooldown_minutes_after_loss=risk.cooldown_minutes_after_loss,
+                duplicate_level_tolerance_pct=risk.duplicate_level_tolerance_pct,
+                duplicate_level_window_hours=risk.duplicate_level_window_hours,
                 max_trades_per_day=risk.max_trades_per_day,
                 max_consecutive_losses=risk.max_consecutive_losses,
                 daily_dd_limit=risk.daily_dd_limit,
                 weekly_dd_limit=risk.weekly_dd_limit,
+                session_start_hour_utc=risk.session_start_hour_utc,
+                session_end_hour_utc=risk.session_end_hour_utc,
+                no_trade_windows_utc=risk.no_trade_windows_utc,
             ),
             state_provider=self._governance_state_provider,
         )
@@ -265,6 +299,7 @@ class BacktestRunner:
                 daily_dd_limit=risk.daily_dd_limit,
                 weekly_dd_limit=risk.weekly_dd_limit,
                 max_hold_hours=risk.max_hold_hours,
+                high_vol_stop_distance_pct=risk.high_vol_stop_distance_pct,
             ),
             state_provider=self._risk_state_provider,
         )
