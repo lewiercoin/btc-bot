@@ -11,6 +11,7 @@ from core.risk_engine import RiskRuntimeState, SettlementMetrics
 from storage.repositories import (
     close_position,
     fetch_closed_trade_pnl_series_between,
+    fetch_open_positions,
     fetch_open_trade_positions,
     fetch_recent_closed_trade_outcomes,
     fetch_trade_log_rows_for_day,
@@ -80,6 +81,42 @@ class StateStore:
 
     def get_open_positions(self) -> int:
         return get_open_positions_count(self.connection)
+
+    def get_open_positions_snapshot(self) -> list[Position]:
+        rows = fetch_open_positions(self.connection)
+        positions: list[Position] = []
+        for row in rows:
+            positions.append(
+                Position(
+                    position_id=row["position_id"],
+                    symbol=row["symbol"],
+                    direction=row["direction"],
+                    status=row["status"],
+                    entry_price=float(row["entry_price"]),
+                    size=float(row["size"]),
+                    leverage=int(row["leverage"]),
+                    stop_loss=float(row["stop_loss"]),
+                    take_profit_1=float(row["take_profit_1"]),
+                    take_profit_2=float(row["take_profit_2"]),
+                    opened_at=datetime.fromisoformat(row["opened_at"]),
+                    updated_at=datetime.fromisoformat(row["updated_at"]),
+                    signal_id=row["signal_id"],
+                )
+            )
+        return positions
+
+    def set_safe_mode(self, enabled: bool, reason: str | None = None, now: datetime | None = None) -> BotState:
+        state = self.refresh_runtime_state(now)
+        assert state is not None
+        updated = replace(
+            state,
+            healthy=False if enabled else True,
+            safe_mode=enabled,
+            open_positions_count=self.get_open_positions(),
+            last_error=reason if enabled else None,
+        )
+        self.save(updated)
+        return updated
 
     def get_governance_state(self, now: datetime | None = None) -> GovernanceRuntimeState:
         ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)

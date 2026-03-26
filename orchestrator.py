@@ -18,6 +18,7 @@ from data.websocket_client import BinanceFuturesWebsocketClient, WebsocketClient
 from execution.execution_engine import ExecutionEngine
 from execution.live_execution_engine import LiveExecutionEngine
 from execution.paper_execution_engine import PaperExecutionEngine
+from execution.recovery import BinanceRecoverySyncSource, NoOpRecoverySyncSource, RecoveryCoordinator
 from monitoring.audit_logger import AuditLogger
 from settings import AppSettings, BotMode
 from storage.repositories import save_executable_signal, save_signal_candidate
@@ -49,6 +50,9 @@ def build_default_bundle(
             timeout_seconds=settings.execution.rest_timeout_seconds,
             max_retries=3,
             retry_backoff_seconds=0.75,
+            api_key=settings.exchange.api_key,
+            api_secret=settings.exchange.api_secret,
+            recv_window_ms=settings.exchange.recv_window_ms,
         )
     )
     websocket_client = BinanceFuturesWebsocketClient(
@@ -136,17 +140,46 @@ class BotOrchestrator:
             governance_state_provider=self.state_store.get_governance_state,
             risk_state_provider=self.state_store.get_risk_state,
         )
+        if self.settings.mode == BotMode.PAPER:
+            exchange_sync = NoOpRecoverySyncSource()
+        else:
+            exchange_sync = BinanceRecoverySyncSource(self.bundle.market_data.rest_client)
+
+        self.recovery = RecoveryCoordinator(
+            symbol=self.settings.strategy.symbol,
+            max_allowed_leverage=self.settings.risk.max_leverage,
+            isolated_only=self.settings.exchange.isolated_only,
+            state_store=self.state_store,
+            audit_logger=self.bundle.audit_logger,
+            exchange_sync=exchange_sync,
+        )
 
     def start(self) -> None:
         LOG.info("Bot started in %s mode", self.settings.mode.value)
         self.state_store.ensure_initialized()
         self.state_store.refresh_runtime_state()
+
+        recovery_report = self.recovery.run_startup_sync()
+        if recovery_report.safe_mode:
+            LOG.error("Startup recovery entered safe mode. New trades are blocked. issues=%s", recovery_report.issues)
+            return
+
+        self._start_data_feeds()
+        state = self.state_store.load()
+        if state and state.safe_mode:
+            LOG.error("Safe mode active after feed startup. New trades are blocked.")
+            return
+
         # Full event loop is planned for Phase F.
         self.run_decision_cycle()
 
     def run_decision_cycle(self) -> None:
         timestamp = datetime.now(timezone.utc)
         self.state_store.refresh_runtime_state(timestamp)
+        state = self.state_store.load()
+        if state and state.safe_mode:
+            self.bundle.audit_logger.log_info("orchestrator", "Safe mode active. Decision cycle skipped.")
+            return
         try:
             snapshot = self._build_snapshot(timestamp)
         except Exception as exc:
@@ -266,3 +299,16 @@ class BotOrchestrator:
             else:
                 result.append(candle)
         return result
+
+    def _start_data_feeds(self) -> None:
+        websocket_client = self.bundle.market_data.websocket_client
+        if websocket_client is None:
+            return
+
+        try:
+            websocket_client.start(symbol=self.settings.strategy.symbol)
+            self.bundle.audit_logger.log_info("recovery", "Market data feeds started after cold start.")
+        except Exception as exc:
+            reason = f"feed_start_failed:{exc}"
+            self.bundle.audit_logger.log_error("recovery", "Failed to start market data feeds.", payload={"error": str(exc)})
+            self.state_store.set_safe_mode(True, reason=reason, now=datetime.now(timezone.utc))

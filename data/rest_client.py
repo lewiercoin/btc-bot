@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+import hashlib
+import hmac
 import logging
 import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any
+from urllib.parse import urlencode
 
 import requests
 
@@ -17,6 +20,9 @@ class RestClientConfig:
     timeout_seconds: int
     max_retries: int = 3
     retry_backoff_seconds: float = 0.75
+    api_key: str = ""
+    api_secret: str = ""
+    recv_window_ms: int = 5000
 
 
 class RestClientError(RuntimeError):
@@ -85,6 +91,52 @@ def normalize_agg_trade(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
     }
 
 
+def _to_bool(value: Any) -> bool:
+    if isinstance(value, bool):
+        return value
+    return str(value).strip().lower() in {"true", "1", "yes", "y"}
+
+
+def _to_float(value: Any, default: float = 0.0) -> float:
+    if value in (None, ""):
+        return default
+    return float(value)
+
+
+def normalize_position_risk(payload: dict[str, Any]) -> dict[str, Any]:
+    raw_amt = _to_float(payload.get("positionAmt"), 0.0)
+    position_side = str(payload.get("positionSide", "BOTH")).upper()
+    direction: str | None = None
+    if raw_amt > 0:
+        direction = "LONG"
+    elif raw_amt < 0:
+        direction = "SHORT"
+    elif position_side in {"LONG", "SHORT"}:
+        direction = position_side
+
+    return {
+        "symbol": str(payload.get("symbol", "")).upper(),
+        "direction": direction,
+        "position_side": position_side,
+        "size": abs(raw_amt),
+        "leverage": int(payload.get("leverage", 0)),
+        "isolated": _to_bool(payload.get("isolated", False)),
+    }
+
+
+def normalize_open_order(payload: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "symbol": str(payload.get("symbol", "")).upper(),
+        "order_id": str(payload.get("orderId", "")),
+        "side": str(payload.get("side", "")).upper(),
+        "position_side": str(payload.get("positionSide", "BOTH")).upper(),
+        "status": str(payload.get("status", "")).upper(),
+        "type": str(payload.get("type", "")).upper(),
+        "price": _to_float(payload.get("price"), 0.0),
+        "orig_qty": _to_float(payload.get("origQty"), 0.0),
+    }
+
+
 class BinanceFuturesRestClient:
     def __init__(self, config: RestClientConfig, session: requests.Session | None = None) -> None:
         self.config = config
@@ -108,6 +160,44 @@ class BinanceFuturesRestClient:
                 time.sleep(sleep_seconds)
 
         raise RestClientError(f"Failed request {path} after retries") from error
+
+    def _signed_request(self, path: str, params: dict[str, Any] | None = None) -> Any:
+        if not self.config.api_key or not self.config.api_secret:
+            raise RestClientError("Signed Binance request requires API key and API secret.")
+
+        base_params = dict(params or {})
+        base_params["recvWindow"] = int(self.config.recv_window_ms)
+        url = f"{self.config.base_url.rstrip('/')}{path}"
+        headers = {"X-MBX-APIKEY": self.config.api_key}
+        error: Exception | None = None
+        for attempt in range(self.config.max_retries + 1):
+            request_params = dict(base_params)
+            request_params["timestamp"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+            query = urlencode(request_params, doseq=True)
+            signature = hmac.new(
+                self.config.api_secret.encode("utf-8"),
+                query.encode("utf-8"),
+                hashlib.sha256,
+            ).hexdigest()
+            request_params["signature"] = signature
+            try:
+                response = self.session.get(
+                    url,
+                    params=request_params,
+                    headers=headers,
+                    timeout=self.config.timeout_seconds,
+                )
+                response.raise_for_status()
+                return response.json()
+            except (requests.RequestException, ValueError) as exc:
+                error = exc
+                if attempt >= self.config.max_retries:
+                    break
+                sleep_seconds = self.config.retry_backoff_seconds * (2**attempt)
+                LOG.warning("Signed REST retry %s/%s for %s after error: %s", attempt + 1, self.config.max_retries, path, exc)
+                time.sleep(sleep_seconds)
+
+        raise RestClientError(f"Failed signed request {path} after retries") from error
 
     def fetch_klines(self, symbol: str, interval: str, limit: int = 500) -> list[dict[str, Any]]:
         payload = self._request(
@@ -158,3 +248,25 @@ class BinanceFuturesRestClient:
 
         payload = self._request("/fapi/v1/aggTrades", params)
         return [normalize_agg_trade(item, symbol=symbol) for item in payload]
+
+    def fetch_position_risk(self, symbol: str) -> list[dict[str, Any]]:
+        payload = self._signed_request("/fapi/v2/positionRisk", {"symbol": symbol.upper()})
+        if not isinstance(payload, list):
+            raise RestClientError("Unexpected positionRisk response payload.")
+        return [normalize_position_risk(item) for item in payload]
+
+    def fetch_open_orders(self, symbol: str) -> list[dict[str, Any]]:
+        payload = self._signed_request("/fapi/v1/openOrders", {"symbol": symbol.upper()})
+        if not isinstance(payload, list):
+            raise RestClientError("Unexpected openOrders response payload.")
+        return [normalize_open_order(item) for item in payload]
+
+    def fetch_active_positions(self, symbol: str) -> list[dict[str, Any]]:
+        active: list[dict[str, Any]] = []
+        for position in self.fetch_position_risk(symbol):
+            if position["symbol"] != symbol.upper():
+                continue
+            if float(position["size"]) <= 0:
+                continue
+            active.append(position)
+        return active

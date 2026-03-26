@@ -102,6 +102,31 @@ def get_open_positions_count(conn: sqlite3.Connection) -> int:
     return int(row["cnt"]) if row else 0
 
 
+def fetch_open_positions(conn: sqlite3.Connection) -> list[dict]:
+    rows = conn.execute(
+        """
+        SELECT
+            position_id,
+            signal_id,
+            symbol,
+            direction,
+            status,
+            entry_price,
+            size,
+            leverage,
+            stop_loss,
+            take_profit_1,
+            take_profit_2,
+            opened_at,
+            updated_at
+        FROM positions
+        WHERE status IN ('OPEN', 'PARTIAL')
+        ORDER BY opened_at ASC
+        """
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
 def get_latest_position_for_signal(conn: sqlite3.Connection, signal_id: str) -> dict | None:
     row = conn.execute(
         """
