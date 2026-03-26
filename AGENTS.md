@@ -139,3 +139,59 @@ This is not a script. This is a trading system.
 Clarity > cleverness
 Stability > speed
 Discipline > complexity
+
+## Workflow: Generator-Evaluator Model
+
+This project uses a structured generator-evaluator workflow:
+
+- **Codex** = builder/generator — implements code, writes tests, commits
+- **Cascade** = independent auditor/evaluator — audits code after push, detects layer leaks, architectural drift, hidden debt
+
+### Rules for Codex (Generator)
+
+- Before starting a milestone:
+  - read `docs/BLUEPRINT_V1.md` (architecture)
+  - read `docs/MILESTONE_TRACKER.md` (current status)
+  - confirm milestone scope and acceptance criteria BEFORE coding
+
+- Implement ONLY what the current milestone scope defines  
+  → no hidden work, no scope expansion
+
+- Every commit must follow AGENTS.md commit discipline (WHAT/WHY/STATUS)
+
+- Do NOT self-assess as "done"  
+  → Cascade issues the final verdict
+
+- After push:
+  - Cascade performs audit
+  - fix list from Cascade is mandatory before proceeding
+
+- No next milestone without audit closure
+
+---
+
+### Source of Truth Files
+
+- `docs/BLUEPRINT_V1.md` — architecture, phases, acceptance criteria, data models  
+- `AGENTS.md` — engineering discipline and commit rules  
+- `CASCADE.md` — Cascade operating model and audit standard  
+- `docs/MILESTONE_TRACKER.md` — phase status, stub inventory, known issues  
+- `docs/audits/` — audit reports from Cascade  
+- `docs/templates/AUDIT_TEMPLATE.md` — audit report format  
+
+---
+
+### Current Project Status
+
+- Phases A, B, C: MVP_DONE  
+- Cross-cutting:
+  - state persistence
+  - trade lifecycle
+  - drawdown persistence  
+  → MVP_DONE  
+
+- Next:
+  - Recovery startup sync → Phase D (execution)
+
+- Known issues tracked in:
+  - `docs/MILESTONE_TRACKER.md`
