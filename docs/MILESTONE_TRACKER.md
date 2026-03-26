@@ -4,12 +4,16 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** ACTIVE
-**Milestone:** Phase E — Monitoring (audit_logger, telegram_notifier, health, metrics)
-**Decision date:** 2026-03-26
-**Decided by:** User (product owner)
-**Scope:** `docs/BLUEPRINT_V1.md` §5.8 — `audit_logger.py`, `telegram_notifier.py`, `health.py`, `metrics.py`
-**Handoff:** See Cascade handoff in chat history
+**Status:** AWAITING_DECISION
+**Options (from Cascade audit 2026-03-26, AUDIT_003):**
+
+| # | Option | Rationale | Risk |
+|---|---|---|---|
+| 1 | Phase F — orchestracja (orchestrator event loop, health/telegram integration, run_paper.py) | Natural next step. Monitoring modules ready for integration. Completes live-capable bot. | Largest scope remaining. Known issue #4 (exec→storage leak) and #6 (safe_mode=exit) should be addressed here. |
+| 2 | Fix execution→storage layer leak (#4) first, then Phase F | Clean architecture before big integration. Prevents layering issues from compounding. | Delays Phase F delivery. |
+| 3 | Phase G — backtest (replay_loader, fill_model, performance, backtest_runner) | Allows strategy validation before going live. Independent of F. | Delays live readiness. |
+
+**Decision:** _pending_
 
 ## Phase Status
 
@@ -20,7 +24,7 @@ Last updated: 2026-03-26
 | C — logika | feature_engine, regime_engine, signal_engine, governance, risk_engine | MVP_DONE | smoke_phase_c.py | Pending |
 | D — execution: recovery | recovery.py, orchestrator startup sync | MVP_DONE | smoke_recovery.py | AUDIT_001 ✅ |
 | D — execution: live + orders | live_execution_engine.py, order_manager.py | MVP_DONE | smoke_live_execution.py | AUDIT_002 ✅ |
-| E — monitoring | audit_logger, telegram, health, metrics | NOT_STARTED | — | — |
+| E — monitoring | audit_logger, telegram, health, metrics | MVP_DONE | smoke_monitoring.py | AUDIT_003 ✅ |
 | F — orchestracja | orchestrator, main, run_paper | NOT_STARTED | — | — |
 | G — backtest | replay_loader, fill_model, performance, backtest_runner | NOT_STARTED | — | — |
 | H — research | analyze_trades, llm_post_trade_review | NOT_STARTED | — | — |
@@ -38,8 +42,6 @@ Last updated: 2026-03-26
 
 | File | Class/Method | Target Phase |
 |---|---|---|
-| monitoring/health.py | HealthMonitor.check | E |
-| monitoring/telegram_notifier.py | TelegramNotifier.send | E |
 | backtest/backtest_runner.py | BacktestRunner.run | G |
 | backtest/fill_model.py | (stub file) | G |
 | backtest/performance.py | (stub file) | G |
@@ -59,6 +61,8 @@ Last updated: 2026-03-26
 8. **Private API as public contract**: `_signed_request` called by OrderManager and LiveExecutionEngine despite underscore prefix — *identified in AUDIT_002*
 9. **Assert in production path**: `order_manager.py:186,190` uses `assert` instead of explicit raises — *identified in AUDIT_002*
 10. **Fees not captured**: `fees=0.0` hardcoded in LiveExecutionEngine — actual Binance fees not extracted — *identified in AUDIT_002*
+11. **Private attribute coupling**: `health.py:44` accesses `websocket_client._thread` — should expose public `is_connected` property — *identified in AUDIT_003*
+12. **Defensive getattr**: `health.py:51` uses `getattr(..., "heartbeat_seconds", 30)` despite type being known — *identified in AUDIT_003*
 
 ## Audit History
 
@@ -66,3 +70,4 @@ Last updated: 2026-03-26
 |---|---|---|---|---|
 | AUDIT_001 | Recovery Startup Sync | 2026-03-26 | 436756b | MVP_DONE |
 | AUDIT_002 | Phase D — Live Execution + Order Manager | 2026-03-26 | c5f9408 | MVP_DONE |
+| AUDIT_003 | Phase E — Monitoring | 2026-03-26 | 2e31e33 | MVP_DONE |
