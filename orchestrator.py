@@ -17,6 +17,7 @@ from data.rest_client import BinanceFuturesRestClient, RestClientConfig
 from data.websocket_client import BinanceFuturesWebsocketClient, WebsocketClientConfig
 from execution.execution_engine import ExecutionEngine
 from execution.live_execution_engine import LiveExecutionEngine
+from execution.order_manager import OrderManager
 from execution.paper_execution_engine import PaperExecutionEngine
 from execution.recovery import BinanceRecoverySyncSource, NoOpRecoverySyncSource, RecoveryCoordinator
 from monitoring.audit_logger import AuditLogger
@@ -44,6 +45,7 @@ def build_default_bundle(
     governance_state_provider: Callable[[], GovernanceRuntimeState],
     risk_state_provider: Callable[[], RiskRuntimeState],
 ) -> EngineBundle:
+    audit_logger = AuditLogger(connection=conn)
     rest_client = BinanceFuturesRestClient(
         RestClientConfig(
             base_url=settings.exchange.futures_rest_base_url,
@@ -66,7 +68,21 @@ def build_default_bundle(
     if settings.mode == BotMode.PAPER:
         execution_engine: ExecutionEngine = PaperExecutionEngine(connection=conn)
     else:
-        execution_engine = LiveExecutionEngine()
+        order_manager = OrderManager(
+            rest_client=rest_client,
+            audit_logger=audit_logger,
+            symbol=settings.strategy.symbol,
+        )
+        execution_engine = LiveExecutionEngine(
+            connection=conn,
+            rest_client=rest_client,
+            order_manager=order_manager,
+            audit_logger=audit_logger,
+            symbol=settings.strategy.symbol,
+            entry_order_type=settings.execution.live_entry_order_type,
+            entry_timeout_seconds=settings.execution.entry_timeout_seconds,
+            poll_interval_seconds=settings.execution.live_fill_poll_seconds,
+        )
 
     return EngineBundle(
         market_data=MarketDataAssembler(
@@ -118,7 +134,7 @@ def build_default_bundle(
             state_provider=risk_state_provider,
         ),
         execution_engine=execution_engine,
-        audit_logger=AuditLogger(connection=conn),
+        audit_logger=audit_logger,
     )
 
 

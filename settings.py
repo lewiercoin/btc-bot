@@ -60,6 +60,8 @@ class ExecutionConfig:
     rest_timeout_seconds: int = 10
     ws_heartbeat_seconds: int = 30
     ws_reconnect_seconds: int = 5
+    live_entry_order_type: str = "LIMIT"
+    live_fill_poll_seconds: float = 1.0
 
 
 @dataclass(frozen=True)

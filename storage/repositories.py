@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from typing import Any
 
+from core.execution_types import FillEvent
 from core.models import BotState, ExecutableSignal, SignalCandidate
 
 
@@ -54,7 +55,7 @@ def save_executable_signal(conn: sqlite3.Connection, signal: ExecutableSignal) -
 
 
 def upsert_bot_state(conn: sqlite3.Connection, state: BotState, timestamp: datetime | None = None) -> None:
-    ts = (timestamp or datetime.utcnow()).isoformat()
+    ts = (timestamp or datetime.now(timezone.utc)).isoformat()
     conn.execute(
         """
         INSERT INTO bot_state (
@@ -139,6 +140,77 @@ def get_latest_position_for_signal(conn: sqlite3.Connection, signal_id: str) -> 
         (signal_id,),
     ).fetchone()
     return dict(row) if row else None
+
+
+def insert_position(
+    conn: sqlite3.Connection,
+    *,
+    position_id: str,
+    signal_id: str,
+    symbol: str,
+    direction: str,
+    status: str,
+    entry_price: float,
+    size: float,
+    leverage: int,
+    stop_loss: float,
+    take_profit_1: float,
+    take_profit_2: float,
+    opened_at: datetime,
+    updated_at: datetime,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO positions (
+            position_id, signal_id, symbol, direction, status, entry_price, size, leverage,
+            stop_loss, take_profit_1, take_profit_2, opened_at, updated_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            position_id,
+            signal_id,
+            symbol,
+            direction,
+            status,
+            entry_price,
+            size,
+            leverage,
+            stop_loss,
+            take_profit_1,
+            take_profit_2,
+            opened_at.isoformat(),
+            updated_at.isoformat(),
+        ),
+    )
+
+
+def insert_execution_fill_event(
+    conn: sqlite3.Connection,
+    *,
+    position_id: str,
+    order_type: str,
+    fill_event: FillEvent,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO executions (
+            execution_id, position_id, order_type, side, requested_price, filled_price,
+            qty, fees, slippage_bps, executed_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            fill_event.execution_id,
+            position_id,
+            order_type,
+            fill_event.side,
+            fill_event.requested_price,
+            fill_event.filled_price,
+            fill_event.qty,
+            fill_event.fees,
+            fill_event.slippage_bps,
+            fill_event.executed_at.isoformat(),
+        ),
+    )
 
 
 def fetch_open_trade_positions(conn: sqlite3.Connection) -> list[dict]:
