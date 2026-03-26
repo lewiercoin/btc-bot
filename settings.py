@@ -35,6 +35,28 @@ class StrategyConfig:
     funding_window_days: int = 60
     oi_z_window_days: int = 60
     confluence_min: float = 3.0
+    ema_trend_gap_pct: float = 0.0025
+    compression_atr_norm_max: float = 0.0055
+    crowded_funding_extreme_pct: float = 85.0
+    crowded_oi_zscore_min: float = 1.5
+    post_liq_tfi_abs_min: float = 0.2
+
+    min_sweep_depth_pct: float = 0.0001
+    entry_offset_atr: float = 0.05
+    invalidation_offset_atr: float = 0.25
+    tp1_atr_mult: float = 2.0
+    tp2_atr_mult: float = 3.5
+    weight_sweep_detected: float = 1.25
+    weight_reclaim_confirmed: float = 1.25
+    weight_cvd_divergence: float = 0.75
+    weight_tfi_impulse: float = 0.50
+    weight_force_order_spike: float = 0.40
+    weight_regime_special: float = 0.35
+    weight_ema_trend_alignment: float = 0.25
+    weight_funding_supportive: float = 0.20
+    direction_tfi_threshold: float = 0.05
+    direction_tfi_threshold_inverse: float = -0.05
+    tfi_impulse_threshold: float = 0.10
 
 
 @dataclass(frozen=True)
@@ -50,6 +72,14 @@ class RiskConfig:
     daily_dd_limit: float = 0.03
     weekly_dd_limit: float = 0.06
     max_hold_hours: int = 24
+    high_vol_stop_distance_pct: float = 0.01
+
+    cooldown_minutes_after_loss: int = 60
+    duplicate_level_tolerance_pct: float = 0.001
+    duplicate_level_window_hours: int = 24
+    session_start_hour_utc: int = 0
+    session_end_hour_utc: int = 23
+    no_trade_windows_utc: tuple[tuple[int, int], ...] = ()
 
 
 @dataclass(frozen=True)
