@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Callable
@@ -21,6 +22,16 @@ from execution.order_manager import OrderManager
 from execution.paper_execution_engine import PaperExecutionEngine
 from execution.recovery import BinanceRecoverySyncSource, NoOpRecoverySyncSource, RecoveryCoordinator
 from monitoring.audit_logger import AuditLogger
+from monitoring.metrics import (
+    CYCLE_DURATION_MS,
+    ERRORS_TOTAL,
+    GOVERNANCE_VETOES,
+    RISK_BLOCKS,
+    SIGNALS_GENERATED,
+    TRADES_CLOSED,
+    TRADES_OPENED,
+    MetricsRegistry,
+)
 from settings import AppSettings, BotMode
 from storage.repositories import save_executable_signal, save_signal_candidate
 from storage.state_store import StateStore
@@ -156,6 +167,7 @@ class BotOrchestrator:
             governance_state_provider=self.state_store.get_governance_state,
             risk_state_provider=self.state_store.get_risk_state,
         )
+        self.metrics = MetricsRegistry()
         if self.settings.mode == BotMode.PAPER:
             exchange_sync = NoOpRecoverySyncSource()
         else:
@@ -190,77 +202,119 @@ class BotOrchestrator:
         self.run_decision_cycle()
 
     def run_decision_cycle(self) -> None:
-        timestamp = datetime.now(timezone.utc)
-        self.state_store.refresh_runtime_state(timestamp)
-        state = self.state_store.load()
-        if state and state.safe_mode:
-            self.bundle.audit_logger.log_info("orchestrator", "Safe mode active. Decision cycle skipped.")
-            return
+        cycle_started = time.perf_counter()
         try:
-            snapshot = self._build_snapshot(timestamp)
-        except Exception as exc:
-            self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
-            self.state_store.mark_error(f"snapshot_build_failed:{exc}")
-            return
+            timestamp = datetime.now(timezone.utc)
+            self.state_store.refresh_runtime_state(timestamp)
+            state = self.state_store.load()
+            if state and state.safe_mode:
+                self.bundle.audit_logger.log_info("orchestrator", "Safe mode active. Decision cycle skipped.")
+                return
+            try:
+                snapshot = self._build_snapshot(timestamp)
+            except Exception as exc:
+                self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
+                self.state_store.mark_error(f"snapshot_build_failed:{exc}")
+                self.metrics.inc(ERRORS_TOTAL)
+                return
 
-        try:
-            closed_count = self._process_trade_lifecycle(snapshot)
-            if closed_count:
-                self.bundle.audit_logger.log_info("lifecycle", f"Closed trades this cycle: {closed_count}")
-        except Exception as exc:
-            self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
-            self.state_store.mark_error(f"lifecycle_failed:{exc}")
-            return
+            try:
+                closed_count = self._process_trade_lifecycle(snapshot)
+                if closed_count:
+                    self.bundle.audit_logger.log_trade("lifecycle", f"Closed trades this cycle: {closed_count}")
+                    self.metrics.inc(TRADES_CLOSED, closed_count)
+            except Exception as exc:
+                self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
+                self.state_store.mark_error(f"lifecycle_failed:{exc}")
+                self.metrics.inc(ERRORS_TOTAL)
+                return
 
-        # 1) Decision logic
-        features = self.bundle.feature_engine.compute(
-            snapshot=snapshot,
-            schema_version=self.settings.schema_version,
-            config_hash=self.settings.config_hash,
-        )
-        regime = self.bundle.regime_engine.classify(features)
-        candidate = self.bundle.signal_engine.generate(features, regime)
-        if candidate is None:
-            self.bundle.audit_logger.log_info("decision", "No signal candidate.")
-            self.state_store.mark_healthy()
-            return
-
-        save_signal_candidate(self.conn, candidate, self.settings.schema_version, self.settings.config_hash)
-        self.conn.commit()
-
-        governance_decision = self.bundle.governance.evaluate(candidate)
-        if not governance_decision.approved:
-            self.bundle.audit_logger.log_info("governance", "Candidate rejected by governance.")
-            self.state_store.mark_healthy()
-            return
-        executable = self.bundle.governance.to_executable(candidate, governance_decision)
-        save_executable_signal(self.conn, executable)
-        self.conn.commit()
-
-        # 2) Risk gate
-        risk_decision = self.bundle.risk_engine.evaluate(
-            signal=executable,
-            equity=self.REFERENCE_EQUITY,
-            open_positions=self.state_store.get_open_positions(),
-        )
-        if not risk_decision.allowed:
-            self.bundle.audit_logger.log_info("risk", f"Trade blocked: {risk_decision.reason}")
-            self.state_store.mark_healthy()
-            return
-
-        # 3) Execution
-        try:
-            self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
-            self.state_store.record_trade_open(
-                candidate=candidate,
-                executable=executable,
+            # 1) Decision logic
+            features = self.bundle.feature_engine.compute(
+                snapshot=snapshot,
                 schema_version=self.settings.schema_version,
                 config_hash=self.settings.config_hash,
             )
-            self.state_store.mark_healthy()
-        except Exception as exc:
-            self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
-            self.state_store.mark_error(f"execution_failed:{exc}")
+            regime = self.bundle.regime_engine.classify(features)
+            candidate = self.bundle.signal_engine.generate(features, regime)
+            if candidate is None:
+                self.bundle.audit_logger.log_decision("decision", "No signal candidate.")
+                self.state_store.mark_healthy()
+                return
+
+            self.metrics.inc(SIGNALS_GENERATED)
+            self.bundle.audit_logger.log_decision(
+                "decision",
+                "Signal candidate generated.",
+                payload={
+                    "signal_id": candidate.signal_id,
+                    "direction": candidate.direction,
+                    "confluence_score": candidate.confluence_score,
+                    "regime": candidate.regime.value,
+                },
+            )
+            save_signal_candidate(self.conn, candidate, self.settings.schema_version, self.settings.config_hash)
+            self.conn.commit()
+
+            governance_decision = self.bundle.governance.evaluate(candidate)
+            if not governance_decision.approved:
+                self.bundle.audit_logger.log_decision(
+                    "governance",
+                    "Candidate rejected by governance.",
+                    payload={"notes": governance_decision.notes},
+                )
+                self.state_store.mark_healthy()
+                self.metrics.inc(GOVERNANCE_VETOES)
+                return
+            executable = self.bundle.governance.to_executable(candidate, governance_decision)
+            save_executable_signal(self.conn, executable)
+            self.conn.commit()
+
+            # 2) Risk gate
+            risk_decision = self.bundle.risk_engine.evaluate(
+                signal=executable,
+                equity=self.REFERENCE_EQUITY,
+                open_positions=self.state_store.get_open_positions(),
+            )
+            if not risk_decision.allowed:
+                self.bundle.audit_logger.log_decision(
+                    "risk",
+                    f"Trade blocked: {risk_decision.reason}",
+                    payload={"reason": risk_decision.reason},
+                )
+                self.state_store.mark_healthy()
+                self.metrics.inc(RISK_BLOCKS)
+                return
+
+            # 3) Execution
+            try:
+                self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
+                self.state_store.record_trade_open(
+                    candidate=candidate,
+                    executable=executable,
+                    schema_version=self.settings.schema_version,
+                    config_hash=self.settings.config_hash,
+                )
+                self.state_store.mark_healthy()
+                self.metrics.inc(TRADES_OPENED)
+                self.bundle.audit_logger.log_trade(
+                    "execution",
+                    "Trade opened.",
+                    payload={
+                        "signal_id": executable.signal_id,
+                        "direction": executable.direction,
+                        "entry_price": executable.entry_price,
+                        "size": risk_decision.size,
+                        "leverage": risk_decision.leverage,
+                    },
+                )
+            except Exception as exc:
+                self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
+                self.state_store.mark_error(f"execution_failed:{exc}")
+                self.metrics.inc(ERRORS_TOTAL)
+        finally:
+            duration_ms = (time.perf_counter() - cycle_started) * 1000.0
+            self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
 
     def _build_snapshot(self, timestamp: datetime) -> MarketSnapshot:
         return self.bundle.market_data.build_snapshot(
