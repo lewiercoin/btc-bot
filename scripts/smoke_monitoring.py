@@ -114,23 +114,19 @@ def run_telegram_smoke(conn) -> None:
 
 
 @dataclass
-class FakeThread:
-    alive: bool
-
-    def is_alive(self) -> bool:
-        return self.alive
-
-
-@dataclass
 class FakeWsConfig:
     heartbeat_seconds: int = 30
 
 
 class FakeWebsocketClient:
     def __init__(self, *, alive: bool, last_message_at: datetime | None) -> None:
-        self._thread = FakeThread(alive=alive)
+        self._alive = alive
         self.last_message_at = last_message_at
         self.config = FakeWsConfig()
+
+    @property
+    def is_connected(self) -> bool:
+        return self._alive
 
 
 class FakeRestClient:

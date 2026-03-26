@@ -62,6 +62,10 @@ class ExecutionConfig:
     ws_reconnect_seconds: int = 5
     live_entry_order_type: str = "LIMIT"
     live_fill_poll_seconds: float = 1.0
+    health_check_interval_seconds: int = 30
+    health_failures_before_safe_mode: int = 3
+    kill_switch_max_exec_errors: int = 2
+    loop_idle_sleep_seconds: float = 0.5
 
 
 @dataclass(frozen=True)
