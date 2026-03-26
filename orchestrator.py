@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import logging
 import sqlite3
+import threading
 import time
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
@@ -22,6 +23,7 @@ from execution.order_manager import OrderManager
 from execution.paper_execution_engine import PaperExecutionEngine
 from execution.recovery import BinanceRecoverySyncSource, NoOpRecoverySyncSource, RecoveryCoordinator
 from monitoring.audit_logger import AuditLogger
+from monitoring.health import HealthMonitor
 from monitoring.metrics import (
     CYCLE_DURATION_MS,
     ERRORS_TOTAL,
@@ -32,8 +34,9 @@ from monitoring.metrics import (
     TRADES_OPENED,
     MetricsRegistry,
 )
+from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
 from settings import AppSettings, BotMode
-from storage.repositories import save_executable_signal, save_signal_candidate
+from storage.repositories import get_daily_metrics, save_executable_signal, save_signal_candidate
 from storage.state_store import StateStore
 
 LOG = logging.getLogger(__name__)
@@ -49,6 +52,7 @@ class EngineBundle:
     risk_engine: RiskEngine
     execution_engine: ExecutionEngine
     audit_logger: AuditLogger
+
 
 def build_default_bundle(
     settings: AppSettings,
@@ -150,10 +154,21 @@ def build_default_bundle(
 
 
 class BotOrchestrator:
-    """Coordinates the pipeline. Decision, risk and execution stay in separate layers."""
+    """Coordinates runtime loops while keeping decision/risk/execution layers separated."""
+
     REFERENCE_EQUITY = 10_000.0
 
-    def __init__(self, settings: AppSettings, conn: sqlite3.Connection, bundle: EngineBundle | None = None) -> None:
+    def __init__(
+        self,
+        settings: AppSettings,
+        conn: sqlite3.Connection,
+        bundle: EngineBundle | None = None,
+        *,
+        health_monitor: HealthMonitor | None = None,
+        telegram_notifier: TelegramNotifier | None = None,
+        now_provider: Callable[[], datetime] | None = None,
+        sleep_fn: Callable[[float], None] | None = None,
+    ) -> None:
         self.settings = settings
         self.conn = conn
         self.state_store = StateStore(
@@ -168,11 +183,20 @@ class BotOrchestrator:
             risk_state_provider=self.state_store.get_risk_state,
         )
         self.metrics = MetricsRegistry()
+        self._stop_event = threading.Event()
+        self._now_provider = now_provider or (lambda: datetime.now(timezone.utc))
+        self._sleep_fn = sleep_fn or time.sleep
+        self._critical_execution_errors = 0
+        self._consecutive_health_failures = 0
+        self._current_utc_day: date | None = None
+        self._next_decision_at: datetime | None = None
+        self._next_monitor_at: datetime | None = None
+        self._next_health_at: datetime | None = None
+
         if self.settings.mode == BotMode.PAPER:
             exchange_sync = NoOpRecoverySyncSource()
         else:
             exchange_sync = BinanceRecoverySyncSource(self.bundle.market_data.rest_client)
-
         self.recovery = RecoveryCoordinator(
             symbol=self.settings.strategy.symbol,
             max_allowed_leverage=self.settings.risk.max_leverage,
@@ -182,54 +206,93 @@ class BotOrchestrator:
             exchange_sync=exchange_sync,
         )
 
+        self.health_monitor = health_monitor or HealthMonitor(
+            websocket_client=self.bundle.market_data.websocket_client,
+            connection=self.conn,
+            rest_client=self.bundle.market_data.rest_client,
+        )
+        self.telegram_notifier = telegram_notifier or TelegramNotifier(
+            TelegramConfig(
+                enabled=self.settings.alerts.telegram_enabled,
+                bot_token=self.settings.alerts.telegram_bot_token,
+                chat_id=self.settings.alerts.telegram_chat_id,
+            ),
+            audit_logger=self.bundle.audit_logger,
+        )
+
     def start(self) -> None:
+        self._stop_event.clear()
         LOG.info("Bot started in %s mode", self.settings.mode.value)
         self.state_store.ensure_initialized()
-        self.state_store.refresh_runtime_state()
+        self.state_store.refresh_runtime_state(self._now())
 
         recovery_report = self.recovery.run_startup_sync()
         if recovery_report.safe_mode:
-            LOG.error("Startup recovery entered safe mode. New trades are blocked. issues=%s", recovery_report.issues)
-            return
+            LOG.warning(
+                "Startup recovery entered safe mode. New trades are blocked but lifecycle monitoring will continue. issues=%s",
+                recovery_report.issues,
+            )
 
         self._start_data_feeds()
-        state = self.state_store.load()
-        if state and state.safe_mode:
-            LOG.error("Safe mode active after feed startup. New trades are blocked.")
-            return
-
-        # Full event loop is planned for Phase F.
-        self.run_decision_cycle()
-
-    def run_decision_cycle(self) -> None:
-        cycle_started = time.perf_counter()
+        now = self._now()
+        self._initialize_runtime_schedule(now)
+        self.bundle.audit_logger.log_info(
+            "orchestrator",
+            "Runtime loop started.",
+            payload={"mode": self.settings.mode.value, "symbol": self.settings.strategy.symbol},
+        )
         try:
-            timestamp = datetime.now(timezone.utc)
+            self._run_event_loop()
+        finally:
+            self._shutdown()
+
+    def stop(self, reason: str = "manual_stop") -> None:
+        if self._stop_event.is_set():
+            return
+        self._stop_event.set()
+        LOG.info("Stop requested (%s).", reason)
+        self.bundle.audit_logger.log_info("orchestrator", "Stop requested.", payload={"reason": reason})
+
+    def run_decision_cycle(self, now: datetime | None = None) -> None:
+        cycle_started = time.perf_counter()
+        timestamp = (now or self._now()).astimezone(timezone.utc)
+        try:
             self.state_store.refresh_runtime_state(timestamp)
-            state = self.state_store.load()
-            if state and state.safe_mode:
-                self.bundle.audit_logger.log_info("orchestrator", "Safe mode active. Decision cycle skipped.")
-                return
             try:
                 snapshot = self._build_snapshot(timestamp)
             except Exception as exc:
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
                 self.state_store.mark_error(f"snapshot_build_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
+                self._send_critical_error_alert("data", f"Snapshot build failed: {exc}")
                 return
 
             try:
-                closed_count = self._process_trade_lifecycle(snapshot)
-                if closed_count:
-                    self.bundle.audit_logger.log_trade("lifecycle", f"Closed trades this cycle: {closed_count}")
-                    self.metrics.inc(TRADES_CLOSED, closed_count)
+                closed_events = self._process_trade_lifecycle(snapshot)
+                if closed_events:
+                    self.metrics.inc(TRADES_CLOSED, len(closed_events))
+                    self.bundle.audit_logger.log_trade(
+                        "lifecycle",
+                        f"Closed trades this cycle: {len(closed_events)}",
+                        payload={"closed_positions": [item["position_id"] for item in closed_events]},
+                    )
+                    self._notify_closed_trades(closed_events)
             except Exception as exc:
                 self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
                 self.state_store.mark_error(f"lifecycle_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
+                self._send_critical_error_alert("lifecycle", f"Lifecycle processing failed: {exc}")
                 return
 
-            # 1) Decision logic
+            state = self.state_store.load()
+            if state and state.safe_mode:
+                self.bundle.audit_logger.log_decision(
+                    "orchestrator",
+                    "Safe mode active. New trade decisions skipped.",
+                    payload={"safe_mode": True},
+                )
+                return
+
             features = self.bundle.feature_engine.compute(
                 snapshot=snapshot,
                 schema_version=self.settings.schema_version,
@@ -266,11 +329,11 @@ class BotOrchestrator:
                 self.state_store.mark_healthy()
                 self.metrics.inc(GOVERNANCE_VETOES)
                 return
+
             executable = self.bundle.governance.to_executable(candidate, governance_decision)
             save_executable_signal(self.conn, executable)
             self.conn.commit()
 
-            # 2) Risk gate
             risk_decision = self.bundle.risk_engine.evaluate(
                 signal=executable,
                 equity=self.REFERENCE_EQUITY,
@@ -286,7 +349,6 @@ class BotOrchestrator:
                 self.metrics.inc(RISK_BLOCKS)
                 return
 
-            # 3) Execution
             try:
                 self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
                 self.state_store.record_trade_open(
@@ -297,24 +359,155 @@ class BotOrchestrator:
                 )
                 self.state_store.mark_healthy()
                 self.metrics.inc(TRADES_OPENED)
-                self.bundle.audit_logger.log_trade(
-                    "execution",
-                    "Trade opened.",
-                    payload={
-                        "signal_id": executable.signal_id,
-                        "direction": executable.direction,
-                        "entry_price": executable.entry_price,
-                        "size": risk_decision.size,
-                        "leverage": risk_decision.leverage,
-                    },
-                )
+                trade_payload = {
+                    "symbol": self.settings.strategy.symbol,
+                    "signal_id": executable.signal_id,
+                    "direction": executable.direction,
+                    "entry_price": executable.entry_price,
+                    "size": risk_decision.size,
+                    "leverage": risk_decision.leverage,
+                }
+                self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
+                self._send_telegram_alert(TelegramNotifier.ALERT_ENTRY, trade_payload)
             except Exception as exc:
+                self._critical_execution_errors += 1
                 self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
                 self.state_store.mark_error(f"execution_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
+                self._send_critical_error_alert("execution", f"Execution failed: {exc}")
         finally:
             duration_ms = (time.perf_counter() - cycle_started) * 1000.0
             self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
+            self._evaluate_kill_switch(timestamp)
+
+    def send_daily_summary(self, day: date | None = None) -> None:
+        summary_day = day or self._now().date()
+        self.state_store.sync_daily_metrics(summary_day)
+        metrics_row = get_daily_metrics(self.conn, summary_day) or {}
+        payload = {
+            "date": summary_day.isoformat(),
+            "trades_count": int(metrics_row.get("trades_count", 0)),
+            "wins": int(metrics_row.get("wins", 0)),
+            "losses": int(metrics_row.get("losses", 0)),
+            "pnl_abs": float(metrics_row.get("pnl_abs", 0.0)),
+            "expectancy_r": float(metrics_row.get("expectancy_r", 0.0)),
+        }
+        self.bundle.audit_logger.log_info("summary", "Daily summary generated.", payload=payload)
+        self._send_telegram_alert(TelegramNotifier.ALERT_DAILY_SUMMARY, payload)
+
+    def _run_event_loop(self) -> None:
+        while not self._stop_event.is_set():
+            now = self._now()
+            self._handle_daily_rollover(now)
+
+            if self._next_health_at and now >= self._next_health_at:
+                self._run_health_check(now)
+                self._next_health_at = now + timedelta(seconds=self.settings.execution.health_check_interval_seconds)
+
+            if self._next_monitor_at and now >= self._next_monitor_at:
+                self._run_position_monitor_cycle(now)
+                self._next_monitor_at = now + timedelta(seconds=self.settings.execution.position_monitor_interval_seconds)
+
+            if self._next_decision_at and now >= self._next_decision_at:
+                self.run_decision_cycle(now=now)
+                self._next_decision_at = self._advance_decision_deadline(self._next_decision_at, now)
+
+            self._evaluate_kill_switch(now)
+            sleep_seconds = self._compute_sleep_seconds(now)
+            self._sleep(sleep_seconds)
+
+    def _run_position_monitor_cycle(self, now: datetime) -> None:
+        if not self.state_store.get_open_trade_records():
+            return
+
+        try:
+            snapshot = self._build_snapshot(now)
+            closed_events = self._process_trade_lifecycle(snapshot)
+            if closed_events:
+                self.metrics.inc(TRADES_CLOSED, len(closed_events))
+                self.bundle.audit_logger.log_trade(
+                    "lifecycle",
+                    f"Closed trades in monitor cycle: {len(closed_events)}",
+                    payload={"closed_positions": [item["position_id"] for item in closed_events]},
+                )
+                self._notify_closed_trades(closed_events)
+        except Exception as exc:
+            self.bundle.audit_logger.log_error("lifecycle", f"Monitor lifecycle failed: {exc}")
+            self.metrics.inc(ERRORS_TOTAL)
+            self._send_critical_error_alert("lifecycle", f"Monitor lifecycle failed: {exc}")
+
+    def _run_health_check(self, now: datetime) -> None:
+        status = self.health_monitor.check()
+        if status.healthy:
+            self._consecutive_health_failures = 0
+            return
+
+        self._consecutive_health_failures += 1
+        payload = {
+            "websocket_alive": status.websocket_alive,
+            "db_writable": status.db_writable,
+            "exchange_reachable": status.exchange_reachable,
+            "consecutive_failures": self._consecutive_health_failures,
+        }
+        self.bundle.audit_logger.log_warning("health", "Health check failed.", payload=payload)
+        if self._consecutive_health_failures >= self.settings.execution.health_failures_before_safe_mode:
+            self._activate_safe_mode(reason="health_check_failure_threshold", now=now, extra_payload=payload)
+
+    def _evaluate_kill_switch(self, now: datetime) -> None:
+        state = self.state_store.refresh_runtime_state(now)
+        reasons: list[str] = []
+        if state.daily_dd_pct > self.settings.risk.daily_dd_limit:
+            reasons.append(f"daily_dd>{self.settings.risk.daily_dd_limit:.4f}")
+        if state.weekly_dd_pct > self.settings.risk.weekly_dd_limit:
+            reasons.append(f"weekly_dd>{self.settings.risk.weekly_dd_limit:.4f}")
+        if state.consecutive_losses > self.settings.risk.max_consecutive_losses:
+            reasons.append(f"consecutive_losses>{self.settings.risk.max_consecutive_losses}")
+        if self._critical_execution_errors > self.settings.execution.kill_switch_max_exec_errors:
+            reasons.append(f"critical_execution_errors>{self.settings.execution.kill_switch_max_exec_errors}")
+
+        if reasons and not state.safe_mode:
+            self._activate_safe_mode(reason=";".join(reasons), now=now)
+
+    def _activate_safe_mode(self, *, reason: str, now: datetime, extra_payload: dict | None = None) -> None:
+        current = self.state_store.load()
+        if current and current.safe_mode:
+            return
+
+        updated = self.state_store.set_safe_mode(True, reason=reason, now=now)
+        payload = {
+            "reason": reason,
+            "safe_mode": True,
+            "open_positions_count": updated.open_positions_count,
+            "daily_dd_pct": updated.daily_dd_pct,
+            "weekly_dd_pct": updated.weekly_dd_pct,
+            "consecutive_losses": updated.consecutive_losses,
+        }
+        if extra_payload:
+            payload.update(extra_payload)
+
+        LOG.warning("Kill-switch activated: %s", reason)
+        self.bundle.audit_logger.log_warning("kill_switch", "Safe mode activated.", payload=payload)
+        self._send_telegram_alert(TelegramNotifier.ALERT_KILL_SWITCH, payload)
+
+    def _notify_closed_trades(self, closed_events: list[dict]) -> None:
+        for event in closed_events:
+            self._send_telegram_alert(TelegramNotifier.ALERT_EXIT, event)
+
+    def _send_critical_error_alert(self, component: str, message: str) -> None:
+        self._send_telegram_alert(
+            TelegramNotifier.ALERT_CRITICAL_ERROR,
+            {"component": component, "message": message},
+        )
+
+    def _send_telegram_alert(self, alert_type: str, payload: dict) -> None:
+        try:
+            self.telegram_notifier.send_alert(alert_type, payload)
+        except Exception as exc:
+            self.bundle.audit_logger.log_error(
+                "telegram",
+                f"Notifier failed for alert_type={alert_type}: {exc}",
+                payload={"alert_payload": payload},
+            )
 
     def _build_snapshot(self, timestamp: datetime) -> MarketSnapshot:
         return self.bundle.market_data.build_snapshot(
@@ -322,16 +515,16 @@ class BotOrchestrator:
             timestamp=timestamp,
         )
 
-    def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> int:
+    def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> list[dict]:
         open_records = self.state_store.get_open_trade_records()
         if not open_records:
-            return 0
+            return []
 
         latest_high = float(snapshot.candles_15m[-1]["high"]) if snapshot.candles_15m else float(snapshot.price)
         latest_low = float(snapshot.candles_15m[-1]["low"]) if snapshot.candles_15m else float(snapshot.price)
         latest_close = float(snapshot.candles_15m[-1]["close"]) if snapshot.candles_15m else float(snapshot.price)
 
-        closed = 0
+        closed_events: list[dict] = []
         for record in open_records:
             decision = self.bundle.risk_engine.evaluate_exit(
                 record.position,
@@ -355,8 +548,19 @@ class BotOrchestrator:
                 settlement=settlement,
                 closed_at=snapshot.timestamp,
             )
-            closed += 1
-        return closed
+            closed_events.append(
+                {
+                    "position_id": record.position.position_id,
+                    "symbol": record.position.symbol,
+                    "direction": record.position.direction,
+                    "entry_price": record.position.entry_price,
+                    "exit_price": settlement.exit_price,
+                    "pnl_abs": settlement.pnl_abs,
+                    "exit_reason": settlement.exit_reason,
+                    "closed_at": snapshot.timestamp.isoformat(),
+                }
+            )
+        return closed_events
 
     @staticmethod
     def _candles_since_open(candles_15m: list[dict], opened_at: datetime) -> list[dict]:
@@ -377,8 +581,96 @@ class BotOrchestrator:
 
         try:
             websocket_client.start(symbol=self.settings.strategy.symbol)
-            self.bundle.audit_logger.log_info("recovery", "Market data feeds started after cold start.")
+            self.bundle.audit_logger.log_info("orchestrator", "Market data feeds started.")
         except Exception as exc:
             reason = f"feed_start_failed:{exc}"
-            self.bundle.audit_logger.log_error("recovery", "Failed to start market data feeds.", payload={"error": str(exc)})
-            self.state_store.set_safe_mode(True, reason=reason, now=datetime.now(timezone.utc))
+            self.bundle.audit_logger.log_error("orchestrator", "Failed to start market data feeds.", payload={"error": str(exc)})
+            self.state_store.set_safe_mode(True, reason=reason, now=self._now())
+            self._send_critical_error_alert("orchestrator", f"Failed to start market data feeds: {exc}")
+
+    def _stop_data_feeds(self) -> None:
+        websocket_client = self.bundle.market_data.websocket_client
+        if websocket_client is None:
+            return
+        try:
+            websocket_client.stop()
+            self.bundle.audit_logger.log_info("orchestrator", "Market data feeds stopped.")
+        except Exception as exc:
+            self.bundle.audit_logger.log_warning("orchestrator", "Failed to stop market data feeds.", payload={"error": str(exc)})
+
+    def _initialize_runtime_schedule(self, now: datetime) -> None:
+        now_utc = now.astimezone(timezone.utc)
+        self._current_utc_day = now_utc.date()
+        self._next_monitor_at = now_utc
+        self._next_health_at = now_utc
+        if self._is_15m_boundary(now_utc):
+            self._next_decision_at = now_utc
+        else:
+            self._next_decision_at = self._next_15m_boundary(now_utc)
+
+    def _handle_daily_rollover(self, now: datetime) -> None:
+        now_utc = now.astimezone(timezone.utc)
+        if self._current_utc_day is None:
+            self._current_utc_day = now_utc.date()
+            return
+        if now_utc.date() == self._current_utc_day:
+            return
+
+        summary_day = self._current_utc_day
+        self.send_daily_summary(summary_day)
+        self._current_utc_day = now_utc.date()
+
+    def _advance_decision_deadline(self, current: datetime, now: datetime) -> datetime:
+        result = current
+        while result <= now:
+            result += timedelta(minutes=15)
+        return result
+
+    def _compute_sleep_seconds(self, now: datetime) -> float:
+        idle_sleep = max(float(self.settings.execution.loop_idle_sleep_seconds), 0.05)
+        targets = [self._next_monitor_at, self._next_health_at, self._next_decision_at]
+        deltas = [
+            (target - now).total_seconds()
+            for target in targets
+            if target is not None and (target - now).total_seconds() > 0
+        ]
+        if not deltas:
+            return idle_sleep
+        return max(min(min(deltas), idle_sleep), 0.05)
+
+    def _shutdown(self) -> None:
+        self._stop_data_feeds()
+        try:
+            self.state_store.refresh_runtime_state(self._now())
+        except Exception:
+            pass
+        self.bundle.audit_logger.log_info(
+            "orchestrator",
+            "Runtime loop stopped.",
+            payload={"metrics": self.metrics.snapshot()},
+        )
+        LOG.info("Bot stopped.")
+
+    def _sleep(self, seconds: float) -> None:
+        if seconds <= 0:
+            return
+        self._sleep_fn(seconds)
+
+    def _now(self) -> datetime:
+        value = self._now_provider()
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc)
+        return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _is_15m_boundary(now: datetime) -> bool:
+        return now.minute % 15 == 0 and now.second == 0 and now.microsecond == 0
+
+    @staticmethod
+    def _next_15m_boundary(now: datetime) -> datetime:
+        now_utc = now.astimezone(timezone.utc)
+        base = now_utc.replace(second=0, microsecond=0)
+        next_minute = ((base.minute // 15) + 1) * 15
+        if next_minute >= 60:
+            return base.replace(minute=0) + timedelta(hours=1)
+        return base.replace(minute=next_minute)

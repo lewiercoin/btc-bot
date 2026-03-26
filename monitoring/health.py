@@ -41,14 +41,13 @@ class HealthMonitor:
     def _check_websocket_alive(self) -> bool:
         if self.websocket_client is None:
             return False
-        thread = getattr(self.websocket_client, "_thread", None)
-        if thread is None or not thread.is_alive():
+        if not self.websocket_client.is_connected:
             return False
 
         last_message_at = self.websocket_client.last_message_at
         if last_message_at is None:
             return True
-        heartbeat_seconds = int(getattr(self.websocket_client.config, "heartbeat_seconds", 30))
+        heartbeat_seconds = int(self.websocket_client.config.heartbeat_seconds)
         max_delay = max(heartbeat_seconds * 3, 5)
         age = (datetime.now(timezone.utc) - last_message_at.astimezone(timezone.utc)).total_seconds()
         return age <= max_delay

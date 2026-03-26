@@ -86,6 +86,10 @@ class BinanceFuturesWebsocketClient:
     def last_message_at(self) -> datetime | None:
         return self._last_message_at
 
+    @property
+    def is_connected(self) -> bool:
+        return bool(self._thread and self._thread.is_alive() and not self._stop_event.is_set())
+
     def _thread_main(self) -> None:
         asyncio.run(self._run_forever())
 
