@@ -4,17 +4,15 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** AWAITING_DECISION
-**Options (from Cascade audit 2026-03-26, AUDIT_005):**
-
-| # | Option | Rationale | Risk |
-|---|---|---|
-| 1 | Phase H — research (analyze_trades, llm_post_trade_review) | Final implementation phase. Completes all blueprint §12 phases. | Low — offline-only, no impact on live path. |
-| 2 | Run backtest on real historical data | Validate strategy per DoD §13 (6-12 month backtest, expectancy > 0.3R). Requires bootstrap_history first. | Needs real API keys to fetch history. |
-| 3 | Start paper trading | Orchestrator + all engines ready. Gather real-time performance data. | No strategy validation yet (no backtest results). |
-| 4 | Fix tech debt (#4, #8, #9, #10, #13) | Clean up before going operational. | Delays live readiness. |
-
-**Decision:** _pending_
+**Status:** ACTIVE
+**Milestone:** Bugfix (config injection gap) + Phase H — Research (analyze_trades, llm_post_trade_review)
+**Decision date:** 2026-03-26
+**Decided by:** User (product owner) + Cascade + Claude collaborative review
+**Scope:**
+- Bugfix: externalize 11 hardcoded `signal_engine.py` values into `SignalConfig`, wire 16 existing config fields in `orchestrator.py` + `backtest_runner.py`
+- Phase H: `research/analyze_trades.py`, `research/llm_post_trade_review.py` per blueprint §5.10
+**Note:** Autoresearch pattern (v2.0 scope per blueprint §14) deferred until bot is operational and strategy is validated on real data.
+**Handoff:** See Cascade handoff in chat history
 
 ## Phase Status
 
@@ -63,6 +61,7 @@ Last updated: 2026-03-26
 13. **Double kill-switch evaluation**: `_evaluate_kill_switch` called both in `run_decision_cycle` finally block and in `_run_event_loop` — redundant `refresh_runtime_state` call — *identified in AUDIT_004*
 14. **ReplayLoader N+1 queries**: 8 SQL queries per 15m bar — ~140k-280k queries for 6-12 month backtest. Functional but slow. Consider batch-loading. — *identified in AUDIT_005*
 15. **Sharpe population variance**: `_daily_sharpe_ratio` uses population variance (/ N) instead of sample variance (/ N-1). Minor statistical difference. — *identified in AUDIT_005*
+16. **Config injection gap**: 16 existing config fields silently ignored in `orchestrator.py:build_default_bundle` and `backtest_runner.py:_build_engines` — RegimeConfig (5/5 fields ignored), SignalConfig (5/6 ignored), GovernanceConfig (5/9 ignored), RiskConfig (1/9 ignored). Plus 11 hardcoded values in `signal_engine.py:79-121` not in any config (8 confluence weights + 3 thresholds). Total: 27 dead parameters. Affects both live and backtest paths. — *identified in Cascade+Claude collaborative review*
 
 ## Audit History
 
