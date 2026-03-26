@@ -292,11 +292,20 @@ class BinanceFuturesRestClient:
             message=message or "Request rejected by Binance.",
         )
 
-    def fetch_klines(self, symbol: str, interval: str, limit: int = 500) -> list[dict[str, Any]]:
-        payload = self._request(
-            "/fapi/v1/klines",
-            {"symbol": symbol.upper(), "interval": interval, "limit": int(limit)},
-        )
+    def fetch_klines(
+        self,
+        symbol: str,
+        interval: str,
+        limit: int = 500,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"symbol": symbol.upper(), "interval": interval, "limit": int(limit)}
+        if start_time_ms is not None:
+            params["startTime"] = int(start_time_ms)
+        if end_time_ms is not None:
+            params["endTime"] = int(end_time_ms)
+        payload = self._request("/fapi/v1/klines", params)
         return [normalize_kline(item, symbol=symbol, timeframe=interval) for item in payload]
 
     def fetch_funding_history(self, symbol: str, limit: int = 200) -> list[dict[str, Any]]:
@@ -310,11 +319,20 @@ class BinanceFuturesRestClient:
         payload = self._request("/fapi/v1/openInterest", {"symbol": symbol.upper()})
         return normalize_open_interest(payload, symbol=symbol)
 
-    def fetch_open_interest_history(self, symbol: str, period: str = "5m", limit: int = 200) -> list[dict[str, Any]]:
-        payload = self._request(
-            "/futures/data/openInterestHist",
-            {"symbol": symbol.upper(), "period": period, "limit": int(limit)},
-        )
+    def fetch_open_interest_history(
+        self,
+        symbol: str,
+        period: str = "5m",
+        limit: int = 200,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"symbol": symbol.upper(), "period": period, "limit": int(limit)}
+        if start_time_ms is not None:
+            params["startTime"] = int(start_time_ms)
+        if end_time_ms is not None:
+            params["endTime"] = int(end_time_ms)
+        payload = self._request("/futures/data/openInterestHist", params)
         if not isinstance(payload, list):
             raise RestClientError("Unexpected openInterestHist response payload.")
         return [normalize_open_interest_hist(item, symbol=symbol) for item in payload]
