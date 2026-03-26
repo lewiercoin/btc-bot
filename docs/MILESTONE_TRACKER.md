@@ -4,12 +4,16 @@ Last updated: 2026-03-26
 
 ## Next Milestone
 
-**Status:** ACTIVE
-**Milestone:** Phase F — Orchestracja (event loop, health/telegram integration, run_paper.py)
-**Decision date:** 2026-03-26
-**Decided by:** User (product owner)
-**Scope:** `docs/BLUEPRINT_V1.md` §10.1-10.2, §11 — `orchestrator.py`, `main.py`, `scripts/run_paper.py`
-**Handoff:** See Cascade handoff in chat history
+**Status:** AWAITING_DECISION
+**Options (from Cascade audit 2026-03-26, AUDIT_004):**
+
+| # | Option | Rationale | Risk |
+|---|---|---|---|
+| 1 | Phase G — backtest (replay_loader, fill_model, performance, backtest_runner) | Enables strategy validation before going live. Required by DoD §13 (6-12 month backtest with positive expectancy). | Delays paper trading start. |
+| 2 | Start paper trading with current system | Orchestrator is feature-complete. Can gather real-time data while backtest is built later. | No strategy validation yet. |
+| 3 | Fix remaining tech debt (#4, #8, #9) before G | Clean architecture before backtest. Prevents layering issues from compounding in backtest code. | Delays both backtest and live readiness. |
+
+**Decision:** _pending_
 
 ## Phase Status
 
@@ -21,7 +25,7 @@ Last updated: 2026-03-26
 | D — execution: recovery | recovery.py, orchestrator startup sync | MVP_DONE | smoke_recovery.py | AUDIT_001 ✅ |
 | D — execution: live + orders | live_execution_engine.py, order_manager.py | MVP_DONE | smoke_live_execution.py | AUDIT_002 ✅ |
 | E — monitoring | audit_logger, telegram, health, metrics | MVP_DONE | smoke_monitoring.py | AUDIT_003 ✅ |
-| F — orchestracja | orchestrator, main, run_paper | NOT_STARTED | — | — |
+| F — orchestracja | orchestrator, main, run_paper | MVP_DONE | smoke_orchestrator.py | AUDIT_004 ✅ |
 | G — backtest | replay_loader, fill_model, performance, backtest_runner | NOT_STARTED | — | — |
 | H — research | analyze_trades, llm_post_trade_review | NOT_STARTED | — | — |
 
@@ -52,13 +56,14 @@ Last updated: 2026-03-26
 3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ — **FIXED in c5f9408** (zero matches in codebase)
 4. **Layer leak**: `PaperExecutionEngine` AND `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage) — *tracked since initial audit, repeated in AUDIT_002*
 5. ~~**Tech debt**: `_signed_request` retry duplication~~ — **FIXED in c5f9408** (unified `_request_with_retry`)
-6. **Safe mode = exit**: orchestrator returns on safe_mode instead of managing existing positions (Phase F scope) — *identified in AUDIT_001*
+6. ~~**Safe mode = exit**: orchestrator returns on safe_mode instead of managing existing positions~~ — **FIXED in 09a099f** (orchestrator continues event loop in safe mode, lifecycle monitoring active)
 7. **Smoke gap**: `smoke_recovery.py` doesn't cover exchange_sync_failed, isolated_mode_mismatch, leverage_mismatch, combined issues — *identified in AUDIT_001*
 8. **Private API as public contract**: `_signed_request` called by OrderManager and LiveExecutionEngine despite underscore prefix — *identified in AUDIT_002*
 9. **Assert in production path**: `order_manager.py:186,190` uses `assert` instead of explicit raises — *identified in AUDIT_002*
 10. **Fees not captured**: `fees=0.0` hardcoded in LiveExecutionEngine — actual Binance fees not extracted — *identified in AUDIT_002*
-11. **Private attribute coupling**: `health.py:44` accesses `websocket_client._thread` — should expose public `is_connected` property — *identified in AUDIT_003*
-12. **Defensive getattr**: `health.py:51` uses `getattr(..., "heartbeat_seconds", 30)` despite type being known — *identified in AUDIT_003*
+11. ~~**Private attribute coupling**: `health.py:44` accesses `websocket_client._thread`~~ — **FIXED in 09a099f** (public `is_connected` property added to `BinanceFuturesWebsocketClient`)
+12. ~~**Defensive getattr**: `health.py:51` uses `getattr(..., "heartbeat_seconds", 30)`~~ — **FIXED in 09a099f** (direct attribute access via `int()` cast)
+13. **Double kill-switch evaluation**: `_evaluate_kill_switch` called both in `run_decision_cycle` finally block and in `_run_event_loop` — redundant `refresh_runtime_state` call — *identified in AUDIT_004*
 
 ## Audit History
 
@@ -67,3 +72,4 @@ Last updated: 2026-03-26
 | AUDIT_001 | Recovery Startup Sync | 2026-03-26 | 436756b | MVP_DONE |
 | AUDIT_002 | Phase D — Live Execution + Order Manager | 2026-03-26 | c5f9408 | MVP_DONE |
 | AUDIT_003 | Phase E — Monitoring | 2026-03-26 | 2e31e33 | MVP_DONE |
+| AUDIT_004 | Phase F — Orchestration | 2026-03-26 | 09a099f | MVP_DONE |
