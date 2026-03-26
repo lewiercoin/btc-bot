@@ -326,6 +326,12 @@ class BinanceFuturesRestClient:
     def fetch_exchange_info(self) -> dict[str, Any]:
         return self._request("/fapi/v1/exchangeInfo")
 
+    def ping(self) -> bool:
+        payload = self._request("/fapi/v1/ping")
+        if isinstance(payload, dict):
+            return True
+        return payload == {}
+
     def fetch_agg_trades(
         self,
         symbol: str,
