@@ -29,6 +29,33 @@ class RestClientError(RuntimeError):
     pass
 
 
+class BinanceRequestError(RestClientError):
+    def __init__(
+        self,
+        *,
+        path: str,
+        method: str,
+        status_code: int | None = None,
+        code: int | None = None,
+        message: str | None = None,
+    ) -> None:
+        self.path = path
+        self.method = method
+        self.status_code = status_code
+        self.code = code
+        self.message = message or "Binance request failed."
+        super().__init__(self.__str__())
+
+    def __str__(self) -> str:
+        details = [f"method={self.method}", f"path={self.path}"]
+        if self.status_code is not None:
+            details.append(f"http={self.status_code}")
+        if self.code is not None:
+            details.append(f"code={self.code}")
+        details.append(f"msg={self.message}")
+        return "BinanceRequestError(" + ", ".join(details) + ")"
+
+
 def _ms_to_utc(ms: int) -> datetime:
     return datetime.fromtimestamp(ms / 1000, tz=timezone.utc)
 
@@ -143,61 +170,127 @@ class BinanceFuturesRestClient:
         self.session = session or requests.Session()
 
     def _request(self, path: str, params: dict[str, Any] | None = None) -> Any:
-        url = f"{self.config.base_url.rstrip('/')}{path}"
-        error: Exception | None = None
+        return self._request_with_retry(
+            method="GET",
+            path=path,
+            params=params,
+            signed=False,
+        )
 
-        for attempt in range(self.config.max_retries + 1):
-            try:
-                response = self.session.get(url, params=params, timeout=self.config.timeout_seconds)
-                response.raise_for_status()
-                return response.json()
-            except (requests.RequestException, ValueError) as exc:
-                error = exc
-                if attempt >= self.config.max_retries:
-                    break
-                sleep_seconds = self.config.retry_backoff_seconds * (2**attempt)
-                LOG.warning("REST retry %s/%s for %s after error: %s", attempt + 1, self.config.max_retries, path, exc)
-                time.sleep(sleep_seconds)
-
-        raise RestClientError(f"Failed request {path} after retries") from error
-
-    def _signed_request(self, path: str, params: dict[str, Any] | None = None) -> Any:
+    def _signed_request(self, path: str, params: dict[str, Any] | None = None, method: str = "GET") -> Any:
         if not self.config.api_key or not self.config.api_secret:
             raise RestClientError("Signed Binance request requires API key and API secret.")
+        return self._request_with_retry(
+            method=method,
+            path=path,
+            params=params,
+            signed=True,
+        )
 
+    def _request_with_retry(
+        self,
+        *,
+        method: str,
+        path: str,
+        params: dict[str, Any] | None,
+        signed: bool,
+    ) -> Any:
+        method_upper = method.upper()
         base_params = dict(params or {})
-        base_params["recvWindow"] = int(self.config.recv_window_ms)
+        headers: dict[str, str] = {}
+
+        if signed:
+            base_params["recvWindow"] = int(self.config.recv_window_ms)
+            headers["X-MBX-APIKEY"] = self.config.api_key
+
         url = f"{self.config.base_url.rstrip('/')}{path}"
-        headers = {"X-MBX-APIKEY": self.config.api_key}
         error: Exception | None = None
         for attempt in range(self.config.max_retries + 1):
             request_params = dict(base_params)
-            request_params["timestamp"] = int(datetime.now(timezone.utc).timestamp() * 1000)
-            query = urlencode(request_params, doseq=True)
-            signature = hmac.new(
-                self.config.api_secret.encode("utf-8"),
-                query.encode("utf-8"),
-                hashlib.sha256,
-            ).hexdigest()
-            request_params["signature"] = signature
+            if signed:
+                request_params["timestamp"] = int(datetime.now(timezone.utc).timestamp() * 1000)
+                query = urlencode(request_params, doseq=True)
+                request_params["signature"] = hmac.new(
+                    self.config.api_secret.encode("utf-8"),
+                    query.encode("utf-8"),
+                    hashlib.sha256,
+                ).hexdigest()
+
             try:
-                response = self.session.get(
+                response = self.session.request(
+                    method_upper,
                     url,
                     params=request_params,
-                    headers=headers,
+                    headers=headers or None,
                     timeout=self.config.timeout_seconds,
                 )
-                response.raise_for_status()
+                if response.status_code >= 400:
+                    request_error = self._parse_binance_error(path, method_upper, response)
+                    if response.status_code >= 500 and attempt < self.config.max_retries:
+                        sleep_seconds = self.config.retry_backoff_seconds * (2**attempt)
+                        LOG.warning(
+                            "REST retry %s/%s for %s %s after http=%s code=%s msg=%s",
+                            attempt + 1,
+                            self.config.max_retries,
+                            method_upper,
+                            path,
+                            request_error.status_code,
+                            request_error.code,
+                            request_error.message,
+                        )
+                        time.sleep(sleep_seconds)
+                        continue
+                    raise request_error
+
+                if not response.text:
+                    return {}
                 return response.json()
             except (requests.RequestException, ValueError) as exc:
                 error = exc
                 if attempt >= self.config.max_retries:
                     break
                 sleep_seconds = self.config.retry_backoff_seconds * (2**attempt)
-                LOG.warning("Signed REST retry %s/%s for %s after error: %s", attempt + 1, self.config.max_retries, path, exc)
+                LOG.warning(
+                    "REST retry %s/%s for %s %s after error: %s",
+                    attempt + 1,
+                    self.config.max_retries,
+                    method_upper,
+                    path,
+                    exc,
+                )
                 time.sleep(sleep_seconds)
+            except BinanceRequestError as exc:
+                error = exc
+                break
 
-        raise RestClientError(f"Failed signed request {path} after retries") from error
+        if isinstance(error, BinanceRequestError):
+            raise error
+        request_kind = "signed request" if signed else "request"
+        raise RestClientError(f"Failed {request_kind} {method_upper} {path} after retries") from error
+
+    @staticmethod
+    def _parse_binance_error(path: str, method: str, response: requests.Response) -> BinanceRequestError:
+        code: int | None = None
+        message: str | None = None
+        try:
+            payload = response.json()
+            if isinstance(payload, dict):
+                raw_code = payload.get("code")
+                if raw_code is not None:
+                    code = int(raw_code)
+                raw_message = payload.get("msg")
+                if raw_message:
+                    message = str(raw_message)
+        except ValueError:
+            message = response.text.strip() or None
+
+        return BinanceRequestError(
+            path=path,
+            method=method,
+            status_code=response.status_code,
+            code=code,
+            message=message or "Request rejected by Binance.",
+        )
 
     def fetch_klines(self, symbol: str, interval: str, limit: int = 500) -> list[dict[str, Any]]:
         payload = self._request(
