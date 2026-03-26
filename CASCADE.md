@@ -122,3 +122,62 @@ Commit: <hash>
 - Explicitly ask: "Write code for X"
 - Cascade writes code in that scope only
 - Cascade does NOT expand scope without permission
+
+## Handoff Protocol: Cascade → Codex
+
+After every audit (or when initiating a new milestone), Cascade generates a **ready-to-copy handoff prompt** for Codex. The user copies it directly into Codex — no rewriting needed.
+
+### Handoff Format
+
+```markdown
+## CASCADE HANDOFF → CODEX
+
+### Checkpoint
+- Last commit: `<hash>` (<short message>)
+- Branch: `<branch>`
+- Working tree: clean | dirty
+
+### Before you code
+Read these files (mandatory):
+1. `docs/BLUEPRINT_V1.md` — architecture
+2. `AGENTS.md` — discipline + your workflow rules
+3. `docs/MILESTONE_TRACKER.md` — current status + known issues
+
+### Milestone: <milestone_name>
+Scope: `docs/BLUEPRINT_V1.md` section <N>
+
+Deliverables:
+- <concrete deliverable 1>
+- <concrete deliverable 2>
+- ...
+
+Target files: <list of files expected to be created or modified>
+
+### Known Issues (from Cascade audit)
+| # | Issue | Blocking for this milestone? |
+|---|---|---|
+| 1 | <issue> | YES / NO / YOU ASSESS |
+
+→ If an issue is blocking, include the fix in this milestone scope.
+→ If not blocking, leave it tracked — do not mix scopes.
+
+### Your first response must contain:
+1. Confirmed milestone scope (what you will implement)
+2. Acceptance criteria (how we know it's done)
+3. Which known issues are in-scope vs out-of-scope (with reasoning)
+4. Implementation plan (ordered steps)
+5. Only then: start coding
+
+### Commit discipline
+- WHAT / WHY / STATUS in every commit message
+- Do NOT self-mark as "done" — Cascade audits after push
+```
+
+### Handoff Rules
+
+- Cascade generates a handoff after every audit report
+- Cascade generates a handoff when user requests a new milestone to be started
+- Handoff is always in the format above — consistent, copy-paste ready
+- User does NOT need to rewrite or add context — handoff is self-contained
+- If audit verdict is NOT_DONE, handoff contains fix list instead of new milestone
+- Handoff references specific blueprint sections, not vague descriptions
