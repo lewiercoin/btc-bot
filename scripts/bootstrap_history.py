@@ -8,7 +8,7 @@ import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterable
+from typing import Any, Callable, Iterable, Iterator
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
@@ -315,6 +315,32 @@ def fetch_aggtrade_buckets_paginated(
     return deduped_60s, deduped_15m, total_trades
 
 
+def iter_aggtrade_windows(
+    rest_client: BinanceFuturesRestClient,
+    *,
+    symbol: str,
+    start_ts: datetime,
+    end_ts: datetime,
+    limit: int,
+    sleep_ms: int,
+) -> Iterator[tuple[list[dict[str, Any]], list[dict[str, Any]], int]]:
+    window_start = _to_utc(start_ts)
+    end_utc = _to_utc(end_ts)
+
+    while window_start < end_utc:
+        window_end = min(window_start + timedelta(hours=1), end_utc)
+        buckets_60s, buckets_15m, trade_count = fetch_aggtrade_buckets_paginated(
+            rest_client,
+            symbol=symbol,
+            start_ts=window_start,
+            end_ts=window_end,
+            limit=limit,
+            sleep_ms=sleep_ms,
+        )
+        yield buckets_60s, buckets_15m, trade_count
+        window_start = window_end
+
+
 def upsert_candles(conn: sqlite3.Connection, candles: list[dict]) -> int:
     conn.executemany(
         """
@@ -453,49 +479,69 @@ def main() -> None:
         end_ts.isoformat(),
         int(args.sleep_ms),
     )
+
+    candle_written_by_interval: dict[str, int] = {}
+    funding_written = 0
+    oi_written = 0
+    agg_written_total = 0
+    agg_trade_total = 0
+    agg_windows_total = 0
+
     try:
-        candles_15m = fetch_klines_paginated(
-            rest_client,
-            symbol=symbol,
-            interval="15m",
-            start_ts=start_ts,
-            end_ts=end_ts,
-            limit=int(args.limit_candles),
-            sleep_ms=int(args.sleep_ms),
-        )
-        candles_1h = fetch_klines_paginated(
-            rest_client,
-            symbol=symbol,
-            interval="1h",
-            start_ts=start_ts,
-            end_ts=end_ts,
-            limit=int(args.limit_candles),
-            sleep_ms=int(args.sleep_ms),
-        )
-        candles_4h = fetch_klines_paginated(
-            rest_client,
-            symbol=symbol,
-            interval="4h",
-            start_ts=start_ts,
-            end_ts=end_ts,
-            limit=int(args.limit_candles),
-            sleep_ms=int(args.sleep_ms),
-        )
+        for interval in ("15m", "1h", "4h"):
+            candles = fetch_klines_paginated(
+                rest_client,
+                symbol=symbol,
+                interval=interval,
+                start_ts=start_ts,
+                end_ts=end_ts,
+                limit=int(args.limit_candles),
+                sleep_ms=int(args.sleep_ms),
+            )
+            if args.dry_run:
+                candle_written_by_interval[interval] = len(candles)
+                LOG.info(
+                    "Dry-run candles[%s]: fetched=%s range=%s..%s",
+                    interval,
+                    len(candles),
+                    start_ts.isoformat(),
+                    end_ts.isoformat(),
+                )
+            else:
+                written = upsert_candles(conn, candles)
+                conn.commit()
+                candle_written_by_interval[interval] = written
+                LOG.info(
+                    "Committed candles[%s]: wrote=%s range=%s..%s",
+                    interval,
+                    written,
+                    start_ts.isoformat(),
+                    end_ts.isoformat(),
+                )
+
         funding_all = _call_with_rate_limit_retry(
             lambda: rest_client.fetch_funding_history(symbol, limit=int(args.limit_funding)),
             sleep_ms=int(args.sleep_ms),
             context="fetch_funding_history",
         )
         funding = [row for row in funding_all if start_ts <= row["funding_time"] < end_ts]
-
-        bucket_60s, bucket_15m, agg_trade_count = fetch_aggtrade_buckets_paginated(
-            rest_client,
-            symbol=symbol,
-            start_ts=start_ts,
-            end_ts=end_ts,
-            limit=int(args.limit_aggtrades),
-            sleep_ms=int(args.sleep_ms),
-        )
+        if args.dry_run:
+            funding_written = len(funding)
+            LOG.info(
+                "Dry-run funding: fetched=%s range=%s..%s",
+                len(funding),
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+            )
+        else:
+            funding_written = upsert_funding(conn, funding)
+            conn.commit()
+            LOG.info(
+                "Committed funding: wrote=%s range=%s..%s",
+                funding_written,
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+            )
 
         try:
             open_interest = fetch_open_interest_paginated(
@@ -515,40 +561,74 @@ def main() -> None:
                 context="fetch_open_interest_snapshot",
             )
             open_interest = [snapshot] if start_ts <= snapshot["timestamp"] < end_ts else []
+        if args.dry_run:
+            oi_written = len(open_interest)
+            LOG.info(
+                "Dry-run open_interest: fetched=%s range=%s..%s",
+                len(open_interest),
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+            )
+        else:
+            oi_written = upsert_open_interest(conn, open_interest)
+            conn.commit()
+            LOG.info(
+                "Committed open_interest: wrote=%s range=%s..%s",
+                oi_written,
+                start_ts.isoformat(),
+                end_ts.isoformat(),
+            )
+
+        window_start = start_ts
+        for bucket_60s, bucket_15m, trade_count in iter_aggtrade_windows(
+            rest_client,
+            symbol=symbol,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            limit=int(args.limit_aggtrades),
+            sleep_ms=int(args.sleep_ms),
+        ):
+            window_end = min(window_start + timedelta(hours=1), end_ts)
+            rows = bucket_60s + bucket_15m
+            if args.dry_run:
+                written_window = len(rows)
+                LOG.info(
+                    "Dry-run aggtrades window: range=%s..%s fetched_buckets=%s trades=%s",
+                    window_start.isoformat(),
+                    window_end.isoformat(),
+                    written_window,
+                    trade_count,
+                )
+            else:
+                written_window = upsert_aggtrade_buckets(conn, rows)
+                conn.commit()
+                LOG.info(
+                    "Committed aggtrades window: range=%s..%s wrote_buckets=%s trades=%s",
+                    window_start.isoformat(),
+                    window_end.isoformat(),
+                    written_window,
+                    trade_count,
+                )
+            agg_written_total += written_window
+            agg_trade_total += trade_count
+            agg_windows_total += 1
+            window_start = window_end
     except RestClientError as exc:
-        conn.close()
         raise SystemExit(f"Bootstrap failed due to REST error: {exc}") from exc
-
-    LOG.info(
-        "Fetched: candles15m=%s candles1h=%s candles4h=%s funding=%s oi=%s agg_trades=%s bucket60=%s bucket15m=%s",
-        len(candles_15m),
-        len(candles_1h),
-        len(candles_4h),
-        len(funding),
-        len(open_interest),
-        agg_trade_count,
-        len(bucket_60s),
-        len(bucket_15m),
-    )
-
-    if args.dry_run:
-        LOG.info("Dry-run mode: no database write.")
+    finally:
         conn.close()
-        return
-
-    written_candles = upsert_candles(conn, candles_15m + candles_1h + candles_4h)
-    written_funding = upsert_funding(conn, funding)
-    written_oi = upsert_open_interest(conn, open_interest)
-    written_agg = upsert_aggtrade_buckets(conn, bucket_60s + bucket_15m)
-    conn.commit()
-    conn.close()
 
     LOG.info(
-        "Bootstrap written: candles=%s funding=%s open_interest=%s aggtrade_buckets=%s",
-        written_candles,
-        written_funding,
-        written_oi,
-        written_agg,
+        "Bootstrap complete: dry_run=%s candles15m=%s candles1h=%s candles4h=%s funding=%s oi=%s aggtrade_buckets=%s aggtrade_trades=%s aggtrade_windows=%s",
+        args.dry_run,
+        candle_written_by_interval.get("15m", 0),
+        candle_written_by_interval.get("1h", 0),
+        candle_written_by_interval.get("4h", 0),
+        funding_written,
+        oi_written,
+        agg_written_total,
+        agg_trade_total,
+        agg_windows_total,
     )
 
 
