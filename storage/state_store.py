@@ -286,7 +286,7 @@ class StateStore:
 
         current = self.load()
         assert current is not None
-        consecutive_losses = self._compute_consecutive_losses()
+        consecutive_losses = self._compute_consecutive_losses(ts)
         daily_dd_pct = self._compute_daily_dd_pct(ts)
         weekly_dd_pct = self._compute_weekly_dd_pct(ts)
 
@@ -301,10 +301,17 @@ class StateStore:
         self.sync_daily_metrics(ts.date())
         return refreshed
 
-    def _compute_consecutive_losses(self) -> int:
+    def _compute_consecutive_losses(self, now: datetime) -> int:
         outcomes = fetch_recent_closed_trade_outcomes(self.connection, limit=100)
+        now_date = _to_utc(now).date()
         losses = 0
         for row in outcomes:
+            closed_at_raw = row.get("closed_at")
+            if not closed_at_raw:
+                continue
+            closed_at = closed_at_raw if isinstance(closed_at_raw, datetime) else datetime.fromisoformat(str(closed_at_raw))
+            if _to_utc(closed_at).date() != now_date:
+                break
             pnl_abs = float(row["pnl_abs"])
             if pnl_abs < 0:
                 losses += 1
@@ -342,3 +349,9 @@ class StateStore:
                 max_drawdown = drawdown
 
         return min(max(max_drawdown, 0.0), 1.0)
+
+
+def _to_utc(value: datetime) -> datetime:
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)

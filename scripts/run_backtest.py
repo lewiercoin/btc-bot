@@ -269,12 +269,14 @@ def main() -> None:
                 print(f"- {line}")
 
         if args.output_json is not None:
+            run_trade_ids = tuple(trade.trade_id for trade in result.trades)
             analysis = analyze_closed_trades(
                 conn,
                 AnalyzeTradesConfig(
                     symbol=symbol,
                     start_ts_utc=start_ts,
                     end_ts_utc=end_ts,
+                    trade_ids=run_trade_ids,
                 ),
             )
             payload = {

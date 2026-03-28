@@ -564,7 +564,7 @@ class BacktestRunner:
         return _RuntimeState(
             now=now,
             trades_today=trades_today,
-            consecutive_losses=_consecutive_losses(closed_records),
+            consecutive_losses=_consecutive_losses(closed_records, now=now),
             daily_dd_pct=_compute_period_drawdown_pct(
                 closed_pnl_events=closed_pnl_events,
                 start_ts=day_start,
@@ -722,9 +722,15 @@ def _append_candle(candles_path: list[dict[str, Any]], candle: dict[str, Any]) -
     candles_path.append(copy)
 
 
-def _consecutive_losses(closed_records: list[_ClosedTradeRecord]) -> int:
+def _consecutive_losses(closed_records: list[_ClosedTradeRecord], *, now: datetime) -> int:
+    now_date = _to_utc(now).date()
     losses = 0
     for record in reversed(closed_records):
+        closed_at = record.trade.closed_at
+        if closed_at is None:
+            continue
+        if _to_utc(closed_at).date() != now_date:
+            break
         pnl_abs = float(record.trade.pnl_abs)
         if pnl_abs < 0:
             losses += 1
