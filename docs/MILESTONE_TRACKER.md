@@ -1,15 +1,13 @@
 # Milestone Tracker
 
-Last updated: 2026-03-26
+Last updated: 2026-03-28
 
 ## Next Milestone
 
-**Status:** AWAITING_DECISION
-**Options:**
-1. Paper trading validation — run bot on live data in PAPER mode to validate end-to-end
-2. Backtest with real data — use bootstrapped Binance data for first real backtest run
-3. Tech debt cleanup — address remaining known issues (#1, #2, #4)
-4. Live deployment preparation — final pre-production hardening
+**Milestone:** Paper Trading Validation
+**Status:** ACTIVE
+**Decision date:** 2026-03-28
+**Scope:** Run bot on live Binance data in PAPER mode. Validate end-to-end pipeline: websocket → features → signals → governance → risk → paper execution → state persistence → recovery.
 
 **Note:** All blueprint phases (A-H) are now MVP_DONE. Autoresearch (v2.0) deferred.
 
@@ -58,6 +56,7 @@ None — all blueprint stubs implemented.
 14. **ReplayLoader N+1 queries**: 8 SQL queries per 15m bar — ~140k-280k queries for 6-12 month backtest. Functional but slow. Consider batch-loading. — *identified in AUDIT_005*
 15. **Sharpe population variance**: `_daily_sharpe_ratio` uses population variance (/ N) instead of sample variance (/ N-1). Minor statistical difference. — *identified in AUDIT_005*
 16. ~~**Config injection gap**: 27 dead parameters in orchestrator + backtest_runner + signal_engine~~ — **FIXED in AUDIT_006** (all parameters wired, smoke_config_injection.py validates)
+17. **Hardcoded symbol**: `PaperExecutionEngine` line 29 hardcodes `"BTCUSDT"` instead of using `settings.strategy.symbol` — *identified in AUDIT_007*
 
 ## Audit History
 
@@ -68,4 +67,5 @@ None — all blueprint stubs implemented.
 | AUDIT_003 | Phase E — Monitoring | 2026-03-26 | 2e31e33 | MVP_DONE |
 | AUDIT_004 | Phase F — Orchestration | 2026-03-26 | 09a099f | MVP_DONE |
 | AUDIT_005 | Phase G — Backtest | 2026-03-26 | 26fe3d7 | MVP_DONE |
-| AUDIT_006 | Config Injection Bugfix + Phase H Research | 2026-03-26 | (pending) | MVP_DONE |
+| AUDIT_006 | Config Injection Bugfix + Phase H Research | 2026-03-26 | c072405 | MVP_DONE |
+| AUDIT_007 | Daily Reset consecutive_losses + Trade Filtering | 2026-03-28 | 0e5f112 | MVP_DONE |
