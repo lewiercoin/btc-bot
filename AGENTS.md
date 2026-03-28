@@ -145,7 +145,7 @@ Discipline > complexity
 This project uses a structured generator-evaluator workflow:
 
 - **Codex** = builder/generator — implements code, writes tests, commits
-- **Cascade** = independent auditor/evaluator — audits code after push, detects layer leaks, architectural drift, hidden debt
+- **Claude Code** = independent auditor/evaluator — audits code after push, detects layer leaks, architectural drift, hidden debt
 
 ### Rules for Codex (Generator)
 
@@ -160,11 +160,11 @@ This project uses a structured generator-evaluator workflow:
 - Every commit must follow AGENTS.md commit discipline (WHAT/WHY/STATUS)
 
 - Do NOT self-assess as "done"  
-  → Cascade issues the final verdict
+  → Claude Code issues the final verdict
 
 - After push:
-  - Cascade performs audit
-  - fix list from Cascade is mandatory before proceeding
+  - Claude Code performs audit
+  - fix list from Claude Code is mandatory before proceeding
 
 - No next milestone without audit closure
 
@@ -174,9 +174,9 @@ This project uses a structured generator-evaluator workflow:
 
 - `docs/BLUEPRINT_V1.md` — architecture, phases, acceptance criteria, data models  
 - `AGENTS.md` — engineering discipline and commit rules  
-- `CASCADE.md` — Cascade operating model and audit standard  
+- `CASCADE.md` — Claude Code operating model and audit standard  
 - `docs/MILESTONE_TRACKER.md` — phase status, stub inventory, known issues  
-- `docs/audits/` — audit reports from Cascade  
+- `docs/audits/` — audit reports from Claude Code  
 - `docs/templates/AUDIT_TEMPLATE.md` — audit report format  
 
 ---
