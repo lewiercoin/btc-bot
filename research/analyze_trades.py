@@ -19,6 +19,8 @@ class AnalyzeTradesConfig:
     start_ts_utc: datetime | None = None
     end_ts_utc: datetime | None = None
     limit: int | None = None
+    trade_id_prefix: str | None = None
+    trade_ids: tuple[str, ...] | None = None
 
 
 @dataclass(slots=True, frozen=True)
@@ -123,6 +125,16 @@ def load_closed_trades(connection: sqlite3.Connection, config: AnalyzeTradesConf
     if config.end_ts_utc is not None:
         clauses.append("t.closed_at < ?")
         params.append(_to_utc(config.end_ts_utc).isoformat())
+    if config.trade_id_prefix:
+        clauses.append("t.trade_id LIKE ?")
+        params.append(f"{config.trade_id_prefix}%")
+    if config.trade_ids is not None:
+        if len(config.trade_ids) == 0:
+            clauses.append("1 = 0")
+        else:
+            placeholders = ", ".join("?" for _ in config.trade_ids)
+            clauses.append(f"t.trade_id IN ({placeholders})")
+            params.extend(config.trade_ids)
 
     sql = f"""
         SELECT
