@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import sqlite3
 import time
 from datetime import datetime, timezone
 from uuid import uuid4
@@ -8,10 +7,9 @@ from uuid import uuid4
 from core.execution_types import ExecutionStatus, FillEvent, OrderRequest
 from core.models import ExecutableSignal
 from data.rest_client import BinanceRequestError, BinanceFuturesRestClient, RestClientError
-from execution.execution_engine import ExecutionEngine
+from execution.execution_engine import ExecutionEngine, PositionPersister
 from execution.order_manager import OrderManager, OrderManagerError
 from monitoring.audit_logger import AuditLogger
-from storage.repositories import insert_execution_fill_event, insert_position
 
 
 class LiveExecutionError(RuntimeError):
@@ -22,7 +20,7 @@ class LiveExecutionEngine(ExecutionEngine):
     def __init__(
         self,
         *,
-        connection: sqlite3.Connection,
+        position_persister: PositionPersister,
         rest_client: BinanceFuturesRestClient,
         order_manager: OrderManager,
         audit_logger: AuditLogger,
@@ -31,7 +29,7 @@ class LiveExecutionEngine(ExecutionEngine):
         entry_timeout_seconds: int = 90,
         poll_interval_seconds: float = 1.0,
     ) -> None:
-        self.connection = connection
+        self.position_persister = position_persister
         self.rest_client = rest_client
         self.order_manager = order_manager
         self.audit_logger = audit_logger
@@ -64,8 +62,7 @@ class LiveExecutionEngine(ExecutionEngine):
         position_id = f"live-{uuid4().hex}"
         position_status = "OPEN" if fill_result.fully_filled else "PARTIAL"
         opened_at = fill_result.executed_at
-        insert_position(
-            self.connection,
+        self.position_persister.insert_position(
             position_id=position_id,
             signal_id=signal.signal_id,
             symbol=self.symbol,
@@ -81,13 +78,12 @@ class LiveExecutionEngine(ExecutionEngine):
             updated_at=opened_at,
         )
         for event in fill_result.events:
-            insert_execution_fill_event(
-                self.connection,
+            self.position_persister.insert_execution_fill_event(
                 position_id=position_id,
                 order_type=entry_request.order_type,
                 fill_event=event,
             )
-        self.connection.commit()
+        self.position_persister.commit()
 
         try:
             exit_side = "SELL" if signal.direction == "LONG" else "BUY"
@@ -120,19 +116,17 @@ class LiveExecutionEngine(ExecutionEngine):
                 requested_price=tp_order.stop_price,
                 fallback_side=tp_order.side,
             )
-            insert_execution_fill_event(
-                self.connection,
+            self.position_persister.insert_execution_fill_event(
                 position_id=position_id,
                 order_type=stop_order.order_type,
                 fill_event=stop_event,
             )
-            insert_execution_fill_event(
-                self.connection,
+            self.position_persister.insert_execution_fill_event(
                 position_id=position_id,
                 order_type=tp_order.order_type,
                 fill_event=tp_event,
             )
-            self.connection.commit()
+            self.position_persister.commit()
             self.audit_logger.log_info(
                 "live_execution",
                 "Live execution completed.",

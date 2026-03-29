@@ -18,6 +18,7 @@ from execution.order_manager import OrderManager, OrderManagerError
 from monitoring.audit_logger import AuditLogger
 from settings import load_settings
 from storage.db import connect, init_db
+from storage.position_persister import SqlitePositionPersister
 
 
 def reset_runtime_tables(conn) -> None:
@@ -180,9 +181,10 @@ def run_order_manager_submit_cancel_smoke(conn) -> None:
 def run_live_execution_flow_smoke(conn) -> None:
     fake = FakeRestClient()
     audit = AuditLogger(conn)
+    position_persister = SqlitePositionPersister(conn)
     manager = OrderManager(rest_client=fake, audit_logger=audit, symbol="BTCUSDT")
     engine = LiveExecutionEngine(
-        connection=conn,
+        position_persister=position_persister,
         rest_client=fake,
         order_manager=manager,
         audit_logger=audit,
@@ -331,9 +333,10 @@ def run_live_execution_flow_smoke(conn) -> None:
 def run_rejected_order_smoke(conn) -> None:
     fake = FakeRestClient()
     audit = AuditLogger(conn)
+    position_persister = SqlitePositionPersister(conn)
     manager = OrderManager(rest_client=fake, audit_logger=audit, symbol="BTCUSDT")
     engine = LiveExecutionEngine(
-        connection=conn,
+        position_persister=position_persister,
         rest_client=fake,
         order_manager=manager,
         audit_logger=audit,

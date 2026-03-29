@@ -36,6 +36,7 @@ from monitoring.metrics import (
 )
 from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
 from settings import AppSettings, BotMode
+from storage.position_persister import SqlitePositionPersister
 from storage.repositories import get_daily_metrics, save_executable_signal, save_signal_candidate
 from storage.state_store import StateStore
 
@@ -79,10 +80,11 @@ def build_default_bundle(
             reconnect_seconds=settings.execution.ws_reconnect_seconds,
         )
     )
+    position_persister = SqlitePositionPersister(conn)
 
     if settings.mode == BotMode.PAPER:
         execution_engine: ExecutionEngine = PaperExecutionEngine(
-            connection=conn,
+            position_persister=position_persister,
             symbol=settings.strategy.symbol.upper(),
         )
     else:
@@ -92,7 +94,7 @@ def build_default_bundle(
             symbol=settings.strategy.symbol,
         )
         execution_engine = LiveExecutionEngine(
-            connection=conn,
+            position_persister=position_persister,
             rest_client=rest_client,
             order_manager=order_manager,
             audit_logger=audit_logger,
