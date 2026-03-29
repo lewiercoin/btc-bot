@@ -4,12 +4,16 @@ Last updated: 2026-03-29
 
 ## Next Milestone
 
-**Milestone:** Strategy Optimization v1 — Regime Gating + SL Redesign + Partial Exits
+**Milestone:** Strategy Optimization v1.1 — Kill SHORT signals + diagnostic funnel
 **Status:** ACTIVE
 **Decision date:** 2026-03-29
-**Scope:** Three surgical changes to fix structurally broken backtest (PF=0.40, -47% DD, 0% SHORT WR). No new features — parameter/filter changes in existing engines only. Backtest validation required.
+**Scope:** Disable SHORT via regime whitelist config (0% WR across 68 trades in v0+v1). Add signal funnel diagnostics to backtest output. Expected: PF > 1.0, ~+$2,300 profit on 87d range.
 
-## Previous Milestone
+## Previous Milestones
+
+**Milestone:** Strategy Optimization v1 — Regime Gating + SL Redesign + Partial Exits
+**Status:** MVP_DONE (commit 8e48bee, audit passed)
+**Results:** PF 0.40→0.97, DD 47.8%→18.8%, WR 15%→34.7%. SHORT 0% WR persists.
 
 **Milestone:** Tech Debt Cleanup
 **Status:** PAUSED (deprioritized — strategy optimization takes precedence)
