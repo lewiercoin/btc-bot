@@ -16,12 +16,12 @@ class BotMode(StrEnum):
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
-        "normal": ("LONG", "SHORT"),
-        "compression": ("LONG", "SHORT"),
+        "normal": ("LONG",),
+        "compression": ("LONG",),
         "downtrend": ("LONG",),
-        "uptrend": ("SHORT",),
+        "uptrend": (),
         "crowded_leverage": (),
-        "post_liquidation": ("LONG", "SHORT"),
+        "post_liquidation": ("LONG",),
     }
 
 
