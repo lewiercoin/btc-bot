@@ -4,10 +4,10 @@ Last updated: 2026-03-29
 
 ## Next Milestone
 
-**Milestone:** Paper Trading Validation
+**Milestone:** Tech Debt Cleanup
 **Status:** ACTIVE
-**Decision date:** 2026-03-28
-**Scope:** Run bot on live Binance data in PAPER mode. Validate end-to-end pipeline: websocket → features → signals → governance → risk → paper execution → state persistence → recovery.
+**Decision date:** 2026-03-29
+**Scope:** Fix remaining open known issues (#1, #4, #8, #9, #10, #13, #14, #15). Zero regressions — all existing smoke tests must pass after each fix.
 
 **Note:** All blueprint phases (A-H) are now MVP_DONE. Autoresearch (v2.0) deferred.
 
