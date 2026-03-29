@@ -1,10 +1,21 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import uuid4
 
 from core.models import Features, RegimeState, SignalCandidate
+
+
+def _default_regime_direction_whitelist() -> dict[str, set[str]]:
+    return {
+        RegimeState.NORMAL.value: {"LONG", "SHORT"},
+        RegimeState.COMPRESSION.value: {"LONG", "SHORT"},
+        RegimeState.DOWNTREND.value: {"LONG"},
+        RegimeState.UPTREND.value: {"SHORT"},
+        RegimeState.CROWDED_LEVERAGE.value: set(),
+        RegimeState.POST_LIQUIDATION.value: {"LONG", "SHORT"},
+    }
 
 
 @dataclass(slots=True)
@@ -12,9 +23,10 @@ class SignalConfig:
     confluence_min: float = 3.0
     min_sweep_depth_pct: float = 0.0001
     entry_offset_atr: float = 0.05
-    invalidation_offset_atr: float = 0.25
-    tp1_atr_mult: float = 2.0
-    tp2_atr_mult: float = 3.5
+    invalidation_offset_atr: float = 0.75
+    min_stop_distance_pct: float = 0.0015
+    tp1_atr_mult: float = 2.5
+    tp2_atr_mult: float = 4.0
     weight_sweep_detected: float = 1.25
     weight_reclaim_confirmed: float = 1.25
     weight_cvd_divergence: float = 0.75
@@ -26,6 +38,7 @@ class SignalConfig:
     direction_tfi_threshold: float = 0.05
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.10
+    regime_direction_whitelist: dict[str, set[str]] = field(default_factory=_default_regime_direction_whitelist)
 
 
 class SignalEngine:
@@ -44,6 +57,8 @@ class SignalEngine:
 
         direction = self._infer_direction(features)
         if direction is None:
+            return None
+        if not self._is_direction_allowed_for_regime(direction=direction, regime=regime):
             return None
 
         confluence_score, reasons = self._confluence_score(features, regime, direction)
@@ -88,6 +103,7 @@ class SignalEngine:
         return None
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
+        _ = regime
         score = 0.0
         reasons: list[str] = []
 
@@ -111,9 +127,6 @@ class SignalEngine:
         if features.force_order_spike:
             score += self.config.weight_force_order_spike
             reasons.append("force_order_spike")
-        if regime in (RegimeState.POST_LIQUIDATION, RegimeState.CROWDED_LEVERAGE):
-            score += self.config.weight_regime_special
-            reasons.append(f"regime_{regime.value}")
 
         if direction == "LONG" and features.ema50_4h >= features.ema200_4h:
             score += self.config.weight_ema_trend_alignment
@@ -136,19 +149,32 @@ class SignalEngine:
         base = float(features.sweep_level or 0.0)
         if base == 0:
             base = max(features.ema50_4h, 1.0)
+        min_stop_distance_pct = max(self.config.min_stop_distance_pct, 0.0)
 
         if direction == "LONG":
             entry = base + (atr * self.config.entry_offset_atr)
-            invalidation = base - (atr * self.config.invalidation_offset_atr)
+            raw_invalidation = base - (atr * self.config.invalidation_offset_atr)
+            min_stop_distance = abs(entry) * min_stop_distance_pct
+            actual_stop_distance = max(abs(entry - raw_invalidation), min_stop_distance)
+            invalidation = entry - actual_stop_distance
             tp1 = entry + atr * self.config.tp1_atr_mult
             tp2 = entry + atr * self.config.tp2_atr_mult
         else:
             entry = base - (atr * self.config.entry_offset_atr)
-            invalidation = base + (atr * self.config.invalidation_offset_atr)
+            raw_invalidation = base + (atr * self.config.invalidation_offset_atr)
+            min_stop_distance = abs(entry) * min_stop_distance_pct
+            actual_stop_distance = max(abs(entry - raw_invalidation), min_stop_distance)
+            invalidation = entry + actual_stop_distance
             tp1 = entry - atr * self.config.tp1_atr_mult
             tp2 = entry - atr * self.config.tp2_atr_mult
 
         return entry, invalidation, tp1, tp2
+
+    def _is_direction_allowed_for_regime(self, *, direction: str, regime: RegimeState) -> bool:
+        allowed = self.config.regime_direction_whitelist.get(regime.value)
+        if allowed is None:
+            return False
+        return direction in allowed
 
     def _make_signal_id(self, timestamp: datetime) -> str:
         ts = timestamp.astimezone(timezone.utc).strftime("%Y%m%dT%H%M%S")

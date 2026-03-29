@@ -139,6 +139,7 @@ def build_default_bundle(
                 min_sweep_depth_pct=settings.strategy.min_sweep_depth_pct,
                 entry_offset_atr=settings.strategy.entry_offset_atr,
                 invalidation_offset_atr=settings.strategy.invalidation_offset_atr,
+                min_stop_distance_pct=settings.strategy.min_stop_distance_pct,
                 tp1_atr_mult=settings.strategy.tp1_atr_mult,
                 tp2_atr_mult=settings.strategy.tp2_atr_mult,
                 weight_sweep_detected=settings.strategy.weight_sweep_detected,
@@ -152,6 +153,10 @@ def build_default_bundle(
                 direction_tfi_threshold=settings.strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=settings.strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=settings.strategy.tfi_impulse_threshold,
+                regime_direction_whitelist={
+                    regime: set(allowed_directions)
+                    for regime, allowed_directions in settings.strategy.regime_direction_whitelist.items()
+                },
             )
         ),
         governance=GovernanceLayer(
@@ -181,6 +186,8 @@ def build_default_bundle(
                 weekly_dd_limit=settings.risk.weekly_dd_limit,
                 max_hold_hours=settings.risk.max_hold_hours,
                 high_vol_stop_distance_pct=settings.risk.high_vol_stop_distance_pct,
+                partial_exit_pct=settings.risk.partial_exit_pct,
+                trailing_atr_mult=settings.risk.trailing_atr_mult,
             ),
             state_provider=risk_state_provider,
         ),

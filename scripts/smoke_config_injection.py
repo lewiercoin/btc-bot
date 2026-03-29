@@ -38,6 +38,7 @@ def _build_custom_settings():
         min_sweep_depth_pct=0.0009,
         entry_offset_atr=0.12,
         invalidation_offset_atr=0.44,
+        min_stop_distance_pct=0.0021,
         tp1_atr_mult=1.8,
         tp2_atr_mult=2.6,
         weight_sweep_detected=1.11,
@@ -51,6 +52,7 @@ def _build_custom_settings():
         direction_tfi_threshold=0.07,
         direction_tfi_threshold_inverse=-0.08,
         tfi_impulse_threshold=0.13,
+        regime_direction_whitelist={"normal": ("LONG",), "uptrend": ("SHORT",)},
     )
     risk = replace(
         base.risk,
@@ -61,6 +63,8 @@ def _build_custom_settings():
         session_end_hour_utc=20,
         no_trade_windows_utc=((8, 9), (13, 14)),
         high_vol_stop_distance_pct=0.015,
+        partial_exit_pct=0.35,
+        trailing_atr_mult=1.4,
     )
     return replace(base, strategy=strategy, risk=risk)
 
@@ -90,6 +94,7 @@ def _assert_live_bundle_config_injection() -> None:
         assert signal_cfg.min_sweep_depth_pct == settings.strategy.min_sweep_depth_pct
         assert signal_cfg.entry_offset_atr == settings.strategy.entry_offset_atr
         assert signal_cfg.invalidation_offset_atr == settings.strategy.invalidation_offset_atr
+        assert signal_cfg.min_stop_distance_pct == settings.strategy.min_stop_distance_pct
         assert signal_cfg.tp1_atr_mult == settings.strategy.tp1_atr_mult
         assert signal_cfg.tp2_atr_mult == settings.strategy.tp2_atr_mult
         assert signal_cfg.weight_sweep_detected == settings.strategy.weight_sweep_detected
@@ -103,6 +108,9 @@ def _assert_live_bundle_config_injection() -> None:
         assert signal_cfg.direction_tfi_threshold == settings.strategy.direction_tfi_threshold
         assert signal_cfg.direction_tfi_threshold_inverse == settings.strategy.direction_tfi_threshold_inverse
         assert signal_cfg.tfi_impulse_threshold == settings.strategy.tfi_impulse_threshold
+        assert signal_cfg.regime_direction_whitelist == {
+            regime: set(directions) for regime, directions in settings.strategy.regime_direction_whitelist.items()
+        }
 
         assert governance_cfg.cooldown_minutes_after_loss == settings.risk.cooldown_minutes_after_loss
         assert governance_cfg.duplicate_level_tolerance_pct == settings.risk.duplicate_level_tolerance_pct
@@ -112,6 +120,8 @@ def _assert_live_bundle_config_injection() -> None:
         assert governance_cfg.no_trade_windows_utc == settings.risk.no_trade_windows_utc
 
         assert risk_cfg.high_vol_stop_distance_pct == settings.risk.high_vol_stop_distance_pct
+        assert risk_cfg.partial_exit_pct == settings.risk.partial_exit_pct
+        assert risk_cfg.trailing_atr_mult == settings.risk.trailing_atr_mult
         print("live bundle config injection smoke: OK")
     finally:
         conn.close()
@@ -136,6 +146,10 @@ def _assert_backtest_config_injection() -> None:
         assert signal_engine.config.direction_tfi_threshold == settings.strategy.direction_tfi_threshold
         assert signal_engine.config.direction_tfi_threshold_inverse == settings.strategy.direction_tfi_threshold_inverse
         assert signal_engine.config.tfi_impulse_threshold == settings.strategy.tfi_impulse_threshold
+        assert signal_engine.config.min_stop_distance_pct == settings.strategy.min_stop_distance_pct
+        assert signal_engine.config.regime_direction_whitelist == {
+            regime: set(directions) for regime, directions in settings.strategy.regime_direction_whitelist.items()
+        }
 
         assert governance.config.cooldown_minutes_after_loss == settings.risk.cooldown_minutes_after_loss
         assert governance.config.duplicate_level_tolerance_pct == settings.risk.duplicate_level_tolerance_pct
@@ -145,6 +159,8 @@ def _assert_backtest_config_injection() -> None:
         assert governance.config.no_trade_windows_utc == settings.risk.no_trade_windows_utc
 
         assert risk_engine.config.high_vol_stop_distance_pct == settings.risk.high_vol_stop_distance_pct
+        assert risk_engine.config.partial_exit_pct == settings.risk.partial_exit_pct
+        assert risk_engine.config.trailing_atr_mult == settings.risk.trailing_atr_mult
         print("backtest engine config injection smoke: OK")
     finally:
         conn.close()

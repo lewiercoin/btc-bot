@@ -4,8 +4,15 @@ Last updated: 2026-03-29
 
 ## Next Milestone
 
-**Milestone:** Tech Debt Cleanup
+**Milestone:** Strategy Optimization v1 — Regime Gating + SL Redesign + Partial Exits
 **Status:** ACTIVE
+**Decision date:** 2026-03-29
+**Scope:** Three surgical changes to fix structurally broken backtest (PF=0.40, -47% DD, 0% SHORT WR). No new features — parameter/filter changes in existing engines only. Backtest validation required.
+
+## Previous Milestone
+
+**Milestone:** Tech Debt Cleanup
+**Status:** PAUSED (deprioritized — strategy optimization takes precedence)
 **Decision date:** 2026-03-29
 **Scope:** Fix remaining open known issues (#1, #4, #8, #9, #10, #13, #14, #15). Zero regressions — all existing smoke tests must pass after each fix.
 

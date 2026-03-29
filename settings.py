@@ -14,6 +14,17 @@ class BotMode(StrEnum):
     LIVE = "LIVE"
 
 
+def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
+    return {
+        "normal": ("LONG", "SHORT"),
+        "compression": ("LONG", "SHORT"),
+        "downtrend": ("LONG",),
+        "uptrend": ("SHORT",),
+        "crowded_leverage": (),
+        "post_liquidation": ("LONG", "SHORT"),
+    }
+
+
 @dataclass(frozen=True)
 class StrategyConfig:
     symbol: str = "BTCUSDT"
@@ -43,9 +54,10 @@ class StrategyConfig:
 
     min_sweep_depth_pct: float = 0.0001
     entry_offset_atr: float = 0.05
-    invalidation_offset_atr: float = 0.25
-    tp1_atr_mult: float = 2.0
-    tp2_atr_mult: float = 3.5
+    invalidation_offset_atr: float = 0.75
+    min_stop_distance_pct: float = 0.0015
+    tp1_atr_mult: float = 2.5
+    tp2_atr_mult: float = 4.0
     weight_sweep_detected: float = 1.25
     weight_reclaim_confirmed: float = 1.25
     weight_cvd_divergence: float = 0.75
@@ -57,6 +69,7 @@ class StrategyConfig:
     direction_tfi_threshold: float = 0.05
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.10
+    regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
 @dataclass(frozen=True)
@@ -73,6 +86,8 @@ class RiskConfig:
     weekly_dd_limit: float = 0.06
     max_hold_hours: int = 24
     high_vol_stop_distance_pct: float = 0.01
+    partial_exit_pct: float = 0.5
+    trailing_atr_mult: float = 1.0
 
     cooldown_minutes_after_loss: int = 60
     duplicate_level_tolerance_pct: float = 0.001
