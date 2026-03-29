@@ -163,3 +163,20 @@ class BotState:
     weekly_dd_pct: float
     last_trade_at: datetime | None
     last_error: str | None
+
+
+@dataclass(slots=True)
+class GovernanceRuntimeState:
+    trades_today: int = 0
+    consecutive_losses: int = 0
+    daily_dd_pct: float = 0.0
+    weekly_dd_pct: float = 0.0
+    last_trade_at: datetime | None = None
+    last_loss_at: datetime | None = None
+
+
+@dataclass(slots=True)
+class RiskRuntimeState:
+    consecutive_losses: int = 0
+    daily_dd_pct: float = 0.0
+    weekly_dd_pct: float = 0.0
