@@ -412,7 +412,6 @@ class BotOrchestrator:
         finally:
             duration_ms = (time.perf_counter() - cycle_started) * 1000.0
             self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
-            self._evaluate_kill_switch(timestamp)
 
     def send_daily_summary(self, day: date | None = None) -> None:
         summary_day = day or self._now().date()
