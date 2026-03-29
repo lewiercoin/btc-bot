@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from typing import Callable
 
-from core.models import ExecutableSignal, Position
+from core.models import ExecutableSignal, Position, RiskRuntimeState
 
 
 @dataclass(slots=True)
@@ -14,13 +14,6 @@ class RiskDecision:
     size: float = 0.0
     leverage: int = 0
     reason: str | None = None
-
-
-@dataclass(slots=True)
-class RiskRuntimeState:
-    consecutive_losses: int = 0
-    daily_dd_pct: float = 0.0
-    weekly_dd_pct: float = 0.0
 
 
 @dataclass(slots=True)

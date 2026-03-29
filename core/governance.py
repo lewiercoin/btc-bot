@@ -5,23 +5,13 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
 from typing import Callable
 
-from core.models import ExecutableSignal, SignalCandidate
+from core.models import ExecutableSignal, GovernanceRuntimeState, SignalCandidate
 
 
 @dataclass(slots=True)
 class GovernanceDecision:
     approved: bool
     notes: list[str] = field(default_factory=list)
-
-
-@dataclass(slots=True)
-class GovernanceRuntimeState:
-    trades_today: int = 0
-    consecutive_losses: int = 0
-    daily_dd_pct: float = 0.0
-    weekly_dd_pct: float = 0.0
-    last_trade_at: datetime | None = None
-    last_loss_at: datetime | None = None
 
 
 @dataclass(slots=True)

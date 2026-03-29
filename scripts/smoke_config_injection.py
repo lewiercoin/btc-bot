@@ -11,8 +11,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from backtest.backtest_runner import BacktestRunner
-from core.governance import GovernanceRuntimeState
-from core.risk_engine import RiskRuntimeState
+from core.models import GovernanceRuntimeState, RiskRuntimeState
 from orchestrator import build_default_bundle
 from settings import load_settings
 from storage.db import init_db
