@@ -308,11 +308,19 @@ class BinanceFuturesRestClient:
         payload = self._request("/fapi/v1/klines", params)
         return [normalize_kline(item, symbol=symbol, timeframe=interval) for item in payload]
 
-    def fetch_funding_history(self, symbol: str, limit: int = 200) -> list[dict[str, Any]]:
-        payload = self._request(
-            "/fapi/v1/fundingRate",
-            {"symbol": symbol.upper(), "limit": int(limit)},
-        )
+    def fetch_funding_history(
+        self,
+        symbol: str,
+        limit: int = 200,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+    ) -> list[dict[str, Any]]:
+        params: dict[str, Any] = {"symbol": symbol.upper(), "limit": int(limit)}
+        if start_time_ms is not None:
+            params["startTime"] = int(start_time_ms)
+        if end_time_ms is not None:
+            params["endTime"] = int(end_time_ms)
+        payload = self._request("/fapi/v1/fundingRate", params)
         return [normalize_funding(item, symbol=symbol) for item in payload]
 
     def fetch_open_interest(self, symbol: str) -> dict[str, Any]:

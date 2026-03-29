@@ -201,6 +201,9 @@ def fetch_klines_paginated(
     return deduped
 
 
+_OI_MAX_LOOKBACK_DAYS = 27
+
+
 def fetch_open_interest_paginated(
     rest_client: BinanceFuturesRestClient,
     *,
@@ -211,19 +214,39 @@ def fetch_open_interest_paginated(
     limit: int,
     sleep_ms: int,
 ) -> list[dict[str, Any]]:
-    start_ms = _to_ms(start_ts)
+    """Fetch OI history with automatic clipping to Binance's ~27-day lookback limit."""
+    now_utc = datetime.now(timezone.utc)
+    earliest_available = now_utc - timedelta(days=_OI_MAX_LOOKBACK_DAYS)
+
+    if end_ts <= earliest_available:
+        LOG.warning(
+            "OI range %s..%s is entirely beyond Binance %d-day lookback. Skipping.",
+            start_ts.isoformat(), end_ts.isoformat(), _OI_MAX_LOOKBACK_DAYS,
+        )
+        return []
+
+    effective_start = max(start_ts, earliest_available)
+    if effective_start != start_ts:
+        LOG.warning(
+            "OI start clipped from %s to %s (Binance %d-day lookback limit).",
+            start_ts.isoformat(), effective_start.isoformat(), _OI_MAX_LOOKBACK_DAYS,
+        )
+
+    start_ms = _to_ms(effective_start)
     end_ms = _to_ms(end_ts)
     cursor_ms = start_ms
     result: list[dict[str, Any]] = []
 
     while cursor_ms < end_ms:
+        _cursor_ms = cursor_ms
+        _end_ms = end_ms
         batch = _call_with_rate_limit_retry(
             lambda: rest_client.fetch_open_interest_history(
                 symbol=symbol,
                 period=period,
                 limit=limit,
-                start_time_ms=cursor_ms,
-                end_time_ms=end_ms - 1,
+                start_time_ms=_cursor_ms,
+                end_time_ms=_end_ms - 1,
             ),
             sleep_ms=sleep_ms,
             context=f"fetch_open_interest_history[{period}]",
@@ -240,7 +263,7 @@ def fetch_open_interest_paginated(
         cursor_ms = next_cursor
         _sleep_ms(sleep_ms)
 
-    in_range = [row for row in result if start_ts <= row["timestamp"] < end_ts]
+    in_range = [row for row in result if effective_start <= row["timestamp"] < end_ts]
     deduped = _dedupe_rows(
         in_range,
         key_fn=lambda item: (item["symbol"], item["timestamp"].isoformat()),
@@ -339,6 +362,55 @@ def iter_aggtrade_windows(
         )
         yield buckets_60s, buckets_15m, trade_count
         window_start = window_end
+
+
+def fetch_funding_paginated(
+    rest_client: BinanceFuturesRestClient,
+    *,
+    symbol: str,
+    start_ts: datetime,
+    end_ts: datetime,
+    limit: int,
+    sleep_ms: int,
+) -> list[dict[str, Any]]:
+    """Fetch funding rate history with pagination using startTime/endTime."""
+    start_ms = _to_ms(start_ts)
+    end_ms = _to_ms(end_ts)
+    cursor_ms = start_ms
+    result: list[dict[str, Any]] = []
+
+    while cursor_ms < end_ms:
+        _cursor_ms = cursor_ms
+        _end_ms = end_ms
+        batch = _call_with_rate_limit_retry(
+            lambda: rest_client.fetch_funding_history(
+                symbol=symbol,
+                limit=limit,
+                start_time_ms=_cursor_ms,
+                end_time_ms=_end_ms - 1,
+            ),
+            sleep_ms=sleep_ms,
+            context="fetch_funding_history",
+        )
+        if not batch:
+            break
+        result.extend(batch)
+        last_ts_ms = _to_ms(batch[-1]["funding_time"])
+        if len(batch) < limit or last_ts_ms >= (end_ms - 1):
+            break
+        next_cursor = last_ts_ms + 1
+        if next_cursor <= cursor_ms:
+            break
+        cursor_ms = next_cursor
+        _sleep_ms(sleep_ms)
+
+    in_range = [row for row in result if start_ts <= row["funding_time"] < end_ts]
+    deduped = _dedupe_rows(
+        in_range,
+        key_fn=lambda item: (item["symbol"], item["funding_time"].isoformat()),
+    )
+    deduped.sort(key=lambda item: item["funding_time"])
+    return deduped
 
 
 def upsert_candles(conn: sqlite3.Connection, candles: list[dict]) -> int:
@@ -519,12 +591,14 @@ def main() -> None:
                     end_ts.isoformat(),
                 )
 
-        funding_all = _call_with_rate_limit_retry(
-            lambda: rest_client.fetch_funding_history(symbol, limit=int(args.limit_funding)),
+        funding = fetch_funding_paginated(
+            rest_client,
+            symbol=symbol,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            limit=int(args.limit_funding),
             sleep_ms=int(args.sleep_ms),
-            context="fetch_funding_history",
         )
-        funding = [row for row in funding_all if start_ts <= row["funding_time"] < end_ts]
         if args.dry_run:
             funding_written = len(funding)
             LOG.info(
@@ -543,24 +617,15 @@ def main() -> None:
                 end_ts.isoformat(),
             )
 
-        try:
-            open_interest = fetch_open_interest_paginated(
-                rest_client,
-                symbol=symbol,
-                start_ts=start_ts,
-                end_ts=end_ts,
-                period="5m",
-                limit=int(args.limit_open_interest),
-                sleep_ms=int(args.sleep_ms),
-            )
-        except RestClientError:
-            LOG.warning("openInterestHist unavailable; using single openInterest snapshot.")
-            snapshot = _call_with_rate_limit_retry(
-                lambda: rest_client.fetch_open_interest(symbol),
-                sleep_ms=int(args.sleep_ms),
-                context="fetch_open_interest_snapshot",
-            )
-            open_interest = [snapshot] if start_ts <= snapshot["timestamp"] < end_ts else []
+        open_interest = fetch_open_interest_paginated(
+            rest_client,
+            symbol=symbol,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            period="5m",
+            limit=int(args.limit_open_interest),
+            sleep_ms=int(args.sleep_ms),
+        )
         if args.dry_run:
             oi_written = len(open_interest)
             LOG.info(
