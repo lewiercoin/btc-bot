@@ -81,7 +81,10 @@ def build_default_bundle(
     )
 
     if settings.mode == BotMode.PAPER:
-        execution_engine: ExecutionEngine = PaperExecutionEngine(connection=conn)
+        execution_engine: ExecutionEngine = PaperExecutionEngine(
+            connection=conn,
+            symbol=settings.strategy.symbol.upper(),
+        )
     else:
         order_manager = OrderManager(
             rest_client=rest_client,
