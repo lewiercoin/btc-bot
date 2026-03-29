@@ -9,8 +9,9 @@ from execution.execution_engine import ExecutionEngine
 
 
 class PaperExecutionEngine(ExecutionEngine):
-    def __init__(self, connection: sqlite3.Connection) -> None:
+    def __init__(self, *, connection: sqlite3.Connection, symbol: str = "BTCUSDT") -> None:
         self.connection = connection
+        self.symbol = symbol.upper()
 
     def execute_signal(self, signal: ExecutableSignal, size: float, leverage: int) -> None:
         position_id = f"paper-{uuid4().hex}"
@@ -26,7 +27,7 @@ class PaperExecutionEngine(ExecutionEngine):
             (
                 position_id,
                 signal.signal_id,
-                "BTCUSDT",
+                self.symbol,
                 signal.direction,
                 "OPEN",
                 signal.entry_price,
