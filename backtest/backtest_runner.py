@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from datetime import date, datetime, time, timedelta, timezone
 from typing import Any
 
@@ -68,6 +68,18 @@ class _OpenPositionRecord:
     executable: ExecutableSignal
     entry_fee: float
     entry_slippage_bps: float
+    initial_size: float
+    initial_stop_loss: float
+    atr_15m: float
+    total_fees: float = 0.0
+    realized_pnl_abs_gross: float = 0.0
+    closed_qty: float = 0.0
+    exit_notional_sum: float = 0.0
+    partial_exit_done: bool = False
+    trailing_stop: float | None = None
+    highest_high_since_partial: float | None = None
+    lowest_low_since_partial: float | None = None
+    slippage_samples: list[float] = field(default_factory=list)
     candles_path: list[dict[str, Any]] = field(default_factory=list)
 
 
@@ -265,6 +277,7 @@ class BacktestRunner:
                 min_sweep_depth_pct=strategy.min_sweep_depth_pct,
                 entry_offset_atr=strategy.entry_offset_atr,
                 invalidation_offset_atr=strategy.invalidation_offset_atr,
+                min_stop_distance_pct=strategy.min_stop_distance_pct,
                 tp1_atr_mult=strategy.tp1_atr_mult,
                 tp2_atr_mult=strategy.tp2_atr_mult,
                 weight_sweep_detected=strategy.weight_sweep_detected,
@@ -278,6 +291,10 @@ class BacktestRunner:
                 direction_tfi_threshold=strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=strategy.tfi_impulse_threshold,
+                regime_direction_whitelist={
+                    regime: set(allowed_directions)
+                    for regime, allowed_directions in strategy.regime_direction_whitelist.items()
+                },
             )
         )
         governance = GovernanceLayer(
@@ -307,6 +324,8 @@ class BacktestRunner:
                 weekly_dd_limit=risk.weekly_dd_limit,
                 max_hold_hours=risk.max_hold_hours,
                 high_vol_stop_distance_pct=risk.high_vol_stop_distance_pct,
+                partial_exit_pct=risk.partial_exit_pct,
+                trailing_atr_mult=risk.trailing_atr_mult,
             ),
             state_provider=self._risk_state_provider,
         )
@@ -367,6 +386,8 @@ class BacktestRunner:
             updated_at=now,
             signal_id=executable.signal_id,
         )
+        atr_15m = float(candidate.features_json.get("atr_15m", 0.0))
+        initial_size = float(risk_decision_size)
         return _OpenPositionRecord(
             trade_id=trade_id,
             position=position,
@@ -374,6 +395,11 @@ class BacktestRunner:
             executable=executable,
             entry_fee=entry_fill.fee_paid,
             entry_slippage_bps=entry_fill.slippage_bps,
+            initial_size=initial_size,
+            initial_stop_loss=executable.stop_loss,
+            atr_15m=max(atr_15m, 0.0),
+            total_fees=entry_fill.fee_paid,
+            slippage_samples=[entry_fill.slippage_bps],
         )
 
     def _close_positions_if_needed(
@@ -410,14 +436,65 @@ class BacktestRunner:
         equity_delta = 0.0
         for record in open_positions:
             _append_candle(record.candles_path, latest_candle)
+            self._update_trailing_stop(
+                record=record,
+                latest_high=latest_high,
+                latest_low=latest_low,
+                trailing_atr_mult=risk_engine.config.trailing_atr_mult,
+            )
             decision = risk_engine.evaluate_exit(
                 record.position,
                 now=snapshot.timestamp,
                 latest_high=latest_high,
                 latest_low=latest_low,
                 latest_close=latest_close,
+                partial_exit_enabled=True,
+                partial_exit_done=record.partial_exit_done,
             )
             if not decision.should_close or decision.exit_price is None or decision.reason is None:
+                remaining.append(record)
+                continue
+
+            if decision.reason == "TP_PARTIAL":
+                partial_pct = decision.partial_pct if decision.partial_pct is not None else risk_engine.config.partial_exit_pct
+                partial_qty = max(min(record.position.size * partial_pct, record.position.size), 0.0)
+                if partial_qty <= 0.0:
+                    remaining.append(record)
+                    continue
+                close_side = "SELL" if record.position.direction == "LONG" else "BUY"
+                exit_fill = fill_model.simulate(
+                    decision.exit_price,
+                    partial_qty,
+                    order_type="MARKET",
+                    side=close_side,
+                )
+                partial_position = replace(record.position, size=partial_qty)
+                partial_settlement = risk_engine.build_settlement_metrics(
+                    partial_position,
+                    exit_price=exit_fill.filled_price,
+                    exit_reason=decision.reason,
+                    candles_15m=record.candles_path,
+                )
+                record.realized_pnl_abs_gross += partial_settlement.pnl_abs
+                record.total_fees += exit_fill.fee_paid
+                record.closed_qty += partial_qty
+                record.exit_notional_sum += partial_settlement.exit_price * partial_qty
+                record.slippage_samples.append(exit_fill.slippage_bps)
+
+                record.position.size = max(record.position.size - partial_qty, 0.0)
+                record.position.status = "PARTIAL"
+                record.position.stop_loss = record.position.entry_price
+                record.position.updated_at = snapshot.timestamp
+                record.partial_exit_done = True
+                record.trailing_stop = record.position.stop_loss
+                if record.position.direction == "LONG":
+                    record.highest_high_since_partial = latest_high
+                else:
+                    record.lowest_low_since_partial = latest_low
+
+                if record.position.size <= 0.0:
+                    continue
+
                 remaining.append(record)
                 continue
 
@@ -428,17 +505,34 @@ class BacktestRunner:
                 order_type="MARKET",
                 side=close_side,
             )
+            closing_position = replace(record.position, size=record.position.size)
             settlement = risk_engine.build_settlement_metrics(
-                record.position,
+                closing_position,
                 exit_price=exit_fill.filled_price,
                 exit_reason=decision.reason,
                 candles_15m=record.candles_path,
             )
-            fees_total = record.entry_fee + exit_fill.fee_paid
-            pnl_abs_net = settlement.pnl_abs - fees_total
-            risk_notional = abs(record.position.entry_price - record.position.stop_loss) * record.position.size
+            total_gross_pnl_abs = record.realized_pnl_abs_gross + settlement.pnl_abs
+            fees_total = record.total_fees + exit_fill.fee_paid
+            pnl_abs_net = total_gross_pnl_abs - fees_total
+            total_closed_qty = record.closed_qty + closing_position.size
+            total_exit_notional = record.exit_notional_sum + (settlement.exit_price * closing_position.size)
+            effective_exit_price = total_exit_notional / max(total_closed_qty, 1e-8)
+            final_position_metrics = replace(
+                record.position,
+                size=record.initial_size,
+                stop_loss=record.initial_stop_loss,
+            )
+            final_metrics = risk_engine.build_settlement_metrics(
+                final_position_metrics,
+                exit_price=effective_exit_price,
+                exit_reason=decision.reason,
+                candles_15m=record.candles_path,
+            )
+            risk_notional = abs(record.position.entry_price - record.initial_stop_loss) * record.initial_size
             pnl_r_net = pnl_abs_net / max(risk_notional, 1e-8)
-            slippage_avg = (record.entry_slippage_bps + exit_fill.slippage_bps) / 2.0
+            slippage_values = record.slippage_samples + [exit_fill.slippage_bps]
+            slippage_avg = sum(slippage_values) / max(len(slippage_values), 1)
             trade = TradeLog(
                 trade_id=record.trade_id,
                 signal_id=record.position.signal_id,
@@ -448,21 +542,28 @@ class BacktestRunner:
                 regime=record.candidate.regime.value,
                 confluence_score=record.candidate.confluence_score,
                 entry_price=record.position.entry_price,
-                exit_price=settlement.exit_price,
-                size=record.position.size,
+                exit_price=effective_exit_price,
+                size=record.initial_size,
                 fees=fees_total,
                 slippage_bps=slippage_avg,
                 pnl_abs=pnl_abs_net,
                 pnl_r=pnl_r_net,
-                mae=settlement.mae,
-                mfe=settlement.mfe,
-                exit_reason=settlement.exit_reason,
+                mae=final_metrics.mae,
+                mfe=final_metrics.mfe,
+                exit_reason=final_metrics.exit_reason,
                 features_at_entry_json=record.candidate.features_json,
+            )
+            closed_position = replace(
+                record.position,
+                size=record.initial_size,
+                stop_loss=record.initial_stop_loss,
+                status="CLOSED",
+                updated_at=snapshot.timestamp,
             )
             closed_records.append(
                 _ClosedTradeRecord(
-                    position=record.position,
-                    position_id=record.position.position_id,
+                    position=closed_position,
+                    position_id=closed_position.position_id,
                     candidate=record.candidate,
                     executable=record.executable,
                     trade=trade,
@@ -473,6 +574,32 @@ class BacktestRunner:
 
         open_positions[:] = remaining
         return equity_delta
+
+    @staticmethod
+    def _update_trailing_stop(
+        *,
+        record: _OpenPositionRecord,
+        latest_high: float,
+        latest_low: float,
+        trailing_atr_mult: float,
+    ) -> None:
+        if not record.partial_exit_done:
+            return
+        atr_value = max(record.atr_15m, 1e-8)
+        trail_distance = max(float(trailing_atr_mult), 0.0) * atr_value
+        if record.position.direction == "LONG":
+            reference_high = max(record.highest_high_since_partial or latest_high, latest_high)
+            record.highest_high_since_partial = reference_high
+            candidate_stop = reference_high - trail_distance
+            current_stop = record.trailing_stop if record.trailing_stop is not None else record.position.stop_loss
+            record.trailing_stop = max(current_stop, candidate_stop)
+        else:
+            reference_low = min(record.lowest_low_since_partial or latest_low, latest_low)
+            record.lowest_low_since_partial = reference_low
+            candidate_stop = reference_low + trail_distance
+            current_stop = record.trailing_stop if record.trailing_stop is not None else record.position.stop_loss
+            record.trailing_stop = min(current_stop, candidate_stop)
+        record.position.stop_loss = record.trailing_stop
 
     def _force_close_remaining_positions(
         self,
@@ -503,17 +630,34 @@ class BacktestRunner:
                 order_type="MARKET",
                 side=close_side,
             )
+            closing_position = replace(record.position, size=record.position.size)
             settlement = risk_engine.build_settlement_metrics(
-                record.position,
+                closing_position,
                 exit_price=exit_fill.filled_price,
                 exit_reason="END_OF_BACKTEST",
                 candles_15m=record.candles_path,
             )
-            fees_total = record.entry_fee + exit_fill.fee_paid
-            pnl_abs_net = settlement.pnl_abs - fees_total
-            risk_notional = abs(record.position.entry_price - record.position.stop_loss) * record.position.size
+            total_gross_pnl_abs = record.realized_pnl_abs_gross + settlement.pnl_abs
+            fees_total = record.total_fees + exit_fill.fee_paid
+            pnl_abs_net = total_gross_pnl_abs - fees_total
+            total_closed_qty = record.closed_qty + closing_position.size
+            total_exit_notional = record.exit_notional_sum + (settlement.exit_price * closing_position.size)
+            effective_exit_price = total_exit_notional / max(total_closed_qty, 1e-8)
+            final_position_metrics = replace(
+                record.position,
+                size=record.initial_size,
+                stop_loss=record.initial_stop_loss,
+            )
+            final_metrics = risk_engine.build_settlement_metrics(
+                final_position_metrics,
+                exit_price=effective_exit_price,
+                exit_reason="END_OF_BACKTEST",
+                candles_15m=record.candles_path,
+            )
+            risk_notional = abs(record.position.entry_price - record.initial_stop_loss) * record.initial_size
             pnl_r_net = pnl_abs_net / max(risk_notional, 1e-8)
-            slippage_avg = (record.entry_slippage_bps + exit_fill.slippage_bps) / 2.0
+            slippage_values = record.slippage_samples + [exit_fill.slippage_bps]
+            slippage_avg = sum(slippage_values) / max(len(slippage_values), 1)
             trade = TradeLog(
                 trade_id=record.trade_id,
                 signal_id=record.position.signal_id,
@@ -523,21 +667,28 @@ class BacktestRunner:
                 regime=record.candidate.regime.value,
                 confluence_score=record.candidate.confluence_score,
                 entry_price=record.position.entry_price,
-                exit_price=settlement.exit_price,
-                size=record.position.size,
+                exit_price=effective_exit_price,
+                size=record.initial_size,
                 fees=fees_total,
                 slippage_bps=slippage_avg,
                 pnl_abs=pnl_abs_net,
                 pnl_r=pnl_r_net,
-                mae=settlement.mae,
-                mfe=settlement.mfe,
-                exit_reason=settlement.exit_reason,
+                mae=final_metrics.mae,
+                mfe=final_metrics.mfe,
+                exit_reason=final_metrics.exit_reason,
                 features_at_entry_json=record.candidate.features_json,
+            )
+            closed_position = replace(
+                record.position,
+                size=record.initial_size,
+                stop_loss=record.initial_stop_loss,
+                status="CLOSED",
+                updated_at=now,
             )
             closed_records.append(
                 _ClosedTradeRecord(
-                    position=record.position,
-                    position_id=record.position.position_id,
+                    position=closed_position,
+                    position_id=closed_position.position_id,
                     candidate=record.candidate,
                     executable=record.executable,
                     trade=trade,

@@ -28,6 +28,8 @@ class RiskConfig:
     weekly_dd_limit: float = 0.06
     max_hold_hours: int = 24
     high_vol_stop_distance_pct: float = 0.01
+    partial_exit_pct: float = 0.5
+    trailing_atr_mult: float = 1.0
 
 
 @dataclass(slots=True)
@@ -35,6 +37,7 @@ class ExitDecision:
     should_close: bool
     reason: str | None = None
     exit_price: float | None = None
+    partial_pct: float | None = None
 
 
 @dataclass(slots=True)
@@ -100,18 +103,30 @@ class RiskEngine:
         latest_high: float,
         latest_low: float,
         latest_close: float,
+        partial_exit_enabled: bool = False,
+        partial_exit_done: bool = False,
     ) -> ExitDecision:
         now_utc = now.astimezone(timezone.utc)
+        partial_pct = min(max(self.config.partial_exit_pct, 0.0), 1.0)
+        allow_partial = partial_exit_enabled and not partial_exit_done and partial_pct > 0.0
         if position.direction == "LONG":
             # Conservative ordering for ambiguous candles: SL before TP.
             if latest_low <= position.stop_loss:
+                if partial_exit_done:
+                    return ExitDecision(True, "TP_TRAIL", position.stop_loss)
                 return ExitDecision(True, "SL", position.stop_loss)
-            if latest_high >= position.take_profit_1:
+            if not partial_exit_done and latest_high >= position.take_profit_1:
+                if allow_partial and partial_pct < 1.0:
+                    return ExitDecision(True, "TP_PARTIAL", position.take_profit_1, partial_pct=partial_pct)
                 return ExitDecision(True, "TP", position.take_profit_1)
         else:
             if latest_high >= position.stop_loss:
+                if partial_exit_done:
+                    return ExitDecision(True, "TP_TRAIL", position.stop_loss)
                 return ExitDecision(True, "SL", position.stop_loss)
-            if latest_low <= position.take_profit_1:
+            if not partial_exit_done and latest_low <= position.take_profit_1:
+                if allow_partial and partial_pct < 1.0:
+                    return ExitDecision(True, "TP_PARTIAL", position.take_profit_1, partial_pct=partial_pct)
                 return ExitDecision(True, "TP", position.take_profit_1)
 
         hold_limit = timedelta(hours=self.config.max_hold_hours)
