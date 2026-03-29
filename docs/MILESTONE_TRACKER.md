@@ -57,7 +57,7 @@ None — all blueprint stubs implemented.
 15. **Sharpe population variance**: `_daily_sharpe_ratio` uses population variance (/ N) instead of sample variance (/ N-1). Minor statistical difference. — *identified in AUDIT_005*
 16. ~~**Config injection gap**: 27 dead parameters in orchestrator + backtest_runner + signal_engine~~ — **FIXED in AUDIT_006** (all parameters wired, smoke_config_injection.py validates)
 17. ~~**Hardcoded symbol**: `PaperExecutionEngine` line 29 hardcodes `"BTCUSDT"` instead of using `settings.strategy.symbol`~~ — **FIXED in b1fb7f4** (symbol param added, orchestrator wired)
-18. **PAPER restart phantom_position**: `NoOpRecoverySyncSource` returns empty lists → `RecoveryCoordinator` sees local OPEN positions as phantoms → `safe_mode=True` → new entries blocked after restart — *identified in AUDIT_008*
+18. ~~**PAPER restart phantom_position**: `NoOpRecoverySyncSource` returns empty lists → `RecoveryCoordinator` sees local OPEN positions as phantoms → `safe_mode=True` → new entries blocked after restart~~ — **FIXED in 27a9270** (PAPER mode skips exchange consistency checks)
 
 ## Audit History
 
@@ -71,3 +71,4 @@ None — all blueprint stubs implemented.
 | AUDIT_006 | Config Injection Bugfix + Phase H Research | 2026-03-26 | c072405 | MVP_DONE |
 | AUDIT_007 | Daily Reset consecutive_losses + Trade Filtering | 2026-03-28 | 0e5f112 | MVP_DONE |
 | AUDIT_008 | Paper Trading Validation | 2026-03-29 | b1fb7f4 | MVP_DONE |
+| AUDIT_009 | Fix #18 — PAPER restart phantom_position | 2026-03-29 | 27a9270 | MVP_DONE |
