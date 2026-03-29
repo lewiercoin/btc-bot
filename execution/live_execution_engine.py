@@ -312,6 +312,7 @@ class LiveExecutionEngine(ExecutionEngine):
         slippage_bps = 0.0
         if requested_price and requested_price > 0 and filled_price and filled_price > 0:
             slippage_bps = abs(filled_price - requested_price) / requested_price * 10_000.0
+        fees = self._to_float(payload.get("commission"), 0.0)
 
         return FillEvent(
             execution_id=f"exe-{uuid4().hex}",
@@ -321,7 +322,7 @@ class LiveExecutionEngine(ExecutionEngine):
             requested_price=requested_price,
             filled_price=filled_price if filled_price and filled_price > 0 else None,
             qty=event_qty,
-            fees=0.0,
+            fees=fees,
             slippage_bps=slippage_bps,
             executed_at=event_ts,
         )
