@@ -177,7 +177,7 @@ class BinanceFuturesRestClient:
             signed=False,
         )
 
-    def _signed_request(self, path: str, params: dict[str, Any] | None = None, method: str = "GET") -> Any:
+    def signed_request(self, path: str, params: dict[str, Any] | None = None, method: str = "GET") -> Any:
         if not self.config.api_key or not self.config.api_secret:
             raise RestClientError("Signed Binance request requires API key and API secret.")
         return self._request_with_retry(
@@ -375,13 +375,13 @@ class BinanceFuturesRestClient:
         return [normalize_agg_trade(item, symbol=symbol) for item in payload]
 
     def fetch_position_risk(self, symbol: str) -> list[dict[str, Any]]:
-        payload = self._signed_request("/fapi/v2/positionRisk", {"symbol": symbol.upper()})
+        payload = self.signed_request("/fapi/v2/positionRisk", {"symbol": symbol.upper()})
         if not isinstance(payload, list):
             raise RestClientError("Unexpected positionRisk response payload.")
         return [normalize_position_risk(item) for item in payload]
 
     def fetch_open_orders(self, symbol: str) -> list[dict[str, Any]]:
-        payload = self._signed_request("/fapi/v1/openOrders", {"symbol": symbol.upper()})
+        payload = self.signed_request("/fapi/v1/openOrders", {"symbol": symbol.upper()})
         if not isinstance(payload, list):
             raise RestClientError("Unexpected openOrders response payload.")
         return [normalize_open_order(item) for item in payload]

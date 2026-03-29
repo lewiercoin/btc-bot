@@ -44,7 +44,7 @@ class FakeRestClient:
         key = (method.upper(), path)
         self._queue.setdefault(key, []).append(response_or_exc)
 
-    def _signed_request(self, path: str, params: dict[str, Any] | None = None, method: str = "GET") -> Any:
+    def signed_request(self, path: str, params: dict[str, Any] | None = None, method: str = "GET") -> Any:
         key = (method.upper(), path)
         self.calls.append({"method": method.upper(), "path": path, "params": dict(params or {})})
         if key not in self._queue or not self._queue[key]:
