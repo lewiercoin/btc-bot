@@ -113,6 +113,21 @@ class RecoveryCoordinator:
         last_state = self.state_store.load()
         local_positions = self.state_store.get_open_positions_snapshot()
 
+        if isinstance(self.exchange_sync, NoOpRecoverySyncSource):
+            self.state_store.set_safe_mode(False, reason=None, now=now)
+            self.audit_logger.log_info(
+                "recovery",
+                "Paper-mode startup recovery skipped exchange consistency checks.",
+                payload={
+                    "symbol": self.symbol,
+                    "local_positions": len(local_positions),
+                    "exchange_positions": 0,
+                    "exchange_orders": 0,
+                    "previous_safe_mode": bool(last_state.safe_mode) if last_state else False,
+                },
+            )
+            return RecoveryReport(healthy=True, safe_mode=False, issues=[])
+
         try:
             exchange_positions = self.exchange_sync.fetch_active_positions(self.symbol)
             exchange_orders = self.exchange_sync.fetch_open_orders(self.symbol)
