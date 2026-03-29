@@ -35,7 +35,7 @@ class OrderManager:
         normalized = self._normalize_request(request)
         params = self._build_submit_params(normalized)
         try:
-            response = self.rest_client._signed_request(
+            response = self.rest_client.signed_request(
                 "/fapi/v1/order",
                 params=params,
                 method="POST",
@@ -74,7 +74,7 @@ class OrderManager:
     def cancel(self, client_order_id: str) -> None:
         normalized_id = str(client_order_id)
         try:
-            response = self.rest_client._signed_request(
+            response = self.rest_client.signed_request(
                 "/fapi/v1/order",
                 params={
                     "symbol": self.symbol,

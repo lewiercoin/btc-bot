@@ -159,7 +159,7 @@ class LiveExecutionEngine(ExecutionEngine):
             raise LiveExecutionError(f"protective_order_failed:{exc}") from exc
 
     def _set_leverage(self, leverage: int) -> None:
-        self.rest_client._signed_request(
+        self.rest_client.signed_request(
             "/fapi/v1/leverage",
             params={"symbol": self.symbol, "leverage": int(leverage)},
             method="POST",
@@ -260,7 +260,7 @@ class LiveExecutionEngine(ExecutionEngine):
                 raise LiveExecutionError(f"entry_order_state_unavailable:{client_order_id}")
 
     def _fetch_order(self, client_order_id: str) -> dict:
-        payload = self.rest_client._signed_request(
+        payload = self.rest_client.signed_request(
             "/fapi/v1/order",
             params={
                 "symbol": self.symbol,

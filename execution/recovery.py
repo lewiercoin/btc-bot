@@ -114,6 +114,19 @@ class RecoveryCoordinator:
         local_positions = self.state_store.get_open_positions_snapshot()
 
         if isinstance(self.exchange_sync, NoOpRecoverySyncSource):
+            if last_state and last_state.safe_mode:
+                self.audit_logger.log_warning(
+                    "recovery",
+                    "Paper-mode startup recovery preserved existing safe mode.",
+                    payload={
+                        "symbol": self.symbol,
+                        "local_positions": len(local_positions),
+                        "exchange_positions": 0,
+                        "exchange_orders": 0,
+                        "previous_safe_mode": True,
+                    },
+                )
+                return RecoveryReport(healthy=False, safe_mode=True, issues=[])
             self.state_store.set_safe_mode(False, reason=None, now=now)
             self.audit_logger.log_info(
                 "recovery",
