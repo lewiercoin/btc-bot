@@ -183,11 +183,13 @@ class OrderManager:
             "newClientOrderId": request.client_order_id,
         }
         if request.order_type == "LIMIT":
-            assert request.price is not None
+            if request.price is None:
+                raise ValueError("LIMIT order requires price")
             params["price"] = _format_float(request.price)
             params["timeInForce"] = request.time_in_force
         if request.order_type in {"STOP_MARKET", "TAKE_PROFIT_MARKET"}:
-            assert request.stop_price is not None
+            if request.stop_price is None:
+                raise ValueError(f"{request.order_type} order requires stop_price")
             params["stopPrice"] = _format_float(request.stop_price)
             params["reduceOnly"] = "true"
         return params
