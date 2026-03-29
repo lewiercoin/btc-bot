@@ -151,7 +151,7 @@ def _daily_sharpe_ratio(trades: list[TradeLog], *, initial_equity: float) -> flo
         return 0.0
 
     avg = sum(daily_returns) / len(daily_returns)
-    variance = sum((value - avg) ** 2 for value in daily_returns) / len(daily_returns)
+    variance = sum((value - avg) ** 2 for value in daily_returns) / max(len(daily_returns) - 1, 1)
     stdev = variance**0.5
     if stdev == 0:
         return 0.0
