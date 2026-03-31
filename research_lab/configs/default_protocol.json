@@ -1,0 +1,10 @@
+{
+  "train_days": 90,
+  "validation_days": 30,
+  "step_days": 30,
+  "min_trades_per_window": 10,
+  "min_trades_full_candidate": 30,
+  "fragility_degradation_threshold_pct": 30.0,
+  "promotion_requires_all_windows_pass": false,
+  "promotion_requires_median_pass": true
+}
