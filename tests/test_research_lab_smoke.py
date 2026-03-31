@@ -40,7 +40,19 @@ def test_param_registry_frozen_params_are_correct() -> None:
     registry = build_param_registry()
 
     assert registry["weight_force_order_spike"].status == PARAM_STATUS_FROZEN
+    assert registry["ema_fast"].status == PARAM_STATUS_FROZEN
+    assert registry["ema_slow"].status == PARAM_STATUS_FROZEN
+    assert registry["ema_trend_gap_pct"].status == PARAM_STATUS_FROZEN
+    assert registry["compression_atr_norm_max"].status == PARAM_STATUS_FROZEN
+    assert registry["crowded_funding_extreme_pct"].status == PARAM_STATUS_FROZEN
+    assert registry["crowded_oi_zscore_min"].status == PARAM_STATUS_FROZEN
     assert registry["regime_direction_whitelist"].status == PARAM_STATUS_FROZEN
+    assert registry["session_start_hour_utc"].status == PARAM_STATUS_FROZEN
+    assert registry["session_end_hour_utc"].status == PARAM_STATUS_FROZEN
+    assert registry["ema_trend_gap_pct"].default_value == 0.0025
+    assert registry["compression_atr_norm_max"].default_value == 0.0055
+    assert registry["crowded_funding_extreme_pct"].default_value == 85.0
+    assert registry["crowded_oi_zscore_min"].default_value == 1.5
     assert registry["force_order_history_points"].status == PARAM_STATUS_UNSUPPORTED
     assert len(get_active_params()) >= 40
 
