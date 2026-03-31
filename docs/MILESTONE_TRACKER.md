@@ -56,7 +56,7 @@ None — all blueprint stubs implemented.
 ## Known Issues
 
 1. **Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines — *tracked since initial audit*
-2. **Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation) — *tracked since initial audit*
+2. ~~**Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation)~~ — **FIXED in this milestone** (`FeatureEngine.reset()` added; backtest already creates fresh FeatureEngine per run; `tests/test_feature_engine.py` validates idempotency and reset-based fresh-instance reproducibility)
 3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ — **FIXED in c5f9408** (zero matches in codebase)
 4. ~~**Layer leak**: `PaperExecutionEngine` AND `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage)~~ — **FIXED in ba72c35** (PositionPersister protocol + DI injection into execution engines)
 5. ~~**Tech debt**: `_signed_request` retry duplication~~ — **FIXED in c5f9408** (unified `_request_with_retry`)

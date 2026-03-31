@@ -152,6 +152,17 @@ class FeatureEngine:
         self._force_order_rate_history: deque[float] = deque(maxlen=self.config.force_order_history_points)
         self._cvd_price_history: deque[tuple[datetime, float, float]] = deque(maxlen=500)
 
+    def reset(self) -> None:
+        """Reset rolling runtime windows used for OI/CVD/force-order derived features.
+
+        FeatureEngine keeps bounded internal windows for metrics that are not fully
+        reconstructable from a single MarketSnapshot payload. Calling reset() makes
+        subsequent compute() output independent from any prior calls.
+        """
+        self._oi_history.clear()
+        self._force_order_rate_history.clear()
+        self._cvd_price_history.clear()
+
     def compute(self, snapshot: MarketSnapshot, schema_version: str, config_hash: str) -> Features:
         timestamp = snapshot.timestamp.astimezone(timezone.utc)
         atr_15m = compute_atr(snapshot.candles_15m, self.config.atr_period)
