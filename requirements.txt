@@ -2,3 +2,4 @@
 # Keep this list explicit and pinned during stabilization.
 requests>=2.32.0,<3.0.0
 websockets>=12.0,<16.0
+optuna>=3.6.0,<5.0.0

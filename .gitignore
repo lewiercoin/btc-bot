@@ -152,6 +152,7 @@ venv.bak/
 logs/
 tmp/
 temp/
+research_lab_runs/
 *.tmp
 *.temp
 
