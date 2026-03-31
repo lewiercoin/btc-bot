@@ -4,12 +4,20 @@ Last updated: 2026-03-31
 
 ## Next Milestone
 
-**Milestone:** Tech Debt: CI + Test Infrastructure
-**Status:** ACTIVE
-**Decision date:** 2026-03-31
-**Scope:** Add minimal CI workflow, pytest foundation, and lint foundation (ruff) with deterministic unit coverage for core pure-logic modules.
+**Milestone:** —
+**Status:** AWAITING_DECISION
+**Decision date:** —
+**Scope:** Research Lab v0.1 complete. Candidate next steps: (A) first real parameter search run (20–50 trials, review Pareto frontier), (B) Known Issue #1 layer leak cleanup, (C) smoke gap #7 coverage.
 
 ## Previous Milestones
+
+**Milestone:** Research Lab v0.1 — Offline Optimization Infrastructure
+**Status:** MVP_DONE (commit dfafa26, audit passed)
+**Scope:** Offline parameter optimization lab: param registry (49 active / 9 frozen params), immutable AppSettings adapter, SQLite snapshot isolation per trial, InstrumentedBacktestRunner with signal funnel, fixed walk-forward protocol, sensitivity analysis, Pareto frontier, experiment store, approval bundle generator, Optuna multi-objective driver, CLI. Deprecated stale `docs/autoresearch/` drafts.
+
+**Milestone:** Tech Debt: CI + Test Infrastructure
+**Status:** MVP_DONE (commits 86917df + a24e1e3, audit passed)
+**Scope:** Added `.github/workflows/ci.yml` (compileall + pytest + smoke_phase_c), pytest foundation with 14 unit tests (performance, models, settings, feature_engine, settings_adapter), ruff config. Fixed Known Issue #2 (FeatureEngine statefulness — `reset()` added, reproducibility tests added).
 
 **Milestone:** Strategy Optimization v1.1 — Kill SHORT signals + diagnostic funnel
 **Status:** MVP_DONE (commit c1ea3cf, audit passed)
@@ -56,7 +64,7 @@ None — all blueprint stubs implemented.
 ## Known Issues
 
 1. **Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines — *tracked since initial audit*
-2. ~~**Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation)~~ — **FIXED in this milestone** (`FeatureEngine.reset()` added; backtest already creates fresh FeatureEngine per run; `tests/test_feature_engine.py` validates idempotency and reset-based fresh-instance reproducibility)
+2. ~~**Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation)~~ — **FIXED in a24e1e3** (`FeatureEngine.reset()` added; backtest already creates fresh FeatureEngine per run; `tests/test_feature_engine.py` validates idempotency and reset-based fresh-instance reproducibility)
 3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ — **FIXED in c5f9408** (zero matches in codebase)
 4. ~~**Layer leak**: `PaperExecutionEngine` AND `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage)~~ — **FIXED in ba72c35** (PositionPersister protocol + DI injection into execution engines)
 5. ~~**Tech debt**: `_signed_request` retry duplication~~ — **FIXED in c5f9408** (unified `_request_with_retry`)
@@ -87,3 +95,7 @@ None — all blueprint stubs implemented.
 | AUDIT_007 | Daily Reset consecutive_losses + Trade Filtering | 2026-03-28 | 0e5f112 | MVP_DONE |
 | AUDIT_008 | Paper Trading Validation | 2026-03-29 | b1fb7f4 | MVP_DONE |
 | AUDIT_009 | Fix #18 — PAPER restart phantom_position | 2026-03-29 | 27a9270 | MVP_DONE |
+| AUDIT_010 | Tech Debt: CI + pytest + ruff foundation | 2026-03-31 | 86917df | MVP_DONE |
+| AUDIT_011 | Known Issue #2 — FeatureEngine statefulness | 2026-03-31 | a24e1e3 | MVP_DONE |
+| AUDIT_012 | Research Lab v0.1 — architecture + implementation | 2026-03-31 | aa68c23 | MVP_DONE |
+| AUDIT_013 | Research Lab v0.1 — optuna runtime validation | 2026-03-31 | dfafa26 | MVP_DONE |
