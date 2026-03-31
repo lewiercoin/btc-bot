@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
@@ -15,16 +15,21 @@ from research_lab.param_registry import get_active_params
 from research_lab.settings_adapter import build_candidate_settings
 from research_lab.types import ObjectiveMetrics, SignalFunnel, TrialEvaluation
 
+if TYPE_CHECKING:
+    import optuna
+
 
 def _require_optuna():
     try:
         import optuna  # type: ignore
     except ImportError as exc:  # pragma: no cover - runtime dependency check
-        raise RuntimeError("optuna is required for optimize workflow. Install optuna in the project environment.") from exc
+        raise RuntimeError(
+            "optuna is required for optimize workflow. Install optuna in the project environment."
+        ) from exc
     return optuna
 
 
-def build_optuna_trial_params(trial: "optuna.Trial") -> dict[str, Any]:
+def build_optuna_trial_params(trial: optuna.Trial) -> dict[str, Any]:
     """Samples ACTIVE params from param_registry using trial.suggest_*."""
 
     sampled: dict[str, Any] = {}
@@ -101,7 +106,7 @@ def run_optuna_study(
         directions=["maximize", "maximize", "minimize"],
     )
 
-    def objective(trial: "optuna.Trial") -> tuple[float, float, float]:
+    def objective(trial: optuna.Trial) -> tuple[float, float, float]:
         trial_id = f"{study_name}-trial-{trial.number:05d}"
         sampled_params = build_optuna_trial_params(trial)
         try:
@@ -136,4 +141,3 @@ def run_optuna_study(
 
     study.optimize(objective, n_trials=int(n_trials))
     return evaluations
-

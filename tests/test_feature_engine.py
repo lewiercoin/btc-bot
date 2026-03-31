@@ -6,6 +6,17 @@ from core.feature_engine import FeatureEngine
 from core.models import MarketSnapshot
 
 
+def _candle(open_time: datetime, open_: float, high: float, low: float, close: float) -> dict[str, float | datetime]:
+    return {
+        "open_time": open_time,
+        "open": open_,
+        "high": high,
+        "low": low,
+        "close": close,
+        "volume": 1.0,
+    }
+
+
 def _snapshot(
     ts: datetime,
     *,
@@ -16,19 +27,19 @@ def _snapshot(
     force_orders_count: int,
 ) -> MarketSnapshot:
     candles_15m = [
-        {"open_time": ts - timedelta(minutes=45), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 1.0},
-        {"open_time": ts - timedelta(minutes=30), "open": 100.0, "high": 102.0, "low": 99.0, "close": 101.0, "volume": 1.0},
-        {"open_time": ts - timedelta(minutes=15), "open": 101.0, "high": 103.0, "low": 100.0, "close": 102.0, "volume": 1.0},
+        _candle(ts - timedelta(minutes=45), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts - timedelta(minutes=30), 100.0, 102.0, 99.0, 101.0),
+        _candle(ts - timedelta(minutes=15), 101.0, 103.0, 100.0, 102.0),
     ]
     candles_1h = [
-        {"open_time": ts - timedelta(hours=3), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 1.0},
-        {"open_time": ts - timedelta(hours=2), "open": 100.0, "high": 101.0, "low": 99.0, "close": 101.0, "volume": 1.0},
-        {"open_time": ts - timedelta(hours=1), "open": 101.0, "high": 102.0, "low": 100.0, "close": 102.0, "volume": 1.0},
+        _candle(ts - timedelta(hours=3), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts - timedelta(hours=2), 100.0, 101.0, 99.0, 101.0),
+        _candle(ts - timedelta(hours=1), 101.0, 102.0, 100.0, 102.0),
     ]
     candles_4h = [
-        {"open_time": ts - timedelta(hours=12), "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume": 1.0},
-        {"open_time": ts - timedelta(hours=8), "open": 100.0, "high": 101.0, "low": 99.0, "close": 101.0, "volume": 1.0},
-        {"open_time": ts - timedelta(hours=4), "open": 101.0, "high": 102.0, "low": 100.0, "close": 102.0, "volume": 1.0},
+        _candle(ts - timedelta(hours=12), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts - timedelta(hours=8), 100.0, 101.0, 99.0, 101.0),
+        _candle(ts - timedelta(hours=4), 101.0, 102.0, 100.0, 102.0),
     ]
     funding = [
         {"funding_time": ts - timedelta(hours=8), "funding_rate": 0.0001},

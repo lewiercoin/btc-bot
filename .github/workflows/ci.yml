@@ -31,5 +31,8 @@ jobs:
       - name: Unit tests
         run: python -m pytest tests/ -x --tb=short
 
+      - name: Lint (research_lab + tests)
+        run: python -m ruff check research_lab/ tests/
+
       - name: Critical smoke tests (no DB/network)
         run: python scripts/smoke_phase_c.py
