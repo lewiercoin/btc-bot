@@ -31,18 +31,30 @@ LOG = logging.getLogger(__name__)
 BASE_URL = "https://data.binance.vision/data/futures/um/daily/aggTrades"
 
 
-def download_zip(symbol: str, day: date) -> bytes | None:
+def download_zip(symbol: str, day: date, max_retries: int = 5) -> bytes | None:
     """Download a single day's aggTrades ZIP. Returns bytes or None if 404."""
+    import time as _time
     url = f"{BASE_URL}/{symbol}/{symbol}-aggTrades-{day.isoformat()}.zip"
     LOG.info("Downloading %s ...", url)
-    try:
-        with urlopen(url, timeout=120) as resp:
-            return resp.read()
-    except HTTPError as exc:
-        if exc.code == 404:
-            LOG.warning("Not found (404): %s — skipping.", url)
-            return None
-        raise
+    for attempt in range(max_retries):
+        try:
+            with urlopen(url, timeout=180) as resp:
+                return resp.read()
+        except HTTPError as exc:
+            if exc.code == 404:
+                LOG.warning("Not found (404): %s — skipping.", url)
+                return None
+            raise
+        except Exception as exc:
+            wait = 5 * (attempt + 1)
+            if attempt < max_retries - 1:
+                LOG.warning("Download failed (attempt %d/%d): %s. Retrying in %ds...",
+                            attempt + 1, max_retries, exc, wait)
+                _time.sleep(wait)
+            else:
+                LOG.error("Download failed after %d attempts: %s — skipping day.", max_retries, exc)
+                return None
+    return None
 
 
 def parse_csv_trades(zip_bytes: bytes, symbol: str) -> list[dict]:
