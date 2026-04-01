@@ -225,13 +225,24 @@ This project uses a structured generator-evaluator workflow:
   - trade lifecycle
   - drawdown persistence
   - recovery startup sync
+  - CI/test foundation
+  - tech debt cleanup
   → MVP_DONE
 
+- Research Lab Governance Foundation: MVP_DONE
+- Research Lab Cleanup: RL-004 + RL-005: MVP_DONE
 - Research Lab v0.1 — Offline Optimization Infrastructure: MVP_DONE
 - Research Lab v1 — Hard Promotion Gate: MVP_DONE
+- Research Lab v2 — WF multicriteria + protocol lineage: MVP_DONE
+- Research Lab v3 — Nested walk-forward optimization: MVP_DONE
+- Research Lab hardening — Store Schema + Operator Clarity: DONE
+- Research Lab vFuture — Autoresearch agent loop: MVP_DONE
+
+- Baseline restore tag:
+  - `v1.0-baseline`
 
 - Active milestone:
-  - Research Lab Cleanup: RL-004 + RL-005
+  - None — all milestones closed
 
 - Known issues tracked in:
   - `docs/MILESTONE_TRACKER.md`
