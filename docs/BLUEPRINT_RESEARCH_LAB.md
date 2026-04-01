@@ -43,9 +43,14 @@ Approval bundle is the end of the automated path. Human review and manual applic
 
 | Module | Role |
 |---|---|
-| `research_lab/cli.py` | Operator entrypoint for optimize, replay, report, and approval-bundle commands |
+| `research_lab/__main__.py` | Package entrypoint for `python -m research_lab` |
+| `research_lab/main.py` | Compatibility entrypoint delegating to the CLI |
+| `research_lab/cli.py` | Operator entrypoint for optimize, replay, autoresearch, report, and approval-bundle commands |
+| `research_lab/autoresearch_loop.py` | Single-pass autoresearch loop: hypothesis generation, direct evaluation, deterministic ranking, and conditional approval bundle output |
 | `research_lab/workflows/optimize_loop.py` | Orchestrates baseline gate, Optuna search, Pareto selection, walk-forward, and recommendation persistence |
 | `research_lab/workflows/replay_candidate.py` | Re-evaluates a stored candidate and rebuilds walk-forward plus recommendation artifacts |
+| `research_lab/types.py` | Frozen dataclass contracts for trials, walk-forward outputs, recommendations, and autoresearch loop reports |
+| `research_lab/constants.py` | Shared thresholds, minimum-trade defaults, and promotion-blocking risk constants |
 | `research_lab/param_registry.py` | Canonical optimization sandbox registry: ACTIVE, FROZEN, DEFERRED, and UNSUPPORTED parameters |
 | `research_lab/constraints.py` | Dependency and domain checks for parameter vectors before evaluation |
 | `research_lab/integrations/optuna_driver.py` | Optuna study integration and trial sampling for ACTIVE parameters only |
