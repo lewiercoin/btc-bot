@@ -188,6 +188,19 @@ def _parse_trial_row(row: sqlite3.Row) -> TrialEvaluation:
     )
 
 
+def _parse_recommendation_row(row: sqlite3.Row) -> RecommendationDraft:
+    payload: dict[str, Any] = json.loads(str(row["recommendation_json"]))
+    return RecommendationDraft(
+        candidate_id=str(payload["candidate_id"]),
+        summary=str(payload["summary"]),
+        params_diff=dict(payload.get("params_diff", {})),
+        expected_improvement={k: float(v) for k, v in dict(payload.get("expected_improvement", {})).items()},
+        risks=tuple(payload.get("risks", [])),
+        approval_required=bool(payload.get("approval_required", True)),
+        protocol_hash=str(payload["protocol_hash"]) if payload.get("protocol_hash") is not None else None,
+    )
+
+
 def load_trials(store_path: Path) -> list[TrialEvaluation]:
     if not store_path.exists():
         return []
@@ -201,3 +214,18 @@ def load_trials(store_path: Path) -> list[TrialEvaluation]:
             """
         ).fetchall()
     return [_parse_trial_row(row) for row in rows]
+
+
+def load_recommendations(store_path: Path) -> list[RecommendationDraft]:
+    if not store_path.exists():
+        return []
+    init_store(store_path)
+    with _connect(store_path) as conn:
+        rows = conn.execute(
+            """
+            SELECT candidate_id, recommendation_json, protocol_hash
+            FROM recommendations
+            ORDER BY created_at_utc ASC, candidate_id ASC
+            """
+        ).fetchall()
+    return [_parse_recommendation_row(row) for row in rows]
