@@ -8,8 +8,10 @@ import pytest
 from backtest.backtest_runner import BacktestConfig
 from research_lab.baseline_gate import BaselineGateError, check_baseline
 from research_lab.approval import write_approval_bundle
+from research_lab.cli import main as research_lab_main
 from research_lab.constants import PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
+from research_lab.experiment_store import save_recommendation
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
 from research_lab.settings_adapter import build_candidate_settings, diff_settings
@@ -112,6 +114,72 @@ def test_approval_bundle_does_not_write_settings(tmp_path: Path) -> None:
     write_approval_bundle(recommendation=recommendation, output_dir=output_dir)
 
     assert not (output_dir / "settings.py").exists()
+    assert (output_dir / "recommendation.json").exists()
+    assert (output_dir / "params_diff.json").exists()
+    assert (output_dir / "candidate_settings.json").exists()
+
+
+def test_build_approval_bundle_cli_rejects_blocking_walkforward_risk(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    store_path = tmp_path / "research_lab.db"
+    output_dir = tmp_path / "approval_bundle"
+    recommendation = RecommendationDraft(
+        candidate_id="candidate-002",
+        summary="blocked recommendation",
+        params_diff={"tp1_atr_mult": {"from": 2.5, "to": 3.0}},
+        expected_improvement={"expectancy_r": 0.1},
+        risks=("walkforward_not_passed",),
+        approval_required=True,
+    )
+    save_recommendation(rec=recommendation, store_path=store_path)
+
+    with pytest.raises(SystemExit) as exc_info:
+        research_lab_main(
+            [
+                "build-approval-bundle",
+                "--candidate-id",
+                recommendation.candidate_id,
+                "--store-path",
+                str(store_path),
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+    assert exc_info.value.code == 1
+    captured = capsys.readouterr()
+    assert "blocking promotion risks detected" in captured.err
+    assert "walkforward_not_passed" in captured.err
+    assert not output_dir.exists()
+
+
+def test_build_approval_bundle_cli_writes_files_for_clean_recommendation(tmp_path: Path) -> None:
+    store_path = tmp_path / "research_lab.db"
+    output_dir = tmp_path / "approval_bundle"
+    recommendation = RecommendationDraft(
+        candidate_id="candidate-003",
+        summary="clean recommendation",
+        params_diff={"tp1_atr_mult": {"from": 2.5, "to": 3.0}},
+        expected_improvement={"expectancy_r": 0.1},
+        risks=(),
+        approval_required=True,
+    )
+    save_recommendation(rec=recommendation, store_path=store_path)
+
+    research_lab_main(
+        [
+            "build-approval-bundle",
+            "--candidate-id",
+            recommendation.candidate_id,
+            "--store-path",
+            str(store_path),
+            "--output-dir",
+            str(output_dir),
+        ]
+    )
+
     assert (output_dir / "recommendation.json").exists()
     assert (output_dir / "params_diff.json").exists()
     assert (output_dir / "candidate_settings.json").exists()
