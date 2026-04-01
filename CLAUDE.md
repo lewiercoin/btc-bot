@@ -45,21 +45,23 @@ Claude Code is the evaluator/auditor in a structured generator-evaluator workflo
 
 | Decision | Authority | Rationale |
 |---|---|---|
-| What to build next (priority, sequence) | **User** (product owner) | Business priorities, time budget, strategic goals |
-| What to recommend (options + trade-offs) | **Claude Code** (auditor) | Architecture awareness, dependency graph, tech risk |
+| Strategic veto (stop, change direction, reprioritize) | **User** (product owner) | Business priorities, time budget, strategic goals |
+| What to build next (technical selection) | **Claude Code + Codex** (consensus) | Architecture awareness, dependency graph, tech risk, scope purity |
 | How to build (implementation) | **Codex** (builder) | Executes handoff scope, follows blueprint |
 
-Codex never decides what to build next. Codex can recommend a next step to Claude Code. Codex receives a handoff and executes.
+Codex can recommend next step to Claude Code. Claude Code makes the technical selection. User approves or vetoes — not picks from a menu.
+
+User does NOT need to understand technical trade-offs to approve. One sentence summary is enough for approval.
 
 ### Post-Audit Decision Flow
 
 ```
 1. Claude Code delivers audit report with verdict
-2. If MVP_DONE -> Claude Code proposes 2-3 next milestone options with rationale + risk
-3. User picks one (or proposes own)
-4. Claude Code updates MILESTONE_TRACKER.md (Next Milestone section)
-5. Claude Code generates handoff for Codex
-6. User copies handoff to Codex
+2. Claude Code + Codex reach consensus on next milestone (internally)
+3. Claude Code presents user with ONE recommendation + one-sentence rationale
+4. User says YES or vetoes with reason
+5. If YES: Claude Code updates MILESTONE_TRACKER.md and generates handoff immediately
+6. If VETO: Claude Code + Codex re-evaluate, present revised recommendation
 ```
 
 ### Where decisions are recorded
