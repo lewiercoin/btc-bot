@@ -4,30 +4,30 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Research Lab Cleanup: RL-004 + RL-005
-**Status:** IMPLEMENTED_AWAITING_AUDIT
+**Milestone:** Research Lab v3 — Nested Walk-Forward
+**Status:** ACTIVE
 **Decision date:** 2026-04-01
-**Scope:** Move promotion blocking risks to `research_lab/constants.py`, wire `min_trades_full_candidate` from protocol into optimize/replay candidate evaluation, and validate the behavior with research lab smoke tests.
+**Scope:** True nested optimization: per-window Optuna search on train data, champion evaluated on validation, results aggregated across windows. Post-hoc mode preserved as default.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Research Lab Cleanup: RL-004 + RL-005
-**Milestone status:** IMPLEMENTED_AWAITING_AUDIT
+**Current active milestone:** Research Lab v3 — Nested Walk-Forward
+**Milestone status:** ACTIVE
 **Last audit verdict:** Pending
 
 ### Milestone ladder
 
 | ID | Name | Status | Implementation commit | Last audit | Blocking issues |
 |---|---|---|---|---|---|
-| RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | IMPLEMENTED_AWAITING_AUDIT | pending local audit checkpoint | Pending | RL-004, RL-005 |
+| RL-V3 | Nested Walk-Forward | ACTIVE | - | - | RL-003 |
+| RL-V2 | WF multicriteria + Protocol lineage | CLOSED | `00e7ada` | 2026-04-01 Claude audit - MVP_DONE | none |
+| RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | CLOSED | `df81334` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
-| RL-V2 | WF multicriteria | AWAITING_DECISION | - | - | RL-001, RL-002, RL-004, RL-005 |
-| RL-V3 | Nested WF | AWAITING_DECISION | - | - | RL-003 |
-| RL-FUTURE | Autoresearch agent loop | AWAITING_DECISION | - | - | RL-002, RL-003 |
+| RL-FUTURE | Autoresearch agent loop | AWAITING_DECISION | - | - | RL-003 |
 
 ### Open issues
 
