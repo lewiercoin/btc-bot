@@ -5,7 +5,7 @@ import sqlite3
 from pathlib import Path
 from typing import Any
 
-from research_lab.experiment_store import load_trials
+from research_lab.experiment_store import init_store, load_trials
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 
 
@@ -26,9 +26,10 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
     walkforward_rows: list[dict[str, Any]] = []
     recommendation_rows: list[dict[str, Any]] = []
     if store_path.exists():
+        init_store(store_path)
         with _connect(store_path) as conn:
             walkforward_query = (
-                "SELECT candidate_id, report_json, created_at_utc "
+                "SELECT candidate_id, report_json, created_at_utc, protocol_hash "
                 "FROM walkforward_reports ORDER BY created_at_utc ASC"
             )
             walkforward_rows = [
@@ -36,11 +37,12 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
                     "candidate_id": str(row["candidate_id"]),
                     "report_json": json.loads(str(row["report_json"])),
                     "created_at_utc": str(row["created_at_utc"]),
+                    "protocol_hash": str(row["protocol_hash"]) if row["protocol_hash"] is not None else None,
                 }
                 for row in conn.execute(walkforward_query).fetchall()
             ]
             recommendations_query = (
-                "SELECT candidate_id, recommendation_json, created_at_utc "
+                "SELECT candidate_id, recommendation_json, created_at_utc, protocol_hash "
                 "FROM recommendations ORDER BY created_at_utc ASC"
             )
             recommendation_rows = [
@@ -48,6 +50,7 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
                     "candidate_id": str(row["candidate_id"]),
                     "recommendation_json": json.loads(str(row["recommendation_json"])),
                     "created_at_utc": str(row["created_at_utc"]),
+                    "protocol_hash": str(row["protocol_hash"]) if row["protocol_hash"] is not None else None,
                 }
                 for row in conn.execute(recommendations_query).fetchall()
             ]
@@ -65,6 +68,7 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
                 "max_drawdown_pct": trial.metrics.max_drawdown_pct,
                 "trades_count": trial.metrics.trades_count,
                 "rejected_reason": trial.rejected_reason,
+                "protocol_hash": trial.protocol_hash,
             }
             for trial in ranked_pareto
         ],

@@ -13,8 +13,9 @@ from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.experiment_store import save_recommendation, save_walkforward
 from research_lab.integrations.optuna_driver import run_optuna_study
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
+from research_lab.protocol import hash_protocol, load_protocol
 from research_lab.settings_adapter import build_candidate_settings
-from research_lab.walkforward import build_windows, load_protocol, run_walkforward
+from research_lab.walkforward import build_windows, run_walkforward
 
 
 def _to_range_value(value: datetime | date | str) -> str:
@@ -39,6 +40,7 @@ def run_optimize_loop(
 ) -> dict[str, Any]:
     protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
     protocol = load_protocol(protocol_file)
+    protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
 
     check_baseline(
@@ -56,6 +58,7 @@ def run_optimize_loop(
         study_name=study_name,
         seed=seed,
         min_trades_full_candidate=min_trades_full_candidate,
+        protocol_hash=protocol_hash,
     )
     frontier = rank_pareto_candidates(compute_pareto_frontier(trials))
 
@@ -88,6 +91,7 @@ def run_optimize_loop(
         recommendations_count += 1
 
     return {
+        "protocol_hash": protocol_hash,
         "trials_total": len(trials),
         "pareto_candidates": len(frontier),
         "walkforward_windows": len(windows),

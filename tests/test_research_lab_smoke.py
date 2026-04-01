@@ -12,11 +12,14 @@ from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
 from research_lab.constants import PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
-from research_lab.experiment_store import save_recommendation
+from research_lab.experiment_store import save_recommendation, save_trial, save_walkforward
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
+from research_lab.protocol import hash_protocol
+from research_lab.reporter import build_experiment_report
 from research_lab.settings_adapter import build_candidate_settings, diff_settings
-from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport
+from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport, WalkForwardWindow
+from research_lab import walkforward as walkforward_module
 from research_lab.workflows import optimize_loop as optimize_loop_module
 from research_lab.workflows import replay_candidate as replay_candidate_module
 from settings import load_settings
@@ -469,3 +472,154 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
     )
 
     assert captured_min_trades == [999]
+
+
+def test_run_walkforward_applies_multicriteria_thresholds(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol = {
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 10,
+        "min_expectancy_r_per_window": 0.0,
+        "min_profit_factor_per_window": 1.0,
+        "max_drawdown_pct_per_window": 50.0,
+        "min_sharpe_ratio_per_window": 0.0,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+    }
+    segment_results = [
+        TrialEvaluation(
+            trial_id="wf-train-000",
+            params={},
+            metrics=ObjectiveMetrics(
+                expectancy_r=0.30,
+                profit_factor=1.40,
+                max_drawdown_pct=12.0,
+                trades_count=20,
+                sharpe_ratio=1.20,
+                pnl_abs=150.0,
+                win_rate=0.55,
+            ),
+            funnel=SignalFunnel(
+                signals_generated=10,
+                signals_regime_blocked=1,
+                signals_governance_rejected=1,
+                signals_risk_rejected=1,
+                signals_executed=7,
+            ),
+            rejected_reason=None,
+        ),
+        TrialEvaluation(
+            trial_id="wf-val-000",
+            params={},
+            metrics=ObjectiveMetrics(
+                expectancy_r=-0.10,
+                profit_factor=0.90,
+                max_drawdown_pct=55.0,
+                trades_count=20,
+                sharpe_ratio=-0.20,
+                pnl_abs=-40.0,
+                win_rate=0.45,
+            ),
+            funnel=SignalFunnel(
+                signals_generated=8,
+                signals_regime_blocked=1,
+                signals_governance_rejected=1,
+                signals_risk_rejected=1,
+                signals_executed=5,
+            ),
+            rejected_reason=None,
+        ),
+    ]
+
+    monkeypatch.setattr(
+        walkforward_module,
+        "_evaluate_window_segment",
+        lambda **_: segment_results.pop(0),
+    )
+
+    report = walkforward_module.run_walkforward(
+        base_settings=settings,
+        candidate_params={},
+        windows=[
+            WalkForwardWindow(
+                train_start="2025-01-01T00:00:00+00:00",
+                train_end="2025-03-31T00:00:00+00:00",
+                validation_start="2025-03-31T00:00:00+00:00",
+                validation_end="2025-04-30T00:00:00+00:00",
+            )
+        ],
+        source_db_path=tmp_path / "source.db",
+        snapshots_dir=tmp_path / "snapshots",
+        protocol=protocol,
+    )
+
+    assert report.passed is False
+    assert report.windows_passed == 0
+    assert report.protocol_hash == hash_protocol(protocol)
+    assert "window_000_validation_failed: expectancy_r=-0.1000 < min_expectancy_r=0.0000" in report.reasons
+    assert "window_000_validation_failed: profit_factor=0.9000 < min_profit_factor=1.0000" in report.reasons
+    assert "window_000_validation_failed: max_drawdown_pct=55.0000 > max_drawdown_pct=50.0000" in report.reasons
+    assert "window_000_validation_failed: sharpe_ratio=-0.2000 < min_sharpe_ratio=0.0000" in report.reasons
+
+
+def test_protocol_hash_persists_through_store_and_report(tmp_path: Path) -> None:
+    store_path = tmp_path / "research_lab.db"
+    protocol_hash = "proto-hash-001"
+    trial = TrialEvaluation(
+        trial_id="candidate-001",
+        params={"tp1_atr_mult": 3.0},
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.25,
+            profit_factor=1.6,
+            max_drawdown_pct=9.0,
+            trades_count=18,
+            sharpe_ratio=1.1,
+            pnl_abs=120.0,
+            win_rate=0.52,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash=protocol_hash,
+    )
+    report = WalkForwardReport(
+        passed=True,
+        windows_total=2,
+        windows_passed=2,
+        is_degradation_pct=5.0,
+        fragile=False,
+        reasons=(),
+        protocol_hash=protocol_hash,
+    )
+    recommendation = RecommendationDraft(
+        candidate_id="candidate-001",
+        summary="with lineage",
+        params_diff={"tp1_atr_mult": {"from": 2.5, "to": 3.0}},
+        expected_improvement={"expectancy_r": 0.25},
+        risks=(),
+        approval_required=True,
+        protocol_hash=protocol_hash,
+    )
+
+    save_trial(trial, store_path)
+    save_walkforward(trial.trial_id, report, store_path)
+    save_recommendation(recommendation, store_path)
+
+    stored_trials = build_experiment_report(store_path)
+
+    assert stored_trials["pareto_ranked"][0]["protocol_hash"] == protocol_hash
+    assert stored_trials["walkforward_reports"][0]["protocol_hash"] == protocol_hash
+    assert stored_trials["walkforward_reports"][0]["report_json"]["protocol_hash"] == protocol_hash
+    assert stored_trials["recommendations"][0]["protocol_hash"] == protocol_hash
+    assert stored_trials["recommendations"][0]["recommendation_json"]["protocol_hash"] == protocol_hash

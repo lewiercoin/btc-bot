@@ -18,6 +18,13 @@ def build_recommendation(
     walkforward_report: WalkForwardReport,
 ) -> RecommendationDraft:
     params_diff = diff_settings(base_settings, candidate_settings)
+    if (
+        evaluation.protocol_hash is not None
+        and walkforward_report.protocol_hash is not None
+        and evaluation.protocol_hash != walkforward_report.protocol_hash
+    ):
+        raise ValueError("Protocol hash mismatch between evaluation and walk-forward report.")
+    protocol_hash = evaluation.protocol_hash or walkforward_report.protocol_hash
 
     risks: list[str] = []
     if evaluation.rejected_reason is not None:
@@ -47,6 +54,7 @@ def build_recommendation(
         },
         risks=tuple(dict.fromkeys(risks)),
         approval_required=True,
+        protocol_hash=protocol_hash,
     )
 
 
@@ -73,6 +81,7 @@ def write_approval_bundle(
     # Candidate settings snapshot is derived from params_diff `to` values.
     candidate_settings_payload = {
         "candidate_id": recommendation.candidate_id,
+        "protocol_hash": recommendation.protocol_hash,
         "changed_params_to": {
             name: payload.get("to")
             for name, payload in recommendation.params_diff.items()
@@ -83,4 +92,3 @@ def write_approval_bundle(
         encoding="utf-8",
     )
     return output_dir
-
