@@ -132,7 +132,7 @@ None - all blueprint stubs implemented.
 4. ~~**Layer leak**: `PaperExecutionEngine` and `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage)~~ - **FIXED in `ba72c35`** (`PositionPersister` protocol plus DI injection into execution engines)
 5. ~~**Tech debt**: `_signed_request` retry duplication~~ - **FIXED in `c5f9408`** (unified `_request_with_retry`)
 6. ~~**Safe mode = exit**: orchestrator returns on `safe_mode` instead of managing existing positions~~ - **FIXED in `09a099f`** (orchestrator continues event loop in safe mode, lifecycle monitoring active)
-7. **Smoke gap**: `smoke_recovery.py` does not cover `exchange_sync_failed`, `isolated_mode_mismatch`, `leverage_mismatch`, or combined issues - identified in `AUDIT_001`
+7. ~~**Smoke gap**: `smoke_recovery.py` does not cover `exchange_sync_failed`, `isolated_mode_mismatch`, `leverage_mismatch`, or combined issues - identified in `AUDIT_001`~~ - **FIXED in Tech Debt Cleanup (Resumed)** (`scripts/smoke_recovery.py` now runs on in-memory SQLite and asserts the missing recovery failure paths plus persisted recovery audit logs deterministically)
 8. ~~**Private API as public contract**: `_signed_request` called by `OrderManager` and `LiveExecutionEngine` despite underscore prefix~~ - **FIXED in `45c9d3d`** (execution layer uses public `signed_request()`)
 9. ~~**Assert in production path**: `order_manager.py` uses `assert` instead of explicit raises~~ - **FIXED in `5c7a882`** (replaced with explicit `OrderManagerError` raises)
 10. ~~**Fees not captured**: `fees=0.0` hardcoded in `LiveExecutionEngine`; actual Binance fees not extracted~~ - **FIXED in `a325072`** (fees parsed from exchange commission payload)
