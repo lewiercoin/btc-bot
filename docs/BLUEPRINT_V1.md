@@ -71,11 +71,16 @@ Core edge:
 
 ```
 btc-bot/
+├── .github/
+│   └── workflows/
+│       └── ci.yml
 ├── main.py
 ├── orchestrator.py
 ├── settings.py
 ├── requirements.txt
 ├── README.md
+├── pytest.ini
+├── ruff.toml
 │
 ├── data/
 │   ├── market_data.py
@@ -104,7 +109,8 @@ btc-bot/
 │   ├── db.py
 │   ├── schema.sql
 │   ├── repositories.py
-│   └── state_store.py
+│   ├── state_store.py
+│   └── position_persister.py
 │
 ├── monitoring/
 │   ├── audit_logger.py
@@ -121,13 +127,38 @@ btc-bot/
 ├── scripts/
 │   ├── init_db.py
 │   ├── bootstrap_history.py
+│   ├── run_backtest.py
 │   ├── run_paper.py
 │   ├── run_live.py
-│   └── daily_summary.py
+│   ├── daily_summary.py
+│   └── smoke_*.py
 │
-└── research/
-    ├── analyze_trades.py
-    └── llm_post_trade_review.py
+├── research/
+│   ├── analyze_trades.py
+│   └── llm_post_trade_review.py
+│
+├── research_lab/
+│   ├── cli.py
+│   ├── main.py
+│   ├── __main__.py
+│   ├── autoresearch_loop.py
+│   ├── workflows/
+│   ├── configs/
+│   └── ...
+│
+├── tests/
+│   ├── test_feature_engine.py
+│   ├── test_models.py
+│   ├── test_performance.py
+│   ├── test_research_lab_smoke.py
+│   ├── test_settings.py
+│   └── test_settings_adapter.py
+│
+└── docs/
+    ├── BLUEPRINT_V1.md
+    ├── BLUEPRINT_RESEARCH_LAB.md
+    ├── MILESTONE_TRACKER.md
+    └── audits/
 ```
 
 ## 5. Odpowiedzialność modułów
@@ -141,9 +172,10 @@ Cienki entrypoint:
 
 ### 5.2 orchestrator.py
 Serce przepływu:
-- uruchamia pętle danych,
-- zamyka 15m cykl decyzyjny,
+- uruchamia startup recovery i feedy,
+- scheduluje health check, monitoring pozycji i 15m decision cycle,
 - koordynuje feature/regime/signal/governance/risk/execution,
+- w `safe_mode` dalej zarządza istniejącymi pozycjami, ale blokuje nowe wejścia,
 - nie liczy feature samodzielnie.
 
 ### 5.3 settings.py
@@ -201,7 +233,9 @@ Zero live edits. Zmiana configu = restart.
 
 **repositories.py** — Operacje CRUD.
 
-**state_store.py** — Zapisywanie bieżącego stanu bota.
+**state_store.py** — Trwały runtime state, drawdowny i widoki stanu dla governance/risk.
+
+**position_persister.py** — Persystencja pozycji i execution-state dla execution layer.
 
 ### 5.8 monitoring/*
 
@@ -480,32 +514,22 @@ Jeśli wszystko jest spójne:
 
 ### 10.1 Live loop
 
-WebSocket aktualizuje aggTrades i forceOrders.
+Start procesu:
+1. `main.py` ładuje `AppSettings`, inicjalizuje SQLite i uruchamia `BotOrchestrator`.
+2. `RecoveryCoordinator` wykonuje startup sync; przy niespójności ustawia `safe_mode=True`.
+3. Orchestrator uruchamia feedy i harmonogram runtime.
 
-Co zamknięcie 15m:
-1. pobierz świeże OHLCV/funding/OI,
-2. zbuduj MarketSnapshot,
-3. policz Features,
-4. sklasyfikuj RegimeState,
-5. wygeneruj SignalCandidate lub None.
+Pętla runtime:
+1. `HealthMonitor` działa niezależnie od cyklu decyzyjnego.
+2. Monitoring pozycji działa również w `safe_mode`, żeby domknąć lifecycle otwartych trade'ów.
+3. Na każdej granicy 15m orchestrator odświeża runtime state i buduje `MarketSnapshot`.
+4. Najpierw przetwarzany jest trade lifecycle i settlement już otwartych pozycji.
+5. Jeśli `safe_mode` jest aktywny, nowe wejścia są pomijane.
+6. W przeciwnym razie pipeline działa deterministycznie:
+   `MarketSnapshot -> Features -> RegimeState -> SignalCandidate -> Governance -> ExecutableSignal -> Risk -> Execution`.
+7. Po fill execution layer zapisuje pozycję, a storage aktualizuje persistent bot state.
 
-Jeśli jest SignalCandidate:
-1. puść przez GovernanceLayer,
-2. jeśli przejdzie, powstaje ExecutableSignal.
-
-RiskEngine ocenia:
-- czy wolno handlować,
-- jaki size,
-- czy RR spełnia minimum.
-
-ExecutionEngine:
-- składa limit entry,
-- po fill ustawia SL/TP,
-- monitoruje pozycję.
-
-AuditLogger loguje wszystko.
-TelegramNotifier wysyła alerty.
-BotState aktualizowany w SQLite.
+Każde veto, błąd, lifecycle event i alert przechodzą przez `AuditLogger`, `TelegramNotifier` i SQLite persistence.
 
 ### 10.2 Daily loop
 - zapisz pasywny ETF bias,
@@ -539,19 +563,16 @@ Bot natychmiast wstrzymuje nowe wejścia, jeśli:
 
 | Phase | Scope | Status |
 |---|---|---|
-| **A — fundament** | settings.py, models.py, schema.sql, db.py + repositories.py, exchange_guard.py | DONE |
-| **B — dane** | rest_client.py, websocket_client.py, market_data.py, bootstrap_history.py | DONE |
-| **C — logika** | feature_engine.py, regime_engine.py, signal_engine.py, governance.py, risk_engine.py | DONE |
-| **D — execution** | paper_execution_engine.py, execution_engine.py, order_manager.py, recovery.py | PENDING |
-| **E — monitoring** | audit_logger.py, telegram_notifier.py, health.py, metrics.py | PENDING |
-| **F — orchestracja** | orchestrator.py, main.py, run_paper.py | PENDING |
-| **G — backtest** | replay_loader.py, fill_model.py, performance.py, backtest_runner.py | PENDING |
-| **H — research** | analyze_trades.py, llm_post_trade_review.py | PENDING |
+| **A — fundament** | settings.py, models.py, schema.sql, db.py + repositories.py, exchange_guard.py | MVP_DONE |
+| **B — dane** | rest_client.py, websocket_client.py, market_data.py, bootstrap_history.py | MVP_DONE |
+| **C — logika** | feature_engine.py, regime_engine.py, signal_engine.py, governance.py, risk_engine.py | MVP_DONE |
+| **D — execution** | paper_execution_engine.py, execution_engine.py, live_execution_engine.py, order_manager.py, recovery.py | MVP_DONE |
+| **E — monitoring** | audit_logger.py, telegram_notifier.py, health.py, metrics.py | MVP_DONE |
+| **F — orchestracja** | orchestrator.py, main.py, run_paper.py | MVP_DONE |
+| **G — backtest** | replay_loader.py, fill_model.py, performance.py, backtest_runner.py | MVP_DONE |
+| **H — research** | analyze_trades.py, llm_post_trade_review.py | MVP_DONE |
 
-**Note:** Phases A-C are DONE as MVP. Additional cross-cutting milestones completed:
-- Runtime state persistence (MVP)
-- Trade lifecycle + PnL settlement (MVP)
-- Drawdown persistence (MVP)
+**Note:** All blueprint phases A-H are MVP_DONE. Cross-cutting milestones for runtime state persistence, trade lifecycle + PnL settlement, drawdown persistence, recovery startup sync, CI/test foundation, and tracked tech-debt cleanup are closed at `v1.0-baseline`.
 
 ## 13. Definition of Done dla MVP v1.0
 
