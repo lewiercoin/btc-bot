@@ -8,6 +8,7 @@ from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
 from research_lab.approval import build_recommendation
+from research_lab.baseline_gate import check_baseline
 from research_lab.experiment_store import save_recommendation, save_walkforward
 from research_lab.integrations.optuna_driver import run_optuna_study
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
@@ -35,6 +36,11 @@ def run_optimize_loop(
     seed: int = 42,
     protocol_path: Path | None = None,
 ) -> dict[str, Any]:
+    check_baseline(
+        source_db_path=source_db_path,
+        backtest_config=backtest_config,
+        base_settings=base_settings,
+    )
     trials = run_optuna_study(
         source_db_path=source_db_path,
         store_path=store_path,
@@ -83,4 +89,3 @@ def run_optimize_loop(
         "walkforward_windows": len(windows),
         "recommendations_saved": recommendations_count,
     }
-
