@@ -42,10 +42,7 @@ None.
 
 #### ARCH_DEBT
 
-| ID | Issue | Target version |
-|---|---|---|
-| RL-DDL | `CREATE TABLE` for trials/walkforward_reports/recommendations missing `protocol_hash` column; schema relies on ALTER TABLE migration instead | hardening |
-| RL-MODE-DOC | `walkforward_mode` protocol field not documented in blueprint; operators must know to edit protocol JSON to activate nested mode | hardening |
+None.
 
 ### Audit history
 
