@@ -1,12 +1,13 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport
+from research_lab.types import NestedWalkForwardReport, ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport
 
 
 def _utc_now_iso() -> str:
@@ -109,7 +110,7 @@ def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
         conn.commit()
 
 
-def save_walkforward(candidate_id: str, report: WalkForwardReport, store_path: Path) -> None:
+def save_walkforward(candidate_id: str, report: WalkForwardReport | NestedWalkForwardReport, store_path: Path) -> None:
     init_store(store_path)
     with _connect(store_path) as conn:
         conn.execute(
@@ -119,18 +120,7 @@ def save_walkforward(candidate_id: str, report: WalkForwardReport, store_path: P
             """,
             (
                 candidate_id,
-                json.dumps(
-                    {
-                        "passed": report.passed,
-                        "windows_total": report.windows_total,
-                        "windows_passed": report.windows_passed,
-                        "is_degradation_pct": report.is_degradation_pct,
-                        "fragile": report.fragile,
-                        "reasons": list(report.reasons),
-                        "protocol_hash": report.protocol_hash,
-                    },
-                    sort_keys=True,
-                ),
+                json.dumps(dataclasses.asdict(report), sort_keys=True),
                 _utc_now_iso(),
                 report.protocol_hash,
             ),

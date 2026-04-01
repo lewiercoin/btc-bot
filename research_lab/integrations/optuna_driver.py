@@ -114,7 +114,7 @@ def run_optuna_study(
     n_trials: int,
     study_name: str,
     seed: int = 42,
-    min_trades_full_candidate: int = MIN_TRADES_DEFAULT,
+    min_trades: int = MIN_TRADES_DEFAULT,
     protocol_hash: str | None = None,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
@@ -151,7 +151,7 @@ def run_optuna_study(
                 conn,
                 settings=candidate_settings,
                 backtest_config=backtest_config,
-                min_trades=int(min_trades_full_candidate),
+                min_trades=int(min_trades),
             )
         finally:
             conn.close()

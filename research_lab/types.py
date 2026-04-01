@@ -68,6 +68,47 @@ class WalkForwardReport:
 
 
 @dataclass(frozen=True)
+class NestedWalkForwardWindowResult:
+    window_index: int
+    window: WalkForwardWindow
+    study_name: str
+    seed: int
+    champion_trial_id: str | None
+    champion_candidate_id: str | None
+    champion_params: dict[str, Any]
+    train_evaluation: TrialEvaluation | None
+    validation_evaluation: TrialEvaluation | None
+    validation_passed: bool
+    reasons: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class NestedWalkForwardCandidateSummary:
+    candidate_id: str
+    params: dict[str, Any]
+    windows_won: int
+    windows_passed: int
+    evaluation: TrialEvaluation
+    contributing_window_indices: tuple[int, ...]
+
+
+@dataclass(frozen=True)
+class NestedWalkForwardReport:
+    passed: bool
+    windows_total: int
+    windows_passed: int
+    is_degradation_pct: float
+    fragile: bool
+    reasons: tuple[str, ...]
+    protocol_hash: str | None = None
+    mode: str = "nested"
+    train_trials_total: int = 0
+    selected_evaluation: TrialEvaluation | None = None
+    candidate_summaries: tuple[NestedWalkForwardCandidateSummary, ...] = ()
+    window_results: tuple[NestedWalkForwardWindowResult, ...] = ()
+
+
+@dataclass(frozen=True)
 class RecommendationDraft:
     candidate_id: str
     summary: str

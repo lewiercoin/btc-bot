@@ -52,7 +52,7 @@ Approval bundle is the end of the automated path. Human review and manual applic
 | `research_lab/objective.py` | Candidate evaluation contract and objective metrics extraction |
 | `research_lab/funnel.py` | Instrumented backtest wrapper for signal funnel metrics |
 | `research_lab/protocol.py` | Protocol loading and deterministic protocol-hash lineage helpers |
-| `research_lab/walkforward.py` | Walk-forward window creation and post-hoc stability evaluation |
+| `research_lab/walkforward.py` | Walk-forward window creation plus post-hoc and nested validation flows |
 | `research_lab/pareto.py` | Multi-objective Pareto frontier computation and ranking |
 | `research_lab/approval.py` | Recommendation drafting and approval bundle generation without auto-promotion |
 | `research_lab/experiment_store.py` | SQLite persistence for trials, walk-forward reports, and recommendations |
@@ -123,18 +123,15 @@ Sandbox rules:
 
 ## Methodology Level
 
-Current methodology level is intentionally limited:
+Current methodology supports two explicit modes:
 
-- Optuna sees the full optimization date range.
-- Pareto frontier selection is based on `expectancy_r`, `profit_factor`, and `max_drawdown_pct`.
-- Walk-forward is applied after candidate search as a stability gate on Pareto candidates.
-- Walk-forward window pass/fail requires train and validation segments to satisfy `min_trades_per_window`.
-- Walk-forward window pass/fail also enforces per-window protocol thresholds for `expectancy_r`, `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio`.
+- `walkforward_mode=post_hoc` remains the default v2-compatible flow.
+- In `post_hoc` mode, Optuna sees the full optimization date range, Pareto frontier selection is based on `expectancy_r`, `profit_factor`, and `max_drawdown_pct`, and walk-forward is applied afterward as a stability gate.
+- In `nested` mode, each walk-forward window runs its own train-only Optuna search, the train champion is evaluated on that window's validation slice, and final candidate selection is based on aggregated out-of-sample validation results.
+- In both modes, walk-forward window pass/fail requires `min_trades_per_window` and enforces per-window protocol thresholds for `expectancy_r`, `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio`.
 - Fragility still uses expectancy degradation between train and validation segments.
 
-This means the current workflow is still a post-hoc stability gate, not true nested optimization.
-
-That limitation remains tracked as explicit methodology debt. It must not be hidden behind marketing language such as "fully robust walk-forward optimization."
+The remaining methodology limitation is narrower: `post_hoc` mode is intentionally not nested, and nested mode still requires honest language about its exact aggregation and selection contract.
 
 ## Promotion Policy
 
@@ -194,8 +191,8 @@ Research Lab is allowed to create artifacts. It is not allowed to create side ef
 | Version | Scope | Status |
 |---|---|---|
 | `v1` | Optimization harness plus hard promotion gate | MVP_DONE |
-| `v2` | Walk-forward multicriteria plus protocol lineage | IN_PROGRESS |
-| `v3` | Nested walk-forward optimization | PLANNED |
+| `v2` | Walk-forward multicriteria plus protocol lineage | CLOSED |
+| `v3` | Nested walk-forward optimization | IN_PROGRESS |
 | `vFuture` | Autoresearch agent loop | DEFERRED until lineage and nested walk-forward are closed |
 
 ## Definition of Done

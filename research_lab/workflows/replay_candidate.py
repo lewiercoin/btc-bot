@@ -44,6 +44,9 @@ def replay_candidate(
 
     protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
     protocol = load_protocol(protocol_file)
+    walkforward_mode = str(protocol.get("walkforward_mode", "post_hoc")).strip().lower()
+    if walkforward_mode != "post_hoc":
+        raise ValueError("replay_candidate supports only walkforward_mode='post_hoc'.")
     protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
 
