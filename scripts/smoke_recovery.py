@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
@@ -13,8 +14,19 @@ from execution.recovery import ExchangeOrder, ExchangePosition, RecoveryCoordina
 from monitoring.audit_logger import AuditLogger
 from orchestrator import BotOrchestrator
 from settings import load_settings
-from storage.db import connect, init_db
+from storage.db import init_db
 from storage.state_store import StateStore
+
+
+SCENARIO_TS = datetime(2026, 3, 26, 12, 0, 0, tzinfo=timezone.utc)
+
+
+def make_conn(schema_path: Path) -> sqlite3.Connection:
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    conn.execute("PRAGMA foreign_keys = ON;")
+    init_db(conn, schema_path)
+    return conn
 
 
 def reset_runtime_tables(conn) -> None:
@@ -44,6 +56,39 @@ class FakeExchangeSyncSource:
     def fetch_open_orders(self, symbol: str) -> list[ExchangeOrder]:
         _ = symbol
         return list(self._orders)
+
+
+class FailingExchangeSyncSource:
+    def __init__(self, error_message: str) -> None:
+        self._error_message = error_message
+
+    def fetch_active_positions(self, symbol: str) -> list[ExchangePosition]:
+        _ = symbol
+        raise RuntimeError(self._error_message)
+
+    def fetch_open_orders(self, symbol: str) -> list[ExchangeOrder]:
+        _ = symbol
+        raise AssertionError("fetch_open_orders should not run after fetch_active_positions failure")
+
+
+def assert_recovery_audit_log(
+    conn,
+    *,
+    expected_severity: str,
+    expected_message: str,
+    expected_issues: tuple[str, ...] = (),
+    expected_issue: str | None = None,
+) -> None:
+    records = AuditLogger(conn).query_recent(component="recovery", limit=1)
+    assert len(records) == 1
+    record = records[0]
+    assert record["severity"] == expected_severity
+    assert record["message"] == expected_message
+    payload = record["payload"]
+    if expected_issue is not None:
+        assert payload["issue"] == expected_issue
+    if expected_issues:
+        assert tuple(payload["issues"]) == expected_issues
 
 
 def seed_local_open_position(conn, *, signal_id: str, opened_at: datetime, direction: str = "LONG") -> None:
@@ -117,16 +162,17 @@ def run_scenario(
     settings,
     name: str,
     local_position: bool,
-    exchange_positions: list[ExchangePosition],
-    exchange_orders: list[ExchangeOrder],
+    exchange_sync,
     expected_safe_mode: bool,
-    expected_issues: set[str],
+    expected_issues: tuple[str, ...],
+    expected_log_severity: str,
+    expected_log_message: str,
 ) -> None:
     reset_runtime_tables(conn)
     state_store = StateStore(connection=conn, mode=settings.mode.value)
     state_store.ensure_initialized()
 
-    now = datetime.now(timezone.utc).replace(microsecond=0)
+    now = SCENARIO_TS
     if local_position:
         seed_local_open_position(conn, signal_id=f"sig-{uuid4().hex[:12]}", opened_at=now, direction="LONG")
 
@@ -136,7 +182,7 @@ def run_scenario(
         isolated_only=settings.exchange.isolated_only,
         state_store=state_store,
         audit_logger=AuditLogger(conn),
-        exchange_sync=FakeExchangeSyncSource(exchange_positions, exchange_orders),
+        exchange_sync=exchange_sync,
     )
     report = coordinator.run_startup_sync()
     persisted = state_store.load()
@@ -145,15 +191,43 @@ def run_scenario(
     print(f"[{name}] report={report}")
     assert report.safe_mode is expected_safe_mode
     assert persisted.safe_mode is expected_safe_mode
-    assert set(report.issues) == expected_issues
+    assert persisted.healthy is (not expected_safe_mode)
+    assert tuple(report.issues) == expected_issues
+
+    if expected_safe_mode:
+        if expected_log_message == "Exchange sync failed during startup recovery.":
+            expected_issue = f"exchange_sync_failed:forced_{name}"
+            assert persisted.last_error == expected_issue
+            assert_recovery_audit_log(
+                conn,
+                expected_severity=expected_log_severity,
+                expected_message=expected_log_message,
+                expected_issue=expected_issue,
+            )
+        else:
+            expected_last_error = "recovery_inconsistency:" + ",".join(expected_issues)
+            assert persisted.last_error == expected_last_error
+            assert_recovery_audit_log(
+                conn,
+                expected_severity=expected_log_severity,
+                expected_message=expected_log_message,
+                expected_issues=expected_issues,
+            )
+        return
+
+    assert persisted.last_error is None
+    assert_recovery_audit_log(
+        conn,
+        expected_severity=expected_log_severity,
+        expected_message=expected_log_message,
+    )
 
 
 def main() -> None:
     settings = load_settings()
     assert settings.storage is not None
 
-    conn = connect(settings.storage.db_path)
-    init_db(conn, settings.storage.schema_path)
+    conn = make_conn(settings.storage.schema_path)
     orchestrator = BotOrchestrator(settings=settings, conn=conn)
     assert orchestrator.recovery.exchange_sync.__class__.__name__ == "NoOpRecoverySyncSource"
 
@@ -162,63 +236,165 @@ def main() -> None:
         settings=settings,
         name="happy_path",
         local_position=True,
-        exchange_positions=[
-            ExchangePosition(
-                symbol="BTCUSDT",
-                direction="LONG",
-                size=0.1,
-                leverage=3,
-                isolated=True,
-            )
-        ],
-        exchange_orders=[],
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[
+                ExchangePosition(
+                    symbol="BTCUSDT",
+                    direction="LONG",
+                    size=0.1,
+                    leverage=3,
+                    isolated=True,
+                )
+            ],
+            orders=[],
+        ),
         expected_safe_mode=False,
-        expected_issues=set(),
+        expected_issues=(),
+        expected_log_severity=AuditLogger.SEVERITY_INFO,
+        expected_log_message="Startup recovery sync completed without inconsistencies.",
     )
     run_scenario(
         conn=conn,
         settings=settings,
         name="unknown_position",
         local_position=False,
-        exchange_positions=[
-            ExchangePosition(
-                symbol="BTCUSDT",
-                direction="LONG",
-                size=0.1,
-                leverage=3,
-                isolated=True,
-            )
-        ],
-        exchange_orders=[],
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[
+                ExchangePosition(
+                    symbol="BTCUSDT",
+                    direction="LONG",
+                    size=0.1,
+                    leverage=3,
+                    isolated=True,
+                )
+            ],
+            orders=[],
+        ),
         expected_safe_mode=True,
-        expected_issues={"unknown_position"},
+        expected_issues=("unknown_position",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
     )
     run_scenario(
         conn=conn,
         settings=settings,
         name="phantom_position",
         local_position=True,
-        exchange_positions=[],
-        exchange_orders=[],
+        exchange_sync=FakeExchangeSyncSource(positions=[], orders=[]),
         expected_safe_mode=True,
-        expected_issues={"phantom_position"},
+        expected_issues=("phantom_position",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
     )
     run_scenario(
         conn=conn,
         settings=settings,
         name="orphan_orders",
         local_position=False,
-        exchange_positions=[],
-        exchange_orders=[
-            ExchangeOrder(
-                symbol="BTCUSDT",
-                order_id="12345",
-                side="BUY",
-                position_side="BOTH",
-            )
-        ],
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[],
+            orders=[
+                ExchangeOrder(
+                    symbol="BTCUSDT",
+                    order_id="12345",
+                    side="BUY",
+                    position_side="BOTH",
+                )
+            ],
+        ),
         expected_safe_mode=True,
-        expected_issues={"orphan_orders"},
+        expected_issues=("orphan_orders",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
+    )
+    run_scenario(
+        conn=conn,
+        settings=settings,
+        name="exchange_sync_failed",
+        local_position=False,
+        exchange_sync=FailingExchangeSyncSource("forced_exchange_sync_failed"),
+        expected_safe_mode=True,
+        expected_issues=("exchange_sync_failed:forced_exchange_sync_failed",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Exchange sync failed during startup recovery.",
+    )
+    run_scenario(
+        conn=conn,
+        settings=settings,
+        name="isolated_mode_mismatch",
+        local_position=True,
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[
+                ExchangePosition(
+                    symbol="BTCUSDT",
+                    direction="LONG",
+                    size=0.1,
+                    leverage=3,
+                    isolated=False,
+                )
+            ],
+            orders=[],
+        ),
+        expected_safe_mode=True,
+        expected_issues=("isolated_mode_mismatch",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
+    )
+    run_scenario(
+        conn=conn,
+        settings=settings,
+        name="leverage_mismatch",
+        local_position=True,
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[
+                ExchangePosition(
+                    symbol="BTCUSDT",
+                    direction="LONG",
+                    size=0.1,
+                    leverage=settings.risk.max_leverage + 1,
+                    isolated=True,
+                )
+            ],
+            orders=[],
+        ),
+        expected_safe_mode=True,
+        expected_issues=("leverage_mismatch",),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
+    )
+    run_scenario(
+        conn=conn,
+        settings=settings,
+        name="combined_issues",
+        local_position=False,
+        exchange_sync=FakeExchangeSyncSource(
+            positions=[
+                ExchangePosition(
+                    symbol="BTCUSDT",
+                    direction="LONG",
+                    size=0.1,
+                    leverage=settings.risk.max_leverage + 1,
+                    isolated=False,
+                )
+            ],
+            orders=[
+                ExchangeOrder(
+                    symbol="BTCUSDT",
+                    order_id="67890",
+                    side="SELL",
+                    position_side="SHORT",
+                )
+            ],
+        ),
+        expected_safe_mode=True,
+        expected_issues=(
+            "isolated_mode_mismatch",
+            "leverage_mismatch",
+            "orphan_orders",
+            "unknown_position",
+        ),
+        expected_log_severity=AuditLogger.SEVERITY_CRITICAL,
+        expected_log_message="Startup recovery found state inconsistency.",
     )
 
     print("recovery smoke: OK")
