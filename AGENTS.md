@@ -150,7 +150,9 @@ This project uses a structured generator-evaluator workflow:
 ### Rules for Codex (Generator)
 
 - Before starting a milestone:
-  - read `docs/BLUEPRINT_V1.md` (architecture)
+  - read the relevant blueprint before coding:
+    - `docs/BLUEPRINT_V1.md` for bot/runtime architecture
+    - `docs/BLUEPRINT_RESEARCH_LAB.md` for research lab milestones
   - read `docs/MILESTONE_TRACKER.md` (current status)
   - confirm milestone scope and acceptance criteria BEFORE coding
 
@@ -172,9 +174,10 @@ This project uses a structured generator-evaluator workflow:
 
 ### Source of Truth Files
 
-- `docs/BLUEPRINT_V1.md` — architecture, phases, acceptance criteria, data models  
+- `docs/BLUEPRINT_V1.md` — bot architecture, phases, acceptance criteria, data models
+- `docs/BLUEPRINT_RESEARCH_LAB.md` — research lab architecture, workflow, sandbox, promotion policy
 - `AGENTS.md` — engineering discipline and commit rules  
-- `CASCADE.md` — Claude Code operating model and audit standard  
+- `CLAUDE.md` — Claude Code operating model and audit standard
 - `docs/MILESTONE_TRACKER.md` — phase status, stub inventory, known issues  
 - `docs/audits/` — audit reports from Claude Code  
 - `docs/templates/AUDIT_TEMPLATE.md` — audit report format  
@@ -183,15 +186,19 @@ This project uses a structured generator-evaluator workflow:
 
 ### Current Project Status
 
-- Phases A, B, C: MVP_DONE  
+- All bot blueprint phases A-H: MVP_DONE
 - Cross-cutting:
   - state persistence
   - trade lifecycle
-  - drawdown persistence  
-  → MVP_DONE  
+  - drawdown persistence
+  - recovery startup sync
+  → MVP_DONE
 
-- Next:
-  - Recovery startup sync → Phase D (execution)
+- Research Lab v0.1 — Offline Optimization Infrastructure: MVP_DONE
+- Research Lab v1 — Hard Promotion Gate: MVP_DONE
+
+- Active milestone:
+  - Research Lab Governance Foundation
 
 - Known issues tracked in:
   - `docs/MILESTONE_TRACKER.md`
