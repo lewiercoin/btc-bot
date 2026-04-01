@@ -7,7 +7,7 @@ This repository is developed as a production trading system.
 - after completing a blueprint phase (A, B, C, D, ...)
 - after finishing a coherent component (for example execution engine or state persistence)
 - after smoke tests or validation pass
-- Codex commits locally. Operator pushes when a checkpoint is ready for audit. Claude Code audits after push.
+- Codex commits locally. Claude Code pushes when a milestone checkpoint is ready for audit (clean working tree, smoke tests pass, Codex confirms checkpoint). Claude Code audits after push.
 - Never commit:
 - incomplete logic fragments
 - unvalidated code
