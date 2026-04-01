@@ -4,10 +4,10 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Tech Debt Cleanup (Resumed)
-**Status:** MVP_DONE (commits `f93507c` + `8602727`, audit passed 2026-04-01)
+**Milestone:** None — all milestones closed
+**Status:** —
 **Decision date:** 2026-04-01
-**Scope:** Close the two remaining open Known Issues: remove the storage-layer runtime-state leak in `storage/state_store.py` and extend `scripts/smoke_recovery.py` to cover the missing recovery failure paths.
+**Scope:** Awaiting the next Claude Code recommendation after the `v1.0-baseline` checkpoint.
 
 ## Research Lab
 
@@ -95,7 +95,7 @@ None.
 **Decision date:** 2026-03-29
 **Scope:** Fix remaining open known issues (#1, #4, #8, #9, #10, #13, #14, #15). Zero regressions - all existing smoke tests must pass after each fix.
 
-**Note:** All blueprint phases (A-H) are now MVP_DONE. Autoresearch (v2.0) remains deferred.
+**Note:** All blueprint phases (A-H), cross-cutting hardening work, and Research Lab milestones through RL-FUTURE are closed at `v1.0-baseline`. Only explicitly listed out-of-scope methodology items remain deferred.
 
 ## Phase Status
 
@@ -126,13 +126,13 @@ None - all blueprint stubs implemented.
 
 ## Known Issues
 
-1. ~~**Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines - tracked since initial audit~~ - **FIXED in Tech Debt Cleanup (Resumed)** (`storage/state_store.py` now depends only on shared contracts from `core/models.py`; `SettlementMetrics` was moved out of `core/risk_engine.py` into the shared core model surface)
+1. ~~**Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines - tracked since initial audit~~ - **FIXED in `f93507c`** (`storage/state_store.py` now depends only on shared contracts from `core/models.py`; `SettlementMetrics` was moved out of `core/risk_engine.py` into the shared core model surface)
 2. ~~**Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation)~~ - **FIXED in `a24e1e3`** (`FeatureEngine.reset()` added; backtest already creates fresh `FeatureEngine` per run; `tests/test_feature_engine.py` validates idempotency and reset-based fresh-instance reproducibility)
 3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ - **FIXED in `c5f9408`** (zero matches in codebase)
 4. ~~**Layer leak**: `PaperExecutionEngine` and `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage)~~ - **FIXED in `ba72c35`** (`PositionPersister` protocol plus DI injection into execution engines)
 5. ~~**Tech debt**: `_signed_request` retry duplication~~ - **FIXED in `c5f9408`** (unified `_request_with_retry`)
 6. ~~**Safe mode = exit**: orchestrator returns on `safe_mode` instead of managing existing positions~~ - **FIXED in `09a099f`** (orchestrator continues event loop in safe mode, lifecycle monitoring active)
-7. ~~**Smoke gap**: `smoke_recovery.py` does not cover `exchange_sync_failed`, `isolated_mode_mismatch`, `leverage_mismatch`, or combined issues - identified in `AUDIT_001`~~ - **FIXED in Tech Debt Cleanup (Resumed)** (`scripts/smoke_recovery.py` now runs on in-memory SQLite and asserts the missing recovery failure paths plus persisted recovery audit logs deterministically)
+7. ~~**Smoke gap**: `smoke_recovery.py` does not cover `exchange_sync_failed`, `isolated_mode_mismatch`, `leverage_mismatch`, or combined issues - identified in `AUDIT_001`~~ - **FIXED in `8602727`** (`scripts/smoke_recovery.py` now runs on in-memory SQLite and asserts the missing recovery failure paths plus persisted recovery audit logs deterministically)
 8. ~~**Private API as public contract**: `_signed_request` called by `OrderManager` and `LiveExecutionEngine` despite underscore prefix~~ - **FIXED in `45c9d3d`** (execution layer uses public `signed_request()`)
 9. ~~**Assert in production path**: `order_manager.py` uses `assert` instead of explicit raises~~ - **FIXED in `5c7a882`** (replaced with explicit `OrderManagerError` raises)
 10. ~~**Fees not captured**: `fees=0.0` hardcoded in `LiveExecutionEngine`; actual Binance fees not extracted~~ - **FIXED in `a325072`** (fees parsed from exchange commission payload)
