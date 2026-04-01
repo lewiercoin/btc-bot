@@ -2,6 +2,17 @@
 
 Last updated: 2026-04-01
 
+## Baseline Checkpoint
+
+| Field | Value |
+|---|---|
+| **Tag** | `v1.0-baseline` |
+| **Commit** | `a1a82b5` |
+| **Date** | 2026-04-01 |
+| **How to restore** | `git checkout v1.0-baseline` |
+| **What it contains** | Fazy A–H MVP_DONE · Research Lab RL-V1 do RL-FUTURE MVP_DONE · 18/18 Known Issues zamknięte · dokumentacja zsynchronizowana · 35/35 testów zielonych |
+| **Strategy at tag** | PF 1.40 · WR 43.6% · Sharpe 4.37 · DD 17.0% |
+
 ## Next Milestone
 
 **Milestone:** None — all milestones closed
