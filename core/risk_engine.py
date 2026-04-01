@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from typing import Callable
 
-from core.models import ExecutableSignal, Position, RiskRuntimeState
+from core.models import ExecutableSignal, Position, RiskRuntimeState, SettlementMetrics
 
 
 @dataclass(slots=True)
@@ -38,16 +38,6 @@ class ExitDecision:
     reason: str | None = None
     exit_price: float | None = None
     partial_pct: float | None = None
-
-
-@dataclass(slots=True)
-class SettlementMetrics:
-    exit_price: float
-    pnl_abs: float
-    pnl_r: float
-    mae: float
-    mfe: float
-    exit_reason: str
 
 
 class RiskEngine:

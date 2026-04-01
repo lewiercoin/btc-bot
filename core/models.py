@@ -180,3 +180,13 @@ class RiskRuntimeState:
     consecutive_losses: int = 0
     daily_dd_pct: float = 0.0
     weekly_dd_pct: float = 0.0
+
+
+@dataclass(slots=True)
+class SettlementMetrics:
+    exit_price: float
+    pnl_abs: float
+    pnl_r: float
+    mae: float
+    mfe: float
+    exit_reason: str

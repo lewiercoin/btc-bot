@@ -5,8 +5,7 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
-from core.models import BotState, ExecutableSignal, GovernanceRuntimeState, Position, RiskRuntimeState, SignalCandidate
-from core.risk_engine import SettlementMetrics
+from core.models import BotState, ExecutableSignal, GovernanceRuntimeState, Position, RiskRuntimeState, SettlementMetrics, SignalCandidate
 from storage.repositories import (
     close_position,
     fetch_closed_trade_pnl_series_between,

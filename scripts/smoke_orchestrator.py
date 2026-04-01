@@ -13,8 +13,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.models import ExecutableSignal, MarketSnapshot, RegimeState, SignalCandidate
-from core.risk_engine import ExitDecision, RiskDecision, SettlementMetrics
+from core.models import ExecutableSignal, MarketSnapshot, RegimeState, SettlementMetrics, SignalCandidate
+from core.risk_engine import ExitDecision, RiskDecision
 from execution.execution_engine import ExecutionEngine
 from monitoring.audit_logger import AuditLogger
 from monitoring.health import HealthStatus
