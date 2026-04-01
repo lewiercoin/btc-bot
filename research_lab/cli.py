@@ -71,6 +71,7 @@ def _load_recommendation(store_path: Path, candidate_id: str) -> RecommendationD
         expected_improvement={k: float(v) for k, v in dict(payload.get("expected_improvement", {})).items()},
         risks=tuple(payload.get("risks", [])),
         approval_required=bool(payload.get("approval_required", True)),
+        protocol_hash=str(payload["protocol_hash"]) if payload.get("protocol_hash") is not None else None,
     )
 
 

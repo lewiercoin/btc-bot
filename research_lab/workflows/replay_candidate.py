@@ -13,8 +13,9 @@ from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
 from research_lab.experiment_store import load_trials, save_recommendation, save_trial, save_walkforward
 from research_lab.objective import evaluate_candidate
+from research_lab.protocol import hash_protocol, load_protocol
 from research_lab.settings_adapter import build_candidate_settings
-from research_lab.walkforward import build_windows, load_protocol, run_walkforward
+from research_lab.walkforward import build_windows, run_walkforward
 
 
 def _to_range_value(value: datetime | date | str) -> str:
@@ -43,6 +44,7 @@ def replay_candidate(
 
     protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
     protocol = load_protocol(protocol_file)
+    protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
 
     candidate_settings = build_candidate_settings(base_settings, selected.params)
@@ -58,7 +60,12 @@ def replay_candidate(
         )
     finally:
         conn.close()
-    evaluation = dataclasses.replace(evaluation_raw, trial_id=candidate_id, params=selected.params)
+    evaluation = dataclasses.replace(
+        evaluation_raw,
+        trial_id=candidate_id,
+        params=selected.params,
+        protocol_hash=protocol_hash,
+    )
     save_trial(evaluation, store_path)
 
     windows = build_windows(
@@ -85,6 +92,7 @@ def replay_candidate(
     save_recommendation(recommendation, store_path)
     return {
         "candidate_id": candidate_id,
+        "protocol_hash": protocol_hash,
         "walkforward_passed": walkforward_report.passed,
         "walkforward_fragile": walkforward_report.fragile,
         "walkforward_windows_total": walkforward_report.windows_total,

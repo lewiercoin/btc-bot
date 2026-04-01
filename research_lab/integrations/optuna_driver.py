@@ -100,6 +100,7 @@ def _rejected_trial(trial_id: str, params: dict[str, Any], reason: str) -> Trial
             signals_executed=0,
         ),
         rejected_reason=reason,
+        protocol_hash=None,
     )
 
 
@@ -114,6 +115,7 @@ def run_optuna_study(
     study_name: str,
     seed: int = 42,
     min_trades_full_candidate: int = MIN_TRADES_DEFAULT,
+    protocol_hash: str | None = None,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
     init_store(store_path)
@@ -132,7 +134,10 @@ def run_optuna_study(
         try:
             assert_valid(sampled_params)
         except ValueError as exc:
-            evaluation = _rejected_trial(trial_id, sampled_params, str(exc))
+            evaluation = dataclasses.replace(
+                _rejected_trial(trial_id, sampled_params, str(exc)),
+                protocol_hash=protocol_hash,
+            )
             evaluations.append(evaluation)
             save_trial(evaluation, store_path)
             return (0.0, 0.0, 1.0)
@@ -151,7 +156,12 @@ def run_optuna_study(
         finally:
             conn.close()
 
-        evaluation = dataclasses.replace(raw_evaluation, trial_id=trial_id, params=sampled_params)
+        evaluation = dataclasses.replace(
+            raw_evaluation,
+            trial_id=trial_id,
+            params=sampled_params,
+            protocol_hash=protocol_hash,
+        )
         evaluations.append(evaluation)
         save_trial(evaluation, store_path)
         if evaluation.rejected_reason is not None:

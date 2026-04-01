@@ -45,6 +45,7 @@ class TrialEvaluation:
     metrics: ObjectiveMetrics
     funnel: SignalFunnel
     rejected_reason: str | None
+    protocol_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -63,6 +64,7 @@ class WalkForwardReport:
     is_degradation_pct: float
     fragile: bool
     reasons: tuple[str, ...]
+    protocol_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,4 +75,4 @@ class RecommendationDraft:
     expected_improvement: dict[str, float]
     risks: tuple[str, ...]
     approval_required: bool = True
-
+    protocol_hash: str | None = None

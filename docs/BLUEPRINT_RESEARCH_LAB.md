@@ -51,6 +51,7 @@ Approval bundle is the end of the automated path. Human review and manual applic
 | `research_lab/integrations/optuna_driver.py` | Optuna study integration and trial sampling for ACTIVE parameters only |
 | `research_lab/objective.py` | Candidate evaluation contract and objective metrics extraction |
 | `research_lab/funnel.py` | Instrumented backtest wrapper for signal funnel metrics |
+| `research_lab/protocol.py` | Protocol loading and deterministic protocol-hash lineage helpers |
 | `research_lab/walkforward.py` | Walk-forward window creation and post-hoc stability evaluation |
 | `research_lab/pareto.py` | Multi-objective Pareto frontier computation and ranking |
 | `research_lab/approval.py` | Recommendation drafting and approval bundle generation without auto-promotion |
@@ -127,12 +128,13 @@ Current methodology level is intentionally limited:
 - Optuna sees the full optimization date range.
 - Pareto frontier selection is based on `expectancy_r`, `profit_factor`, and `max_drawdown_pct`.
 - Walk-forward is applied after candidate search as a stability gate on Pareto candidates.
-- Walk-forward window pass/fail currently uses `expectancy_r` plus degradation/fragility logic only.
-- `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio` are recorded metrics, but they do not yet drive per-window walk-forward decisions.
+- Walk-forward window pass/fail requires train and validation segments to satisfy `min_trades_per_window`.
+- Walk-forward window pass/fail also enforces per-window protocol thresholds for `expectancy_r`, `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio`.
+- Fragility still uses expectancy degradation between train and validation segments.
 
-This means the current workflow is a post-hoc stability gate, not true nested optimization.
+This means the current workflow is still a post-hoc stability gate, not true nested optimization.
 
-That limitation is accepted in v1 and tracked as explicit methodology debt. It must not be hidden behind marketing language such as "fully robust walk-forward optimization."
+That limitation remains tracked as explicit methodology debt. It must not be hidden behind marketing language such as "fully robust walk-forward optimization."
 
 ## Promotion Policy
 
@@ -163,10 +165,10 @@ Current state:
 - `config_hash` is first-class in `AppSettings`
 - `seed` and `study_name` are first-class CLI inputs
 - source DB path and date range are provided to workflow entrypoints
-- `protocol_hash` is not yet persisted or enforced
+- `protocol_hash` is derived from canonical protocol JSON and persisted with trials, walk-forward reports, recommendations, and experiment reports
 - commit SHA is not yet persisted in the experiment store
 
-Until protocol lineage is hashed and persisted, cross-experiment comparability is incomplete by design.
+Protocol lineage is now explicit for the current blueprint version, but full reproducibility is still incomplete until commit SHA is persisted.
 
 ## Data Isolation
 
@@ -185,18 +187,14 @@ Research Lab is allowed to create artifacts. It is not allowed to create side ef
 
 | ID | Type | Description | Target version |
 |---|---|---|---|
-| `RL-001` | METHODOLOGY_DEBT | Walk-forward window decisions use `expectancy_r` only; drawdown, profit factor, and sharpe are not part of window pass/fail | v2 |
-| `RL-002` | ARCH_DEBT | Protocol lineage is not hashed or enforced; `protocol_hash` is missing from experiment identity | v2 |
 | `RL-003` | METHODOLOGY_DEBT | Walk-forward is post-hoc stability checking, not true nested optimization | v3 |
-| `RL-004` | BUG | `min_trades_full_candidate` exists in `research_lab/configs/default_protocol.json` but is not consumed by the workflow | v2 |
-| `RL-005` | ARCH_DEBT | `_PROMOTION_BLOCKING_RISKS` is defined in `cli.py` instead of a canonical shared contract location | v2 |
 
 ## Roadmap
 
 | Version | Scope | Status |
 |---|---|---|
 | `v1` | Optimization harness plus hard promotion gate | MVP_DONE |
-| `v2` | Walk-forward multicriteria plus protocol lineage | PLANNED |
+| `v2` | Walk-forward multicriteria plus protocol lineage | IN_PROGRESS |
 | `v3` | Nested walk-forward optimization | PLANNED |
 | `vFuture` | Autoresearch agent loop | DEFERRED until lineage and nested walk-forward are closed |
 

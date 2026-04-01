@@ -20,6 +20,17 @@ def _connect(store_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _table_columns(conn: sqlite3.Connection, table_name: str) -> set[str]:
+    rows = conn.execute(f"PRAGMA table_info({table_name})").fetchall()
+    return {str(row["name"]) for row in rows}
+
+
+def _ensure_protocol_hash_columns(conn: sqlite3.Connection) -> None:
+    for table_name in ("trials", "walkforward_reports", "recommendations"):
+        if "protocol_hash" not in _table_columns(conn, table_name):
+            conn.execute(f"ALTER TABLE {table_name} ADD COLUMN protocol_hash TEXT NULL")
+
+
 def init_store(store_path: Path) -> None:
     with _connect(store_path) as conn:
         conn.execute(
@@ -52,6 +63,7 @@ def init_store(store_path: Path) -> None:
             )
             """
         )
+        _ensure_protocol_hash_columns(conn)
         conn.commit()
 
 
@@ -61,8 +73,8 @@ def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO trials (
-                trial_id, params_json, metrics_json, funnel_json, rejected_reason, created_at_utc
-            ) VALUES (?, ?, ?, ?, ?, ?)
+                trial_id, params_json, metrics_json, funnel_json, rejected_reason, created_at_utc, protocol_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evaluation.trial_id,
@@ -91,6 +103,7 @@ def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
                 ),
                 evaluation.rejected_reason,
                 _utc_now_iso(),
+                evaluation.protocol_hash,
             ),
         )
         conn.commit()
@@ -101,8 +114,8 @@ def save_walkforward(candidate_id: str, report: WalkForwardReport, store_path: P
     with _connect(store_path) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO walkforward_reports (candidate_id, report_json, created_at_utc)
-            VALUES (?, ?, ?)
+            INSERT OR REPLACE INTO walkforward_reports (candidate_id, report_json, created_at_utc, protocol_hash)
+            VALUES (?, ?, ?, ?)
             """,
             (
                 candidate_id,
@@ -114,10 +127,12 @@ def save_walkforward(candidate_id: str, report: WalkForwardReport, store_path: P
                         "is_degradation_pct": report.is_degradation_pct,
                         "fragile": report.fragile,
                         "reasons": list(report.reasons),
+                        "protocol_hash": report.protocol_hash,
                     },
                     sort_keys=True,
                 ),
                 _utc_now_iso(),
+                report.protocol_hash,
             ),
         )
         conn.commit()
@@ -128,8 +143,8 @@ def save_recommendation(rec: RecommendationDraft, store_path: Path) -> None:
     with _connect(store_path) as conn:
         conn.execute(
             """
-            INSERT OR REPLACE INTO recommendations (candidate_id, recommendation_json, created_at_utc)
-            VALUES (?, ?, ?)
+            INSERT OR REPLACE INTO recommendations (candidate_id, recommendation_json, created_at_utc, protocol_hash)
+            VALUES (?, ?, ?, ?)
             """,
             (
                 rec.candidate_id,
@@ -141,10 +156,12 @@ def save_recommendation(rec: RecommendationDraft, store_path: Path) -> None:
                         "expected_improvement": rec.expected_improvement,
                         "risks": list(rec.risks),
                         "approval_required": rec.approval_required,
+                        "protocol_hash": rec.protocol_hash,
                     },
                     sort_keys=True,
                 ),
                 _utc_now_iso(),
+                rec.protocol_hash,
             ),
         )
         conn.commit()
@@ -174,19 +191,20 @@ def _parse_trial_row(row: sqlite3.Row) -> TrialEvaluation:
             signals_executed=int(funnel_payload["signals_executed"]),
         ),
         rejected_reason=str(row["rejected_reason"]) if row["rejected_reason"] is not None else None,
+        protocol_hash=str(row["protocol_hash"]) if row["protocol_hash"] is not None else None,
     )
 
 
 def load_trials(store_path: Path) -> list[TrialEvaluation]:
     if not store_path.exists():
         return []
+    init_store(store_path)
     with _connect(store_path) as conn:
         rows = conn.execute(
             """
-            SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason
+            SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash
             FROM trials
             ORDER BY created_at_utc ASC, trial_id ASC
             """
         ).fetchall()
     return [_parse_trial_row(row) for row in rows]
-
