@@ -375,7 +375,7 @@ smoke coverage for all stop criteria.
 | `v2` | Walk-forward multicriteria plus protocol lineage | CLOSED MVP_DONE |
 | `v3` | Nested walk-forward optimization | CLOSED MVP_DONE |
 | `hardening` | Store schema DDL + operator clarity | CLOSED DONE |
-| `vFuture` | Autoresearch agent loop | AWAITING_DECISION |
+| `vFuture` | Autoresearch agent loop | CLOSED MVP_DONE |
 
 ## Definition of Done
 

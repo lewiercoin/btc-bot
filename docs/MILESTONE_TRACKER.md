@@ -5,7 +5,7 @@ Last updated: 2026-04-01
 ## Next Milestone
 
 **Milestone:** Research Lab vFuture - Autoresearch Agent Loop v1
-**Status:** ACTIVE
+**Status:** MVP_DONE (commits `e5a5ab6`–`d1ab0f1`, audit passed 2026-04-01)
 **Decision date:** 2026-04-01
 **Scope:** Add single-pass autoresearch loop workflow, CLI trigger, ranked loop report, conditional approval bundle output, and deterministic smoke coverage for the v1 post-hoc-only contract.
 
@@ -14,9 +14,9 @@ Last updated: 2026-04-01
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Research Lab vFuture - Autoresearch Agent Loop v1
-**Milestone status:** ACTIVE
-**Last audit verdict:** Pending
+**Current active milestone:** None — all Research Lab milestones through RL-FUTURE are CLOSED
+**Milestone status:** MVP_DONE
+**Last audit verdict:** 2026-04-01 Claude audit - MVP_DONE
 
 ### Milestone ladder
 
@@ -28,7 +28,7 @@ Last updated: 2026-04-01
 | RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | CLOSED | `df81334` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
-| RL-FUTURE | Autoresearch agent loop | ACTIVE | - | - | none |
+| RL-FUTURE | Autoresearch agent loop | CLOSED | `d1ab0f1` | 2026-04-01 Claude audit - MVP_DONE | none |
 
 ### Known Out-Of-Scope For RL-FUTURE v1
 
@@ -62,6 +62,7 @@ None.
 | `AUDIT_013` | Research Lab v0.1 optuna runtime validation | 2026-03-31 | MVP_DONE | Tracker record |
 | `CLAUDE_2026-04-01_HARD_GATE` | Hard Promotion Gate | 2026-04-01 | MVP_DONE | Claude audit and handoff record |
 | `CLAUDE_2026-04-01_GOVERNANCE_FOUNDATION` | Research Lab Governance Foundation | 2026-04-01 | MVP_DONE | Claude audit and handoff record |
+| `AUDIT_RL_FUTURE_AUTORESEARCH_V1` | Autoresearch Agent Loop v1 | 2026-04-01 | MVP_DONE | [docs/audits/AUDIT_RL_FUTURE_AUTORESEARCH_V1_2026-04-01.md](audits/AUDIT_RL_FUTURE_AUTORESEARCH_V1_2026-04-01.md) |
 
 ## Previous Milestones
 
