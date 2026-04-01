@@ -4,7 +4,7 @@ Deterministyczny bot tradingowy BTC perpetual futures (Binance) oparty na techni
 
 ## Status
 
-All blueprint phases A–H: **MVP_DONE**. Research Lab v0.1: **MVP_DONE**.
+All blueprint phases A–H: **MVP_DONE**. Research Lab Governance Foundation, Cleanup, v0.1, v1, v2, v3, and vFuture are closed (`MVP_DONE`; hardening is `DONE`). Baseline restore point: tag `v1.0-baseline`.
 
 Szczegółowy stan: [`docs/MILESTONE_TRACKER.md`](docs/MILESTONE_TRACKER.md)
 
@@ -58,7 +58,7 @@ Narzędzie do systematycznej optymalizacji parametrów strategii. Działa offlin
 ### Pierwszy search run (20 triali)
 
 ```bash
-python -m research_lab.main optimize \
+python -m research_lab optimize \
   --source-db-path storage/btc_bot.db \
   --store-path research_lab_runs/store.db \
   --snapshots-dir research_lab_runs/snapshots \
@@ -71,15 +71,15 @@ python -m research_lab.main optimize \
 ### Raport z wynikami
 
 ```bash
-python -m research_lab.main build-report \
+python -m research_lab build-report \
   --store-path research_lab_runs/store.db \
-  --output-dir research_lab_runs/reports/search-v1
+  --output-json research_lab_runs/reports/search-v1.json
 ```
 
 ### Replay wybranego kandydata
 
 ```bash
-python -m research_lab.main replay-candidate \
+python -m research_lab replay-candidate \
   --candidate-id <trial_id> \
   --store-path research_lab_runs/store.db \
   --source-db-path storage/btc_bot.db \
@@ -90,7 +90,7 @@ python -m research_lab.main replay-candidate \
 ### Approval bundle (przed zmianą produkcyjnego configa)
 
 ```bash
-python -m research_lab.main build-approval-bundle \
+python -m research_lab build-approval-bundle \
   --candidate-id <trial_id> \
   --store-path research_lab_runs/store.db \
   --output-dir research_lab_runs/approvals/<trial_id>
