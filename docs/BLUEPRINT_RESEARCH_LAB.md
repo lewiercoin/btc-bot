@@ -67,7 +67,7 @@ Approval bundle is the end of the automated path. Human review and manual applic
 Primary optimization flow:
 
 1. `python -m research_lab optimize ...`
-2. CLI loads baseline `AppSettings`, resolves source DB, store path, and snapshots directory.
+2. CLI loads baseline `AppSettings`, resolves source DB, store path, snapshots directory, and protocol configuration.
 3. `baseline_gate` runs a read-only baseline backtest and blocks the workflow if the baseline contract fails.
 4. Optuna samples ACTIVE parameters from `param_registry`.
 5. Each trial is validated by `constraints.py`.
@@ -87,6 +87,13 @@ Replay flow:
 3. Re-run candidate evaluation on a fresh snapshot.
 4. Rebuild walk-forward report and recommendation draft.
 5. Persist refreshed artifacts for human review.
+
+Protocol operation:
+
+- `walkforward_mode` is a protocol field, not a separate CLI command.
+- Default protocol is `research_lab/configs/default_protocol.json` and currently sets `walkforward_mode` to `post_hoc`.
+- Operators may activate nested mode by editing the protocol JSON or by providing an alternate protocol file through `--protocol-path`.
+- `replay-candidate` supports `walkforward_mode=post_hoc` only and rejects nested mode explicitly.
 
 ## Optimization Sandbox
 
@@ -126,6 +133,7 @@ Sandbox rules:
 Current methodology supports two explicit modes:
 
 - `walkforward_mode=post_hoc` remains the default v2-compatible flow.
+- Operators choose the mode through protocol JSON, either by editing the default protocol or by passing a custom file with `--protocol-path`.
 - In `post_hoc` mode, Optuna sees the full optimization date range, Pareto frontier selection is based on `expectancy_r`, `profit_factor`, and `max_drawdown_pct`, and walk-forward is applied afterward as a stability gate.
 - In `nested` mode, each walk-forward window runs its own train-only Optuna search, the train champion is evaluated on that window's validation slice, and final candidate selection is based on aggregated out-of-sample validation results.
 - In both modes, walk-forward window pass/fail requires `min_trades_per_window` and enforces per-window protocol thresholds for `expectancy_r`, `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio`.

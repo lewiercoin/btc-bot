@@ -42,7 +42,8 @@ def init_store(store_path: Path) -> None:
                 metrics_json TEXT NOT NULL,
                 funnel_json TEXT NOT NULL,
                 rejected_reason TEXT NULL,
-                created_at_utc TEXT NOT NULL
+                created_at_utc TEXT NOT NULL,
+                protocol_hash TEXT NULL
             )
             """
         )
@@ -51,7 +52,8 @@ def init_store(store_path: Path) -> None:
             CREATE TABLE IF NOT EXISTS walkforward_reports (
                 candidate_id TEXT PRIMARY KEY,
                 report_json TEXT NOT NULL,
-                created_at_utc TEXT NOT NULL
+                created_at_utc TEXT NOT NULL,
+                protocol_hash TEXT NULL
             )
             """
         )
@@ -60,7 +62,8 @@ def init_store(store_path: Path) -> None:
             CREATE TABLE IF NOT EXISTS recommendations (
                 candidate_id TEXT PRIMARY KEY,
                 recommendation_json TEXT NOT NULL,
-                created_at_utc TEXT NOT NULL
+                created_at_utc TEXT NOT NULL,
+                protocol_hash TEXT NULL
             )
             """
         )

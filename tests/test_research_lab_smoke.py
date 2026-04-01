@@ -12,7 +12,7 @@ from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
 from research_lab.constants import PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
-from research_lab.experiment_store import save_recommendation, save_trial, save_walkforward
+from research_lab.experiment_store import init_store, save_recommendation, save_trial, save_walkforward
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
 from research_lab.protocol import hash_protocol
@@ -934,3 +934,30 @@ def test_protocol_hash_persists_through_store_and_report(tmp_path: Path) -> None
     assert stored_trials["walkforward_reports"][0]["report_json"]["protocol_hash"] == protocol_hash
     assert stored_trials["recommendations"][0]["protocol_hash"] == protocol_hash
     assert stored_trials["recommendations"][0]["recommendation_json"]["protocol_hash"] == protocol_hash
+
+
+def test_init_store_creates_protocol_hash_columns_in_fresh_schema(tmp_path: Path) -> None:
+    store_path = tmp_path / "fresh_research_lab.db"
+    init_store(store_path)
+
+    conn = sqlite3.connect(store_path)
+    conn.row_factory = sqlite3.Row
+    try:
+        trials_columns = {
+            str(row["name"]): str(row["type"])
+            for row in conn.execute("PRAGMA table_info(trials)").fetchall()
+        }
+        walkforward_columns = {
+            str(row["name"]): str(row["type"])
+            for row in conn.execute("PRAGMA table_info(walkforward_reports)").fetchall()
+        }
+        recommendations_columns = {
+            str(row["name"]): str(row["type"])
+            for row in conn.execute("PRAGMA table_info(recommendations)").fetchall()
+        }
+    finally:
+        conn.close()
+
+    assert trials_columns["protocol_hash"] == "TEXT"
+    assert walkforward_columns["protocol_hash"] == "TEXT"
+    assert recommendations_columns["protocol_hash"] == "TEXT"
