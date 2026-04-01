@@ -4,24 +4,25 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** —
-**Status:** AWAITING_DECISION
+**Milestone:** Research Lab Cleanup: RL-004 + RL-005
+**Status:** IMPLEMENTED_AWAITING_AUDIT
 **Decision date:** 2026-04-01
-**Scope:** Research Lab Governance Foundation closed as `MVP_DONE`. Decision pending for the next cleanup or v2 milestone.
+**Scope:** Move promotion blocking risks to `research_lab/constants.py`, wire `min_trades_full_candidate` from protocol into optimize/replay candidate evaluation, and validate the behavior with research lab smoke tests.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** —
-**Milestone status:** AWAITING_DECISION
-**Last audit verdict:** `MVP_DONE` for Research Lab Governance Foundation
+**Current active milestone:** Research Lab Cleanup: RL-004 + RL-005
+**Milestone status:** IMPLEMENTED_AWAITING_AUDIT
+**Last audit verdict:** Pending
 
 ### Milestone ladder
 
 | ID | Name | Status | Implementation commit | Last audit | Blocking issues |
 |---|---|---|---|---|---|
+| RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | IMPLEMENTED_AWAITING_AUDIT | pending local audit checkpoint | Pending | RL-004, RL-005 |
 | RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V2 | WF multicriteria | AWAITING_DECISION | - | - | RL-001, RL-002, RL-004, RL-005 |

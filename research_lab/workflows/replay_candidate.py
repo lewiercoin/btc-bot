@@ -9,6 +9,7 @@ from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
 from research_lab.approval import build_recommendation
+from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
 from research_lab.experiment_store import load_trials, save_recommendation, save_trial, save_walkforward
 from research_lab.objective import evaluate_candidate
@@ -40,6 +41,10 @@ def replay_candidate(
         raise ValueError(f"Candidate {candidate_id!r} not found in experiment store.")
     selected = matched[-1]
 
+    protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
+    protocol = load_protocol(protocol_file)
+    min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
+
     candidate_settings = build_candidate_settings(base_settings, selected.params)
     snapshot_path = create_trial_snapshot(source_db_path, snapshots_dir, f"replay-{candidate_id}")
     conn = open_snapshot_connection(snapshot_path)
@@ -49,14 +54,13 @@ def replay_candidate(
             conn,
             settings=candidate_settings,
             backtest_config=backtest_config,
+            min_trades=min_trades_full_candidate,
         )
     finally:
         conn.close()
     evaluation = dataclasses.replace(evaluation_raw, trial_id=candidate_id, params=selected.params)
     save_trial(evaluation, store_path)
 
-    protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
-    protocol = load_protocol(protocol_file)
     windows = build_windows(
         data_start=_to_range_value(backtest_config.start_date),
         data_end=_to_range_value(backtest_config.end_date),
@@ -86,4 +90,3 @@ def replay_candidate(
         "walkforward_windows_total": walkforward_report.windows_total,
         "walkforward_windows_passed": walkforward_report.windows_passed,
     }
-

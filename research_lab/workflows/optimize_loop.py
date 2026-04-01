@@ -9,6 +9,7 @@ from settings import AppSettings
 
 from research_lab.approval import build_recommendation
 from research_lab.baseline_gate import check_baseline
+from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.experiment_store import save_recommendation, save_walkforward
 from research_lab.integrations.optuna_driver import run_optuna_study
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
@@ -36,6 +37,10 @@ def run_optimize_loop(
     seed: int = 42,
     protocol_path: Path | None = None,
 ) -> dict[str, Any]:
+    protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
+    protocol = load_protocol(protocol_file)
+    min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
+
     check_baseline(
         source_db_path=source_db_path,
         backtest_config=backtest_config,
@@ -50,11 +55,10 @@ def run_optimize_loop(
         n_trials=n_trials,
         study_name=study_name,
         seed=seed,
+        min_trades_full_candidate=min_trades_full_candidate,
     )
     frontier = rank_pareto_candidates(compute_pareto_frontier(trials))
 
-    protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
-    protocol = load_protocol(protocol_file)
     windows = build_windows(
         data_start=_to_range_value(backtest_config.start_date),
         data_end=_to_range_value(backtest_config.end_date),

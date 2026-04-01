@@ -12,13 +12,12 @@ from backtest.backtest_runner import BacktestConfig
 from settings import load_settings
 
 from research_lab.approval import write_approval_bundle
+from research_lab.constants import PROMOTION_BLOCKING_RISKS
 from research_lab.experiment_store import init_store
 from research_lab.reporter import build_experiment_report, write_experiment_report
 from research_lab.types import RecommendationDraft
 from research_lab.workflows.optimize_loop import run_optimize_loop
 from research_lab.workflows.replay_candidate import replay_candidate
-
-_PROMOTION_BLOCKING_RISKS = frozenset({"walkforward_not_passed", "walkforward_fragile"})
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -76,7 +75,7 @@ def _load_recommendation(store_path: Path, candidate_id: str) -> RecommendationD
 
 
 def _get_blocking_promotion_risks(risks: tuple[str, ...]) -> tuple[str, ...]:
-    return tuple(dict.fromkeys(risk for risk in risks if risk in _PROMOTION_BLOCKING_RISKS))
+    return tuple(dict.fromkeys(risk for risk in risks if risk in PROMOTION_BLOCKING_RISKS))
 
 
 def _build_parser() -> argparse.ArgumentParser:

@@ -231,7 +231,7 @@ This project uses a structured generator-evaluator workflow:
 - Research Lab v1 — Hard Promotion Gate: MVP_DONE
 
 - Active milestone:
-  - Research Lab Governance Foundation
+  - Research Lab Cleanup: RL-004 + RL-005
 
 - Known issues tracked in:
   - `docs/MILESTONE_TRACKER.md`
