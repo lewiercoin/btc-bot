@@ -117,3 +117,30 @@ class RecommendationDraft:
     risks: tuple[str, ...]
     approval_required: bool = True
     protocol_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class AutoresearchCandidateResult:
+    candidate_id: str
+    params: dict[str, Any]
+    hypothesis_rationale: str
+    evaluation: TrialEvaluation
+    walkforward_report: WalkForwardReport
+    blocking_risks: tuple[str, ...]
+    rank: int
+
+
+@dataclass(frozen=True)
+class AutoresearchLoopReport:
+    run_id: str
+    protocol_hash: str
+    seed: int
+    date_range_start: str
+    date_range_end: str
+    candidates_generated: int
+    candidates_evaluated: int
+    candidates_blocked: int
+    stop_reason: str
+    results: tuple[AutoresearchCandidateResult, ...]
+    approval_bundle_written: bool
+    approval_bundle_candidate_id: str | None
