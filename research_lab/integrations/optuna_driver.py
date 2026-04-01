@@ -34,6 +34,24 @@ def build_optuna_trial_params(trial: optuna.Trial) -> dict[str, Any]:
 
     sampled: dict[str, Any] = {}
     for name, spec in sorted(get_active_params().items()):
+        # Coupled pair: ema_slow must be > ema_fast
+        if name == "ema_slow":
+            if spec.low is None or spec.high is None:
+                raise ValueError(f"Missing int bounds for active parameter {name}")
+            ema_fast_val = sampled.get("ema_fast", int(spec.low))
+            low = max(int(spec.low), int(ema_fast_val) + 1)
+            sampled[name] = trial.suggest_int(name, low, int(spec.high), step=1)
+            continue
+
+        # Coupled pair: tp2_atr_mult must be > tp1_atr_mult
+        if name == "tp2_atr_mult":
+            if spec.low is None or spec.high is None:
+                raise ValueError(f"Missing float bounds for active parameter {name}")
+            tp1_val = sampled.get("tp1_atr_mult", float(spec.low))
+            low = max(float(spec.low), round(float(tp1_val) + 0.1, 1))
+            sampled[name] = trial.suggest_float(name, low, float(spec.high), step=0.1)
+            continue
+
         if spec.domain_type == "int":
             if spec.low is None or spec.high is None:
                 raise ValueError(f"Missing int bounds for active parameter {name}")
@@ -133,6 +151,8 @@ def run_optuna_study(
         evaluation = dataclasses.replace(raw_evaluation, trial_id=trial_id, params=sampled_params)
         evaluations.append(evaluation)
         save_trial(evaluation, store_path)
+        if evaluation.rejected_reason is not None:
+            return (0.0, 0.0, 1.0)
         return (
             evaluation.metrics.expectancy_r,
             evaluation.metrics.profit_factor,
