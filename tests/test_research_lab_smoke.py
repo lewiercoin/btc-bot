@@ -18,7 +18,16 @@ from research_lab.pareto import compute_pareto_frontier
 from research_lab.protocol import hash_protocol
 from research_lab.reporter import build_experiment_report
 from research_lab.settings_adapter import build_candidate_settings, diff_settings
-from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport, WalkForwardWindow
+from research_lab.types import (
+    NestedWalkForwardCandidateSummary,
+    NestedWalkForwardReport,
+    ObjectiveMetrics,
+    RecommendationDraft,
+    SignalFunnel,
+    TrialEvaluation,
+    WalkForwardReport,
+    WalkForwardWindow,
+)
 from research_lab import walkforward as walkforward_module
 from research_lab.workflows import optimize_loop as optimize_loop_module
 from research_lab.workflows import replay_candidate as replay_candidate_module
@@ -261,7 +270,7 @@ def test_run_optimize_loop_uses_protocol_min_trades_full_candidate(tmp_path: Pat
     captured_min_trades: list[int] = []
 
     def fake_run_optuna_study(**kwargs):
-        min_trades = int(kwargs["min_trades_full_candidate"])
+        min_trades = int(kwargs["min_trades"])
         captured_min_trades.append(min_trades)
         if min_trades >= 999:
             return [
@@ -472,6 +481,308 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
     )
 
     assert captured_min_trades == [999]
+
+
+def test_run_nested_walkforward_selects_aggregated_oos_winner(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol = {
+        "walkforward_mode": "nested",
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 10,
+        "min_expectancy_r_per_window": 0.0,
+        "min_profit_factor_per_window": 1.0,
+        "max_drawdown_pct_per_window": 50.0,
+        "min_sharpe_ratio_per_window": 0.0,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+    }
+    params_a = {"tp1_atr_mult": 3.0}
+    params_b = {"tp1_atr_mult": 3.4}
+    expected_a_id = f"nested-{build_candidate_settings(settings, params_a).config_hash[:12]}"
+    expected_b_id = f"nested-{build_candidate_settings(settings, params_b).config_hash[:12]}"
+    windows = [
+        WalkForwardWindow(
+            train_start="2025-01-01T00:00:00+00:00",
+            train_end="2025-03-31T00:00:00+00:00",
+            validation_start="2025-03-31T00:00:00+00:00",
+            validation_end="2025-04-30T00:00:00+00:00",
+        ),
+        WalkForwardWindow(
+            train_start="2025-01-31T00:00:00+00:00",
+            train_end="2025-04-30T00:00:00+00:00",
+            validation_start="2025-04-30T00:00:00+00:00",
+            validation_end="2025-05-30T00:00:00+00:00",
+        ),
+        WalkForwardWindow(
+            train_start="2025-03-02T00:00:00+00:00",
+            train_end="2025-05-31T00:00:00+00:00",
+            validation_start="2025-05-31T00:00:00+00:00",
+            validation_end="2025-06-30T00:00:00+00:00",
+        ),
+    ]
+    captured_train_ranges: list[tuple[str, str, int, int, str]] = []
+    train_trial_sets = [
+        [
+            TrialEvaluation(
+                trial_id="win0-a",
+                params=params_a,
+                metrics=ObjectiveMetrics(0.30, 1.50, 10.0, 20, 1.0, 120.0, 0.55),
+                funnel=SignalFunnel(10, 1, 1, 1, 7),
+                rejected_reason=None,
+            )
+        ],
+        [
+            TrialEvaluation(
+                trial_id="win1-b",
+                params=params_b,
+                metrics=ObjectiveMetrics(0.45, 1.70, 11.0, 22, 1.1, 150.0, 0.58),
+                funnel=SignalFunnel(10, 1, 1, 1, 7),
+                rejected_reason=None,
+            )
+        ],
+        [
+            TrialEvaluation(
+                trial_id="win2-a",
+                params=params_a,
+                metrics=ObjectiveMetrics(0.28, 1.45, 9.0, 19, 0.9, 110.0, 0.53),
+                funnel=SignalFunnel(10, 1, 1, 1, 7),
+                rejected_reason=None,
+            )
+        ],
+    ]
+    validation_results = [
+        TrialEvaluation(
+            trial_id="val0",
+            params={},
+            metrics=ObjectiveMetrics(0.20, 1.20, 12.0, 12, 0.8, 60.0, 0.52),
+            funnel=SignalFunnel(8, 1, 1, 1, 5),
+            rejected_reason=None,
+        ),
+        TrialEvaluation(
+            trial_id="val1",
+            params={},
+            metrics=ObjectiveMetrics(0.50, 1.80, 14.0, 11, 1.2, 90.0, 0.60),
+            funnel=SignalFunnel(8, 1, 1, 1, 5),
+            rejected_reason=None,
+        ),
+        TrialEvaluation(
+            trial_id="val2",
+            params={},
+            metrics=ObjectiveMetrics(0.18, 1.10, 10.0, 10, 0.7, 50.0, 0.50),
+            funnel=SignalFunnel(8, 1, 1, 1, 5),
+            rejected_reason=None,
+        ),
+    ]
+
+    def fake_run_optuna_study(**kwargs):
+        config = kwargs["backtest_config"]
+        captured_train_ranges.append(
+            (
+                str(config.start_date),
+                str(config.end_date),
+                int(kwargs["min_trades"]),
+                int(kwargs["seed"]),
+                str(kwargs["study_name"]),
+            )
+        )
+        return train_trial_sets.pop(0)
+
+    monkeypatch.setattr(walkforward_module, "run_optuna_study", fake_run_optuna_study)
+    monkeypatch.setattr(walkforward_module, "_evaluate_window_segment", lambda **_: validation_results.pop(0))
+
+    report = walkforward_module.run_nested_walkforward(
+        base_settings=settings,
+        windows=windows,
+        source_db_path=tmp_path / "source.db",
+        snapshots_dir=tmp_path / "snapshots",
+        store_path=tmp_path / "research_lab.db",
+        protocol=protocol,
+        base_n_trials=5,
+        study_name_prefix="nested-study",
+        seed=7,
+    )
+
+    assert report.passed is True
+    assert report.windows_passed == 3
+    assert report.train_trials_total == 3
+    assert report.selected_evaluation is not None
+    assert report.selected_evaluation.trial_id == expected_a_id
+    assert [summary.candidate_id for summary in report.candidate_summaries] == [expected_a_id, expected_b_id]
+    assert report.candidate_summaries[0].windows_won == 2
+    assert captured_train_ranges == [
+        ("2025-01-01T00:00:00+00:00", "2025-03-31T00:00:00+00:00", 10, 7, "nested-study-window-000-train"),
+        ("2025-01-31T00:00:00+00:00", "2025-04-30T00:00:00+00:00", 10, 8, "nested-study-window-001-train"),
+        ("2025-03-02T00:00:00+00:00", "2025-05-31T00:00:00+00:00", 10, 9, "nested-study-window-002-train"),
+    ]
+
+
+def test_run_optimize_loop_uses_nested_mode_when_requested(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    source_db_path = tmp_path / "source.db"
+    store_path = tmp_path / "research_lab.db"
+    snapshots_dir = tmp_path / "snapshots"
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+    protocol_path = tmp_path / "protocol_nested.json"
+    protocol_path.write_text(
+        json.dumps(
+            {
+                "walkforward_mode": "nested",
+                "train_days": 90,
+                "validation_days": 30,
+                "step_days": 30,
+                "min_trades_per_window": 10,
+                "min_trades_full_candidate": 30,
+                "fragility_degradation_threshold_pct": 30.0,
+                "promotion_requires_all_windows_pass": False,
+                "promotion_requires_median_pass": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    selected = TrialEvaluation(
+        trial_id="nested-abcdef123456",
+        params={"tp1_atr_mult": 3.0},
+        metrics=ObjectiveMetrics(0.22, 1.55, 11.0, 21, 1.0, 130.0, 0.54),
+        funnel=SignalFunnel(20, 2, 2, 2, 14),
+        rejected_reason=None,
+        protocol_hash="proto-hash",
+    )
+    report = NestedWalkForwardReport(
+        passed=True,
+        windows_total=2,
+        windows_passed=2,
+        is_degradation_pct=4.0,
+        fragile=False,
+        reasons=(),
+        protocol_hash="proto-hash",
+        train_trials_total=8,
+        selected_evaluation=selected,
+        candidate_summaries=(
+            NestedWalkForwardCandidateSummary(
+                candidate_id=selected.trial_id,
+                params=selected.params,
+                windows_won=2,
+                windows_passed=2,
+                evaluation=selected,
+                contributing_window_indices=(0, 1),
+            ),
+        ),
+    )
+    captured_save_walkforward: list[str] = []
+    captured_nested_args: list[dict[str, object]] = []
+
+    monkeypatch.setattr(optimize_loop_module, "check_baseline", lambda **_: None)
+
+    def fake_run_nested_walkforward(**kwargs):
+        captured_nested_args.append(kwargs)
+        return report
+
+    monkeypatch.setattr(optimize_loop_module, "run_nested_walkforward", fake_run_nested_walkforward)
+    monkeypatch.setattr(optimize_loop_module, "save_walkforward", lambda candidate_id, *_: captured_save_walkforward.append(candidate_id))
+    monkeypatch.setattr(optimize_loop_module, "build_candidate_settings", lambda base, params: base)
+    monkeypatch.setattr(
+        optimize_loop_module,
+        "build_recommendation",
+        lambda **_: RecommendationDraft(
+            candidate_id=selected.trial_id,
+            summary="nested",
+            params_diff={},
+            expected_improvement={},
+            risks=(),
+            approval_required=True,
+            protocol_hash="proto-hash",
+        ),
+    )
+    monkeypatch.setattr(optimize_loop_module, "save_recommendation", lambda *args, **kwargs: None)
+
+    summary = optimize_loop_module.run_optimize_loop(
+        source_db_path=source_db_path,
+        store_path=store_path,
+        snapshots_dir=snapshots_dir,
+        backtest_config=config,
+        base_settings=settings,
+        n_trials=8,
+        study_name="nested-study",
+        seed=99,
+        protocol_path=protocol_path,
+    )
+
+    assert summary["walkforward_mode"] == "nested"
+    assert summary["trials_total"] == 8
+    assert summary["pareto_candidates"] == 1
+    assert summary["recommendations_saved"] == 1
+    assert summary["selected_candidate_id"] == selected.trial_id
+    assert captured_save_walkforward == [selected.trial_id]
+    assert len(captured_nested_args) == 1
+    assert captured_nested_args[0]["base_n_trials"] == 8
+    assert captured_nested_args[0]["study_name_prefix"] == "nested-study"
+    assert captured_nested_args[0]["seed"] == 99
+
+
+def test_replay_candidate_rejects_nested_mode(tmp_path: Path) -> None:
+    settings = load_settings(project_root=tmp_path)
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+    protocol_path = tmp_path / "protocol_nested.json"
+    protocol_path.write_text(
+        json.dumps(
+            {
+                "walkforward_mode": "nested",
+                "train_days": 90,
+                "validation_days": 30,
+                "step_days": 30,
+                "min_trades_per_window": 10,
+                "min_trades_full_candidate": 30,
+                "fragility_degradation_threshold_pct": 30.0,
+                "promotion_requires_all_windows_pass": False,
+                "promotion_requires_median_pass": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    save_trial(
+        TrialEvaluation(
+            trial_id="candidate-001",
+            params={"tp1_atr_mult": 3.0},
+            metrics=ObjectiveMetrics(0.2, 1.5, 10.0, 20, 1.0, 100.0, 0.5),
+            funnel=SignalFunnel(10, 1, 1, 1, 7),
+            rejected_reason=None,
+        ),
+        tmp_path / "research_lab.db",
+    )
+
+    with pytest.raises(ValueError) as exc_info:
+        replay_candidate_module.replay_candidate(
+            candidate_id="candidate-001",
+            base_settings=settings,
+            source_db_path=tmp_path / "source.db",
+            snapshots_dir=tmp_path / "snapshots",
+            store_path=tmp_path / "research_lab.db",
+            backtest_config=config,
+            protocol_path=protocol_path,
+        )
+
+    assert "walkforward_mode='post_hoc'" in str(exc_info.value)
 
 
 def test_run_walkforward_applies_multicriteria_thresholds(

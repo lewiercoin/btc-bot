@@ -7,7 +7,7 @@ from pathlib import Path
 from settings import AppSettings
 
 from research_lab.settings_adapter import diff_settings
-from research_lab.types import RecommendationDraft, TrialEvaluation, WalkForwardReport
+from research_lab.types import NestedWalkForwardReport, RecommendationDraft, TrialEvaluation, WalkForwardReport
 
 
 def build_recommendation(
@@ -15,7 +15,7 @@ def build_recommendation(
     base_settings: AppSettings,
     candidate_settings: AppSettings,
     evaluation: TrialEvaluation,
-    walkforward_report: WalkForwardReport,
+    walkforward_report: WalkForwardReport | NestedWalkForwardReport,
 ) -> RecommendationDraft:
     params_diff = diff_settings(base_settings, candidate_settings)
     if (

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import math
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -9,10 +10,21 @@ from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
+from research_lab.integrations.optuna_driver import run_optuna_study
 from research_lab.objective import evaluate_candidate
+from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 from research_lab.protocol import hash_protocol
 from research_lab.settings_adapter import build_candidate_settings
-from research_lab.types import TrialEvaluation, WalkForwardReport, WalkForwardWindow
+from research_lab.types import (
+    NestedWalkForwardCandidateSummary,
+    NestedWalkForwardReport,
+    NestedWalkForwardWindowResult,
+    ObjectiveMetrics,
+    SignalFunnel,
+    TrialEvaluation,
+    WalkForwardReport,
+    WalkForwardWindow,
+)
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -134,6 +146,62 @@ def _segment_failures(
     return failures
 
 
+def _window_seed(seed: int, index: int) -> int:
+    return int(seed) + int(index)
+
+
+def _nested_candidate_id(base_settings: AppSettings, candidate_params: dict[str, Any]) -> str:
+    candidate_settings = build_candidate_settings(base_settings, candidate_params)
+    return f"nested-{candidate_settings.config_hash[:12]}"
+
+
+def _aggregate_objective_metrics(evaluations: list[TrialEvaluation]) -> ObjectiveMetrics:
+    if not evaluations:
+        return ObjectiveMetrics(
+            expectancy_r=0.0,
+            profit_factor=0.0,
+            max_drawdown_pct=0.0,
+            trades_count=0,
+            sharpe_ratio=0.0,
+            pnl_abs=0.0,
+            win_rate=0.0,
+        )
+
+    count = len(evaluations)
+    return ObjectiveMetrics(
+        expectancy_r=sum(item.metrics.expectancy_r for item in evaluations) / count,
+        profit_factor=sum(item.metrics.profit_factor for item in evaluations) / count,
+        max_drawdown_pct=max(item.metrics.max_drawdown_pct for item in evaluations),
+        trades_count=sum(item.metrics.trades_count for item in evaluations),
+        sharpe_ratio=sum(item.metrics.sharpe_ratio for item in evaluations) / count,
+        pnl_abs=sum(item.metrics.pnl_abs for item in evaluations),
+        win_rate=sum(item.metrics.win_rate for item in evaluations) / count,
+    )
+
+
+def _aggregate_signal_funnel(evaluations: list[TrialEvaluation]) -> SignalFunnel:
+    return SignalFunnel(
+        signals_generated=sum(item.funnel.signals_generated for item in evaluations),
+        signals_regime_blocked=sum(item.funnel.signals_regime_blocked for item in evaluations),
+        signals_governance_rejected=sum(item.funnel.signals_governance_rejected for item in evaluations),
+        signals_risk_rejected=sum(item.funnel.signals_risk_rejected for item in evaluations),
+        signals_executed=sum(item.funnel.signals_executed for item in evaluations),
+    )
+
+
+def _nested_candidate_sort_key(summary: NestedWalkForwardCandidateSummary) -> tuple[Any, ...]:
+    evaluation = summary.evaluation
+    return (
+        -summary.windows_passed,
+        -summary.windows_won,
+        -evaluation.metrics.expectancy_r,
+        -evaluation.metrics.profit_factor,
+        evaluation.metrics.max_drawdown_pct,
+        -evaluation.metrics.trades_count,
+        evaluation.trial_id,
+    )
+
+
 def run_walkforward(
     *,
     base_settings: AppSettings,
@@ -240,4 +308,207 @@ def run_walkforward(
         fragile=fragile,
         reasons=tuple(reasons),
         protocol_hash=protocol_hash,
+    )
+
+
+def run_nested_walkforward(
+    *,
+    base_settings: AppSettings,
+    windows: list[WalkForwardWindow],
+    source_db_path: Path,
+    snapshots_dir: Path,
+    store_path: Path,
+    protocol: dict[str, Any],
+    base_n_trials: int,
+    study_name_prefix: str,
+    seed: int,
+) -> NestedWalkForwardReport:
+    min_trades_per_window = int(protocol["min_trades_per_window"])
+    min_expectancy_r = float(protocol.get("min_expectancy_r_per_window", 0.0))
+    min_profit_factor = float(protocol.get("min_profit_factor_per_window", 1.0))
+    max_drawdown_pct = float(protocol.get("max_drawdown_pct_per_window", 50.0))
+    min_sharpe_ratio = float(protocol.get("min_sharpe_ratio_per_window", 0.0))
+    fragile_threshold = float(protocol["fragility_degradation_threshold_pct"])
+    require_all = bool(protocol["promotion_requires_all_windows_pass"])
+    require_median = bool(protocol["promotion_requires_median_pass"])
+    protocol_hash = hash_protocol(protocol)
+
+    windows_total = len(windows)
+    windows_passed = 0
+    train_trials_total = 0
+    degradations: list[float] = []
+    reasons: list[str] = []
+    window_results: list[NestedWalkForwardWindowResult] = []
+    candidate_bucket: dict[str, dict[str, Any]] = {}
+
+    for index, window in enumerate(windows):
+        window_seed = _window_seed(seed, index)
+        study_name = f"{study_name_prefix}-window-{index:03d}-train"
+        train_trials = run_optuna_study(
+            source_db_path=source_db_path,
+            store_path=store_path,
+            snapshots_dir=snapshots_dir,
+            backtest_config=BacktestConfig(
+                start_date=window.train_start,
+                end_date=window.train_end,
+                symbol=base_settings.strategy.symbol,
+            ),
+            base_settings=base_settings,
+            n_trials=int(base_n_trials),
+            study_name=study_name,
+            seed=window_seed,
+            min_trades=min_trades_per_window,
+            protocol_hash=protocol_hash,
+        )
+        train_trials_total += len(train_trials)
+        frontier = rank_pareto_candidates(compute_pareto_frontier(train_trials))
+        if not frontier:
+            reason = "no_train_candidate"
+            reasons.append(f"window_{index:03d}_{reason}")
+            window_results.append(
+                NestedWalkForwardWindowResult(
+                    window_index=index,
+                    window=window,
+                    study_name=study_name,
+                    seed=window_seed,
+                    champion_trial_id=None,
+                    champion_candidate_id=None,
+                    champion_params={},
+                    train_evaluation=None,
+                    validation_evaluation=None,
+                    validation_passed=False,
+                    reasons=(reason,),
+                )
+            )
+            continue
+
+        champion_train = frontier[0]
+        champion_candidate_id = _nested_candidate_id(base_settings, champion_train.params)
+        champion_settings = build_candidate_settings(base_settings, champion_train.params)
+        validation_raw = _evaluate_window_segment(
+            candidate_settings=champion_settings,
+            source_db_path=source_db_path,
+            snapshots_dir=snapshots_dir,
+            segment_id=f"{study_name_prefix}-window-{index:03d}-validation",
+            start_ts=window.validation_start,
+            end_ts=window.validation_end,
+            min_trades=min_trades_per_window,
+        )
+        validation_evaluation = dataclasses.replace(
+            validation_raw,
+            trial_id=champion_candidate_id,
+            params=champion_train.params,
+            protocol_hash=protocol_hash,
+        )
+        validation_failures = _segment_failures(
+            evaluation=validation_evaluation,
+            min_expectancy_r=min_expectancy_r,
+            min_profit_factor=min_profit_factor,
+            max_drawdown_pct=max_drawdown_pct,
+            min_sharpe_ratio=min_sharpe_ratio,
+        )
+        validation_passed = not validation_failures
+        if validation_passed:
+            windows_passed += 1
+        degradations.append(
+            _degradation_pct(champion_train.metrics.expectancy_r, validation_evaluation.metrics.expectancy_r)
+        )
+        for detail in validation_failures:
+            reasons.append(f"window_{index:03d}_validation_failed: {detail}")
+
+        window_results.append(
+            NestedWalkForwardWindowResult(
+                window_index=index,
+                window=window,
+                study_name=study_name,
+                seed=window_seed,
+                champion_trial_id=champion_train.trial_id,
+                champion_candidate_id=champion_candidate_id,
+                champion_params=champion_train.params,
+                train_evaluation=champion_train,
+                validation_evaluation=validation_evaluation,
+                validation_passed=validation_passed,
+                reasons=tuple(validation_failures),
+            )
+        )
+
+        bucket = candidate_bucket.setdefault(
+            champion_candidate_id,
+            {
+                "params": dict(champion_train.params),
+                "evaluations": [],
+                "window_indices": [],
+                "windows_won": 0,
+                "windows_passed": 0,
+            },
+        )
+        bucket["evaluations"].append(validation_evaluation)
+        bucket["window_indices"].append(index)
+        bucket["windows_won"] += 1
+        if validation_passed:
+            bucket["windows_passed"] += 1
+
+    if windows_total == 0:
+        reasons.append("no_windows_available")
+
+    avg_degradation = sum(degradations) / len(degradations) if degradations else 0.0
+    fragile = avg_degradation > fragile_threshold
+    if fragile:
+        reasons.append(
+            "fragility_threshold_exceeded: "
+            f"{avg_degradation:.2f}% > {fragile_threshold:.2f}%"
+        )
+
+    if require_all:
+        passed = windows_total > 0 and windows_passed == windows_total and not fragile
+    elif require_median:
+        median_required = math.ceil(windows_total / 2) if windows_total else 0
+        passed = windows_total > 0 and windows_passed >= median_required and not fragile
+        if windows_total > 0 and windows_passed < median_required:
+            reasons.append(f"median_windows_not_met: {windows_passed}/{windows_total}")
+    else:
+        passed = windows_total > 0 and windows_passed > 0 and not fragile
+
+    if windows_total > 0 and windows_passed == 0:
+        reasons.append("no_window_passed")
+
+    candidate_summaries: list[NestedWalkForwardCandidateSummary] = []
+    for candidate_id, bucket in candidate_bucket.items():
+        evaluations = list(bucket["evaluations"])
+        aggregated_evaluation = TrialEvaluation(
+            trial_id=candidate_id,
+            params=dict(bucket["params"]),
+            metrics=_aggregate_objective_metrics(evaluations),
+            funnel=_aggregate_signal_funnel(evaluations),
+            rejected_reason=None,
+            protocol_hash=protocol_hash,
+        )
+        candidate_summaries.append(
+            NestedWalkForwardCandidateSummary(
+                candidate_id=candidate_id,
+                params=dict(bucket["params"]),
+                windows_won=int(bucket["windows_won"]),
+                windows_passed=int(bucket["windows_passed"]),
+                evaluation=aggregated_evaluation,
+                contributing_window_indices=tuple(bucket["window_indices"]),
+            )
+        )
+
+    candidate_summaries.sort(key=_nested_candidate_sort_key)
+    selected_evaluation = candidate_summaries[0].evaluation if candidate_summaries else None
+    if not candidate_summaries:
+        reasons.append("no_nested_candidate_available")
+
+    return NestedWalkForwardReport(
+        passed=passed,
+        windows_total=windows_total,
+        windows_passed=windows_passed,
+        is_degradation_pct=avg_degradation,
+        fragile=fragile,
+        reasons=tuple(reasons),
+        protocol_hash=protocol_hash,
+        train_trials_total=train_trials_total,
+        selected_evaluation=selected_evaluation,
+        candidate_summaries=tuple(candidate_summaries),
+        window_results=tuple(window_results),
     )

@@ -1,4 +1,5 @@
 {
+  "walkforward_mode": "post_hoc",
   "train_days": 90,
   "validation_days": 30,
   "step_days": 30,
