@@ -4,17 +4,17 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Research Lab Hardening — Store Schema + Operator Clarity
+**Milestone:** Research Lab vFuture - Autoresearch Agent Loop v1
 **Status:** ACTIVE
 **Decision date:** 2026-04-01
-**Scope:** Fix DDL debt (protocol_hash first-class in CREATE TABLE), document protocol-driven walkforward_mode switch in blueprint, update tracker to reflect closed issues.
+**Scope:** Add single-pass autoresearch loop workflow, CLI trigger, ranked loop report, conditional approval bundle output, and deterministic smoke coverage for the v1 post-hoc-only contract.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Research Lab Hardening — Store Schema + Operator Clarity
+**Current active milestone:** Research Lab vFuture - Autoresearch Agent Loop v1
 **Milestone status:** ACTIVE
 **Last audit verdict:** Pending
 
@@ -22,13 +22,22 @@ Last updated: 2026-04-01
 
 | ID | Name | Status | Implementation commit | Last audit | Blocking issues |
 |---|---|---|---|---|---|
-| RL-HARDENING | Store Schema + Operator Clarity | ACTIVE | - | - | RL-DDL, RL-MODE-DOC |
+| RL-HARDENING | Store Schema + Operator Clarity | CLOSED | `8d47528` | - | none |
 | RL-V3 | Nested Walk-Forward | CLOSED | `9849486` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V2 | WF multicriteria + Protocol lineage | CLOSED | `00e7ada` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | CLOSED | `df81334` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
-| RL-FUTURE | Autoresearch agent loop | AWAITING_DECISION | - | - | none |
+| RL-FUTURE | Autoresearch agent loop | ACTIVE | - | - | none |
+
+### Known Out-Of-Scope For RL-FUTURE v1
+
+| Type | Issue |
+|---|---|
+| vFuture | Multi-iteration autonomous loop |
+| vFuture | `walkforward_mode=nested` support |
+| vFuture | Scheduled/event-triggered runs |
+| vFuture | LLM as gate or ranking authority |
 
 ### Open issues
 
