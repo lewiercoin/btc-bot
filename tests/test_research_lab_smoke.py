@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 
 from backtest.backtest_runner import BacktestConfig
+from research_lab.autoresearch_loop import run_autoresearch_loop
 from research_lab.baseline_gate import BaselineGateError, check_baseline
 from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
@@ -28,6 +29,7 @@ from research_lab.types import (
     WalkForwardReport,
     WalkForwardWindow,
 )
+from research_lab import autoresearch_loop as autoresearch_loop_module
 from research_lab import walkforward as walkforward_module
 from research_lab.workflows import optimize_loop as optimize_loop_module
 from research_lab.workflows import replay_candidate as replay_candidate_module
@@ -56,6 +58,83 @@ def _trial(trial_id: str, expectancy_r: float, profit_factor: float, max_drawdow
         ),
         rejected_reason=None,
     )
+
+
+def _trial_with_params(
+    trial_id: str,
+    params: dict[str, float],
+    *,
+    expectancy_r: float,
+    profit_factor: float,
+    max_drawdown_pct: float,
+    trades_count: int = 20,
+) -> TrialEvaluation:
+    return TrialEvaluation(
+        trial_id=trial_id,
+        params=params,
+        metrics=ObjectiveMetrics(
+            expectancy_r=expectancy_r,
+            profit_factor=profit_factor,
+            max_drawdown_pct=max_drawdown_pct,
+            trades_count=trades_count,
+            sharpe_ratio=1.0,
+            pnl_abs=100.0,
+            win_rate=0.5,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+    )
+
+
+def _autoresearch_protocol(*, walkforward_mode: str = "post_hoc") -> dict[str, object]:
+    return {
+        "walkforward_mode": walkforward_mode,
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 10,
+        "min_expectancy_r_per_window": 0.0,
+        "min_profit_factor_per_window": 1.0,
+        "max_drawdown_pct_per_window": 50.0,
+        "min_sharpe_ratio_per_window": 0.0,
+        "min_trades_full_candidate": 30,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+    }
+
+
+def _write_protocol(path: Path, *, walkforward_mode: str = "post_hoc") -> Path:
+    path.write_text(
+        json.dumps(_autoresearch_protocol(walkforward_mode=walkforward_mode), indent=2),
+        encoding="utf-8",
+    )
+    return path
+
+
+class _FakeSnapshotConn:
+    def close(self) -> None:
+        return None
+
+
+def _patch_autoresearch_snapshot_io(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "create_trial_snapshot",
+        lambda *args, **kwargs: tmp_path / "snapshot.db",
+    )
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "open_snapshot_connection",
+        lambda _: _FakeSnapshotConn(),
+    )
+    monkeypatch.setattr(autoresearch_loop_module, "verify_required_tables", lambda conn: None)
 
 
 def test_param_registry_frozen_params_are_correct() -> None:
@@ -961,3 +1040,266 @@ def test_init_store_creates_protocol_hash_columns_in_fresh_schema(tmp_path: Path
     assert trials_columns["protocol_hash"] == "TEXT"
     assert walkforward_columns["protocol_hash"] == "TEXT"
     assert recommendations_columns["protocol_hash"] == "TEXT"
+
+
+def test_autoresearch_loop_single_pass_produces_ranked_loop_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol_path = _write_protocol(tmp_path / "protocol.json")
+    output_dir = tmp_path / "autoresearch_output"
+    generated_vectors = [
+        {"tp1_atr_mult": 2.1, "tp2_atr_mult": 3.1},
+        {"tp1_atr_mult": 2.6, "tp2_atr_mult": 3.6},
+        {"tp1_atr_mult": 1.8, "tp2_atr_mult": 2.8},
+    ]
+
+    monkeypatch.setattr(autoresearch_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "_generate_candidate_vectors",
+        lambda **_: [dict(vector) for vector in generated_vectors],
+    )
+    _patch_autoresearch_snapshot_io(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "evaluate_candidate",
+        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+            trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
+            params={},
+            expectancy_r=float(settings.strategy.tp1_atr_mult),
+            profit_factor=float(settings.strategy.tp2_atr_mult),
+            max_drawdown_pct=10.0 - float(settings.strategy.tp1_atr_mult),
+            trades_count=20 + int(float(settings.strategy.tp1_atr_mult) * 10),
+        ),
+    )
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=True,
+            windows_total=2,
+            windows_passed=2,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=(),
+        ),
+    )
+
+    report = run_autoresearch_loop(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "research_lab.db",
+        snapshots_dir=tmp_path / "snapshots",
+        output_dir=output_dir,
+        backtest_config=BacktestConfig(
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            initial_equity=10_000.0,
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        protocol_path=protocol_path,
+        max_candidates=3,
+    )
+
+    assert (output_dir / "loop_report.json").exists()
+    assert len(report.results) == 3
+    assert report.results[0].rank == 1
+    assert report.approval_bundle_written is True
+    assert (output_dir / "approval_bundle" / "recommendation.json").exists()
+
+
+def test_autoresearch_loop_all_candidates_blocked_writes_no_bundle(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol_path = _write_protocol(tmp_path / "protocol.json")
+    output_dir = tmp_path / "autoresearch_output"
+    generated_vectors = [
+        {"tp1_atr_mult": 2.1, "tp2_atr_mult": 3.1},
+        {"tp1_atr_mult": 2.6, "tp2_atr_mult": 3.6},
+        {"tp1_atr_mult": 1.8, "tp2_atr_mult": 2.8},
+    ]
+
+    monkeypatch.setattr(autoresearch_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "_generate_candidate_vectors",
+        lambda **_: [dict(vector) for vector in generated_vectors],
+    )
+    _patch_autoresearch_snapshot_io(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "evaluate_candidate",
+        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+            trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
+            params={},
+            expectancy_r=float(settings.strategy.tp1_atr_mult),
+            profit_factor=float(settings.strategy.tp2_atr_mult),
+            max_drawdown_pct=10.0 - float(settings.strategy.tp1_atr_mult),
+        ),
+    )
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=False,
+            windows_total=2,
+            windows_passed=0,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=("walkforward_not_passed",),
+        ),
+    )
+
+    report = run_autoresearch_loop(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "research_lab.db",
+        snapshots_dir=tmp_path / "snapshots",
+        output_dir=output_dir,
+        backtest_config=BacktestConfig(
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            initial_equity=10_000.0,
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        protocol_path=protocol_path,
+        max_candidates=3,
+    )
+
+    assert (output_dir / "loop_report.json").exists()
+    assert report.approval_bundle_written is False
+    assert (output_dir / "approval_bundle").exists() is False
+
+
+def test_autoresearch_loop_baseline_gate_failure_writes_empty_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol_path = _write_protocol(tmp_path / "protocol.json")
+    output_dir = tmp_path / "autoresearch_output"
+
+    def fail_baseline(**kwargs):
+        raise BaselineGateError("baseline failed")
+
+    monkeypatch.setattr(autoresearch_loop_module, "check_baseline", fail_baseline)
+
+    report = run_autoresearch_loop(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "research_lab.db",
+        snapshots_dir=tmp_path / "snapshots",
+        output_dir=output_dir,
+        backtest_config=BacktestConfig(
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            initial_equity=10_000.0,
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        protocol_path=protocol_path,
+        max_candidates=3,
+    )
+
+    assert report.stop_reason == "baseline_gate_failed"
+    assert len(report.results) == 0
+    assert (output_dir / "loop_report.json").exists()
+
+
+def test_autoresearch_loop_rejects_nested_walkforward_mode(tmp_path: Path) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol_path = _write_protocol(tmp_path / "protocol_nested.json", walkforward_mode="nested")
+
+    with pytest.raises(ValueError) as exc_info:
+        run_autoresearch_loop(
+            source_db_path=tmp_path / "source.db",
+            store_path=tmp_path / "research_lab.db",
+            snapshots_dir=tmp_path / "snapshots",
+            output_dir=tmp_path / "autoresearch_output",
+            backtest_config=BacktestConfig(
+                start_date="2025-01-01",
+                end_date="2025-03-31",
+                initial_equity=10_000.0,
+                symbol=settings.strategy.symbol,
+            ),
+            base_settings=settings,
+            protocol_path=protocol_path,
+            max_candidates=3,
+        )
+
+    assert "autoresearch v1 requires walkforward_mode=post_hoc" in str(exc_info.value)
+
+
+def test_autoresearch_loop_ranking_is_deterministic(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol_path = _write_protocol(tmp_path / "protocol.json")
+
+    monkeypatch.setattr(autoresearch_loop_module, "check_baseline", lambda **_: None)
+    _patch_autoresearch_snapshot_io(tmp_path, monkeypatch)
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "evaluate_candidate",
+        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+            trial_id=f"candidate-{settings.config_hash[:12]}",
+            params={},
+            expectancy_r=float(settings.strategy.tp1_atr_mult) + float(settings.strategy.tp2_atr_mult) / 10.0,
+            profit_factor=float(settings.risk.min_rr),
+            max_drawdown_pct=float(settings.risk.daily_dd_limit) * 100.0,
+            trades_count=20 + int(float(settings.strategy.tp1_atr_mult) * 10),
+        ),
+    )
+    monkeypatch.setattr(
+        autoresearch_loop_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=True,
+            windows_total=2,
+            windows_passed=2,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=(),
+        ),
+    )
+
+    first_report = run_autoresearch_loop(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "run1.db",
+        snapshots_dir=tmp_path / "snapshots_run1",
+        output_dir=tmp_path / "output_run1",
+        backtest_config=BacktestConfig(
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            initial_equity=10_000.0,
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        protocol_path=protocol_path,
+        seed=7,
+        max_candidates=3,
+    )
+    second_report = run_autoresearch_loop(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "run2.db",
+        snapshots_dir=tmp_path / "snapshots_run2",
+        output_dir=tmp_path / "output_run2",
+        backtest_config=BacktestConfig(
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            initial_equity=10_000.0,
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        protocol_path=protocol_path,
+        seed=7,
+        max_candidates=3,
+    )
+
+    assert [result.candidate_id for result in first_report.results] == [
+        result.candidate_id for result in second_report.results
+    ]
