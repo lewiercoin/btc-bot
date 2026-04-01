@@ -4,17 +4,17 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Research Lab v3 — Nested Walk-Forward
+**Milestone:** Research Lab Hardening — Store Schema + Operator Clarity
 **Status:** ACTIVE
 **Decision date:** 2026-04-01
-**Scope:** True nested optimization: per-window Optuna search on train data, champion evaluated on validation, results aggregated across windows. Post-hoc mode preserved as default.
+**Scope:** Fix DDL debt (protocol_hash first-class in CREATE TABLE), document protocol-driven walkforward_mode switch in blueprint, update tracker to reflect closed issues.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Research Lab v3 — Nested Walk-Forward
+**Current active milestone:** Research Lab Hardening — Store Schema + Operator Clarity
 **Milestone status:** ACTIVE
 **Last audit verdict:** Pending
 
@@ -22,34 +22,30 @@ Last updated: 2026-04-01
 
 | ID | Name | Status | Implementation commit | Last audit | Blocking issues |
 |---|---|---|---|---|---|
-| RL-V3 | Nested Walk-Forward | ACTIVE | - | - | RL-003 |
+| RL-HARDENING | Store Schema + Operator Clarity | ACTIVE | - | - | RL-DDL, RL-MODE-DOC |
+| RL-V3 | Nested Walk-Forward | CLOSED | `9849486` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V2 | WF multicriteria + Protocol lineage | CLOSED | `00e7ada` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-CLEANUP-001 | Research Lab Cleanup: RL-004 + RL-005 | CLOSED | `df81334` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
-| RL-FUTURE | Autoresearch agent loop | AWAITING_DECISION | - | - | RL-003 |
+| RL-FUTURE | Autoresearch agent loop | AWAITING_DECISION | - | - | none |
 
 ### Open issues
 
 #### BUG
 
-| ID | Issue | Target version |
-|---|---|---|
-| RL-004 | `min_trades_full_candidate` exists in `research_lab/configs/default_protocol.json` but the workflow does not consume it | v2 |
+None.
 
 #### METHODOLOGY_DEBT
 
-| ID | Issue | Target version |
-|---|---|---|
-| RL-001 | Walk-forward window decisions use `expectancy_r` only; drawdown, profit factor, and sharpe do not affect pass/fail | v2 |
-| RL-003 | Walk-forward is post-hoc stability checking, not true nested optimization | v3 |
+None.
 
 #### ARCH_DEBT
 
 | ID | Issue | Target version |
 |---|---|---|
-| RL-002 | Protocol lineage is not hashed or enforced; `protocol_hash` is missing from experiment identity | v2 |
-| RL-005 | `_PROMOTION_BLOCKING_RISKS` lives in `cli.py` instead of a canonical shared contract location | v2 |
+| RL-DDL | `CREATE TABLE` for trials/walkforward_reports/recommendations missing `protocol_hash` column; schema relies on ALTER TABLE migration instead | hardening |
+| RL-MODE-DOC | `walkforward_mode` protocol field not documented in blueprint; operators must know to edit protocol JSON to activate nested mode | hardening |
 
 ### Audit history
 
