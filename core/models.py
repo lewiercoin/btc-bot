@@ -54,6 +54,7 @@ class Features:
     reclaim_detected: bool = False
     sweep_level: float | None = None
     sweep_depth_pct: float | None = None
+    sweep_side: str | None = None
     funding_8h: float = 0.0
     funding_sma3: float = 0.0
     funding_sma9: float = 0.0

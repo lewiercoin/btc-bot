@@ -41,6 +41,7 @@ def _build_features(*, now: datetime, bullish: bool) -> Features:
         reclaim_detected=True,
         sweep_level=70000.0,
         sweep_depth_pct=0.001,
+        sweep_side="LOW" if bullish else "HIGH",
         funding_8h=-0.0001 if bullish else 0.0001,
         funding_sma3=0.0,
         funding_sma9=0.0,
@@ -62,8 +63,11 @@ def _assert_regime_gating_and_stop_floor() -> None:
     now = datetime(2026, 3, 29, 10, 0, tzinfo=timezone.utc)
     engine = SignalEngine()
 
-    blocked_short = engine.generate(_build_features(now=now, bullish=False), RegimeState.DOWNTREND)
-    assert blocked_short is None, "SHORT in DOWNTREND must be blocked by regime whitelist"
+    allowed_short = engine.generate(_build_features(now=now, bullish=False), RegimeState.DOWNTREND)
+    assert allowed_short is not None, "SHORT in DOWNTREND should be allowed in SHORT-REBUILD-P0"
+
+    blocked_short = engine.generate(_build_features(now=now, bullish=False), RegimeState.POST_LIQUIDATION)
+    assert blocked_short is None, "SHORT in POST_LIQUIDATION must remain blocked by regime whitelist"
 
     allowed_long = engine.generate(_build_features(now=now, bullish=True), RegimeState.DOWNTREND)
     assert allowed_long is not None, "LONG in DOWNTREND should be allowed"

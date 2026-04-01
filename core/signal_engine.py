@@ -7,14 +7,14 @@ from uuid import uuid4
 from core.models import Features, RegimeState, SignalCandidate
 
 
-def _default_regime_direction_whitelist() -> dict[str, set[str]]:
+def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
-        RegimeState.NORMAL.value: {"LONG", "SHORT"},
-        RegimeState.COMPRESSION.value: {"LONG", "SHORT"},
-        RegimeState.DOWNTREND.value: {"LONG"},
-        RegimeState.UPTREND.value: {"SHORT"},
-        RegimeState.CROWDED_LEVERAGE.value: set(),
-        RegimeState.POST_LIQUIDATION.value: {"LONG", "SHORT"},
+        RegimeState.NORMAL.value: ("LONG",),
+        RegimeState.COMPRESSION.value: ("LONG",),
+        RegimeState.DOWNTREND.value: ("LONG", "SHORT"),
+        RegimeState.UPTREND.value: (),
+        RegimeState.CROWDED_LEVERAGE.value: ("SHORT",),
+        RegimeState.POST_LIQUIDATION.value: ("LONG",),
     }
 
 
@@ -38,7 +38,7 @@ class SignalConfig:
     direction_tfi_threshold: float = 0.05
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.10
-    regime_direction_whitelist: dict[str, set[str]] = field(default_factory=_default_regime_direction_whitelist)
+    regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
 class SignalEngine:
@@ -82,6 +82,7 @@ class SignalEngine:
             features_json={
                 "atr_15m": features.atr_15m,
                 "sweep_depth_pct": features.sweep_depth_pct,
+                "sweep_side": features.sweep_side,
                 "funding_pct_60d": features.funding_pct_60d,
                 "oi_zscore_60d": features.oi_zscore_60d,
                 "cvd_15m": features.cvd_15m,
@@ -92,18 +93,23 @@ class SignalEngine:
         )
 
     def _infer_direction(self, features: Features) -> str | None:
+        inferred_direction: str | None = None
         if features.cvd_bullish_divergence and not features.cvd_bearish_divergence:
-            return "LONG"
-        if features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
-            return "SHORT"
-        if features.tfi_60s > self.config.direction_tfi_threshold:
-            return "LONG"
-        if features.tfi_60s < self.config.direction_tfi_threshold_inverse:
-            return "SHORT"
-        return None
+            inferred_direction = "LONG"
+        elif features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
+            inferred_direction = "SHORT"
+        elif features.tfi_60s > self.config.direction_tfi_threshold:
+            inferred_direction = "LONG"
+        elif features.tfi_60s < self.config.direction_tfi_threshold_inverse:
+            inferred_direction = "SHORT"
+
+        if inferred_direction == "LONG" and features.sweep_side != "LOW":
+            return None
+        if inferred_direction == "SHORT" and features.sweep_side != "HIGH":
+            return None
+        return inferred_direction
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
-        _ = regime
         score = 0.0
         reasons: list[str] = []
 
@@ -121,12 +127,18 @@ class SignalEngine:
             score += self.config.weight_cvd_divergence
             reasons.append("cvd_bearish_divergence")
 
-        if abs(features.tfi_60s) >= self.config.tfi_impulse_threshold:
+        if direction == "LONG" and features.tfi_60s >= self.config.tfi_impulse_threshold:
+            score += self.config.weight_tfi_impulse
+            reasons.append("tfi_impulse")
+        if direction == "SHORT" and features.tfi_60s <= -self.config.tfi_impulse_threshold:
             score += self.config.weight_tfi_impulse
             reasons.append("tfi_impulse")
         if features.force_order_spike:
             score += self.config.weight_force_order_spike
             reasons.append("force_order_spike")
+        if self._is_regime_special_supportive(direction=direction, regime=regime):
+            score += self.config.weight_regime_special
+            reasons.append("regime_special")
 
         if direction == "LONG" and features.ema50_4h >= features.ema200_4h:
             score += self.config.weight_ema_trend_alignment
@@ -143,6 +155,15 @@ class SignalEngine:
             reasons.append("funding_supportive")
 
         return score, reasons
+
+    def _is_regime_special_supportive(self, *, direction: str, regime: RegimeState) -> bool:
+        # Award the special bonus only in structurally asymmetric regimes:
+        # SHORTs in HTF downtrend / crowded leverage, LONGs after liquidation unwind.
+        if direction == "SHORT":
+            return regime in {RegimeState.DOWNTREND, RegimeState.CROWDED_LEVERAGE}
+        if direction == "LONG":
+            return regime is RegimeState.POST_LIQUIDATION
+        return False
 
     def _build_levels(self, features: Features, direction: str) -> tuple[float, float, float, float]:
         atr = max(features.atr_15m, 1e-8)
