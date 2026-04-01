@@ -4,25 +4,25 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Research Lab Governance Foundation
-**Status:** ACTIVE
+**Milestone:** —
+**Status:** AWAITING_DECISION
 **Decision date:** 2026-04-01
-**Scope:** Fix workflow document drift, add the dedicated research lab blueprint, codify research-lab-specific tracker and audit rules, and define research phase boundaries in `AGENTS.md`.
+**Scope:** Research Lab Governance Foundation closed as `MVP_DONE`. Decision pending for the next cleanup or v2 milestone.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Research Lab Governance Foundation
-**Milestone status:** ACTIVE
-**Last audit verdict:** Pending
+**Current active milestone:** —
+**Milestone status:** AWAITING_DECISION
+**Last audit verdict:** `MVP_DONE` for Research Lab Governance Foundation
 
 ### Milestone ladder
 
 | ID | Name | Status | Implementation commit | Last audit | Blocking issues |
 |---|---|---|---|---|---|
-| RL-GOV-FOUNDATION | Research Lab Governance Foundation | ACTIVE | - | - | none |
+| RL-GOV-FOUNDATION | Research Lab Governance Foundation | CLOSED | `6abaadf` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V1 | Hard Promotion Gate | CLOSED | `10e4e87` | 2026-04-01 Claude audit - MVP_DONE | none |
 | RL-V2 | WF multicriteria | AWAITING_DECISION | - | - | RL-001, RL-002, RL-004, RL-005 |
 | RL-V3 | Nested WF | AWAITING_DECISION | - | - | RL-003 |
@@ -58,8 +58,13 @@ Last updated: 2026-04-01
 | `AUDIT_012` | Research Lab v0.1 architecture + implementation | 2026-03-31 | MVP_DONE | Tracker record |
 | `AUDIT_013` | Research Lab v0.1 optuna runtime validation | 2026-03-31 | MVP_DONE | Tracker record |
 | `CLAUDE_2026-04-01_HARD_GATE` | Hard Promotion Gate | 2026-04-01 | MVP_DONE | Claude audit and handoff record |
+| `CLAUDE_2026-04-01_GOVERNANCE_FOUNDATION` | Research Lab Governance Foundation | 2026-04-01 | MVP_DONE | Claude audit and handoff record |
 
 ## Previous Milestones
+
+**Milestone:** Research Lab Governance Foundation
+**Status:** MVP_DONE (commits `254f7c1` + `6abaadf`, audit passed)
+**Scope:** Closed workflow document drift, added `docs/BLUEPRINT_RESEARCH_LAB.md`, extended `CLAUDE.md` with research lab audit rules, and codified research-lab-specific tracker and phase rules.
 
 **Milestone:** Research Lab v1 - Hard Promotion Gate
 **Status:** MVP_DONE (commit `10e4e87`, audit passed)

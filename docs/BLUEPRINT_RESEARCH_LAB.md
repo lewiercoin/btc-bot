@@ -195,7 +195,7 @@ Research Lab is allowed to create artifacts. It is not allowed to create side ef
 
 | Version | Scope | Status |
 |---|---|---|
-| `v1` | Optimization harness plus hard promotion gate | DONE (`MVP_DONE`) |
+| `v1` | Optimization harness plus hard promotion gate | MVP_DONE |
 | `v2` | Walk-forward multicriteria plus protocol lineage | PLANNED |
 | `v3` | Nested walk-forward optimization | PLANNED |
 | `vFuture` | Autoresearch agent loop | DEFERRED until lineage and nested walk-forward are closed |
