@@ -5,7 +5,7 @@ Last updated: 2026-04-01
 ## Next Milestone
 
 **Milestone:** Tech Debt Cleanup (Resumed)
-**Status:** ACTIVE
+**Status:** MVP_DONE (commits `f93507c` + `8602727`, audit passed 2026-04-01)
 **Decision date:** 2026-04-01
 **Scope:** Close the two remaining open Known Issues: remove the storage-layer runtime-state leak in `storage/state_store.py` and extend `scripts/smoke_recovery.py` to cover the missing recovery failure paths.
 
@@ -14,9 +14,9 @@ Last updated: 2026-04-01
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** Tech Debt Cleanup (Resumed)
-**Milestone status:** ACTIVE
-**Last audit verdict:** 2026-04-01 Claude audit - RL-FUTURE MVP_DONE
+**Current active milestone:** None — all milestones closed
+**Milestone status:** —
+**Last audit verdict:** 2026-04-01 Claude audit - Tech Debt Cleanup MVP_DONE
 
 ### Milestone ladder
 
@@ -162,3 +162,4 @@ None - all blueprint stubs implemented.
 | AUDIT_011 | Known Issue #2 - FeatureEngine statefulness | 2026-03-31 | `a24e1e3` | MVP_DONE |
 | AUDIT_012 | Research Lab v0.1 - architecture + implementation | 2026-03-31 | `aa68c23` | MVP_DONE |
 | AUDIT_013 | Research Lab v0.1 - optuna runtime validation | 2026-03-31 | `dfafa26` | MVP_DONE |
+| AUDIT_014 | Tech Debt Cleanup (Resumed) - Issues #1 + #7 | 2026-04-01 | `8602727` | MVP_DONE |
