@@ -170,6 +170,38 @@ This project uses a structured generator-evaluator workflow:
 
 - No next milestone without audit closure
 
+### Research Lab Phase Rules
+
+- Default write scope:
+  - `research_lab/**`
+  - `tests/test_research_lab*`
+  - `docs/BLUEPRINT_RESEARCH_LAB.md`
+  - `docs/MILESTONE_TRACKER.md`
+  - `docs/audits/AUDIT_RESEARCH_LAB_*`
+  - `research_lab/configs/**`
+
+- Explicit exception:
+  - boundary contract fixes may touch `backtest/` or settings adapter surfaces only when the milestone explicitly includes them
+
+- `settings.py` is not a candidate promotion channel
+
+- If a milestone is research-lab-only, do NOT modify:
+  - `core/**`
+  - `execution/**`
+  - `orchestrator.py`
+  - paper/live execution engines
+
+- Do NOT commit:
+  - `research_lab.db`
+  - `research_lab/snapshots/`
+  - generated approval bundles
+  - ad hoc run reports
+
+- Do NOT "rescue" a candidate by relaxing `min_trades`, walk-forward thresholds, frozen params, or constraints unless the milestone explicitly changes methodology
+
+- Preserve scope purity:
+  - do not mix a bugfix milestone with methodology redesign
+
 ---
 
 ### Source of Truth Files
