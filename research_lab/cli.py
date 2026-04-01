@@ -12,8 +12,8 @@ from backtest.backtest_runner import BacktestConfig
 from settings import load_settings
 
 from research_lab.approval import write_approval_bundle
+from research_lab.autoresearch_loop import run_autoresearch_loop
 from research_lab.constants import PROMOTION_BLOCKING_RISKS
-from research_lab.experiment_store import init_store
 from research_lab.reporter import build_experiment_report, write_experiment_report
 from research_lab.types import RecommendationDraft
 from research_lab.workflows.optimize_loop import run_optimize_loop
@@ -103,6 +103,17 @@ def _build_parser() -> argparse.ArgumentParser:
     replay.add_argument("--start-date", required=True, type=str)
     replay.add_argument("--end-date", required=True, type=str)
 
+    autoresearch = sub.add_parser("autoresearch", help="Run single-pass autoresearch loop and write loop artifacts.")
+    autoresearch.add_argument("--start-date", required=True, type=str)
+    autoresearch.add_argument("--end-date", required=True, type=str)
+    autoresearch.add_argument("--output-dir", required=True, type=Path)
+    autoresearch.add_argument("--source-db-path", type=Path, default=None)
+    autoresearch.add_argument("--store-path", type=Path, default=None)
+    autoresearch.add_argument("--snapshots-dir", type=Path, default=None)
+    autoresearch.add_argument("--protocol-path", type=Path, default=None)
+    autoresearch.add_argument("--seed", type=int, default=42)
+    autoresearch.add_argument("--max-candidates", type=int, default=10)
+
     report = sub.add_parser("build-report", help="Build experiment report from store.")
     report.add_argument("--store-path", type=Path, default=None)
     report.add_argument("--output-json", type=Path, required=True)
@@ -125,7 +136,6 @@ def main(argv: list[str] | None = None) -> None:
     source_db_path = args.source_db_path if getattr(args, "source_db_path", None) is not None else default_source_db
     store_path = args.store_path if getattr(args, "store_path", None) is not None else default_store_path
     snapshots_dir = args.snapshots_dir if getattr(args, "snapshots_dir", None) is not None else default_snapshots_dir
-    init_store(store_path)
 
     if args.command == "optimize":
         start_ts = _parse_iso_datetime(args.start_date, is_end=False)
@@ -169,6 +179,37 @@ def main(argv: list[str] | None = None) -> None:
             protocol_path=args.protocol_path,
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
+        return
+
+    if args.command == "autoresearch":
+        start_ts = _parse_iso_datetime(args.start_date, is_end=False)
+        end_ts = _parse_iso_datetime(args.end_date, is_end=True)
+        if end_ts <= start_ts:
+            raise ValueError("--end-date must be later than --start-date.")
+        report = run_autoresearch_loop(
+            source_db_path=source_db_path,
+            store_path=store_path,
+            snapshots_dir=snapshots_dir,
+            output_dir=args.output_dir,
+            backtest_config=BacktestConfig(
+                start_date=start_ts,
+                end_date=end_ts,
+                symbol=settings.strategy.symbol,
+            ),
+            base_settings=settings,
+            protocol_path=args.protocol_path,
+            seed=int(args.seed),
+            max_candidates=int(args.max_candidates),
+        )
+        summary = {
+            "run_id": report.run_id,
+            "candidates_evaluated": report.candidates_evaluated,
+            "candidates_blocked": report.candidates_blocked,
+            "stop_reason": report.stop_reason,
+            "approval_bundle_written": report.approval_bundle_written,
+            "approval_bundle_candidate_id": report.approval_bundle_candidate_id,
+        }
+        print(json.dumps(summary, indent=2))
         return
 
     if args.command == "build-report":
