@@ -25,8 +25,8 @@ def validate_param_vector(params: dict[str, Any]) -> list[str]:
         violations.append("min_rr must be > 1.0")
 
     risk_per_trade_pct = params.get("risk_per_trade_pct")
-    if risk_per_trade_pct is not None and not (0.001 < float(risk_per_trade_pct) < 0.05):
-        violations.append("risk_per_trade_pct must be in (0.001, 0.05)")
+    if risk_per_trade_pct is not None and not (0.001 <= float(risk_per_trade_pct) <= 0.05):
+        violations.append("risk_per_trade_pct must be in [0.001, 0.05]")
 
     max_leverage = params.get("max_leverage")
     if max_leverage is not None and not (1 < int(max_leverage) < 10):
@@ -52,4 +52,3 @@ def assert_valid(params: dict[str, Any]) -> None:
     violations = validate_param_vector(params)
     if violations:
         raise ValueError("; ".join(violations))
-

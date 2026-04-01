@@ -1,7 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 from pathlib import Path
 
+import pytest
+
+from backtest.backtest_runner import BacktestConfig
+from research_lab.baseline_gate import BaselineGateError, check_baseline
 from research_lab.approval import write_approval_bundle
 from research_lab.constants import PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
@@ -110,3 +115,38 @@ def test_approval_bundle_does_not_write_settings(tmp_path: Path) -> None:
     assert (output_dir / "recommendation.json").exists()
     assert (output_dir / "params_diff.json").exists()
     assert (output_dir / "candidate_settings.json").exists()
+
+
+def test_baseline_gate_raises_on_empty_db(tmp_path: Path) -> None:
+    schema_sql = (Path(__file__).resolve().parents[1] / "storage" / "schema.sql").read_text(encoding="utf-8")
+    memory_conn = sqlite3.connect(":memory:")
+    try:
+        memory_conn.executescript(schema_sql)
+        disk_db_path = tmp_path / "empty_source.db"
+        disk_conn = sqlite3.connect(disk_db_path)
+        try:
+            memory_conn.backup(disk_conn)
+        finally:
+            disk_conn.close()
+    finally:
+        memory_conn.close()
+
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+    )
+    settings = load_settings(project_root=tmp_path)
+
+    with pytest.raises(BaselineGateError) as exc_info:
+        check_baseline(
+            source_db_path=disk_db_path,
+            backtest_config=config,
+            base_settings=settings,
+        )
+
+    message = str(exc_info.value)
+    assert "trades=0" in message
+    assert "2025-01-01" in message
+    assert "2025-03-31" in message
+    assert "aggtrade_buckets" in message
