@@ -18,9 +18,9 @@ def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
         "normal": ("LONG",),
         "compression": ("LONG",),
-        "downtrend": ("LONG",),
+        "downtrend": ("LONG", "SHORT"),
         "uptrend": (),
-        "crowded_leverage": (),
+        "crowded_leverage": ("SHORT",),
         "post_liquidation": ("LONG",),
     }
 

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from core.feature_engine import FeatureEngine
+from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.models import MarketSnapshot
 
 
@@ -25,8 +25,9 @@ def _snapshot(
     cvd_15m: float,
     tfi_60s: float,
     force_orders_count: int,
+    candles_15m: list[dict[str, float | datetime]] | None = None,
 ) -> MarketSnapshot:
-    candles_15m = [
+    candles_15m = candles_15m or [
         _candle(ts - timedelta(minutes=45), 100.0, 101.0, 99.0, 100.0),
         _candle(ts - timedelta(minutes=30), 100.0, 102.0, 99.0, 101.0),
         _candle(ts - timedelta(minutes=15), 101.0, 103.0, 100.0, 102.0),
@@ -61,6 +62,24 @@ def _snapshot(
         aggtrades_bucket_15m={"cvd": cvd_15m},
         force_order_events_60s=force_orders,
     )
+
+
+def _low_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
+    return [
+        _candle(ts - timedelta(minutes=60), 101.0, 103.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=45), 102.0, 104.0, 100.0, 103.0),
+        _candle(ts - timedelta(minutes=30), 103.0, 104.0, 101.0, 103.5),
+        _candle(ts - timedelta(minutes=15), 102.5, 103.0, 98.0, 101.5),
+    ]
+
+
+def _high_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
+    return [
+        _candle(ts - timedelta(minutes=60), 100.0, 104.0, 99.0, 101.0),
+        _candle(ts - timedelta(minutes=45), 101.0, 104.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=30), 102.0, 103.0, 101.0, 102.5),
+        _candle(ts - timedelta(minutes=15), 102.5, 106.0, 101.5, 102.0),
+    ]
 
 
 def test_compute_features_is_idempotent() -> None:
@@ -112,3 +131,57 @@ def test_compute_features_independent_of_prior_state() -> None:
     used_engine.reset()
     reset_result = used_engine.compute(target_snapshot, "v1.0", "hash")
     assert reset_result == fresh_result
+
+
+def test_compute_features_marks_low_sweep_side() -> None:
+    now = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+    snapshot = _snapshot(
+        now,
+        price=101.5,
+        open_interest=1_000.0,
+        cvd_15m=5.0,
+        tfi_60s=0.1,
+        force_orders_count=2,
+        candles_15m=_low_sweep_candles(now),
+    )
+
+    features = FeatureEngine().compute(snapshot, "v1.0", "hash")
+
+    assert features.sweep_detected is True
+    assert features.sweep_side == "LOW"
+
+
+def test_compute_features_marks_high_sweep_side() -> None:
+    now = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+    snapshot = _snapshot(
+        now,
+        price=102.0,
+        open_interest=1_000.0,
+        cvd_15m=5.0,
+        tfi_60s=-0.1,
+        force_orders_count=2,
+        candles_15m=_high_sweep_candles(now),
+    )
+
+    features = FeatureEngine().compute(snapshot, "v1.0", "hash")
+
+    assert features.sweep_detected is True
+    assert features.sweep_side == "HIGH"
+
+
+def test_cvd_divergence_uses_windowed_swing_reference_not_last_bar_only() -> None:
+    engine = FeatureEngine(FeatureEngineConfig(cvd_divergence_window_bars=4))
+    start = datetime(2026, 1, 1, 0, 0, tzinfo=timezone.utc)
+    engine._cvd_price_history.extend(
+        [
+            (start, 100.0, 5.0),
+            (start + timedelta(minutes=15), 102.0, 8.0),
+            (start + timedelta(minutes=30), 101.0, -20.0),
+            (start + timedelta(minutes=45), 103.0, 1.0),
+        ]
+    )
+
+    bullish, bearish = engine._compute_cvd_divergence()
+
+    assert bullish is False
+    assert bearish is True

@@ -22,6 +22,7 @@ class FeatureEngineConfig:
     funding_window_days: int = 60
     oi_z_window_days: int = 60
     force_order_history_points: int = 180
+    cvd_divergence_window_bars: int = 10
 
 
 def _mean(values: Iterable[float]) -> float:
@@ -110,9 +111,9 @@ def detect_sweep_reclaim(
     equal_highs: list[float],
     atr_15m: float,
     config: FeatureEngineConfig,
-) -> tuple[bool, bool, float | None, float | None]:
+) -> tuple[bool, bool, float | None, float | None, str | None]:
     if len(candles_15m) < 2 or atr_15m <= 0:
-        return False, False, None, None
+        return False, False, None, None, None
 
     latest = candles_15m[-1]
     open_price = float(latest["open"])
@@ -132,7 +133,7 @@ def detect_sweep_reclaim(
         wick_ok = (body_low - low_price) >= wick_min
         if swept:
             depth_pct = abs(level - low_price) / level if level else 0.0
-            return True, bool(reclaimed and wick_ok), float(level), depth_pct
+            return True, bool(reclaimed and wick_ok), float(level), depth_pct, "LOW"
 
     for level in equal_highs:
         swept = high_price > (level + sweep_buffer)
@@ -140,9 +141,9 @@ def detect_sweep_reclaim(
         wick_ok = (high_price - body_high) >= wick_min
         if swept:
             depth_pct = abs(high_price - level) / level if level else 0.0
-            return True, bool(reclaimed and wick_ok), float(level), depth_pct
+            return True, bool(reclaimed and wick_ok), float(level), depth_pct, "HIGH"
 
-    return False, False, None, None
+    return False, False, None, None, None
 
 
 class FeatureEngine:
@@ -180,7 +181,7 @@ class FeatureEngine:
         equal_lows = detect_equal_levels(lows, tolerance=level_tolerance, min_hits=2)
         equal_highs = detect_equal_levels(highs, tolerance=level_tolerance, min_hits=2)
 
-        sweep_detected, reclaim_detected, sweep_level, sweep_depth_pct = detect_sweep_reclaim(
+        sweep_detected, reclaim_detected, sweep_level, sweep_depth_pct, sweep_side = detect_sweep_reclaim(
             snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config
         )
 
@@ -217,6 +218,7 @@ class FeatureEngine:
             reclaim_detected=reclaim_detected,
             sweep_level=sweep_level,
             sweep_depth_pct=sweep_depth_pct,
+            sweep_side=sweep_side,
             funding_8h=funding_8h,
             funding_sma3=funding_sma3,
             funding_sma9=funding_sma9,
@@ -259,12 +261,33 @@ class FeatureEngine:
         return float(oi_value), zscore(values, float(oi_value)), delta_pct
 
     def _compute_cvd_divergence(self) -> tuple[bool, bool]:
-        if len(self._cvd_price_history) < 3:
+        window = max(int(self.config.cvd_divergence_window_bars), 3)
+        if len(self._cvd_price_history) < window:
             return False, False
-        _, current_price, current_cvd = self._cvd_price_history[-1]
-        _, prev_price, prev_cvd = self._cvd_price_history[-2]
-        bullish = current_price < prev_price and current_cvd > prev_cvd
-        bearish = current_price > prev_price and current_cvd < prev_cvd
+
+        recent = list(self._cvd_price_history)[-window:]
+        prices = [price for _, price, _ in recent]
+        rolling_cvd: list[float] = []
+        running_cvd = 0.0
+        for _, _, cvd_value in recent:
+            running_cvd += cvd_value
+            rolling_cvd.append(running_cvd)
+
+        previous_prices = prices[:-1]
+        if not previous_prices:
+            return False, False
+
+        prev_high_idx = max(range(len(previous_prices)), key=lambda idx: previous_prices[idx])
+        prev_low_idx = min(range(len(previous_prices)), key=lambda idx: previous_prices[idx])
+        current_price = prices[-1]
+        current_cvd = rolling_cvd[-1]
+        prev_price_high = previous_prices[prev_high_idx]
+        prev_price_low = previous_prices[prev_low_idx]
+        prev_cvd_at_high = rolling_cvd[prev_high_idx]
+        prev_cvd_at_low = rolling_cvd[prev_low_idx]
+
+        bullish = current_price < prev_price_low and current_cvd > prev_cvd_at_low
+        bearish = current_price > prev_price_high and current_cvd < prev_cvd_at_high
         return bullish, bearish
 
     def _is_force_order_spike(self, current_rate: float) -> bool:
