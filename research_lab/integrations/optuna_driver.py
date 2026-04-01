@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, Any
 from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
+from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.constraints import assert_valid
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
 from research_lab.experiment_store import init_store, save_trial
@@ -112,6 +113,7 @@ def run_optuna_study(
     n_trials: int,
     study_name: str,
     seed: int = 42,
+    min_trades_full_candidate: int = MIN_TRADES_DEFAULT,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
     init_store(store_path)
@@ -144,6 +146,7 @@ def run_optuna_study(
                 conn,
                 settings=candidate_settings,
                 backtest_config=backtest_config,
+                min_trades=int(min_trades_full_candidate),
             )
         finally:
             conn.close()

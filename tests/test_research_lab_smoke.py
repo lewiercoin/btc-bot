@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from pathlib import Path
 
@@ -15,7 +16,9 @@ from research_lab.experiment_store import save_recommendation
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
 from research_lab.settings_adapter import build_candidate_settings, diff_settings
-from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation
+from research_lab.types import ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport
+from research_lab.workflows import optimize_loop as optimize_loop_module
+from research_lab.workflows import replay_candidate as replay_candidate_module
 from settings import load_settings
 
 
@@ -218,3 +221,251 @@ def test_baseline_gate_raises_on_empty_db(tmp_path: Path) -> None:
     assert "2025-01-01" in message
     assert "2025-03-31" in message
     assert "aggtrade_buckets" in message
+
+
+def test_run_optimize_loop_uses_protocol_min_trades_full_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = load_settings(project_root=tmp_path)
+    source_db_path = tmp_path / "source.db"
+    store_path = tmp_path / "research_lab.db"
+    snapshots_dir = tmp_path / "snapshots"
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+
+    protocol_lo = tmp_path / "protocol_lo.json"
+    protocol_hi = tmp_path / "protocol_hi.json"
+    protocol_payload = {
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 10,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+    }
+    protocol_lo.write_text(
+        json.dumps({**protocol_payload, "min_trades_full_candidate": 3}, indent=2),
+        encoding="utf-8",
+    )
+    protocol_hi.write_text(
+        json.dumps({**protocol_payload, "min_trades_full_candidate": 999}, indent=2),
+        encoding="utf-8",
+    )
+
+    captured_min_trades: list[int] = []
+
+    def fake_run_optuna_study(**kwargs):
+        min_trades = int(kwargs["min_trades_full_candidate"])
+        captured_min_trades.append(min_trades)
+        if min_trades >= 999:
+            return [
+                TrialEvaluation(
+                    trial_id="trial-rejected",
+                    params={"tp1_atr_mult": 3.0},
+                    metrics=ObjectiveMetrics(
+                        expectancy_r=0.0,
+                        profit_factor=0.0,
+                        max_drawdown_pct=1.0,
+                        trades_count=0,
+                        sharpe_ratio=0.0,
+                        pnl_abs=0.0,
+                        win_rate=0.0,
+                    ),
+                    funnel=SignalFunnel(
+                        signals_generated=0,
+                        signals_regime_blocked=0,
+                        signals_governance_rejected=0,
+                        signals_risk_rejected=0,
+                        signals_executed=0,
+                    ),
+                    rejected_reason="MIN_TRADES_NOT_MET",
+                )
+            ]
+        return [
+            TrialEvaluation(
+                trial_id="trial-accepted",
+                params={"tp1_atr_mult": 3.0},
+                metrics=ObjectiveMetrics(
+                    expectancy_r=0.2,
+                    profit_factor=1.5,
+                    max_drawdown_pct=0.1,
+                    trades_count=12,
+                    sharpe_ratio=1.0,
+                    pnl_abs=100.0,
+                    win_rate=0.5,
+                ),
+                funnel=SignalFunnel(
+                    signals_generated=10,
+                    signals_regime_blocked=1,
+                    signals_governance_rejected=1,
+                    signals_risk_rejected=1,
+                    signals_executed=7,
+                ),
+                rejected_reason=None,
+            )
+        ]
+
+    monkeypatch.setattr(optimize_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "run_optuna_study", fake_run_optuna_study)
+    monkeypatch.setattr(optimize_loop_module, "compute_pareto_frontier", lambda trials: [t for t in trials if t.rejected_reason is None])
+    monkeypatch.setattr(optimize_loop_module, "rank_pareto_candidates", lambda frontier: frontier)
+    monkeypatch.setattr(
+        optimize_loop_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=True,
+            windows_total=1,
+            windows_passed=1,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=(),
+        ),
+    )
+    monkeypatch.setattr(optimize_loop_module, "save_walkforward", lambda *args, **kwargs: None)
+    monkeypatch.setattr(optimize_loop_module, "save_recommendation", lambda *args, **kwargs: None)
+
+    low_summary = optimize_loop_module.run_optimize_loop(
+        source_db_path=source_db_path,
+        store_path=store_path,
+        snapshots_dir=snapshots_dir,
+        backtest_config=config,
+        base_settings=settings,
+        n_trials=1,
+        study_name="test-study",
+        protocol_path=protocol_lo,
+    )
+    high_summary = optimize_loop_module.run_optimize_loop(
+        source_db_path=source_db_path,
+        store_path=store_path,
+        snapshots_dir=snapshots_dir,
+        backtest_config=config,
+        base_settings=settings,
+        n_trials=1,
+        study_name="test-study",
+        protocol_path=protocol_hi,
+    )
+
+    assert captured_min_trades == [3, 999]
+    assert low_summary["trials_total"] == 1
+    assert low_summary["pareto_candidates"] == 1
+    assert low_summary["recommendations_saved"] == 1
+    assert high_summary["trials_total"] == 1
+    assert high_summary["pareto_candidates"] == 0
+    assert high_summary["recommendations_saved"] == 0
+
+
+def test_replay_candidate_uses_protocol_min_trades_full_candidate(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+    protocol_path = tmp_path / "protocol.json"
+    protocol_path.write_text(
+        json.dumps(
+            {
+                "train_days": 90,
+                "validation_days": 30,
+                "step_days": 30,
+                "min_trades_per_window": 10,
+                "min_trades_full_candidate": 999,
+                "fragility_degradation_threshold_pct": 30.0,
+                "promotion_requires_all_windows_pass": False,
+                "promotion_requires_median_pass": True,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    selected = TrialEvaluation(
+        trial_id="candidate-001",
+        params={"tp1_atr_mult": 3.0},
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.2,
+            profit_factor=1.5,
+            max_drawdown_pct=0.1,
+            trades_count=12,
+            sharpe_ratio=1.0,
+            pnl_abs=100.0,
+            win_rate=0.5,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+    )
+
+    captured_min_trades: list[int] = []
+
+    class _FakeConn:
+        def close(self) -> None:
+            return None
+
+    def fake_evaluate_candidate(connection, *, settings, backtest_config, min_trades):
+        captured_min_trades.append(int(min_trades))
+        return TrialEvaluation(
+            trial_id="candidate-001",
+            params={"tp1_atr_mult": 3.0},
+            metrics=selected.metrics,
+            funnel=selected.funnel,
+            rejected_reason="MIN_TRADES_NOT_MET",
+        )
+
+    monkeypatch.setattr(replay_candidate_module, "load_trials", lambda _: [selected])
+    monkeypatch.setattr(replay_candidate_module, "build_candidate_settings", lambda base, params: base)
+    monkeypatch.setattr(replay_candidate_module, "create_trial_snapshot", lambda *args, **kwargs: tmp_path / "snapshot.db")
+    monkeypatch.setattr(replay_candidate_module, "open_snapshot_connection", lambda _: _FakeConn())
+    monkeypatch.setattr(replay_candidate_module, "verify_required_tables", lambda conn: None)
+    monkeypatch.setattr(replay_candidate_module, "evaluate_candidate", fake_evaluate_candidate)
+    monkeypatch.setattr(replay_candidate_module, "save_trial", lambda *args, **kwargs: None)
+    monkeypatch.setattr(replay_candidate_module, "save_walkforward", lambda *args, **kwargs: None)
+    monkeypatch.setattr(replay_candidate_module, "save_recommendation", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        replay_candidate_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=False,
+            windows_total=1,
+            windows_passed=0,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=("no_window_passed",),
+        ),
+    )
+    monkeypatch.setattr(
+        replay_candidate_module,
+        "build_recommendation",
+        lambda **_: RecommendationDraft(
+            candidate_id="candidate-001",
+            summary="replayed",
+            params_diff={},
+            expected_improvement={},
+            risks=("walkforward_not_passed",),
+            approval_required=True,
+        ),
+    )
+
+    replay_candidate_module.replay_candidate(
+        candidate_id="candidate-001",
+        base_settings=settings,
+        source_db_path=tmp_path / "source.db",
+        snapshots_dir=tmp_path / "snapshots",
+        store_path=tmp_path / "research_lab.db",
+        backtest_config=config,
+        protocol_path=protocol_path,
+    )
+
+    assert captured_min_trades == [999]
