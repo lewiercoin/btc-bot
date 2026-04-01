@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import json
 import sqlite3
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,8 @@ from research_lab.reporter import build_experiment_report, write_experiment_repo
 from research_lab.types import RecommendationDraft
 from research_lab.workflows.optimize_loop import run_optimize_loop
 from research_lab.workflows.replay_candidate import replay_candidate
+
+_PROMOTION_BLOCKING_RISKS = frozenset({"walkforward_not_passed", "walkforward_fragile"})
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -70,6 +73,10 @@ def _load_recommendation(store_path: Path, candidate_id: str) -> RecommendationD
         risks=tuple(payload.get("risks", [])),
         approval_required=bool(payload.get("approval_required", True)),
     )
+
+
+def _get_blocking_promotion_risks(risks: tuple[str, ...]) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(risk for risk in risks if risk in _PROMOTION_BLOCKING_RISKS))
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -172,9 +179,17 @@ def main(argv: list[str] | None = None) -> None:
 
     if args.command == "build-approval-bundle":
         recommendation = _load_recommendation(store_path, args.candidate_id)
+        blocking_risks = _get_blocking_promotion_risks(recommendation.risks)
+        if blocking_risks:
+            blocking_str = ", ".join(blocking_risks)
+            print(
+                "Cannot build approval bundle: blocking promotion risks detected "
+                f"for candidate {recommendation.candidate_id}: {blocking_str}",
+                file=sys.stderr,
+            )
+            raise SystemExit(1)
         bundle_path = write_approval_bundle(recommendation=recommendation, output_dir=args.output_dir)
         print(bundle_path)
         return
 
     raise ValueError(f"Unsupported command: {args.command}")
-
