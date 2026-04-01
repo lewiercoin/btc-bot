@@ -4,19 +4,19 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** Research Lab vFuture - Autoresearch Agent Loop v1
-**Status:** MVP_DONE (commits `e5a5ab6`–`d1ab0f1`, audit passed 2026-04-01)
+**Milestone:** Tech Debt Cleanup (Resumed)
+**Status:** ACTIVE
 **Decision date:** 2026-04-01
-**Scope:** Add single-pass autoresearch loop workflow, CLI trigger, ranked loop report, conditional approval bundle output, and deterministic smoke coverage for the v1 post-hoc-only contract.
+**Scope:** Close the two remaining open Known Issues: remove the storage-layer runtime-state leak in `storage/state_store.py` and extend `scripts/smoke_recovery.py` to cover the missing recovery failure paths.
 
 ## Research Lab
 
 **Blueprint:** `docs/BLUEPRINT_RESEARCH_LAB.md`
 **Boundary:** Offline-only; reads from `backtest/` and `settings` surfaces; no live path mutation; approval bundle ends with human-review artifacts
 
-**Current active milestone:** None — all Research Lab milestones through RL-FUTURE are CLOSED
-**Milestone status:** MVP_DONE
-**Last audit verdict:** 2026-04-01 Claude audit - MVP_DONE
+**Current active milestone:** Tech Debt Cleanup (Resumed)
+**Milestone status:** ACTIVE
+**Last audit verdict:** 2026-04-01 Claude audit - RL-FUTURE MVP_DONE
 
 ### Milestone ladder
 
@@ -126,7 +126,7 @@ None - all blueprint stubs implemented.
 
 ## Known Issues
 
-1. **Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines - tracked since initial audit
+1. ~~**Layer leak**: `storage/state_store.py` imports `GovernanceRuntimeState` and `RiskRuntimeState` directly from core engines - tracked since initial audit~~ - **FIXED in Tech Debt Cleanup (Resumed)** (`storage/state_store.py` now depends only on shared contracts from `core/models.py`; `SettlementMetrics` was moved out of `core/risk_engine.py` into the shared core model surface)
 2. ~~**Statefulness**: `FeatureEngine` internal deques break independent reproducibility (AGENTS.md violation)~~ - **FIXED in `a24e1e3`** (`FeatureEngine.reset()` added; backtest already creates fresh `FeatureEngine` per run; `tests/test_feature_engine.py` validates idempotency and reset-based fresh-instance reproducibility)
 3. ~~**Deprecated API**: `repositories.py:57` uses `datetime.utcnow()`~~ - **FIXED in `c5f9408`** (zero matches in codebase)
 4. ~~**Layer leak**: `PaperExecutionEngine` and `LiveExecutionEngine` import from `storage.repositories` and take `sqlite3.Connection` (execution should not know storage)~~ - **FIXED in `ba72c35`** (`PositionPersister` protocol plus DI injection into execution engines)
