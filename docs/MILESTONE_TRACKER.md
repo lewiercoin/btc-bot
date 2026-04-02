@@ -15,10 +15,25 @@ Last updated: 2026-04-01
 
 ## Next Milestone
 
-**Milestone:** None — all milestones closed
+**Milestone:** DASHBOARD-M1 — Read-Only Observability + WAL Patch
+**Status:** MVP_DONE (audit 2026-04-02, 46/46 tests green)
+**Decision date:** 2026-04-02
+**Scope:** WAL mode in `storage/db.py` + `connect_readonly()` helper + FastAPI dashboard (observability only: `/api/status`, `/api/positions`, `/api/trades`, `/api/logs/stream`). No start/stop. No terminal. Bind 127.0.0.1 only.
+**Audit:** [docs/audits/AUDIT_DASHBOARD_M1_2026-04-02.md](audits/AUDIT_DASHBOARD_M1_2026-04-02.md)
+
+## Next Milestone
+
+**Milestone:** DASHBOARD-M3 — Managed Start/Stop
+**Status:** MVP_DONE (audit 2026-04-02, 53/53 tests green)
+**Decision date:** 2026-04-02
+**Scope:** `ProcessManager` (`CREATE_NEW_PROCESS_GROUP` + `CTRL_C_EVENT` + 10s timeout + hard fallback + operator audit log) + `/api/bot/start` + `/api/bot/stop` + `uptime_seconds` in `/api/status` + M1 carry-overs: `db_reader.py` OperationalError guard + `app.js` innerHTML → DOM fix.
+**Audit:** [docs/audits/AUDIT_DASHBOARD_M3_2026-04-02.md](audits/AUDIT_DASHBOARD_M3_2026-04-02.md)
+
+## Next Milestone
+
+**Milestone:** None — dashboard M3 in operator use. Awaiting field validation before deciding M4.
 **Status:** —
-**Decision date:** 2026-04-01
-**Scope:** Awaiting the next Claude Code recommendation after the `v1.0-baseline` checkpoint.
+**Decision date:** 2026-04-02
 
 ## Research Lab
 
@@ -107,6 +122,13 @@ None.
 **Scope:** Fix remaining open known issues (#1, #4, #8, #9, #10, #13, #14, #15). Zero regressions - all existing smoke tests must pass after each fix.
 
 **Note:** All blueprint phases (A-H), cross-cutting hardening work, and Research Lab milestones through RL-FUTURE are closed at `v1.0-baseline`. Only explicitly listed out-of-scope methodology items remain deferred.
+
+## Optional Future Milestones (not scheduled)
+
+| ID | Name | Trigger |
+|---|---|---|
+| DASHBOARD-M4 | Backtest/Research Job Runner (asyncio queue, job_id, SSE output, history) | After M3 has been in operator use and field-validated |
+| DASHBOARD-M5 | Embedded terminal (admin-only, separate origin, ConPTY) | Only if terminal access from browser becomes a real need |
 
 ## Phase Status
 
