@@ -147,12 +147,16 @@ venv.bak/
 
 # Runtime artifacts
 *.db
+*.db-shm
+*.db-wal
 *.sqlite
 *.sqlite3
 logs/
 tmp/
 temp/
 research_lab_runs/
+research_lab/snapshots/
+research_lab/runs/
 *.tmp
 *.temp
 
