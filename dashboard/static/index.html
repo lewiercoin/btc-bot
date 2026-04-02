@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>BTC Bot Dashboard</title>
+    <link rel="stylesheet" href="/static/style.css" />
+  </head>
+  <body>
+    <main class="page">
+      <header class="hero">
+        <div>
+          <p class="eyebrow">Observability</p>
+          <h1>BTC Bot Dashboard</h1>
+        </div>
+        <div class="badge badge--unknown" id="status-badge">No data</div>
+      </header>
+
+      <section class="panel panel--control">
+        <div class="panel__header">
+          <h2>Bot Control</h2>
+          <span class="panel__meta" id="process-status">Stopped</span>
+        </div>
+        <div class="control-row">
+          <select id="bot-mode">
+            <option value="PAPER">PAPER</option>
+            <option value="LIVE">LIVE</option>
+          </select>
+          <button id="btn-start" class="btn btn--start">Start</button>
+          <button id="btn-stop" class="btn btn--stop" disabled>Stop</button>
+        </div>
+        <p class="panel__note" id="control-message">Process state is tracked separately from persisted bot state.</p>
+      </section>
+
+      <section class="grid grid--top">
+        <article class="panel">
+          <div class="panel__header">
+            <h2>Bot Status</h2>
+            <span class="panel__meta" id="dashboard-version">m3</span>
+          </div>
+          <dl class="stat-list" id="status-list">
+            <div class="stat-row">
+              <dt>Mode</dt>
+              <dd id="status-mode">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Healthy</dt>
+              <dd id="status-healthy">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Safe mode</dt>
+              <dd id="status-safe-mode">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Safe mode reason</dt>
+              <dd id="status-safe-mode-reason">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Open positions</dt>
+              <dd id="status-open-positions">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Consecutive losses</dt>
+              <dd id="status-consecutive-losses">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Daily DD</dt>
+              <dd id="status-daily-dd">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Weekly DD</dt>
+              <dd id="status-weekly-dd">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Last trade</dt>
+              <dd id="status-last-trade">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>State timestamp</dt>
+              <dd id="status-timestamp">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Process mode</dt>
+              <dd id="status-process-mode">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Process PID</dt>
+              <dd id="status-process-pid">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Process exit code</dt>
+              <dd id="status-process-exit-code">-</dd>
+            </div>
+            <div class="stat-row">
+              <dt>Uptime</dt>
+              <dd id="status-uptime">-</dd>
+            </div>
+          </dl>
+        </article>
+
+        <article class="panel">
+          <div class="panel__header">
+            <h2>Open Positions</h2>
+            <span class="panel__meta" id="positions-age">Age: -</span>
+          </div>
+          <p class="panel__note">Unrealized PnL is not shown in M1.</p>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Direction</th>
+                  <th>Entry</th>
+                  <th>Size</th>
+                  <th>Stop</th>
+                  <th>TP1</th>
+                  <th>Status</th>
+                  <th>Opened</th>
+                </tr>
+              </thead>
+              <tbody id="positions-body">
+                <tr>
+                  <td colspan="7" class="empty">No open positions.</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+      </section>
+
+      <section class="panel">
+        <div class="panel__header">
+          <h2>Recent Trades</h2>
+          <span class="panel__meta">Last 20 closed trades</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Direction</th>
+                <th>Entry</th>
+                <th>Exit</th>
+                <th>PnL</th>
+                <th>PnL R</th>
+                <th>Outcome</th>
+                <th>Closed</th>
+              </tr>
+            </thead>
+            <tbody id="trades-body">
+              <tr>
+                <td colspan="7" class="empty">No closed trades.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="panel panel--logs">
+        <div class="panel__header panel__header--stack">
+          <div>
+            <h2>Log Stream</h2>
+            <p class="panel__note">SSE tail of <code>logs/btc_bot.log</code>, last 100 lines on connect.</p>
+          </div>
+          <label class="filter">
+            <span>Filter</span>
+            <select id="log-filter">
+              <option value="all">All</option>
+              <option value="warn">Warn+</option>
+              <option value="error">Error only</option>
+            </select>
+          </label>
+        </div>
+        <pre class="log-stream" id="log-stream">Connecting to log stream...</pre>
+      </section>
+    </main>
+
+    <script src="/static/app.js" defer></script>
+  </body>
+</html>
