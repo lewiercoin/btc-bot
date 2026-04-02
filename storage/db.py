@@ -10,6 +10,14 @@ def connect(db_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, detect_types=sqlite3.PARSE_DECLTYPES)
     conn.row_factory = sqlite3.Row
     conn.execute("PRAGMA foreign_keys = ON;")
+    conn.execute("PRAGMA journal_mode=WAL;")
+    return conn
+
+
+def connect_readonly(db_path: Path) -> sqlite3.Connection:
+    db_uri = f"{db_path.resolve().as_uri()}?mode=ro"
+    conn = sqlite3.connect(db_uri, uri=True, detect_types=sqlite3.PARSE_DECLTYPES)
+    conn.row_factory = sqlite3.Row
     return conn
 
 

@@ -1,0 +1,371 @@
+const statusBadge = document.getElementById("status-badge");
+const dashboardVersion = document.getElementById("dashboard-version");
+const positionsAge = document.getElementById("positions-age");
+const positionsBody = document.getElementById("positions-body");
+const tradesBody = document.getElementById("trades-body");
+const logStream = document.getElementById("log-stream");
+const logFilter = document.getElementById("log-filter");
+const processStatus = document.getElementById("process-status");
+const controlMessage = document.getElementById("control-message");
+const botModeSelect = document.getElementById("bot-mode");
+const startButton = document.getElementById("btn-start");
+const stopButton = document.getElementById("btn-stop");
+
+const statusFields = {
+  mode: document.getElementById("status-mode"),
+  healthy: document.getElementById("status-healthy"),
+  safeMode: document.getElementById("status-safe-mode"),
+  safeModeReason: document.getElementById("status-safe-mode-reason"),
+  openPositions: document.getElementById("status-open-positions"),
+  consecutiveLosses: document.getElementById("status-consecutive-losses"),
+  dailyDd: document.getElementById("status-daily-dd"),
+  weeklyDd: document.getElementById("status-weekly-dd"),
+  lastTrade: document.getElementById("status-last-trade"),
+  timestamp: document.getElementById("status-timestamp"),
+  processMode: document.getElementById("status-process-mode"),
+  processPid: document.getElementById("status-process-pid"),
+  processExitCode: document.getElementById("status-process-exit-code"),
+  uptime: document.getElementById("status-uptime"),
+};
+
+const logEntries = [];
+let controlBusy = false;
+
+function formatDate(value) {
+  if (!value) {
+    return "-";
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleString();
+}
+
+function formatNumber(value, digits = 2) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+  return Number(value).toFixed(digits);
+}
+
+function formatPercent(value) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+  return `${(Number(value) * 100).toFixed(2)}%`;
+}
+
+function formatUptime(seconds) {
+  if (seconds === null || seconds === undefined) {
+    return "-";
+  }
+  const total = Math.max(Math.floor(Number(seconds)), 0);
+  const hours = Math.floor(total / 3600);
+  const minutes = Math.floor((total % 3600) / 60);
+  const remainingSeconds = total % 60;
+  if (hours > 0) {
+    return `${hours}h ${minutes}m ${remainingSeconds}s`;
+  }
+  if (minutes > 0) {
+    return `${minutes}m ${remainingSeconds}s`;
+  }
+  return `${remainingSeconds}s`;
+}
+
+function setControlEnabled(processRunning) {
+  startButton.disabled = controlBusy || processRunning;
+  stopButton.disabled = controlBusy || !processRunning;
+  botModeSelect.disabled = controlBusy || processRunning;
+}
+
+function setControlBusy(action) {
+  controlBusy = action !== null;
+  startButton.textContent = action === "start" ? "Starting..." : "Start";
+  stopButton.textContent = action === "stop" ? "Stopping..." : "Stop";
+}
+
+function setControlMessage(message) {
+  controlMessage.textContent = message;
+}
+
+function setBadge(state) {
+  statusBadge.className = "badge";
+  if (!state) {
+    statusBadge.classList.add("badge--unknown");
+    statusBadge.textContent = "No data";
+    return;
+  }
+  if (state.healthy && !state.safe_mode) {
+    statusBadge.classList.add("badge--ok");
+    statusBadge.textContent = "Healthy";
+    return;
+  }
+  if (state.safe_mode) {
+    statusBadge.classList.add("badge--warn");
+    statusBadge.textContent = "Safe mode";
+    return;
+  }
+  statusBadge.classList.add("badge--error");
+  statusBadge.textContent = "Unhealthy";
+}
+
+function renderStatus(payload) {
+  dashboardVersion.textContent = payload.dashboard_version || "m3";
+  const state = payload.bot_state;
+  const process = payload.process || { running: false, pid: null, mode: null, exit_code: null };
+  setBadge(state);
+  processStatus.textContent = process.running
+    ? `Running PID ${process.pid} (${process.mode})`
+    : "Stopped";
+  setControlEnabled(process.running);
+
+  if (!state) {
+    statusFields.mode.textContent = "-";
+    statusFields.healthy.textContent = "-";
+    statusFields.safeMode.textContent = "-";
+    statusFields.safeModeReason.textContent = "-";
+    statusFields.openPositions.textContent = "-";
+    statusFields.consecutiveLosses.textContent = "-";
+    statusFields.dailyDd.textContent = "-";
+    statusFields.weeklyDd.textContent = "-";
+    statusFields.lastTrade.textContent = "-";
+    statusFields.timestamp.textContent = "-";
+  } else {
+    statusFields.mode.textContent = state.mode;
+    statusFields.healthy.textContent = state.healthy ? "Yes" : "No";
+    statusFields.safeMode.textContent = state.safe_mode ? "Yes" : "No";
+    statusFields.safeModeReason.textContent = state.safe_mode_reason || "-";
+    statusFields.openPositions.textContent = String(state.open_positions_count);
+    statusFields.consecutiveLosses.textContent = String(state.consecutive_losses);
+    statusFields.dailyDd.textContent = formatPercent(state.daily_dd_pct);
+    statusFields.weeklyDd.textContent = formatPercent(state.weekly_dd_pct);
+    statusFields.lastTrade.textContent = formatDate(state.last_trade_at);
+    statusFields.timestamp.textContent = formatDate(state.state_timestamp);
+  }
+
+  statusFields.processMode.textContent = process.mode || "-";
+  statusFields.processPid.textContent = process.pid === null ? "-" : String(process.pid);
+  statusFields.processExitCode.textContent = process.exit_code === null ? "-" : String(process.exit_code);
+  statusFields.uptime.textContent = formatUptime(payload.uptime_seconds);
+}
+
+function appendCells(row, values) {
+  for (const value of values) {
+    const cell = document.createElement("td");
+    cell.textContent = value;
+    row.appendChild(cell);
+  }
+}
+
+function renderEmptyTableRow(tbody, colspan, message) {
+  tbody.replaceChildren();
+  const row = document.createElement("tr");
+  const cell = document.createElement("td");
+  cell.colSpan = colspan;
+  cell.className = "empty";
+  cell.textContent = message;
+  row.appendChild(cell);
+  tbody.appendChild(row);
+}
+
+function renderPositions(payload) {
+  positionsAge.textContent = payload.data_age_seconds === null
+    ? "Age: -"
+    : `Age: ${Math.round(payload.data_age_seconds)}s`;
+
+  if (!payload.positions.length) {
+    renderEmptyTableRow(positionsBody, 7, "No open positions.");
+    return;
+  }
+
+  positionsBody.replaceChildren();
+  for (const position of payload.positions) {
+    const row = document.createElement("tr");
+    appendCells(row, [
+      position.direction,
+      formatNumber(position.entry_price),
+      formatNumber(position.size, 4),
+      position.stop_loss === null ? "-" : formatNumber(position.stop_loss),
+      position.take_profit_1 === null ? "-" : formatNumber(position.take_profit_1),
+      position.status,
+      formatDate(position.opened_at),
+    ]);
+    positionsBody.appendChild(row);
+  }
+}
+
+function renderTrades(payload) {
+  if (!payload.trades.length) {
+    renderEmptyTableRow(tradesBody, 7, "No closed trades.");
+    return;
+  }
+
+  tradesBody.replaceChildren();
+  for (const trade of payload.trades) {
+    const row = document.createElement("tr");
+    appendCells(row, [
+      trade.direction,
+      formatNumber(trade.entry_price),
+      trade.exit_price === null ? "-" : formatNumber(trade.exit_price),
+      trade.pnl_abs === null ? "-" : formatNumber(trade.pnl_abs),
+      trade.pnl_r === null ? "-" : formatNumber(trade.pnl_r, 3),
+      trade.outcome || "-",
+      formatDate(trade.closed_at),
+    ]);
+    tradesBody.appendChild(row);
+  }
+}
+
+function lineLevel(line) {
+  if (line.includes("| ERROR |")) {
+    return "error";
+  }
+  if (line.includes("| WARNING |") || line.includes("| WARN |")) {
+    return "warn";
+  }
+  return "info";
+}
+
+function passesFilter(entry, filterValue) {
+  if (filterValue === "all") {
+    return true;
+  }
+  if (filterValue === "warn") {
+    return entry.level === "warn" || entry.level === "error";
+  }
+  return entry.level === "error";
+}
+
+function renderLogStream() {
+  const filterValue = logFilter.value;
+  const lines = logEntries
+    .filter((entry) => passesFilter(entry, filterValue))
+    .map((entry) => entry.line);
+  logStream.textContent = lines.join("\n");
+  logStream.scrollTop = logStream.scrollHeight;
+}
+
+function appendLogLine(line) {
+  logEntries.push({ line, level: lineLevel(line) });
+  if (logEntries.length > 400) {
+    logEntries.shift();
+  }
+  renderLogStream();
+}
+
+async function loadJson(url) {
+  const response = await fetch(url, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function postJson(url, payload) {
+  const response = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+  if (!response.ok) {
+    throw new Error(`Request failed: ${response.status}`);
+  }
+  return response.json();
+}
+
+async function refreshStatus() {
+  try {
+    renderStatus(await loadJson("/api/status"));
+  } catch (error) {
+    statusBadge.className = "badge badge--error";
+    statusBadge.textContent = "Status error";
+  }
+}
+
+async function refreshPositions() {
+  try {
+    renderPositions(await loadJson("/api/positions"));
+  } catch (error) {
+    positionsAge.textContent = "Age: error";
+  }
+}
+
+async function refreshTrades() {
+  try {
+    renderTrades(await loadJson("/api/trades?limit=20"));
+  } catch (error) {
+    renderEmptyTableRow(tradesBody, 7, "Trades unavailable.");
+  }
+}
+
+async function handleStart() {
+  const mode = botModeSelect.value;
+  if (mode === "LIVE") {
+    const confirmed = window.confirm("Start LIVE trading with real funds? This will place real orders.");
+    if (!confirmed) {
+      return;
+    }
+  }
+
+  setControlBusy("start");
+  setControlEnabled(false);
+  try {
+    const result = await postJson("/api/bot/start", { mode });
+    if (result.started) {
+      setControlMessage(`Started PID ${result.pid} in ${result.mode} mode.`);
+    } else {
+      setControlMessage(`Error: ${result.reason}.`);
+    }
+    await refreshStatus();
+  } catch (error) {
+    setControlMessage(`Error: ${error.message}`);
+  } finally {
+    setControlBusy(null);
+    await refreshStatus();
+  }
+}
+
+async function handleStop() {
+  setControlBusy("stop");
+  setControlEnabled(false);
+  try {
+    const result = await postJson("/api/bot/stop", { reason: "operator_stop" });
+    if (result.stopped) {
+      setControlMessage(result.graceful ? `Stopped gracefully (PID ${result.pid}).` : `Stopped with hard fallback (PID ${result.pid}).`);
+    } else {
+      setControlMessage(`Error: ${result.reason}.`);
+    }
+    await refreshStatus();
+  } catch (error) {
+    setControlMessage(`Error: ${error.message}`);
+  } finally {
+    setControlBusy(null);
+    await refreshStatus();
+  }
+}
+
+function connectLogs() {
+  const source = new EventSource("/api/logs/stream");
+  source.onmessage = (event) => {
+    const payload = JSON.parse(event.data);
+    appendLogLine(payload.line);
+  };
+  source.onerror = () => {
+    appendLogLine("Log stream disconnected. Waiting for reconnect...");
+  };
+}
+
+logFilter.addEventListener("change", renderLogStream);
+startButton.addEventListener("click", handleStart);
+stopButton.addEventListener("click", handleStop);
+
+setControlEnabled(false);
+refreshStatus();
+refreshPositions();
+refreshTrades();
+connectLogs();
+
+window.setInterval(refreshStatus, 5000);
+window.setInterval(refreshPositions, 10000);
+window.setInterval(refreshTrades, 30000);

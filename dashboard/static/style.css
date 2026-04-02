@@ -1,0 +1,268 @@
+:root {
+  color-scheme: light;
+  --bg: #f3f1ea;
+  --panel: #fffdf8;
+  --panel-border: #d8cfbf;
+  --ink: #16130f;
+  --muted: #6e6358;
+  --accent: #8c5e34;
+  --ok: #2a7a4b;
+  --warn: #b88719;
+  --error: #b54535;
+  --shadow: 0 14px 40px rgba(55, 39, 24, 0.08);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at top right, rgba(140, 94, 52, 0.14), transparent 30%),
+    linear-gradient(180deg, #f8f5ed 0%, var(--bg) 100%);
+  color: var(--ink);
+  font-family: Georgia, "Times New Roman", serif;
+}
+
+.page {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: var(--accent);
+  font-size: 0.82rem;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+
+h1,
+h2,
+p,
+pre,
+dl {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2rem, 3vw, 3.2rem);
+  line-height: 1;
+}
+
+h2 {
+  font-size: 1.2rem;
+}
+
+.grid {
+  display: grid;
+  gap: 20px;
+}
+
+.grid--top {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-bottom: 20px;
+}
+
+.panel {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(255, 252, 244, 0.98));
+  border: 1px solid var(--panel-border);
+  border-radius: 18px;
+  box-shadow: var(--shadow);
+  padding: 20px;
+  margin-bottom: 20px;
+}
+
+.panel--control {
+  margin-bottom: 20px;
+}
+
+.panel--logs {
+  margin-bottom: 0;
+}
+
+.panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.panel__header--stack {
+  align-items: flex-start;
+}
+
+.panel__meta,
+.panel__note,
+.filter span {
+  color: var(--muted);
+  font-size: 0.92rem;
+}
+
+.panel__note {
+  margin-bottom: 12px;
+}
+
+.badge {
+  border-radius: 999px;
+  padding: 10px 16px;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.badge--ok {
+  background: rgba(42, 122, 75, 0.12);
+  color: var(--ok);
+}
+
+.badge--warn {
+  background: rgba(184, 135, 25, 0.14);
+  color: var(--warn);
+}
+
+.badge--error {
+  background: rgba(181, 69, 53, 0.14);
+  color: var(--error);
+}
+
+.badge--unknown {
+  background: rgba(110, 99, 88, 0.12);
+  color: var(--muted);
+}
+
+.stat-list {
+  display: grid;
+  gap: 10px;
+}
+
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  border-bottom: 1px solid rgba(216, 207, 191, 0.7);
+  padding-bottom: 8px;
+}
+
+.stat-row dt {
+  color: var(--muted);
+}
+
+.stat-row dd {
+  text-align: right;
+}
+
+.table-wrap {
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+th,
+td {
+  padding: 10px 8px;
+  border-bottom: 1px solid rgba(216, 207, 191, 0.7);
+  text-align: left;
+  white-space: nowrap;
+}
+
+th {
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.empty {
+  color: var(--muted);
+  text-align: center;
+}
+
+.filter {
+  display: grid;
+  gap: 6px;
+}
+
+.control-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.control-row select,
+.filter select {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: 10px;
+  color: var(--ink);
+  font: inherit;
+  padding: 8px 12px;
+}
+
+.btn {
+  border: 0;
+  border-radius: 999px;
+  color: #fffdf8;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+  padding: 10px 18px;
+  transition: opacity 0.2s ease;
+}
+
+.btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.btn--start {
+  background: var(--ok);
+}
+
+.btn--stop {
+  background: var(--error);
+}
+
+.log-stream {
+  min-height: 320px;
+  max-height: 420px;
+  overflow: auto;
+  background: #191611;
+  color: #f6ead6;
+  border-radius: 14px;
+  padding: 16px;
+  font-family: "Courier New", monospace;
+  font-size: 0.9rem;
+  line-height: 1.5;
+}
+
+code {
+  font-family: "Courier New", monospace;
+}
+
+@media (max-width: 900px) {
+  .grid--top {
+    grid-template-columns: 1fr;
+  }
+
+  .hero,
+  .panel__header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
