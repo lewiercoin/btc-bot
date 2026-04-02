@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-01
+Last updated: 2026-04-02
 
 ## Baseline Checkpoint
 
@@ -30,6 +30,11 @@ Last updated: 2026-04-01
 **Audit:** [docs/audits/AUDIT_DASHBOARD_M3_2026-04-02.md](audits/AUDIT_DASHBOARD_M3_2026-04-02.md)
 
 ## Next Milestone
+
+**Milestone:** SERVER-DEPLOY-V1 — Hetzner Research Lab Deployment
+**Status:** DONE (audit 2026-04-02)
+**Decision date:** 2026-04-02
+**Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
 **Milestone:** None — dashboard M3 in operator use. Awaiting field validation before deciding M4.
 **Status:** —

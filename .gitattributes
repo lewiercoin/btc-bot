@@ -1,0 +1,5 @@
+# Default: normalize line endings on checkout
+* text=auto
+
+# Shell scripts must always use LF on all platforms
+*.sh text eol=lf
