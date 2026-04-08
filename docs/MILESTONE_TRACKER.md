@@ -189,6 +189,8 @@ None - all blueprint stubs implemented.
 17. ~~**Hardcoded symbol**: `PaperExecutionEngine` hardcoded `BTCUSDT` instead of using `settings.strategy.symbol`~~ - **FIXED in `b1fb7f4`** (symbol param added, orchestrator wired)
 18. ~~**PAPER restart phantom_position**: `NoOpRecoverySyncSource` returns empty lists -> `RecoveryCoordinator` sees local OPEN positions as phantoms -> `safe_mode=True` -> new entries blocked after restart~~ - **FIXED in `27a9270`** (PAPER mode skips exchange consistency checks)
 19. **ARCH_DEBT — ProcessManager in-memory state lost on dashboard restart**: `ProcessManager` holds bot PID and start timestamp in-memory only. If `btc-bot-dashboard.service` crashes and restarts, the new ProcessManager instance has no reference to the already-running bot process. Dashboard `/api/status` reports bot as not running and `/api/bot/stop` cannot stop it. Bot continues running unaffected; systemd manages it independently. Fix requires persisting PID + start timestamp to a lockfile or DB entry. Out-of-scope for SERVER-DEPLOY-V2 — requires persistence layer design decision. Workaround: `systemctl stop btc-bot` directly.
+20. **GAP — `setup.sh` missing `python3-venv` pre-install**: On fresh Ubuntu 24.04 `python3 -m venv .venv` fails because `python3-venv` package is not installed by default. `setup.sh` should run `apt-get install -y python3-venv` before creating the venv. Low priority — candidate for next deploy tooling milestone.
+21. **GAP — Deploy bundle must be regenerated after final push**: `btc-bot.bundle` committed in root repo was stale (pre SERVER-DEPLOY-V2 commits). `SERVER_DEPLOYMENT.md` must include an explicit step: regenerate bundle with `git bundle create btc-bot.bundle --all` immediately after the final push, before SCP to server. Low priority — candidate for next deploy tooling milestone.
 
 ## Audit History
 
@@ -208,3 +210,4 @@ None - all blueprint stubs implemented.
 | AUDIT_012 | Research Lab v0.1 - architecture + implementation | 2026-03-31 | `aa68c23` | MVP_DONE |
 | AUDIT_013 | Research Lab v0.1 - optuna runtime validation | 2026-03-31 | `dfafa26` | MVP_DONE |
 | AUDIT_014 | Tech Debt Cleanup (Resumed) - Issues #1 + #7 | 2026-04-01 | `8602727` | MVP_DONE |
+| AUDIT_015 | SERVER-DEPLOY-V2 — Hetzner cpx22 production deploy | 2026-04-08 | `713f826` | DONE |
