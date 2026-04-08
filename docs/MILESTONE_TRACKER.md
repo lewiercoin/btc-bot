@@ -40,11 +40,11 @@ Last updated: 2026-04-08
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
 **Milestone:** SERVER-DEPLOY-V2 — Production Hetzner Deploy (Bot + Research Lab)
-**Status:** ACTIVE
+**Status:** DONE (audit 2026-04-08, commits 1343d3c + 5f51ded)
 **Decision date:** 2026-04-08
 **Active builder:** Cascade
 **Scope:** Fix ProcessManager Linux signal bug (G1) · systemd unit files for bot + dashboard (G2) · SERVER_DEPLOYMENT.md hardening: user setup, chmod, sshd, rsync --ignore-existing (G3, G4, G7, G8) · run_dashboard.sh script (G5) · logrotate config for research lab logs (G6)
-**Audit:** pending
+**Audit:** [docs/audits/AUDIT_SERVER_DEPLOY_V2_2026-04-08.md](audits/AUDIT_SERVER_DEPLOY_V2_2026-04-08.md)
 
 ## Research Lab
 

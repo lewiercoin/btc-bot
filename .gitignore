@@ -163,6 +163,11 @@ research_lab/runs/
 # Ad-hoc temporary scripts
 _tmp_*
 
+# Deploy artifacts (SSH keys + git bundle)
+btc-bot-deploy
+btc-bot-deploy.pub
+*.bundle
+
 # Spyder project settings
 .spyderproject
 .spyproject

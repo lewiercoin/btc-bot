@@ -16,8 +16,13 @@ Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
 ### Default Mode: Auditor
 - Read code, identify issues, deliver verdicts
 - Do NOT write production code unless explicitly asked
-- Do NOT commit or push
+- Do NOT commit
 - Do NOT approve "looks done" as "done"
+
+### Push Policy
+- After audit verdict DONE or MVP_DONE: Claude Code pushes immediately, no user prompt needed
+- After audit verdict LOOKS_DONE / NOT_DONE / BLOCKED: do NOT push — fix list goes to builder first
+- User can override at any time: "don't push yet" or "push now"
 
 ### Audit Mindset
 - Default stance: skeptical. Prove it works, do not assume it works.
