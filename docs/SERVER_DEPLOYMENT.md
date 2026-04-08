@@ -1,25 +1,186 @@
 # Server Deployment
 
-## Initial Setup
+## Target infrastructure
 
-1. SSH onto the Hetzner server and clone or update the repo to the target path.
-2. Change into the repo root:
-   `cd /path/to/btc-bot`
-3. Run the one-time setup:
-   `sh scripts/server/setup.sh`
-4. Copy the local environment file if the server should reuse the same variables:
-   `scp .env user@server:/path/to/btc-bot/.env`
-5. Copy the source market database used by Research Lab:
-   `scp storage/btc_bot.db user@server:/path/to/btc-bot/storage/btc_bot.db`
-6. Optional but recommended: create a dedicated tmux session for long runs:
-   `tmux new -s research-lab`
+- **Provider:** Hetzner Cloud
+- **Server type:** cpx31 (8 vCPU, 16 GB RAM, 80 GB SSD NVMe)
+- **Location:** hel1 (Helsinki)
+- **OS:** Ubuntu 24.04
+- **Deploy path:** `/home/btc-bot/btc-bot`
+- **System user:** `btc-bot` (non-root, no login shell)
+- **SSH key:** ed25519 key injected at server creation (`~/.ssh/id_ed25519.pub`)
 
-Notes:
-- `load_settings()` resolves paths from the repo root automatically. No extra path env vars are needed.
-- `BOT_MODE` defaults to `PAPER`. Research Lab does not require `LIVE`.
-- Current `bootstrap_history.py` uses public Binance REST endpoints, but the wrappers still load `.env` when present for operator consistency.
+---
 
-## Przed każdym runem
+## Deploy Checklist
+
+Complete all steps in order. Do not skip.
+
+### PRE-DEPLOY (locally)
+
+```sh
+# Verify BINANCE_API_KEY scope in Binance dashboard:
+# Futures Trading permissions ONLY. No withdrawal permissions.
+
+# Build or update the deploy bundle:
+git bundle create btc-bot.bundle --all
+```
+
+### SERVER SETUP
+
+SSH as root after server creation:
+
+```sh
+# Create dedicated system user (no login shell)
+useradd --system --shell /usr/sbin/nologin --home /home/btc-bot --create-home btc-bot
+
+# Harden SSH: disable password authentication
+# Edit /etc/ssh/sshd_config and set:
+#   PasswordAuthentication no
+# Then restart SSH:
+systemctl restart ssh
+
+# Enable firewall (SSH only — dashboard is NOT exposed)
+ufw allow 22/tcp
+ufw enable
+```
+
+### DEPLOY REPO
+
+From the local machine:
+
+```sh
+scp btc-bot.bundle root@<server-ip>:/home/btc-bot/btc-bot.bundle
+```
+
+On the server:
+
+```sh
+cd /home/btc-bot
+git clone btc-bot.bundle btc-bot
+chown -R btc-bot:btc-bot /home/btc-bot/btc-bot
+chmod 750 /home/btc-bot/btc-bot
+cd /home/btc-bot/btc-bot
+sh scripts/server/setup.sh
+```
+
+### ENVIRONMENT
+
+From the local machine:
+
+```sh
+scp .env root@<server-ip>:/home/btc-bot/btc-bot/.env
+```
+
+On the server:
+
+```sh
+chmod 600 /home/btc-bot/btc-bot/.env
+chown btc-bot:btc-bot /home/btc-bot/btc-bot/.env
+
+# Verify BOT_MODE is PAPER before starting
+grep BOT_MODE /home/btc-bot/btc-bot/.env
+```
+
+### MARKET DATA
+
+From the local machine:
+
+```sh
+scp storage/btc_bot.db root@<server-ip>:/home/btc-bot/btc-bot/storage/btc_bot.db
+```
+
+On the server:
+
+```sh
+chown btc-bot:btc-bot /home/btc-bot/btc-bot/storage/btc_bot.db
+cd /home/btc-bot/btc-bot
+sh scripts/server/refresh_data.sh
+```
+
+### SYSTEMD SERVICES
+
+On the server:
+
+```sh
+cd /home/btc-bot/btc-bot
+
+# Install unit files
+cp scripts/server/btc-bot.service /etc/systemd/system/btc-bot.service
+cp scripts/server/btc-bot-dashboard.service /etc/systemd/system/btc-bot-dashboard.service
+
+# Reload systemd and enable both services
+systemctl daemon-reload
+systemctl enable btc-bot btc-bot-dashboard
+
+# Start bot
+systemctl start btc-bot
+```
+
+### LOG ROTATION
+
+On the server:
+
+```sh
+sudo cp /home/btc-bot/btc-bot/scripts/server/btc-bot-logrotate.conf /etc/logrotate.d/btc-bot
+```
+
+Rotates: `optimize_*.log`, `autoresearch_*.log`, `refresh_data_*.log`, `autoresearch_cron.log`.
+Daily, 14 rotations, compressed. Does NOT rotate `btc_bot.log` (handled by Python `RotatingFileHandler`).
+
+### SMOKE TEST
+
+```sh
+# Verify bot is running
+systemctl status btc-bot
+
+# Tail logs for 5 minutes — no crashes expected
+tail -f /home/btc-bot/btc-bot/logs/btc_bot.log
+
+# Graceful stop test
+systemctl stop btc-bot
+# Verify: exit 0, no SIGKILL in logs
+```
+
+---
+
+## Dashboard access
+
+The dashboard binds to `127.0.0.1:8080` only — it is not publicly accessible.
+
+Access via SSH tunnel from the local machine:
+
+```sh
+ssh -L 8080:127.0.0.1:8080 btc-bot@<server-ip> -N
+```
+
+Then open `http://localhost:8080` in the browser.
+
+Recommended: add to `~/.ssh/config` locally:
+
+```
+Host btc-bot-server
+    HostName <server-ip>
+    User btc-bot
+    IdentityFile ~/.ssh/id_ed25519
+    LocalForward 8080 127.0.0.1:8080
+```
+
+Then connect with: `ssh btc-bot-server -N`
+
+### Starting the dashboard
+
+The dashboard is managed by systemd (`btc-bot-dashboard.service`). For manual/tmux use:
+
+```sh
+sh scripts/server/run_dashboard.sh
+```
+
+---
+
+## Research Lab runs
+
+### Przed każdym runem
 
 Refresh source data:
 
@@ -49,7 +210,9 @@ Artifacts:
 - Optional approval bundle: `research_lab/runs/<timestamp>/approval_bundle/`
 - Logs: `logs/refresh_data_*.log`, `logs/optimize_*.log`, `logs/autoresearch_*.log`
 
-## Monitorowanie
+Note: run `refresh_data.sh` when the bot is stopped or in a low-activity window. Both the bot and refresh script write to `storage/btc_bot.db`; SQLite WAL mode handles concurrent access, but a very long refresh transaction may introduce brief latency.
+
+### Monitorowanie
 
 Attach to the running tmux session:
 
@@ -71,31 +234,33 @@ tail -f logs/autoresearch_<timestamp>.log
 tail -f logs/refresh_data_<timestamp>.log
 ```
 
-## Odbieranie wyników
+### Odbieranie wyników
 
 Copy all Research Lab outputs back to the local machine with `rsync`:
 
 ```sh
-rsync -avz user@server:/path/to/btc-bot/research_lab/runs/ ./research_lab/runs/
+rsync -avz --ignore-existing btc-bot@<server-ip>:/home/btc-bot/btc-bot/research_lab/runs/ ./research_lab/runs/
 ```
 
-Or copy a single run with `scp`:
+`--ignore-existing` is required — it prevents overwriting locally approved results if the server has a newer version of the same file.
+
+Copy a single run with `scp`:
 
 ```sh
-scp -r user@server:/path/to/btc-bot/research_lab/runs/<run_id> ./research_lab/runs/<run_id>
+scp -r btc-bot@<server-ip>:/home/btc-bot/btc-bot/research_lab/runs/<run_id> ./research_lab/runs/<run_id>
 ```
 
-## Cron (opcjonalnie)
+### Cron (opcjonalnie)
 
 Example crontab entry for a nightly refresh + autoresearch pass at `02:30` UTC:
 
 ```cron
-30 2 * * * cd /path/to/btc-bot && /bin/sh scripts/server/refresh_data.sh && /bin/sh scripts/server/run_autoresearch.sh --max-candidates 10 >> logs/cron_autoresearch.log 2>&1
+30 2 * * * cd /home/btc-bot/btc-bot && /bin/sh scripts/server/refresh_data.sh && /bin/sh scripts/server/run_autoresearch.sh --max-candidates 10 >> logs/autoresearch_cron.log 2>&1
 ```
 
 For long runs, keep tmux for manual control and treat cron as optional automation only.
 
-## Czyszczenie
+### Czyszczenie snapshotów
 
 Remove snapshot files older than 7 days:
 

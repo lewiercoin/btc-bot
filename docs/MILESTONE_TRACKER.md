@@ -39,10 +39,12 @@ Last updated: 2026-04-08
 **Active builder:** Codex
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
-**Milestone:** None — dashboard M3 in operator use. Awaiting field validation before deciding M4.
-**Status:** —
-**Decision date:** 2026-04-02
-**Active builder:** —
+**Milestone:** SERVER-DEPLOY-V2 — Production Hetzner Deploy (Bot + Research Lab)
+**Status:** ACTIVE
+**Decision date:** 2026-04-08
+**Active builder:** Cascade
+**Scope:** Fix ProcessManager Linux signal bug (G1) · systemd unit files for bot + dashboard (G2) · SERVER_DEPLOYMENT.md hardening: user setup, chmod, sshd, rsync --ignore-existing (G3, G4, G7, G8) · run_dashboard.sh script (G5) · logrotate config for research lab logs (G6)
+**Audit:** pending
 
 ## Research Lab
 
@@ -186,6 +188,7 @@ None - all blueprint stubs implemented.
 16. ~~**Config injection gap**: 27 dead parameters in orchestrator + backtest_runner + signal_engine~~ - **FIXED in `AUDIT_006`** (all parameters wired, `smoke_config_injection.py` validates)
 17. ~~**Hardcoded symbol**: `PaperExecutionEngine` hardcoded `BTCUSDT` instead of using `settings.strategy.symbol`~~ - **FIXED in `b1fb7f4`** (symbol param added, orchestrator wired)
 18. ~~**PAPER restart phantom_position**: `NoOpRecoverySyncSource` returns empty lists -> `RecoveryCoordinator` sees local OPEN positions as phantoms -> `safe_mode=True` -> new entries blocked after restart~~ - **FIXED in `27a9270`** (PAPER mode skips exchange consistency checks)
+19. **ARCH_DEBT — ProcessManager in-memory state lost on dashboard restart**: `ProcessManager` holds bot PID and start timestamp in-memory only. If `btc-bot-dashboard.service` crashes and restarts, the new ProcessManager instance has no reference to the already-running bot process. Dashboard `/api/status` reports bot as not running and `/api/bot/stop` cannot stop it. Bot continues running unaffected; systemd manages it independently. Fix requires persisting PID + start timestamp to a lockfile or DB entry. Out-of-scope for SERVER-DEPLOY-V2 — requires persistence layer design decision. Workaround: `systemctl stop btc-bot` directly.
 
 ## Audit History
 
