@@ -87,8 +87,9 @@ class ProcessManager:
             pid = int(process.pid)
             graceful = True
 
+            sig = signal.CTRL_C_EVENT if sys.platform == "win32" else signal.SIGTERM
             try:
-                os.kill(pid, signal.CTRL_C_EVENT)
+                os.kill(pid, sig)
             except OSError:
                 if process.poll() is None:
                     raise

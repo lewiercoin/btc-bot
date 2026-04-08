@@ -1,0 +1,17 @@
+[Unit]
+Description=BTC Bot (btc-bot)
+After=network.target
+
+[Service]
+Type=simple
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+EnvironmentFile=/home/btc-bot/btc-bot/.env
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/python main.py --mode PAPER
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
+
+[Install]
+WantedBy=multi-user.target
