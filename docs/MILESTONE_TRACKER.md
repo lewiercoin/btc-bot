@@ -39,6 +39,13 @@ Last updated: 2026-04-08
 **Active builder:** Codex
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
+**Milestone:** SNAPSHOT-CLEANUP-PER-TRIAL — delete trial snapshot after each trial evaluation
+**Status:** DONE (audit 2026-04-08, commit ebd63a5)
+**Decision date:** 2026-04-08
+**Active builder:** Cascade
+**Scope:** `research_lab/integrations/optuna_driver.py` — add `snapshot_path.unlink(missing_ok=True)` in `finally` block after `conn.close()`. Eliminates 665MB × N_trials disk accumulation during optimize run.
+**Audit:** inline — single line fix, no audit file required
+
 **Milestone:** RESEARCH-LAB-FIXES — run_optimize.sh bug + disk management + protocol tuning
 **Status:** DONE (audit 2026-04-08, commit 903d6f1)
 **Decision date:** 2026-04-08
