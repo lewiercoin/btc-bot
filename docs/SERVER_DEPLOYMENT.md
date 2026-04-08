@@ -113,8 +113,9 @@ cp scripts/server/btc-bot-dashboard.service /etc/systemd/system/btc-bot-dashboar
 systemctl daemon-reload
 systemctl enable btc-bot btc-bot-dashboard
 
-# Start bot
+# Start both services
 systemctl start btc-bot
+systemctl start btc-bot-dashboard
 ```
 
 ### LOG ROTATION
@@ -131,8 +132,9 @@ Daily, 14 rotations, compressed. Does NOT rotate `btc_bot.log` (handled by Pytho
 ### SMOKE TEST
 
 ```sh
-# Verify bot is running
+# Verify both services are running
 systemctl status btc-bot
+systemctl status btc-bot-dashboard
 
 # Tail logs for 5 minutes — no crashes expected
 tail -f /home/btc-bot/btc-bot/logs/btc_bot.log
