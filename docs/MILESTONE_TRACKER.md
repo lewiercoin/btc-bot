@@ -39,6 +39,13 @@ Last updated: 2026-04-08
 **Active builder:** Codex
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
+**Milestone:** SIGNAL-UNLOCK-V1 — unfreeze regime thresholds + allow_long_in_uptrend + narrow search space
+**Status:** DONE (audit 2026-04-08)
+**Decision date:** 2026-04-08
+**Active builder:** Codex
+**Scope:** `allow_long_in_uptrend: bool = False` in StrategyConfig · whitelist composition in builders · unfreeze ema_trend_gap_pct + compression_atr_norm_max · narrow 5 range overrides (atr_period, confluence_min, direction_tfi_threshold, tfi_impulse_threshold, equal_level_tol_atr) · 58/58 tests
+**Audit:** [docs/audits/AUDIT_SIGNAL_UNLOCK_V1_2026-04-08.md](audits/AUDIT_SIGNAL_UNLOCK_V1_2026-04-08.md)
+
 **Milestone:** SNAPSHOT-CLEANUP-PER-TRIAL — delete trial snapshot after each trial evaluation
 **Status:** DONE (audit 2026-04-08, commit ebd63a5)
 **Decision date:** 2026-04-08

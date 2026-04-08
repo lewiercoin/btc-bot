@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from settings import BotMode, _parse_mode, load_settings
+from settings import BotMode, StrategyConfig, _parse_mode, build_signal_regime_direction_whitelist, load_settings
 
 
 def test_parse_mode_accepts_case_insensitive_values() -> None:
@@ -40,3 +40,21 @@ def test_config_hash_is_stable_for_same_configuration(monkeypatch: pytest.Monkey
     first = load_settings(project_root=tmp_path)
     second = load_settings(project_root=tmp_path)
     assert first.config_hash == second.config_hash
+
+
+def test_build_signal_regime_direction_whitelist_preserves_defaults_when_flag_disabled() -> None:
+    strategy = StrategyConfig()
+
+    assert build_signal_regime_direction_whitelist(strategy) == strategy.regime_direction_whitelist
+
+
+def test_build_signal_regime_direction_whitelist_adds_long_in_uptrend_when_enabled() -> None:
+    strategy = StrategyConfig(
+        allow_long_in_uptrend=True,
+        regime_direction_whitelist={"normal": ("LONG",), "uptrend": ("SHORT",)},
+    )
+
+    assert build_signal_regime_direction_whitelist(strategy) == {
+        "normal": ("LONG",),
+        "uptrend": ("SHORT", "LONG"),
+    }
