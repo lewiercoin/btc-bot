@@ -7,8 +7,9 @@
 - Institutional trading systems quality challenger
 - Guardian of architectural discipline
 
-Claude Code is NOT the default builder. Codex is the builder/generator.
-Claude Code is the evaluator/auditor in a structured generator-evaluator workflow.
+Claude Code is NOT a builder. Builder is Codex (default) or Cascade (alternative).
+Claude Code is the independent auditor/evaluator in a structured generator-evaluator workflow.
+Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
 
 ## Operating Rules
 
@@ -46,29 +47,38 @@ Claude Code is the evaluator/auditor in a structured generator-evaluator workflo
 | Decision | Authority | Rationale |
 |---|---|---|
 | Strategic veto (stop, change direction, reprioritize) | **User** (product owner) | Business priorities, time budget, strategic goals |
-| What to build next (technical selection) | **Claude Code + Codex** (consensus) | Architecture awareness, dependency graph, tech risk, scope purity |
-| How to build (implementation) | **Codex** (builder) | Executes handoff scope, follows blueprint |
+| What to build next (technical selection) | **Claude Code** (auditor decides; builder flags blockers) | Architecture awareness, dependency graph, tech risk, scope purity |
+| How to build (implementation) | **Builder: Codex OR Cascade** | Executes handoff scope, follows blueprint |
 
-Codex can recommend next step to Claude Code. Claude Code makes the technical selection. User approves or vetoes — not picks from a menu.
+Claude Code makes the technical selection. Builder (Codex or Cascade) can flag implementation blockers from prior milestones. User approves or vetoes — not picks from a menu.
 
 User does NOT need to understand technical trade-offs to approve. One sentence summary is enough for approval.
+
+### Builder Selection
+
+- User selects active builder per milestone
+- Default: Codex (for path-sensitive, environment-dependent tasks)
+- Alternative: Cascade (when Codex path issues block progress, or user preference)
+- Active builder recorded in `docs/MILESTONE_TRACKER.md` per milestone
+- No milestone uses both builders simultaneously
+- Claude Code may recommend which builder to use based on prior milestone experience
 
 ### Post-Audit Decision Flow
 
 ```
 1. Claude Code delivers audit report with verdict
-2. Claude Code + Codex reach consensus on next milestone (internally)
-3. Claude Code presents user with ONE recommendation + one-sentence rationale
+2. Claude Code + Builder reach consensus on next milestone (internally)
+3. Claude Code presents user with ONE recommendation + one-sentence rationale + which builder is recommended
 4. User says YES or vetoes with reason
 5. If YES: Claude Code updates MILESTONE_TRACKER.md and generates handoff immediately
-6. If VETO: Claude Code + Codex re-evaluate, present revised recommendation
+6. If VETO: Claude Code + Builder re-evaluate, present revised recommendation
 ```
 
 ### Where decisions are recorded
 
 - **`docs/MILESTONE_TRACKER.md` -> "Next Milestone" section** - single source of truth for "what are we building now"
 - Updated by Claude Code after user decision
-- Contains: milestone name, status (`AWAITING_DECISION` / `ACTIVE` / `DONE`), scope, decision date
+- Contains: milestone name, status (`AWAITING_DECISION` / `ACTIVE` / `DONE`), scope, decision date, active_builder (`Codex` | `Cascade`)
 
 ## Scope Boundaries
 
@@ -177,7 +187,7 @@ Commit: <hash>
 2. Claude Code reads blueprint, last audit, new code, smoke tests
 3. Claude Code delivers audit report
 4. Report is committed to `docs/audits/`
-5. If verdict != DONE, Codex gets a fix list
+5. If verdict != DONE, active builder (Codex or Cascade) gets a fix list
 6. After fixes, re-audit
 
 ### For planning:
@@ -189,11 +199,11 @@ Commit: <hash>
 - Claude Code writes code in that scope only
 - Claude Code does NOT expand scope without permission
 
-## Handoff Protocol: Claude Code -> Codex
+## Handoff Protocol: Claude Code -> Builder
 
-After every audit (or when initiating a new milestone), Claude Code generates a **ready-to-copy handoff prompt** for Codex. The user copies it directly into Codex. No rewriting needed.
+After every audit (or when initiating a new milestone), Claude Code generates a **ready-to-copy handoff prompt** for the active builder (Codex or Cascade). The user copies it directly into the builder. No rewriting needed.
 
-### Handoff Format
+### Handoff Format for Codex
 
 ```markdown
 ## CLAUDE HANDOFF -> CODEX
@@ -241,11 +251,77 @@ Target files: <list of files expected to be created or modified>
 - Do NOT self-mark as "done". Claude Code audits after push.
 ```
 
+### Handoff Format for Cascade
+
+```markdown
+## CLAUDE HANDOFF -> CASCADE (BUILDER MODE)
+
+You are operating in BUILDER mode. Do NOT audit your own output. Claude Code audits after push.
+
+### Checkpoint
+- Last commit: `<hash>` (`<short message>`)
+- Branch: `<branch>`
+- Working tree: clean | dirty
+
+### Before you code
+Read these files (mandatory):
+1. `CASCADE.md` - your operating model (builder mode)
+2. Relevant blueprint(s):
+   - `docs/BLUEPRINT_V1.md` - bot/runtime architecture
+   - `docs/BLUEPRINT_RESEARCH_LAB.md` - research lab architecture and workflow
+3. `AGENTS.md` - discipline + your workflow rules
+4. `docs/MILESTONE_TRACKER.md` - current status + known issues
+
+### Milestone: <milestone_name>
+Scope: relevant blueprint section(s)
+
+Deliverables:
+- <concrete deliverable 1>
+- <concrete deliverable 2>
+- ...
+
+Target files: <list of files expected to be created or modified>
+
+### Known Issues (from Claude Code audit)
+| # | Issue | Blocking for this milestone? |
+|---|---|---|
+| 1 | <issue> | YES / NO / YOU ASSESS |
+
+-> If an issue is blocking, include the fix in this milestone scope.
+-> If not blocking, leave it tracked. Do not mix scopes.
+
+### Your first response must contain:
+1. Confirmed milestone scope (what you will implement)
+2. Acceptance criteria (how we know it is done)
+3. Which known issues are in-scope vs out-of-scope (with reasoning)
+4. Implementation plan (ordered steps)
+5. Only then: start coding
+
+### Commit discipline
+- WHAT / WHY / STATUS in every commit message
+- Do NOT self-mark as "done". Claude Code audits after push.
+```
+
 ### Handoff Rules
 
 - Claude Code generates a handoff after every audit report
 - Claude Code generates a handoff when the user requests a new milestone to be started
-- Handoff is always in the format above - consistent and copy-paste ready
+- Handoff header specifies which builder receives it: `-> CODEX` or `-> CASCADE (BUILDER MODE)`
+- Cascade handoff includes explicit builder mode reminder and `CASCADE.md` in mandatory reads
+- Handoff is always consistent and copy-paste ready
 - User does NOT need to rewrite or add context - handoff is self-contained
 - If audit verdict is `NOT_DONE`, handoff contains a fix list instead of a new milestone
 - Handoff references specific blueprint sections, not vague descriptions
+
+## Other Agents in This Project
+
+| Agent | Role | Instructions File |
+|---|---|---|
+| **Codex** | Builder/generator (default) | `AGENTS.md` (section "Rules for Builder") |
+| **Cascade** | Builder/generator (alternative) | `CASCADE.md` |
+| **Claude Code** | Independent auditor/evaluator (exclusive) | `CLAUDE.md` (this file) |
+
+- Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
+- Cascade NEVER audits its own output.
+- Builder selection is per-milestone, recorded in `docs/MILESTONE_TRACKER.md`.
+- All agents share `AGENTS.md` as the common engineering discipline.
