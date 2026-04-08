@@ -39,6 +39,13 @@ Last updated: 2026-04-08
 **Active builder:** Codex
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
+**Milestone:** RESEARCH-LAB-FIXES — run_optimize.sh bug + disk management + protocol tuning
+**Status:** DONE (audit 2026-04-08, commit 903d6f1)
+**Decision date:** 2026-04-08
+**Active builder:** Cascade
+**Scope:** Fix run_optimize.sh SUMMARY_TMP redirect bug (C3) · auto-cleanup snapshots po optimize run · fix setup.sh python3-venv (gap #20) · fix SERVER_DEPLOYMENT.md bundle step (gap #21) · update default_protocol.json walk-forward windows
+**Audit:** [docs/audits/AUDIT_RESEARCH_LAB_FIXES_2026-04-08.md](audits/AUDIT_RESEARCH_LAB_FIXES_2026-04-08.md)
+
 **Milestone:** SERVER-DEPLOY-V2 — Production Hetzner Deploy (Bot + Research Lab)
 **Status:** DONE (audit 2026-04-08, commits 1343d3c + 5f51ded)
 **Decision date:** 2026-04-08
