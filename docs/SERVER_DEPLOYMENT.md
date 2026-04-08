@@ -23,6 +23,7 @@ Complete all steps in order. Do not skip.
 # Futures Trading permissions ONLY. No withdrawal permissions.
 
 # Build or update the deploy bundle:
+# IMPORTANT: run this AFTER the final git push — bundle must include latest commits
 git bundle create btc-bot.bundle --all
 ```
 
