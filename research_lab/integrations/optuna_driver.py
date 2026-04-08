@@ -155,6 +155,7 @@ def run_optuna_study(
             )
         finally:
             conn.close()
+            snapshot_path.unlink(missing_ok=True)
 
         evaluation = dataclasses.replace(
             raw_evaluation,
