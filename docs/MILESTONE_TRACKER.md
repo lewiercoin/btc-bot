@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-02
+Last updated: 2026-04-08
 
 ## Baseline Checkpoint
 
@@ -18,6 +18,7 @@ Last updated: 2026-04-02
 **Milestone:** DASHBOARD-M1 — Read-Only Observability + WAL Patch
 **Status:** MVP_DONE (audit 2026-04-02, 46/46 tests green)
 **Decision date:** 2026-04-02
+**Active builder:** Codex
 **Scope:** WAL mode in `storage/db.py` + `connect_readonly()` helper + FastAPI dashboard (observability only: `/api/status`, `/api/positions`, `/api/trades`, `/api/logs/stream`). No start/stop. No terminal. Bind 127.0.0.1 only.
 **Audit:** [docs/audits/AUDIT_DASHBOARD_M1_2026-04-02.md](audits/AUDIT_DASHBOARD_M1_2026-04-02.md)
 
@@ -26,6 +27,7 @@ Last updated: 2026-04-02
 **Milestone:** DASHBOARD-M3 — Managed Start/Stop
 **Status:** MVP_DONE (audit 2026-04-02, 53/53 tests green)
 **Decision date:** 2026-04-02
+**Active builder:** Codex
 **Scope:** `ProcessManager` (`CREATE_NEW_PROCESS_GROUP` + `CTRL_C_EVENT` + 10s timeout + hard fallback + operator audit log) + `/api/bot/start` + `/api/bot/stop` + `uptime_seconds` in `/api/status` + M1 carry-overs: `db_reader.py` OperationalError guard + `app.js` innerHTML → DOM fix.
 **Audit:** [docs/audits/AUDIT_DASHBOARD_M3_2026-04-02.md](audits/AUDIT_DASHBOARD_M3_2026-04-02.md)
 
@@ -34,11 +36,13 @@ Last updated: 2026-04-02
 **Milestone:** SERVER-DEPLOY-V1 — Hetzner Research Lab Deployment
 **Status:** DONE (audit 2026-04-02)
 **Decision date:** 2026-04-02
+**Active builder:** Codex
 **Scope:** Deployment scripts for running Research Lab and Autoresearch on remote Hetzner server. No changes to existing Python logic. Artifacts: `scripts/server/setup.sh`, `scripts/server/refresh_data.sh`, `scripts/server/run_optimize.sh`, `scripts/server/run_autoresearch.sh`, `scripts/server/status.sh`, `scripts/server/cleanup_snapshots.sh`, `docs/SERVER_DEPLOYMENT.md`.
 
 **Milestone:** None — dashboard M3 in operator use. Awaiting field validation before deciding M4.
 **Status:** —
 **Decision date:** 2026-04-02
+**Active builder:** —
 
 ## Research Lab
 
