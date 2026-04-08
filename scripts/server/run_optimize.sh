@@ -85,30 +85,26 @@ if "$PYTHON_BIN" -m research_lab optimize \
     --start-date "$START_DATE" \
     --end-date "$END_DATE" \
     >"$SUMMARY_TMP" 2>>"$LOG_FILE"; then
-    :
+    cat "$SUMMARY_TMP" >>"$LOG_FILE"
 else
     STATUS=$?
-    [ -s "$SUMMARY_TMP" ] && cat "$SUMMARY_TMP" >>"$LOG_FILE"
+    cat "$SUMMARY_TMP" >>"$LOG_FILE"
     echo "Optimize run failed: status=failed requested_trials=$N_TRIALS study_name=$STUDY_NAME" >&2
     echo "Log: $LOG_FILE" >&2
     exit "$STATUS"
 fi
 
-[ -s "$SUMMARY_TMP" ] && cat "$SUMMARY_TMP" >>"$LOG_FILE"
-
 if "$PYTHON_BIN" -m research_lab build-report \
     --output-json "$REPORT_PATH" \
     >"$REPORT_TMP" 2>>"$LOG_FILE"; then
-    :
+    cat "$REPORT_TMP" >>"$LOG_FILE"
 else
     STATUS=$?
-    [ -s "$REPORT_TMP" ] && cat "$REPORT_TMP" >>"$LOG_FILE"
+    cat "$REPORT_TMP" >>"$LOG_FILE"
     echo "Optimize run finished, but build-report failed." >&2
     echo "Log: $LOG_FILE" >&2
     exit "$STATUS"
 fi
-
-[ -s "$REPORT_TMP" ] && cat "$REPORT_TMP" >>"$LOG_FILE"
 [ -f "$REPORT_PATH" ] || {
     echo "build-report did not create $REPORT_PATH" >&2
     echo "Log: $LOG_FILE" >&2
@@ -134,3 +130,8 @@ echo "requested_trials=$N_TRIALS"
 echo "study_name=$STUDY_NAME"
 echo "report_path=$REPORT_PATH"
 echo "log_path=$LOG_FILE"
+
+if [ -x "scripts/server/cleanup_snapshots.sh" ]; then
+    echo "Cleaning up trial snapshots..."
+    sh scripts/server/cleanup_snapshots.sh 0 --force >>"$LOG_FILE" 2>&1 || true
+fi

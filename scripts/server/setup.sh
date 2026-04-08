@@ -28,6 +28,10 @@ if ! "$SYSTEM_PYTHON" -c "import sys; raise SystemExit(0 if sys.version_info >= 
     exit 1
 fi
 
+if command -v apt-get >/dev/null 2>&1; then
+    apt-get install -y python3-venv -qq || true
+fi
+
 if [ ! -d .venv ]; then
     echo "Creating virtual environment in .venv"
     "$SYSTEM_PYTHON" -m venv .venv
