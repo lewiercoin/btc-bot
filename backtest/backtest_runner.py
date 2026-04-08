@@ -22,7 +22,7 @@ from core.models import (
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
-from settings import AppSettings, load_settings
+from settings import AppSettings, build_signal_regime_direction_whitelist, load_settings
 
 
 @dataclass(slots=True)
@@ -246,6 +246,7 @@ class BacktestRunner:
     def _build_engines(self) -> tuple[FeatureEngine, RegimeEngine, SignalEngine, GovernanceLayer, RiskEngine]:
         strategy = self.settings.strategy
         risk = self.settings.risk
+        signal_whitelist = build_signal_regime_direction_whitelist(strategy)
 
         # Fresh FeatureEngine per run ensures no cross-run deque contamination.
         feature_engine = FeatureEngine(
@@ -291,10 +292,7 @@ class BacktestRunner:
                 direction_tfi_threshold=strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=strategy.tfi_impulse_threshold,
-                regime_direction_whitelist={
-                    regime: set(allowed_directions)
-                    for regime, allowed_directions in strategy.regime_direction_whitelist.items()
-                },
+                regime_direction_whitelist=signal_whitelist,
             )
         )
         governance = GovernanceLayer(

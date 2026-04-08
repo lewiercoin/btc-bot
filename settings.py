@@ -25,6 +25,21 @@ def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     }
 
 
+def build_signal_regime_direction_whitelist(strategy: "StrategyConfig") -> dict[str, tuple[str, ...]]:
+    whitelist = {
+        regime: tuple(allowed_directions)
+        for regime, allowed_directions in strategy.regime_direction_whitelist.items()
+    }
+    if not strategy.allow_long_in_uptrend:
+        return whitelist
+
+    existing = list(whitelist.get("uptrend", ()))
+    if "LONG" not in existing:
+        existing.append("LONG")
+    whitelist["uptrend"] = tuple(existing)
+    return whitelist
+
+
 @dataclass(frozen=True)
 class StrategyConfig:
     symbol: str = "BTCUSDT"
@@ -69,6 +84,7 @@ class StrategyConfig:
     direction_tfi_threshold: float = 0.05
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.10
+    allow_long_in_uptrend: bool = False
     regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 

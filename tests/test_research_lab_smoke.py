@@ -11,7 +11,7 @@ from research_lab.autoresearch_loop import run_autoresearch_loop
 from research_lab.baseline_gate import BaselineGateError, check_baseline
 from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
-from research_lab.constants import PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
+from research_lab.constants import PARAM_STATUS_ACTIVE, PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
 from research_lab.experiment_store import init_store, save_recommendation, save_trial, save_walkforward
 from research_lab.param_registry import build_param_registry, get_active_params
@@ -143,19 +143,23 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["weight_force_order_spike"].status == PARAM_STATUS_FROZEN
     assert registry["ema_fast"].status == PARAM_STATUS_FROZEN
     assert registry["ema_slow"].status == PARAM_STATUS_FROZEN
-    assert registry["ema_trend_gap_pct"].status == PARAM_STATUS_FROZEN
-    assert registry["compression_atr_norm_max"].status == PARAM_STATUS_FROZEN
+    assert registry["ema_trend_gap_pct"].status == PARAM_STATUS_ACTIVE
+    assert registry["compression_atr_norm_max"].status == PARAM_STATUS_ACTIVE
     assert registry["crowded_funding_extreme_pct"].status == PARAM_STATUS_FROZEN
     assert registry["crowded_oi_zscore_min"].status == PARAM_STATUS_FROZEN
     assert registry["regime_direction_whitelist"].status == PARAM_STATUS_FROZEN
     assert registry["session_start_hour_utc"].status == PARAM_STATUS_FROZEN
     assert registry["session_end_hour_utc"].status == PARAM_STATUS_FROZEN
+    assert registry["allow_long_in_uptrend"].status == PARAM_STATUS_ACTIVE
+    assert registry["allow_long_in_uptrend"].domain_type == "bool"
     assert registry["ema_trend_gap_pct"].default_value == 0.0025
     assert registry["compression_atr_norm_max"].default_value == 0.0055
     assert registry["crowded_funding_extreme_pct"].default_value == 85.0
     assert registry["crowded_oi_zscore_min"].default_value == 1.5
     assert registry["force_order_history_points"].status == PARAM_STATUS_UNSUPPORTED
-    assert len(get_active_params()) >= 40
+    assert "allow_long_in_uptrend" in get_active_params()
+    assert "ema_trend_gap_pct" in get_active_params()
+    assert "compression_atr_norm_max" in get_active_params()
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
@@ -172,6 +176,32 @@ def test_constraints_rejects_invalid_vectors() -> None:
     assert "ema_fast must be < ema_slow" in violations
     assert "tp1_atr_mult must be < tp2_atr_mult" in violations
     assert "min_rr must be > 1.0" in violations
+
+
+def test_param_registry_unlock_ranges_are_updated() -> None:
+    registry = build_param_registry()
+
+    assert (registry["atr_period"].low, registry["atr_period"].high, registry["atr_period"].step) == (8, 50, 1)
+    assert (registry["confluence_min"].low, registry["confluence_min"].high, registry["confluence_min"].step) == (
+        2.5,
+        4.5,
+        0.1,
+    )
+    assert (
+        registry["direction_tfi_threshold"].low,
+        registry["direction_tfi_threshold"].high,
+        registry["direction_tfi_threshold"].step,
+    ) == (0.01, 0.5, 0.01)
+    assert (
+        registry["tfi_impulse_threshold"].low,
+        registry["tfi_impulse_threshold"].high,
+        registry["tfi_impulse_threshold"].step,
+    ) == (0.05, 0.5, 0.01)
+    assert (
+        registry["equal_level_tol_atr"].low,
+        registry["equal_level_tol_atr"].high,
+        registry["equal_level_tol_atr"].step,
+    ) == (0.01, 0.3, 0.01)
 
 
 def test_settings_adapter_roundtrip(tmp_path: Path) -> None:

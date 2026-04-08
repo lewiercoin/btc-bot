@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 from core.models import Features, RegimeState
-from core.signal_engine import SignalEngine
+from core.signal_engine import SignalConfig, SignalEngine
 
 
 def _features(
@@ -101,3 +101,21 @@ def test_short_tfi_impulse_requires_negative_flow() -> None:
     assert negative_score == positive_score + engine.config.weight_tfi_impulse
     assert "tfi_impulse" not in positive_reasons
     assert "tfi_impulse" in negative_reasons
+
+
+def test_direction_whitelist_blocks_long_in_uptrend_by_default() -> None:
+    engine = SignalEngine()
+
+    assert engine._is_direction_allowed_for_regime(direction="LONG", regime=RegimeState.UPTREND) is False
+
+
+def test_direction_whitelist_can_allow_long_in_uptrend_via_config() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            }
+        )
+    )
+
+    assert engine._is_direction_allowed_for_regime(direction="LONG", regime=RegimeState.UPTREND) is True

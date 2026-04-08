@@ -13,7 +13,7 @@ if str(PROJECT_ROOT) not in sys.path:
 from backtest.backtest_runner import BacktestRunner
 from core.models import GovernanceRuntimeState, RiskRuntimeState
 from orchestrator import build_default_bundle
-from settings import load_settings
+from settings import build_signal_regime_direction_whitelist, load_settings
 from storage.db import init_db
 
 
@@ -52,6 +52,7 @@ def _build_custom_settings():
         direction_tfi_threshold=0.07,
         direction_tfi_threshold_inverse=-0.08,
         tfi_impulse_threshold=0.13,
+        allow_long_in_uptrend=True,
         regime_direction_whitelist={"normal": ("LONG",), "uptrend": ("SHORT",)},
     )
     risk = replace(
@@ -108,9 +109,7 @@ def _assert_live_bundle_config_injection() -> None:
         assert signal_cfg.direction_tfi_threshold == settings.strategy.direction_tfi_threshold
         assert signal_cfg.direction_tfi_threshold_inverse == settings.strategy.direction_tfi_threshold_inverse
         assert signal_cfg.tfi_impulse_threshold == settings.strategy.tfi_impulse_threshold
-        assert signal_cfg.regime_direction_whitelist == {
-            regime: set(directions) for regime, directions in settings.strategy.regime_direction_whitelist.items()
-        }
+        assert signal_cfg.regime_direction_whitelist == build_signal_regime_direction_whitelist(settings.strategy)
 
         assert governance_cfg.cooldown_minutes_after_loss == settings.risk.cooldown_minutes_after_loss
         assert governance_cfg.duplicate_level_tolerance_pct == settings.risk.duplicate_level_tolerance_pct
@@ -147,9 +146,7 @@ def _assert_backtest_config_injection() -> None:
         assert signal_engine.config.direction_tfi_threshold_inverse == settings.strategy.direction_tfi_threshold_inverse
         assert signal_engine.config.tfi_impulse_threshold == settings.strategy.tfi_impulse_threshold
         assert signal_engine.config.min_stop_distance_pct == settings.strategy.min_stop_distance_pct
-        assert signal_engine.config.regime_direction_whitelist == {
-            regime: set(directions) for regime, directions in settings.strategy.regime_direction_whitelist.items()
-        }
+        assert signal_engine.config.regime_direction_whitelist == build_signal_regime_direction_whitelist(settings.strategy)
 
         assert governance.config.cooldown_minutes_after_loss == settings.risk.cooldown_minutes_after_loss
         assert governance.config.duplicate_level_tolerance_pct == settings.risk.duplicate_level_tolerance_pct

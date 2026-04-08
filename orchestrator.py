@@ -35,7 +35,7 @@ from monitoring.metrics import (
     MetricsRegistry,
 )
 from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
-from settings import AppSettings, BotMode
+from settings import AppSettings, BotMode, build_signal_regime_direction_whitelist
 from storage.position_persister import SqlitePositionPersister
 from storage.repositories import get_daily_metrics, save_executable_signal, save_signal_candidate
 from storage.state_store import StateStore
@@ -61,6 +61,7 @@ def build_default_bundle(
     governance_state_provider: Callable[[], GovernanceRuntimeState],
     risk_state_provider: Callable[[], RiskRuntimeState],
 ) -> EngineBundle:
+    signal_whitelist = build_signal_regime_direction_whitelist(settings.strategy)
     audit_logger = AuditLogger(connection=conn)
     rest_client = BinanceFuturesRestClient(
         RestClientConfig(
@@ -153,10 +154,7 @@ def build_default_bundle(
                 direction_tfi_threshold=settings.strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=settings.strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=settings.strategy.tfi_impulse_threshold,
-                regime_direction_whitelist={
-                    regime: set(allowed_directions)
-                    for regime, allowed_directions in settings.strategy.regime_direction_whitelist.items()
-                },
+                regime_direction_whitelist=signal_whitelist,
             )
         ),
         governance=GovernanceLayer(
