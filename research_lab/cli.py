@@ -93,6 +93,10 @@ def _build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--n-trials", type=int, default=50)
     optimize.add_argument("--study-name", type=str, default="research-lab-v0_1")
     optimize.add_argument("--seed", type=int, default=42)
+    optimize.add_argument("--max-sweep-rate", type=float, default=0.5)
+    optimize.add_argument("--optuna-storage-path", type=Path, default=None)
+    optimize.add_argument("--warm-start-from-store", action="store_true", default=False)
+    optimize.add_argument("--multivariate-tpe", action="store_true", default=False)
 
     replay = sub.add_parser("replay-candidate", help="Replay one candidate and rebuild walk-forward artifacts.")
     replay.add_argument("--candidate-id", required=True, type=str)
@@ -156,6 +160,10 @@ def main(argv: list[str] | None = None) -> None:
             study_name=str(args.study_name),
             seed=int(args.seed),
             protocol_path=args.protocol_path,
+            max_sweep_rate=float(args.max_sweep_rate),
+            optuna_storage_path=args.optuna_storage_path,
+            warm_start_from_store=bool(args.warm_start_from_store),
+            multivariate_tpe=bool(args.multivariate_tpe),
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
         return

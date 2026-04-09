@@ -15,6 +15,32 @@ def _connect(store_path: Path) -> sqlite3.Connection:
     return conn
 
 
+def _compute_funnel_summary(trials: list[Any]) -> dict[str, Any]:
+    accepted = [t for t in trials if t.rejected_reason is None]
+    if not accepted:
+        return {"trials_with_funnel": 0}
+
+    total = len(accepted)
+    total_generated = sum(t.funnel.signals_generated for t in accepted)
+    total_regime_blocked = sum(t.funnel.signals_regime_blocked for t in accepted)
+    total_governance_rejected = sum(t.funnel.signals_governance_rejected for t in accepted)
+    total_risk_rejected = sum(t.funnel.signals_risk_rejected for t in accepted)
+    total_executed = sum(t.funnel.signals_executed for t in accepted)
+
+    def _safe_rate(numerator: int, denominator: int) -> float:
+        return round(numerator / denominator, 4) if denominator > 0 else 0.0
+
+    return {
+        "trials_with_funnel": total,
+        "avg_signals_generated": round(total_generated / total, 2),
+        "avg_signals_executed": round(total_executed / total, 2),
+        "regime_blocked_rate": _safe_rate(total_regime_blocked, total_generated),
+        "governance_rejected_rate": _safe_rate(total_governance_rejected, total_generated),
+        "risk_rejected_rate": _safe_rate(total_risk_rejected, total_generated),
+        "executed_rate": _safe_rate(total_executed, total_generated),
+    }
+
+
 def build_experiment_report(store_path: Path) -> dict[str, Any]:
     trials = load_trials(store_path)
     accepted = [trial for trial in trials if trial.rejected_reason is None]
@@ -60,6 +86,7 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
         "trials_accepted": len(accepted),
         "trials_rejected": len(rejected),
         "pareto_count": len(pareto_frontier),
+        "signal_funnel_summary": _compute_funnel_summary(trials),
         "pareto_ranked": [
             {
                 "trial_id": trial.trial_id,

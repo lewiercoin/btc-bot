@@ -2,6 +2,22 @@
 
 Last updated: 2026-04-09
 
+## Active Milestone
+
+**Milestone:** OPTUNA-UTILITY-V1 — Optimize Optuna search efficiency (8 deliverables)
+**Status:** IN_PROGRESS
+**Active builder:** Cascade
+**Scope:**
+- [#0] Pre-campaign signal health gate (`SignalHealthError` + `check_signal_health()` in `optimize_loop.py`; `--max-sweep-rate` CLI flag; blocks campaign if sweep_detected_rate > threshold)
+- [#1] Fix `_to_finite_float()`: `+inf` → `1e6` (was `0.0`; Optuna maximizer was treating perfect profit_factor as worst outcome)
+- [#2] Persistent Optuna storage + resume: `JournalStorage` file backend; `load_if_exists=True`; `--optuna-storage-path` CLI flag
+- [#3] Warm-start from baseline + prior Pareto winners: opt-in via `--warm-start-from-store`; enqueues baseline config + top-N winners from experiment_store
+- [#4] Missing constraint: `high_vol_leverage <= max_leverage` added to `constraints.py`
+- [#5] `TPESampler(multivariate=True)` opt-in flag: `--multivariate-tpe` CLI flag
+- [#6] Optuna metadata observability: `study.set_metric_names()`, `trial.set_user_attr()` (protocol_hash, wall_time_s, rejection_reason)
+- [#7] Signal Funnel Summary in experiment report: `signal_funnel_summary` section with per-campaign aggregate rates
+- Tests: +12 new smoke tests; 72/72 green
+
 ## Baseline Checkpoint
 
 | Field | Value |
@@ -13,7 +29,7 @@ Last updated: 2026-04-09
 | **What it contains** | Fazy A–H MVP_DONE · Research Lab RL-V1 do RL-FUTURE MVP_DONE · 18/18 Known Issues zamknięte · dokumentacja zsynchronizowana · 35/35 testów zielonych |
 | **Strategy at tag** | PF 1.40 · WR 43.6% · Sharpe 4.37 · DD 17.0% |
 
-## Next Milestone
+## Previous Milestone
 
 **Milestone:** SWEEP-RECLAIM-FIX-V1 — Restore sweep as rare event (level semantics + gate-vs-score cleanup)
 **Status:** MVP_DONE (audit 2026-04-09, commit ba1d6d1, 60/60 tests green)
