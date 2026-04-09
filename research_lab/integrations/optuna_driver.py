@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -10,9 +11,10 @@ from settings import AppSettings
 from research_lab.constants import MIN_TRADES_DEFAULT
 from research_lab.constraints import assert_valid
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
-from research_lab.experiment_store import init_store, save_trial
+from research_lab.experiment_store import init_store, load_trials, save_trial
 from research_lab.objective import evaluate_candidate
 from research_lab.param_registry import get_active_params
+from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 from research_lab.settings_adapter import build_candidate_settings
 from research_lab.types import ObjectiveMetrics, SignalFunnel, TrialEvaluation
 
@@ -104,6 +106,40 @@ def _rejected_trial(trial_id: str, params: dict[str, Any], reason: str) -> Trial
     )
 
 
+def _enqueue_warm_start_trials(
+    study: "optuna.Study",
+    *,
+    base_settings: AppSettings,
+    store_path: Path,
+    protocol_hash: str | None,
+    warm_start_top_n: int,
+) -> None:
+    """Enqueue baseline config + top-N Pareto winners from store as warm-start trials."""
+    active_names = set(get_active_params().keys())
+
+    baseline_params: dict[str, Any] = {}
+    for k, v in dataclasses.asdict(base_settings.strategy).items():
+        if k in active_names:
+            baseline_params[k] = v
+    for k, v in dataclasses.asdict(base_settings.risk).items():
+        if k in active_names:
+            baseline_params[k] = v
+    if baseline_params:
+        study.enqueue_trial(baseline_params)
+
+    if store_path.exists():
+        existing = load_trials(store_path)
+        if protocol_hash is not None:
+            candidates = [t for t in existing if t.protocol_hash == protocol_hash and t.rejected_reason is None]
+        else:
+            candidates = [t for t in existing if t.rejected_reason is None]
+        pareto = rank_pareto_candidates(compute_pareto_frontier(candidates))
+        for winner in pareto[:warm_start_top_n]:
+            warm_params = {k: v for k, v in winner.params.items() if k in active_names}
+            if warm_params:
+                study.enqueue_trial(warm_params)
+
+
 def run_optuna_study(
     *,
     source_db_path: Path,
@@ -116,26 +152,57 @@ def run_optuna_study(
     seed: int = 42,
     min_trades: int = MIN_TRADES_DEFAULT,
     protocol_hash: str | None = None,
+    optuna_storage_path: Path | None = None,
+    multivariate_tpe: bool = False,
+    warm_start_from_store: bool = False,
+    warm_start_top_n: int = 3,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
     init_store(store_path)
     evaluations: list[TrialEvaluation] = []
 
-    sampler = optuna.samplers.TPESampler(seed=seed)
+    sampler = optuna.samplers.TPESampler(seed=seed, multivariate=multivariate_tpe)
+
+    if optuna_storage_path is not None:
+        optuna_storage_path.parent.mkdir(parents=True, exist_ok=True)
+        storage: Any = optuna.storages.JournalStorage(
+            optuna.storages.journal.JournalFileBackend(str(optuna_storage_path))
+        )
+    else:
+        storage = None
+
     study = optuna.create_study(
         study_name=study_name,
         sampler=sampler,
         directions=["maximize", "maximize", "minimize"],
+        storage=storage,
+        load_if_exists=optuna_storage_path is not None,
     )
+    study.set_metric_names(["expectancy_r", "profit_factor", "max_drawdown_pct"])
+
+    if warm_start_from_store:
+        _enqueue_warm_start_trials(
+            study,
+            base_settings=base_settings,
+            store_path=store_path,
+            protocol_hash=protocol_hash,
+            warm_start_top_n=warm_start_top_n,
+        )
 
     def objective(trial: optuna.Trial) -> tuple[float, float, float]:
+        wall_time_start = time.monotonic()
+        trial.set_user_attr("protocol_hash", protocol_hash or "")
+
         trial_id = f"{study_name}-trial-{trial.number:05d}"
         sampled_params = build_optuna_trial_params(trial)
         try:
             assert_valid(sampled_params)
         except ValueError as exc:
+            rejection_reason = str(exc)
+            trial.set_user_attr("rejection_reason", rejection_reason)
+            trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
             evaluation = dataclasses.replace(
-                _rejected_trial(trial_id, sampled_params, str(exc)),
+                _rejected_trial(trial_id, sampled_params, rejection_reason),
                 protocol_hash=protocol_hash,
             )
             evaluations.append(evaluation)
@@ -165,6 +232,9 @@ def run_optuna_study(
         )
         evaluations.append(evaluation)
         save_trial(evaluation, store_path)
+        if evaluation.rejected_reason is not None:
+            trial.set_user_attr("rejection_reason", evaluation.rejected_reason)
+        trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
         if evaluation.rejected_reason is not None:
             return (0.0, 0.0, 1.0)
         return (

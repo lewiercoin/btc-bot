@@ -23,9 +23,11 @@ def _flatten_trial_params(settings: AppSettings) -> dict[str, Any]:
 
 def _to_finite_float(value: float) -> float:
     numeric = float(value)
-    if not isfinite(numeric):
-        return 0.0
-    return numeric
+    if isfinite(numeric):
+        return numeric
+    if numeric > 0:
+        return 1e6
+    return 0.0
 
 
 def metrics_from_result(result: BacktestResult) -> ObjectiveMetrics:

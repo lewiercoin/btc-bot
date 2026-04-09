@@ -32,6 +32,10 @@ def validate_param_vector(params: dict[str, Any]) -> list[str]:
     if max_leverage is not None and not (1 < int(max_leverage) < 10):
         violations.append("max_leverage must be in (1, 10)")
 
+    high_vol_leverage = params.get("high_vol_leverage")
+    if high_vol_leverage is not None and max_leverage is not None and not (int(high_vol_leverage) <= int(max_leverage)):
+        violations.append("high_vol_leverage must be <= max_leverage")
+
     partial_exit_pct = params.get("partial_exit_pct")
     if partial_exit_pct is not None and not (0.0 < float(partial_exit_pct) < 1.0):
         violations.append("partial_exit_pct must be in (0.0, 1.0)")
