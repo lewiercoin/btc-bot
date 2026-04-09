@@ -17,6 +17,8 @@ from research_lab.types import ParamSpec
 _INFRA_REASON = "infrastructure params; not strategy params"
 _FROZEN_REASONS: dict[str, str] = {
     "weight_force_order_spike": "force_orders table has 0 rows; feature unavailable",
+    "weight_sweep_detected": "always-true intercept: hard gate before scoring makes this a constant, not evidence",
+    "weight_reclaim_confirmed": "always-true intercept: hard gate before scoring makes this a constant, not evidence",
     "ema_fast": "controls ema50_4h feature used by regime engine; feature name implies design intent for 50-period; architecture param frozen in v0.1",
     "ema_slow": "controls ema200_4h feature used by regime engine; feature name implies design intent for 200-period; architecture param frozen in v0.1",
     "crowded_funding_extreme_pct": "regime crowded-leverage funding threshold; frozen at baseline-calibrated value in v0.1",
@@ -46,7 +48,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "wick_min_atr": {"low": 0.05, "high": 1.0, "step": 0.05},
     "funding_window_days": {"low": 7, "high": 180, "step": 1},
     "oi_z_window_days": {"low": 7, "high": 180, "step": 1},
-    "confluence_min": {"low": 2.5, "high": 4.5, "step": 0.1},
+    "confluence_min": {"low": 0.0, "high": 2.0, "step": 0.05},
     "ema_trend_gap_pct": {"low": 0.0001, "high": 0.02, "step": 0.0001},
     "compression_atr_norm_max": {"low": 0.0001, "high": 0.05, "step": 0.0001},
     "crowded_funding_extreme_pct": {"low": 50.0, "high": 99.9, "step": 0.1},
@@ -58,6 +60,8 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "min_stop_distance_pct": {"low": 0.0001, "high": 0.02, "step": 0.0001},
     "tp1_atr_mult": {"low": 0.1, "high": 10.0, "step": 0.1},
     "tp2_atr_mult": {"low": 0.2, "high": 15.0, "step": 0.1},
+    "level_min_age_bars": {"low": 2, "high": 20, "step": 1},
+    "min_hits": {"low": 2, "high": 5, "step": 1},
     "weight_sweep_detected": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_reclaim_confirmed": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_cvd_divergence": {"low": 0.0, "high": 5.0, "step": 0.05},

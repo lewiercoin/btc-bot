@@ -123,6 +123,8 @@ def build_default_bundle(
                 wick_min_atr=settings.strategy.wick_min_atr,
                 funding_window_days=settings.strategy.funding_window_days,
                 oi_z_window_days=settings.strategy.oi_z_window_days,
+                level_min_age_bars=settings.strategy.level_min_age_bars,
+                min_hits=settings.strategy.min_hits,
             )
         ),
         regime_engine=RegimeEngine(
