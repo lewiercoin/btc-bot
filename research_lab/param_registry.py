@@ -62,7 +62,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "tp2_atr_mult": {"low": 0.2, "high": 15.0, "step": 0.1},
     "level_min_age_bars": {"low": 2, "high": 20, "step": 1},
     "min_hits": {"low": 2, "high": 5, "step": 1},
-    "sweep_proximity_atr": {"low": 0.5, "high": 3.0, "step": 0.1},
+    "sweep_proximity_atr": {"low": 0.2, "high": 2.0, "step": 0.05},
     "weight_sweep_detected": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_reclaim_confirmed": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_cvd_divergence": {"low": 0.0, "high": 5.0, "step": 0.05},
