@@ -112,6 +112,7 @@ def _evaluate_window_segment(
         )
     finally:
         conn.close()
+        snapshot_path.unlink(missing_ok=True)
 
 
 def _segment_failures(
