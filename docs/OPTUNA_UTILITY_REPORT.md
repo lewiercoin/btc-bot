@@ -297,3 +297,119 @@ Blueprint impact: none.
 4. Should warm-starting from prior winners become canonical campaign policy, or remain an optional optimization mode?
 5. Is `force_orders` still effectively unavailable in current production data, or has that freeze rationale gone stale since the last review?
 6. Should `study_name`, `seed`, `config_hash`, protocol hash, source DB path, and commit SHA become first-class mandatory audit fields in persistent Optuna storage, the custom experiment store, or both?
+
+---
+
+## Sweep/Reclaim Analysis — Session 2026-04-09
+Analysts: Codex (diagnosis) + Claude Code (audit/correction)
+
+### Confirmed Root Cause
+
+Primary driver: permissive level creation in `feature_engine.py:177-182`. With ATR≈$200 and tolerance=ATR×0.25=$50, a typical 50-bar 15m BTC window ($1,000-$1,500 range) produces 4-8 merged low clusters and 4-8 merged high clusters. The early-return architecture at `feature_engine.py:130` turns this dense cluster set into `sweep_detected=True` on 99.49% of bars.
+
+Root cause is both: loose level definition (dominant) + early-return amplifier (secondary).
+
+### Scenario Decision: B (restore sweep as rare event)
+
+Scenario A rejected. `reclaim_detected=7.16%` (~7 bars/day) is semantically diluted — it represents "rejection candle near a noisy local cluster," not a blueprint-style stop hunt. The blueprint (`BLUEPRINT_V1.md:60`) defines the edge as liquidity sweep + reclaim + context, not generic cluster rejection.
+
+Optuna evidence: `baseline-v3-smoke` did not naturally converge toward rare-sweep semantics (`equal_level_tol_atr=0.21`, `equal_level_lookback=105`, `weight_sweep_detected=3.8`). Optuna learns a threshold offset, not sweep quality, because `weight_sweep_detected` and `weight_reclaim_confirmed` are constant intercepts once scoring runs.
+
+### Corrected Plan: SWEEP-RECLAIM-FIX-V1
+
+Status: **AWAITING RUN3_DONE** — do not start until Cascade reports run #3 complete.
+
+**Scope (confirmed):**
+1. Add `level_min_age_bars: int` to `FeatureEngineConfig` — level only counts if N bars elapsed between first and last hit in the cluster (B5, architectural)
+2. Make `min_hits` configurable in `FeatureEngineConfig` — raise default from 2 to 3; expose in `StrategyConfig` (B3, architectural)
+3. Add both params to `param_registry.py` as ACTIVE with curated ranges
+4. Keep B1 (`equal_level_tol_atr`), B2 (`equal_level_lookback`), B4 (`sweep_buf_atr`) searchable — already are
+5. Do NOT remove `weight_sweep_detected` / `weight_reclaim_confirmed` from confluence — see open decision below
+6. After fix: clean baseline run + new Optuna campaign
+
+**What this milestone does NOT do:** It does not resolve the gate-vs-score architectural question. That is an explicit open decision.
+
+**Run #3 artifact interpretation note:** When evaluating Run #3 Pareto candidates, flag any candidate with `weight_sweep_detected > 2.0` as a threshold-chaser, not a real strategy discovery. High sweep weight in a degraded-sweep regime signals the optimizer compensating for a constant, not learning signal quality.
+
+### Corrected Codex Note on Weight Semantics
+
+Claude Code's initial statement — "after B5+B3, `weight_sweep_detected` becomes valid evidence again" — was incorrect. Codex correctly identified: because `signal_engine.py:49-52` gates on both flags *before* `_confluence_score()` runs, both weights are **constant intercepts on every scored candidate**, regardless of how rare sweep becomes. Making sweep rare changes how often we enter scoring, not what happens inside it. The weights do not become discriminating by fixing the feature.
+
+### Open Methodological Decisions (explicit, not deferred silently)
+
+**Decision 1 — Gate-vs-Score architecture**
+
+Current state: `weight_sweep_detected=1.25` and `weight_reclaim_confirmed=1.25` are added unconditionally inside `_confluence_score()` because both are hard-gated before scoring. They are threshold offsets, not evidence weights.
+
+Options:
+- **Option A:** Remove both from confluence scoring. Hard gates remain. Confluence threshold drops by 2.50 max; lower `confluence_min` accordingly. Optuna no longer wastes search budget on two constant parameters.
+- **Option B:** Keep in confluence, replace with quality-based scoring. E.g., replace binary `weight_sweep_detected` with a continuous `sweep_depth_pct`-derived score. This requires objective redesign.
+- **Option C:** Keep current architecture — accept that they are offsets, freeze their weights at 0.0 in Optuna search to reduce dimensionality.
+
+**This decision requires user approval before implementation.** Claude Code recommends Option A as the lowest-risk cleanup consistent with blueprint intent, but it alters confluence semantics and requires `confluence_min` recalibration.
+
+**Decision 2 — force_orders data gap**
+
+`force_orders` table has 0 rows in production DB. Consequences:
+- `force_order_spike` = always False → `POST_LIQUIDATION` regime never fires
+- `weight_force_order_spike=0.40` is permanently locked out of confluence scoring
+- `weight_regime_special=0.35` for LONG (POST_LIQ bonus) is permanently locked
+
+`weight_force_order_spike` is already frozen in `param_registry.py`, but the wasted confluence ceiling (~0.75 points) affects what `confluence_min=3.0` means in practice. Verify: does `market_data.py` populate `force_order_events_60s` from WS feed, or is it always empty because `force_orders` DB table is unpopulated?
+
+**Decision 3 — B6 HTF levels (deferred, not discarded)**
+
+Using 4h/1h candles for level detection would produce structurally rarer, more meaningful levels. Strong semantic alignment with blueprint intent. Not in SWEEP-RECLAIM-FIX-V1 scope because it is a larger redesign with high trade-count risk. Revisit after B5+B3 are in place and a new campaign produces enough trades to evaluate.
+
+### Proposed Handoff: SWEEP-RECLAIM-FIX-V1
+
+To be issued after Run #3 completes and artifacts are evaluated.
+
+```
+## CLAUDE HANDOFF -> CODEX
+
+### Checkpoint
+- Last commit: [to be filled after RUN3_DONE]
+- Branch: main
+- Working tree: clean
+
+### Before you code
+Read these files (mandatory):
+1. docs/BLUEPRINT_V1.md — section 3.3 (core edge definition)
+2. docs/OPTUNA_UTILITY_REPORT.md — section "Sweep/Reclaim Analysis 2026-04-09"
+3. AGENTS.md — discipline + workflow rules
+4. docs/MILESTONE_TRACKER.md — current status
+
+### Milestone: SWEEP-RECLAIM-FIX-V1
+Scope: feature_engine.py, settings.py, research_lab/param_registry.py
+
+Deliverables:
+1. Add `level_min_age_bars: int = 5` to FeatureEngineConfig (feature_engine.py)
+   - A cluster of prices qualifies as a level only if the time span between
+     first and last candle in the cluster is >= level_min_age_bars bars
+   - Modify detect_equal_levels() or detect_sweep_reclaim() to enforce this
+2. Make `min_hits: int = 3` configurable in FeatureEngineConfig (was hardcoded at 2)
+   - Pass through from StrategyConfig or FeatureEngineConfig consistently
+3. Add both to param_registry.py as ACTIVE:
+   - level_min_age_bars: int, range 2-20, step 1
+   - min_hits: int (or expose existing equal_level param), range 2-5, step 1
+4. Smoke test: verify sweep_detected rate drops below 50% on any historical
+   dataset with default parameters (level_min_age_bars=5, min_hits=3,
+   equal_level_tol_atr=0.25, equal_level_lookback=50)
+
+Target files: core/feature_engine.py, settings.py, research_lab/param_registry.py
+
+### Known Issues
+| # | Issue | Blocking for this milestone? |
+|---|---|---|
+| 1 | weight_sweep_detected / weight_reclaim_confirmed are constant intercepts | NO — open decision, do not touch |
+| 2 | force_orders table 0 rows | NO — separate investigation |
+| 3 | gate-vs-score architecture decision pending | NO — explicitly deferred |
+
+-> Do not touch signal_engine.py confluence weights in this milestone.
+-> Do not touch walkforward protocol or Optuna driver in this milestone.
+
+### Commit discipline
+- WHAT / WHY / STATUS in every commit message
+- Do NOT self-mark as done. Claude Code audits after push.
+```

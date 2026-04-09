@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-08
+Last updated: 2026-04-09
 
 ## Baseline Checkpoint
 
@@ -14,6 +14,36 @@ Last updated: 2026-04-08
 | **Strategy at tag** | PF 1.40 · WR 43.6% · Sharpe 4.37 · DD 17.0% |
 
 ## Next Milestone
+
+**Milestone:** SWEEP-RECLAIM-FIX-V1 — Restore sweep as rare event (level semantics + gate-vs-score cleanup)
+**Status:** MVP_DONE (audit 2026-04-09, commit ba1d6d1, 60/60 tests green)
+**Audit:** [docs/audits/AUDIT_SWEEP_RECLAIM_FIX_V1_2026-04-09.md](audits/AUDIT_SWEEP_RECLAIM_FIX_V1_2026-04-09.md)
+**Decision date:** 2026-04-09
+**Active builder:** Cascade
+**Scope:**
+- [A] `level_min_age_bars: int = 5` — cluster qualifies as level only if span between first and last bar ≥ N bars; requires `detect_equal_levels()` refactor to accept bar indices alongside prices (`list[tuple[int, float]]`)
+- [B] `min_hits: int = 3` configurable (was hardcoded 2); wire through `StrategyConfig` → `FeatureEngineConfig`
+- [C2a] Remove `weight_sweep_detected` + `weight_reclaim_confirmed` from `_confluence_score()`; freeze both in `param_registry._FROZEN_REASONS` (reason: "always-true intercept"); `confluence_min` default → 0.75, range → [0.0, 2.0, step 0.05]
+- Wire A+B through `orchestrator.py` + `backtest/backtest_runner.py`; add A+B to `param_registry.py` as ACTIVE
+- Smoke: `sweep_detected` < 50% on replay with new defaults; pytest green; Optuna sees A+B as ACTIVE
+**Out of scope:** `governance.py` duplicate-level redesign; force_orders data coverage; B6 HTF levels; `_to_finite_float` fix (separate micro-commit after RUN3_DONE, before RUN4).
+
+### Resolved decisions (2026-04-09)
+
+| ID | Decision | Resolution |
+|---|---|---|
+| D1 | Gate-vs-score: `weight_sweep_detected` + `weight_reclaim_confirmed` are constant intercepts | **C2a** — remove from `_confluence_score()`, freeze in registry, `confluence_min` default → 0.75, range [0.0, 2.0]. C2b rejected: weight=0.0 + confluence_min=3.0 = zero signals. |
+
+### Open decisions (not scheduled, require explicit user approval)
+
+| ID | Decision | Status |
+|---|---|---|
+| D2 | force_orders data gap — no bootstrap path, backtest permanently blind | DEFERRED — separate data-coverage milestone |
+| D3 | B6 HTF levels — use 4h/1h candles for level detection | DEFERRED — revisit after SWEEP-RECLAIM-FIX-V1 + new run |
+
+---
+
+## Previous milestones (closed)
 
 **Milestone:** DASHBOARD-M1 — Read-Only Observability + WAL Patch
 **Status:** MVP_DONE (audit 2026-04-02, 46/46 tests green)
@@ -59,6 +89,13 @@ Last updated: 2026-04-08
 **Active builder:** Cascade
 **Scope:** Fix run_optimize.sh SUMMARY_TMP redirect bug (C3) · auto-cleanup snapshots po optimize run · fix setup.sh python3-venv (gap #20) · fix SERVER_DEPLOYMENT.md bundle step (gap #21) · update default_protocol.json walk-forward windows
 **Audit:** [docs/audits/AUDIT_RESEARCH_LAB_FIXES_2026-04-08.md](audits/AUDIT_RESEARCH_LAB_FIXES_2026-04-08.md)
+
+**Milestone:** WF-SNAPSHOT-CLEANUP — delete walk-forward snapshots after each window evaluation
+**Status:** DONE (commit 8f2c6f2, 58/58 tests green)
+**Decision date:** 2026-04-08
+**Active builder:** Cascade
+**Scope:** `research_lab/walkforward.py` `_evaluate_window_segment()` — add `snapshot_path.unlink(missing_ok=True)` in `finally` block after `conn.close()`. Eliminates 1 Pareto candidate × 6 windows × 2 (train+val) = 12 × 665MB = 7.8GB disk accumulation per walk-forward evaluation.
+**Audit:** inline — single line fix, same pattern as SNAPSHOT-CLEANUP-PER-TRIAL
 
 **Milestone:** SERVER-DEPLOY-V2 — Production Hetzner Deploy (Bot + Research Lab)
 **Status:** DONE (audit 2026-04-08, commits 1343d3c + 5f51ded)
