@@ -261,6 +261,8 @@ class BacktestRunner:
                 wick_min_atr=strategy.wick_min_atr,
                 funding_window_days=strategy.funding_window_days,
                 oi_z_window_days=strategy.oi_z_window_days,
+                level_min_age_bars=strategy.level_min_age_bars,
+                min_hits=strategy.min_hits,
             )
         )
         regime_engine = RegimeEngine(

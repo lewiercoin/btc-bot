@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
+import pytest
+
 from core.models import Features, RegimeState
 from core.signal_engine import SignalConfig, SignalEngine
 
@@ -75,7 +77,7 @@ def test_regime_special_bonus_changes_short_confluence_score() -> None:
     normal_score, normal_reasons = engine._confluence_score(features, RegimeState.NORMAL, "SHORT")
     downtrend_score, downtrend_reasons = engine._confluence_score(features, RegimeState.DOWNTREND, "SHORT")
 
-    assert downtrend_score == normal_score + engine.config.weight_regime_special
+    assert downtrend_score == pytest.approx(normal_score + engine.config.weight_regime_special)
     assert "regime_special" not in normal_reasons
     assert "regime_special" in downtrend_reasons
 

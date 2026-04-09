@@ -183,9 +183,9 @@ def test_param_registry_unlock_ranges_are_updated() -> None:
 
     assert (registry["atr_period"].low, registry["atr_period"].high, registry["atr_period"].step) == (8, 50, 1)
     assert (registry["confluence_min"].low, registry["confluence_min"].high, registry["confluence_min"].step) == (
-        2.5,
-        4.5,
-        0.1,
+        0.0,
+        2.0,
+        0.05,
     )
     assert (
         registry["direction_tfi_threshold"].low,
