@@ -25,6 +25,7 @@ class FeatureEngineConfig:
     cvd_divergence_window_bars: int = 10
     level_min_age_bars: int = 5
     min_hits: int = 3
+    sweep_proximity_atr: float = 1.0
 
 
 def _mean(values: Iterable[float]) -> float:
@@ -141,7 +142,11 @@ def detect_sweep_reclaim(
     reclaim_buffer = config.reclaim_buf_atr * atr_15m
     wick_min = config.wick_min_atr * atr_15m
 
+    proximity = config.sweep_proximity_atr * atr_15m
+
     for level in equal_lows:
+        if abs(open_price - level) > proximity:
+            continue
         swept = low_price < (level - sweep_buffer)
         reclaimed = close_price > (level + reclaim_buffer)
         wick_ok = (body_low - low_price) >= wick_min
@@ -150,6 +155,8 @@ def detect_sweep_reclaim(
             return True, bool(reclaimed and wick_ok), float(level), depth_pct, "LOW"
 
     for level in equal_highs:
+        if abs(open_price - level) > proximity:
+            continue
         swept = high_price > (level + sweep_buffer)
         reclaimed = close_price < (level - reclaim_buffer)
         wick_ok = (high_price - body_high) >= wick_min

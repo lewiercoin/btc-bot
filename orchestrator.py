@@ -125,6 +125,7 @@ def build_default_bundle(
                 oi_z_window_days=settings.strategy.oi_z_window_days,
                 level_min_age_bars=settings.strategy.level_min_age_bars,
                 min_hits=settings.strategy.min_hits,
+                sweep_proximity_atr=settings.strategy.sweep_proximity_atr,
             )
         ),
         regime_engine=RegimeEngine(
