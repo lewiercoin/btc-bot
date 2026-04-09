@@ -46,6 +46,9 @@ STUDY_NAME=${1:-short-rebuild-v1}
 N_TRIALS=${2:-50}
 START_DATE=${3:-2022-01-01}
 END_DATE=${4:-2026-03-01}
+MAX_SWEEP_RATE=${5:-}
+WARM_START=${6:-}
+MULTIVARIATE_TPE=${7:-}
 
 case "$N_TRIALS" in
     ''|*[!0-9]*)
@@ -77,6 +80,8 @@ trap 'rm -f "$SUMMARY_TMP" "$REPORT_TMP"' EXIT HUP INT TERM
     echo "start_date=${START_DATE}"
     echo "end_date=${END_DATE}"
     echo "python=${PYTHON_BIN}"
+    echo "optuna_storage=research_lab/runs/optuna_${SAFE_STUDY}.journal"
+    [ -n "$MAX_SWEEP_RATE" ] && echo "max_sweep_rate=$MAX_SWEEP_RATE"
 } >>"$LOG_FILE"
 
 if "$PYTHON_BIN" -m research_lab optimize \
@@ -84,6 +89,10 @@ if "$PYTHON_BIN" -m research_lab optimize \
     --n-trials "$N_TRIALS" \
     --start-date "$START_DATE" \
     --end-date "$END_DATE" \
+    --optuna-storage-path "research_lab/runs/optuna_${SAFE_STUDY}.journal" \
+    ${MAX_SWEEP_RATE:+--max-sweep-rate "$MAX_SWEEP_RATE"} \
+    ${WARM_START:+--warm-start-from-store} \
+    ${MULTIVARIATE_TPE:+--multivariate-tpe} \
     >"$SUMMARY_TMP" 2>>"$LOG_FILE"; then
     cat "$SUMMARY_TMP" >>"$LOG_FILE"
 else
