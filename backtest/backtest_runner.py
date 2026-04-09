@@ -263,6 +263,7 @@ class BacktestRunner:
                 oi_z_window_days=strategy.oi_z_window_days,
                 level_min_age_bars=strategy.level_min_age_bars,
                 min_hits=strategy.min_hits,
+                sweep_proximity_atr=strategy.sweep_proximity_atr,
             )
         )
         regime_engine = RegimeEngine(
