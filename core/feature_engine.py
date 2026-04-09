@@ -25,7 +25,7 @@ class FeatureEngineConfig:
     cvd_divergence_window_bars: int = 10
     level_min_age_bars: int = 5
     min_hits: int = 3
-    sweep_proximity_atr: float = 1.0
+    sweep_proximity_atr: float = 0.4
 
 
 def _mean(values: Iterable[float]) -> float:

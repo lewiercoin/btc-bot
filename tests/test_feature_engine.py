@@ -73,7 +73,7 @@ def _low_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
         _candle(ts - timedelta(minutes=45),  103.0, 104.0, 101.5, 103.0),
         _candle(ts - timedelta(minutes=30),  103.0, 104.0, 100.0, 103.5),
         _candle(ts - timedelta(minutes=15),  103.0, 103.5, 101.5, 103.0),
-        _candle(ts,                          103.0, 103.5,  97.0, 101.5),
+        _candle(ts,                          101.0, 103.5,  97.0, 101.5),
     ]
 
 

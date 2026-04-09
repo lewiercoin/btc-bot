@@ -59,7 +59,7 @@ class StrategyConfig:
     wick_min_atr: float = 0.40
     level_min_age_bars: int = 5
     min_hits: int = 3
-    sweep_proximity_atr: float = 1.0
+    sweep_proximity_atr: float = 0.4
 
     funding_window_days: int = 60
     oi_z_window_days: int = 60
