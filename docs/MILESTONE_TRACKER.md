@@ -2,10 +2,17 @@
 
 Last updated: 2026-04-10
 
-## Active Milestone
+## Next Milestone
+
+**Milestone:** SIGNAL-ENGINE-REARCH-V1 — Rearchitect _infer_direction: sweep_side as direction source, CVD/TFI as confluence only
+**Status:** AWAITING_DECISION
+**Active builder:** Cascade (recommended)
+**Decision date:** 2026-04-10
+
+## Previous Active Milestone
 
 **Milestone:** SIGNAL-INVERSION-V1 — Invert sweep+reclaim direction (failed reclaim thesis)
-**Status:** DONE — D2 backtest NEGATIVE, architectural incompatibility discovered
+**Status:** DONE (audit 2026-04-10, commit ab664e2, 101/101 tests) — D2 backtest NEGATIVE, architectural incompatibility discovered
 **Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Scope:**
