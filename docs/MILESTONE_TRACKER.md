@@ -2,10 +2,17 @@
 
 Last updated: 2026-04-10
 
+## Next Milestone
+
+**Status:** AWAITING_DECISION
+**Pending:** SIGNAL-HORIZON-CHECK — 15-minute data query on event_study_v1.json (bar+16/bar+96 returns)
+before Claude Code can confirm redesign direction. Not a milestone — one-time query, no commit.
+
 ## Active Milestone
 
 **Milestone:** SIGNAL-ANALYSIS-V1 — Cross-regime signal diagnostic + volume lever audit before Run #5
-**Status:** MVP_DONE (infrastructure) — AWAITING_EXECUTION (D2/D3 against production DB)
+**Status:** DONE (audit 2026-04-10, commits cef73f6 + fea17aa, 94/94 tests green)
+**Result:** P1+MATURE edge 0/6 segments. Decision tree branch 4 active: Stop optimization, redesign feature level.
 **Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Scope:**
