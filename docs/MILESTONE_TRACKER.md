@@ -5,7 +5,7 @@ Last updated: 2026-04-10
 ## Next Milestone
 
 **Milestone:** RUN5-LAUNCH — Optuna campaign on rearchitected signal engine
-**Status:** IN_PROGRESS
+**Status:** DONE — prerequisites verified, campaign CLEAR TO LAUNCH
 **Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Prerequisites in scope:**
