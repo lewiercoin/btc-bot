@@ -12,7 +12,7 @@ from settings import AppSettings
 
 from research_lab.approval import build_recommendation
 from research_lab.baseline_gate import check_baseline
-from research_lab.constants import MIN_TRADES_DEFAULT
+from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.experiment_store import save_recommendation, save_walkforward
 from research_lab.integrations.optuna_driver import run_optuna_study
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
@@ -129,6 +129,7 @@ def run_optimize_loop(
     walkforward_mode = str(protocol.get("walkforward_mode", "post_hoc")).strip().lower()
     protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
+    max_trades_full_candidate = int(protocol.get("max_trades_full_candidate", MAX_TRADES_DEFAULT))
 
     check_baseline(
         source_db_path=source_db_path,
@@ -199,6 +200,7 @@ def run_optimize_loop(
         study_name=study_name,
         seed=seed,
         min_trades=min_trades_full_candidate,
+        max_trades=max_trades_full_candidate,
         protocol_hash=protocol_hash,
         optuna_storage_path=optuna_storage_path,
         multivariate_tpe=multivariate_tpe,

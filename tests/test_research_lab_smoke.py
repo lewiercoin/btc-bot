@@ -150,6 +150,8 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["crowded_funding_extreme_pct"].status == PARAM_STATUS_FROZEN
     assert registry["crowded_oi_zscore_min"].status == PARAM_STATUS_FROZEN
     assert registry["regime_direction_whitelist"].status == PARAM_STATUS_FROZEN
+    # RUN5-LAUNCH P2: direction_tfi_threshold frozen after SIGNAL-ENGINE-REARCH-V1
+    assert registry["direction_tfi_threshold"].status == PARAM_STATUS_FROZEN
     assert registry["session_start_hour_utc"].status == PARAM_STATUS_FROZEN
     assert registry["session_end_hour_utc"].status == PARAM_STATUS_FROZEN
     assert registry["allow_long_in_uptrend"].status == PARAM_STATUS_ACTIVE
@@ -162,6 +164,8 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert "allow_long_in_uptrend" in get_active_params()
     assert "ema_trend_gap_pct" in get_active_params()
     assert "compression_atr_norm_max" in get_active_params()
+    # direction_tfi_threshold should NOT be in active params
+    assert "direction_tfi_threshold" not in get_active_params()
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
@@ -184,16 +188,14 @@ def test_param_registry_unlock_ranges_are_updated() -> None:
     registry = build_param_registry()
 
     assert (registry["atr_period"].low, registry["atr_period"].high, registry["atr_period"].step) == (8, 50, 1)
+    # RUN5-LAUNCH P2: confluence_min range updated to [0.20, 0.75]
     assert (registry["confluence_min"].low, registry["confluence_min"].high, registry["confluence_min"].step) == (
-        0.0,
-        2.0,
+        0.20,
+        0.75,
         0.05,
     )
-    assert (
-        registry["direction_tfi_threshold"].low,
-        registry["direction_tfi_threshold"].high,
-        registry["direction_tfi_threshold"].step,
-    ) == (0.01, 0.5, 0.01)
+    # direction_tfi_threshold is now FROZEN after SIGNAL-ENGINE-REARCH-V1
+    assert registry["direction_tfi_threshold"].status == PARAM_STATUS_FROZEN
     assert (
         registry["tfi_impulse_threshold"].low,
         registry["tfi_impulse_threshold"].high,
@@ -1558,3 +1560,185 @@ def test_run_optimize_loop_threads_optuna_params_to_study(
     assert kw["optuna_storage_path"] == storage_path
     assert kw["multivariate_tpe"] is True
     assert kw["warm_start_from_store"] is True
+
+
+def test_evaluate_candidate_rejects_max_trades_volume_constraint(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from research_lab.objective import evaluate_candidate
+    from research_lab.constants import MAX_TRADES_DEFAULT
+    from backtest.performance import PerformanceReport
+
+    settings = load_settings(project_root=tmp_path)
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+
+    class _FakeConn:
+        def close(self) -> None:
+            pass
+
+    def fake_run_backtest_with_funnel(*args, **kwargs):
+        from backtest.backtest_runner import BacktestResult
+
+        # Simulate a result with excessive trade count (volume lever inflation)
+        result = BacktestResult(
+            performance=PerformanceReport(
+                trades_count=15000,  # Exceeds MAX_TRADES_DEFAULT (10000)
+                expectancy_r=0.5,
+                pnl_abs=5000.0,
+                pnl_r_sum=7500.0,
+                max_drawdown_pct=0.1,
+                win_rate=0.6,
+                avg_winner_r=0.8,
+                avg_loser_r=-0.4,
+                profit_factor=2.0,
+                max_consecutive_losses=3,
+                sharpe_ratio=2.0,
+                total_fees=0.0,
+            ),
+            trades=[],
+            equity_curve=[],
+        )
+        funnel = SignalFunnel(
+            signals_generated=1000,
+            signals_regime_blocked=100,
+            signals_governance_rejected=50,
+            signals_risk_rejected=20,
+            signals_executed=830,
+        )
+        return result, funnel
+
+    monkeypatch.setattr("research_lab.objective.run_backtest_with_funnel", fake_run_backtest_with_funnel)
+
+    evaluation = evaluate_candidate(
+        _FakeConn(),
+        settings=settings,
+        backtest_config=config,
+        min_trades=30,
+        max_trades=MAX_TRADES_DEFAULT,
+    )
+
+    assert evaluation.rejected_reason is not None
+    assert "MAX_TRADES_VOLUME_CONSTRAINT" in evaluation.rejected_reason
+    assert "trades_count=15000" in evaluation.rejected_reason
+    assert f"max_trades={MAX_TRADES_DEFAULT}" in evaluation.rejected_reason
+
+
+def test_run_optimize_loop_uses_protocol_max_trades_full_candidate(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    settings = load_settings(project_root=tmp_path)
+    source_db_path = tmp_path / "source.db"
+    store_path = tmp_path / "research_lab.db"
+    snapshots_dir = tmp_path / "snapshots"
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+        symbol=settings.strategy.symbol,
+    )
+
+    protocol_path = tmp_path / "protocol.json"
+    protocol_payload = {
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 10,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+        "min_trades_full_candidate": 2000,
+        "max_trades_full_candidate": 8000,
+    }
+    protocol_path.write_text(json.dumps(protocol_payload, indent=2), encoding="utf-8")
+
+    captured_max_trades: list[int] = []
+
+    def fake_run_optuna_study(**kwargs):
+        max_trades = int(kwargs["max_trades"])
+        captured_max_trades.append(max_trades)
+        return [
+            TrialEvaluation(
+                trial_id="trial-accepted",
+                params={"tp1_atr_mult": 3.0},
+                metrics=ObjectiveMetrics(
+                    expectancy_r=0.2,
+                    profit_factor=1.5,
+                    max_drawdown_pct=0.1,
+                    trades_count=5000,  # Within [2000, 8000]
+                    sharpe_ratio=1.0,
+                    pnl_abs=100.0,
+                    win_rate=0.5,
+                ),
+                funnel=SignalFunnel(
+                    signals_generated=10,
+                    signals_regime_blocked=1,
+                    signals_governance_rejected=1,
+                    signals_risk_rejected=1,
+                    signals_executed=7,
+                ),
+                rejected_reason=None,
+            )
+        ]
+
+    monkeypatch.setattr(optimize_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "check_signal_health", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "run_optuna_study", fake_run_optuna_study)
+    monkeypatch.setattr(optimize_loop_module, "compute_pareto_frontier", lambda trials: trials)
+    monkeypatch.setattr(optimize_loop_module, "rank_pareto_candidates", lambda frontier: frontier)
+    monkeypatch.setattr(
+        optimize_loop_module,
+        "run_walkforward",
+        lambda **_: WalkForwardReport(
+            passed=True,
+            windows_total=1,
+            windows_passed=1,
+            is_degradation_pct=0.0,
+            fragile=False,
+            reasons=(),
+        ),
+    )
+    monkeypatch.setattr(optimize_loop_module, "save_walkforward", lambda *args, **kwargs: None)
+    monkeypatch.setattr(optimize_loop_module, "save_recommendation", lambda *args, **kwargs: None)
+
+    summary = optimize_loop_module.run_optimize_loop(
+        source_db_path=source_db_path,
+        store_path=store_path,
+        snapshots_dir=snapshots_dir,
+        backtest_config=config,
+        base_settings=settings,
+        n_trials=1,
+        study_name="test-study",
+        protocol_path=protocol_path,
+    )
+
+    assert captured_max_trades == [8000]
+    assert summary["trials_total"] == 1
+    assert summary["pareto_candidates"] == 1
+
+
+def test_param_registry_confluence_range_updated_for_run5() -> None:
+    registry = build_param_registry()
+
+    # P2: confluence_min range updated to [0.20, 0.75]
+    assert registry["confluence_min"].low == 0.20
+    assert registry["confluence_min"].high == 0.75
+    assert registry["confluence_min"].step == 0.05
+
+
+def test_param_registry_weight_cvd_divergence_range_ceilinged_for_run5() -> None:
+    registry = build_param_registry()
+
+    # P2: weight_cvd_divergence range ceilinged to [0.0, 0.50]
+    assert registry["weight_cvd_divergence"].low == 0.0
+    assert registry["weight_cvd_divergence"].high == 0.50
+    assert registry["weight_cvd_divergence"].step == 0.05
+
+
+def test_param_registry_direction_tfi_threshold_frozen_after_rearch() -> None:
+    registry = build_param_registry()
+
+    # P2: direction_tfi_threshold frozen after SIGNAL-ENGINE-REARCH-V1
+    assert registry["direction_tfi_threshold"].status == PARAM_STATUS_FROZEN
+    assert "no longer used by _infer_direction after SIGNAL-ENGINE-REARCH-V1" in registry["direction_tfi_threshold"].reason
+    assert "direction now derived from sweep_side only" in registry["direction_tfi_threshold"].reason

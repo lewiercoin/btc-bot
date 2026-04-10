@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
-from research_lab.constants import MIN_TRADES_DEFAULT
+from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.constraints import assert_valid
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
 from research_lab.experiment_store import init_store, load_trials, save_trial
@@ -151,6 +151,7 @@ def run_optuna_study(
     study_name: str,
     seed: int = 42,
     min_trades: int = MIN_TRADES_DEFAULT,
+    max_trades: int = MAX_TRADES_DEFAULT,
     protocol_hash: str | None = None,
     optuna_storage_path: Path | None = None,
     multivariate_tpe: bool = False,
@@ -219,6 +220,7 @@ def run_optuna_study(
                 settings=candidate_settings,
                 backtest_config=backtest_config,
                 min_trades=int(min_trades),
+                max_trades=int(max_trades),
             )
         finally:
             conn.close()
