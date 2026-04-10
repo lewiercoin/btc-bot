@@ -24,6 +24,10 @@ _FROZEN_REASONS: dict[str, str] = {
     "crowded_funding_extreme_pct": "regime crowded-leverage funding threshold; frozen at baseline-calibrated value in v0.1",
     "crowded_oi_zscore_min": "regime crowded-leverage OI threshold; frozen at baseline-calibrated value in v0.1",
     "regime_direction_whitelist": "composite dict type; SHORT disabled in v1.1; frozen in v0.1",
+    "direction_tfi_threshold": (
+        "no longer used by _infer_direction after SIGNAL-ENGINE-REARCH-V1; "
+        "direction now derived from sweep_side only"
+    ),
     "direction_tfi_threshold_inverse": "derived constraint; changes with direction_tfi_threshold",
     "no_trade_windows_utc": "tuple of tuples; composite type; frozen in v0.1",
     "session_start_hour_utc": "correlated pair; independent sampling produces ~50% invalid pairs; frozen in v0.1",
@@ -48,7 +52,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "wick_min_atr": {"low": 0.05, "high": 1.0, "step": 0.05},
     "funding_window_days": {"low": 7, "high": 180, "step": 1},
     "oi_z_window_days": {"low": 7, "high": 180, "step": 1},
-    "confluence_min": {"low": 0.0, "high": 2.0, "step": 0.05},
+    "confluence_min": {"low": 0.20, "high": 0.75, "step": 0.05},
     "ema_trend_gap_pct": {"low": 0.0001, "high": 0.02, "step": 0.0001},
     "compression_atr_norm_max": {"low": 0.0001, "high": 0.05, "step": 0.0001},
     "crowded_funding_extreme_pct": {"low": 50.0, "high": 99.9, "step": 0.1},
@@ -65,7 +69,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "sweep_proximity_atr": {"low": 0.2, "high": 2.0, "step": 0.05},
     "weight_sweep_detected": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_reclaim_confirmed": {"low": 0.0, "high": 5.0, "step": 0.05},
-    "weight_cvd_divergence": {"low": 0.0, "high": 5.0, "step": 0.05},
+    "weight_cvd_divergence": {"low": 0.0, "high": 0.50, "step": 0.05},
     "weight_tfi_impulse": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_regime_special": {"low": 0.0, "high": 5.0, "step": 0.05},
     "weight_ema_trend_alignment": {"low": 0.0, "high": 5.0, "step": 0.05},

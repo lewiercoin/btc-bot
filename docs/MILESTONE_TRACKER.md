@@ -5,8 +5,8 @@ Last updated: 2026-04-10
 ## Next Milestone
 
 **Milestone:** RUN5-LAUNCH — Optuna campaign on rearchitected signal engine
-**Status:** AWAITING_DECISION
-**Active builder:** Cascade (recommended)
+**Status:** IN_PROGRESS
+**Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Prerequisites in scope:**
 - Trade count floor: reject trials with trade_count < 2000 or > 10000 (structural volume lever fix)

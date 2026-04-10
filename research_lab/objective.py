@@ -9,7 +9,7 @@ from typing import Any
 from backtest.backtest_runner import BacktestConfig, BacktestResult
 from settings import AppSettings
 
-from research_lab.constants import MIN_TRADES_DEFAULT
+from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.funnel import run_backtest_with_funnel
 from research_lab.types import ObjectiveMetrics, TrialEvaluation
 
@@ -51,8 +51,9 @@ def evaluate_candidate(
     settings: AppSettings,
     backtest_config: BacktestConfig,
     min_trades: int = MIN_TRADES_DEFAULT,
+    max_trades: int = MAX_TRADES_DEFAULT,
 ) -> TrialEvaluation:
-    """Runs backtest + funnel. Returns TrialEvaluation with min-trades rejection metadata."""
+    """Runs backtest + funnel. Returns TrialEvaluation with min/max-trades rejection metadata."""
 
     result, funnel = run_backtest_with_funnel(
         connection,
@@ -63,6 +64,11 @@ def evaluate_candidate(
     rejected_reason: str | None = None
     if metrics.trades_count < int(min_trades):
         rejected_reason = f"MIN_TRADES_NOT_MET: trades_count={metrics.trades_count} < min_trades={int(min_trades)}"
+    elif metrics.trades_count > int(max_trades):
+        rejected_reason = (
+            f"MAX_TRADES_VOLUME_CONSTRAINT: "
+            f"trades_count={metrics.trades_count} > max_trades={int(max_trades)}"
+        )
 
     flat_params = _flatten_trial_params(settings)
     deterministic_payload = json.dumps(flat_params, sort_keys=True, separators=(",", ":"))
