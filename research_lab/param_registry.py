@@ -92,6 +92,45 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "session_end_hour_utc": {"low": 0, "high": 23, "step": 1},
 }
 
+_VOLUME_LEVER_MAP: dict[str, tuple[bool, str | None]] = {
+    # Signal generation levers — moving parameter in volume_direction inflates trade count
+    # without requiring improved signal quality (confirmed set from SIGNAL-ANALYSIS-V1 handoff)
+    "sweep_proximity_atr":        (True, "up"),    # wider proximity → more bars near a level
+    "level_min_age_bars":         (True, "down"),  # lower bar span → more clusters qualify
+    "min_hits":                   (True, "down"),  # fewer required touches → more clusters qualify
+    "equal_level_lookback":       (True, "up"),    # longer lookback → more levels detected
+    "equal_level_tol_atr":        (True, "up"),    # wider tolerance → more cluster merging
+    "wick_min_atr":               (True, "down"),  # smaller required wick → more reclaims qualify
+    "min_sweep_depth_pct":        (True, "down"),  # shallower required depth → more sweeps qualify
+    # Signal generation levers — additional (identified during implementation)
+    "sweep_buf_atr":              (True, "down"),  # lower buffer → easier sweep detection
+    "reclaim_buf_atr":            (True, "down"),  # lower buffer → easier reclaim detection
+    # Filter levers (confirmed)
+    "confluence_min":             (True, "down"),  # lower threshold → more signals pass
+    "direction_tfi_threshold":    (True, "up"),    # higher threshold → less directional TFI required
+    "weight_sweep_detected":      (True, "up"),    # raises confluence score for sweep events
+    "weight_reclaim_confirmed":   (True, "up"),    # raises confluence score for reclaim events
+    "weight_force_order_spike":   (True, "up"),    # raises confluence score for force-order events
+    "weight_cvd_divergence":      (True, "up"),    # raises confluence score for CVD divergence events
+    "weight_tfi_impulse":         (True, "up"),    # raises confluence score for TFI impulse events
+    "weight_regime_special":      (True, "up"),    # raises confluence score for special-regime events
+    "weight_ema_trend_alignment": (True, "up"),    # raises confluence score for trend-aligned events
+    "weight_funding_supportive":  (True, "up"),    # raises confluence score for funding-supported events
+    # Filter levers — additional
+    "tfi_impulse_threshold":      (True, "down"),  # lower threshold → more impulse signals pass
+    "post_liq_tfi_abs_min":       (True, "down"),  # lower threshold → more post-liq signals pass
+    "allow_long_in_uptrend":      (True, "up"),    # True opens LONG trading in uptrend regime
+    # Execution levers (confirmed)
+    "max_trades_per_day":         (True, "up"),    # higher cap → more daily trades allowed
+    "max_open_positions":         (True, "up"),    # higher cap → more concurrent positions
+    "max_consecutive_losses":     (True, "up"),    # longer loss streak before pause → more trades
+    "cooldown_minutes_after_loss":(True, "down"),  # shorter cooldown → trade again sooner
+    # Risk gate levers — additional
+    "min_rr":                     (True, "down"),  # lower min R:R → more signals pass risk gate
+    "daily_dd_limit":             (True, "up"),    # higher daily limit → more trades before stop
+    "weekly_dd_limit":            (True, "up"),    # higher weekly limit → more trades before stop
+}
+
 _DOMAIN_OVERRIDES: dict[str, str] = {
     "symbol": "categorical",
     "tf_setup": "categorical",
@@ -151,6 +190,7 @@ def _build_section_specs(section_name: str, cfg_type: type[Any]) -> dict[str, Pa
         range_override = _RANGE_OVERRIDES.get(name, {})
         choices = _CHOICES_OVERRIDES.get(name)
 
+        lever_entry = _VOLUME_LEVER_MAP.get(name, (False, None))
         result[name] = ParamSpec(
             name=name,
             target_section=section_name,
@@ -162,6 +202,8 @@ def _build_section_specs(section_name: str, cfg_type: type[Any]) -> dict[str, Pa
             choices=choices,
             step=range_override.get("step"),
             reason=reason,
+            volume_lever=lever_entry[0],
+            volume_direction=lever_entry[1],
         )
     return result
 

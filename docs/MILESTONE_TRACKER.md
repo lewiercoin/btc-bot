@@ -4,14 +4,22 @@ Last updated: 2026-04-09
 
 ## Active Milestone
 
-**Milestone:** SIGNAL-ANALYSIS-V1 — Per-year signal diagnostic before Run #5
-**Status:** AWAITING_DECISION
-**Active builder:** Codex (recommended)
+**Milestone:** SIGNAL-ANALYSIS-V1 — Cross-regime signal diagnostic + volume lever audit before Run #5
+**Status:** IN_PROGRESS
+**Active builder:** Cascade
+**Decision date:** 2026-04-10
 **Scope:**
-- Run default config (proximity=0.4, level_min_age_bars=5, min_hits=3) on 4 annual slices: 2022, 2023, 2024, 2025
-- Report per-year: signals_generated, signals_executed, expectancy_r, profit_factor, trades_count, max_drawdown_pct
-- Determine which years show positive expectancy
-- Recommend backtest window for Run #5
+- D1: Volume-lever audit — classify all ACTIVE parameters as volume_lever=True/False with volume_direction in param_registry.py; output docs/diagnostics/VOLUME_LEVER_AUDIT.md
+- D2: Raw event study — FeatureEngine on full dataset 2022-01-01→2026-03-01 with default params, fixed exit model (SL=1×ATR, TP=2×ATR, max_hold=16 bars), regime segments S1-S6, proximity/structure buckets, t-test per bucket; output research_lab/runs/event_study_v1.json
+- D3: Regime decomposition (conditional on D2) — tag baseline-v3-trial-00195 trades by regime segment S1-S6; output research_lab/runs/regime_decomposition_v1.json
+- D4: Decision report template — docs/diagnostics/SIGNAL_ANALYSIS_V1.md with decision tree + open item on objective function vulnerability
+- Tests: tests/test_research_lab_diagnostics.py smoke tests
+**Known issues in scope:**
+- #1 Proximity filter calibrated on Q1 2025 only → D2 investigates cross-regime edge
+- #2 45-param search with ~15 volume levers → D1 classifies structurally (26 levers identified)
+- #4 baseline-v3-trial-00195 not WF-validated → D3 addresses conditionally
+**Known issues out of scope:**
+- #3 Objective function no volume-inflation penalty → tracked in D4 as explicit open item
 
 ## Previous Milestone
 
