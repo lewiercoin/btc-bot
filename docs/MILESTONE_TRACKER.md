@@ -1,11 +1,11 @@
 # Milestone Tracker
 
-Last updated: 2026-04-09
+Last updated: 2026-04-10
 
 ## Active Milestone
 
 **Milestone:** SIGNAL-ANALYSIS-V1 — Cross-regime signal diagnostic + volume lever audit before Run #5
-**Status:** IN_PROGRESS
+**Status:** MVP_DONE (infrastructure) — AWAITING_EXECUTION (D2/D3 against production DB)
 **Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Scope:**
