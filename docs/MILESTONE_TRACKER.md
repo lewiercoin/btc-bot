@@ -4,8 +4,19 @@ Last updated: 2026-04-09
 
 ## Active Milestone
 
+**Milestone:** SIGNAL-ANALYSIS-V1 — Per-year signal diagnostic before Run #5
+**Status:** AWAITING_DECISION
+**Active builder:** Codex (recommended)
+**Scope:**
+- Run default config (proximity=0.4, level_min_age_bars=5, min_hits=3) on 4 annual slices: 2022, 2023, 2024, 2025
+- Report per-year: signals_generated, signals_executed, expectancy_r, profit_factor, trades_count, max_drawdown_pct
+- Determine which years show positive expectancy
+- Recommend backtest window for Run #5
+
+## Previous Milestone
+
 **Milestone:** OPTUNA-UTILITY-V1 — Optimize Optuna search efficiency (8 deliverables)
-**Status:** IN_PROGRESS
+**Status:** MVP_DONE (audit 2026-04-09, commit 00f205d, 72/72 tests green)
 **Active builder:** Cascade
 **Scope:**
 - [#0] Pre-campaign signal health gate (`SignalHealthError` + `check_signal_health()` in `optimize_loop.py`; `--max-sweep-rate` CLI flag; blocks campaign if sweep_detected_rate > threshold)
@@ -285,3 +296,4 @@ None - all blueprint stubs implemented.
 | AUDIT_013 | Research Lab v0.1 - optuna runtime validation | 2026-03-31 | `dfafa26` | MVP_DONE |
 | AUDIT_014 | Tech Debt Cleanup (Resumed) - Issues #1 + #7 | 2026-04-01 | `8602727` | MVP_DONE |
 | AUDIT_015 | SERVER-DEPLOY-V2 — Hetzner cpx22 production deploy | 2026-04-08 | `713f826` | DONE |
+| AUDIT_016 | RUN4-CAMPAIGN — Run #4 Optuna results | 2026-04-10 | bfc78ba | NOT_PROMOTED |
