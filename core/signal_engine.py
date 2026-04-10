@@ -9,12 +9,12 @@ from core.models import Features, RegimeState, SignalCandidate
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
-        RegimeState.NORMAL.value: ("LONG",),
-        RegimeState.COMPRESSION.value: ("LONG",),
+        RegimeState.NORMAL.value: ("LONG", "SHORT"),
+        RegimeState.COMPRESSION.value: ("LONG", "SHORT"),
         RegimeState.DOWNTREND.value: ("LONG", "SHORT"),
         RegimeState.UPTREND.value: (),
         RegimeState.CROWDED_LEVERAGE.value: ("SHORT",),
-        RegimeState.POST_LIQUIDATION.value: ("LONG",),
+        RegimeState.POST_LIQUIDATION.value: ("LONG", "SHORT"),
     }
 
 
@@ -103,9 +103,9 @@ class SignalEngine:
         elif features.tfi_60s < self.config.direction_tfi_threshold_inverse:
             inferred_direction = "SHORT"
 
-        if inferred_direction == "LONG" and features.sweep_side != "LOW":
+        if inferred_direction == "LONG" and features.sweep_side != "HIGH":
             return None
-        if inferred_direction == "SHORT" and features.sweep_side != "HIGH":
+        if inferred_direction == "SHORT" and features.sweep_side != "LOW":
             return None
         return inferred_direction
 

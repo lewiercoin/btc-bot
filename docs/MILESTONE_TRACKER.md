@@ -2,13 +2,29 @@
 
 Last updated: 2026-04-10
 
-## Next Milestone
-
-**Status:** AWAITING_DECISION
-**Pending:** SIGNAL-HORIZON-CHECK — 15-minute data query on event_study_v1.json (bar+16/bar+96 returns)
-before Claude Code can confirm redesign direction. Not a milestone — one-time query, no commit.
-
 ## Active Milestone
+
+**Milestone:** SIGNAL-INVERSION-V1 — Invert sweep+reclaim direction (failed reclaim thesis)
+**Status:** DONE — D2 backtest NEGATIVE, architectural incompatibility discovered
+**Active builder:** Cascade
+**Decision date:** 2026-04-10
+**Scope:**
+- D1: Flip sweep_side↔direction mapping in `_infer_direction` (LOW→SHORT, HIGH→LONG)
+- D2: Full backtest 2022-01-01→2026-03-01 with inverted direction + default params
+- D3: Audit all direction-dependent logic; fix regime whitelist LONG-bias → symmetric
+- D4: Update signal engine tests + add inversion-specific determinism tests
+**Result:**
+- D1: 2-line change in `core/signal_engine.py:106-109` ✓
+- D2: **NEGATIVE** — 563 trades, 10.5% WR, ExpR=-0.94, PF=0.28. Inverse edge does NOT survive full stack.
+- D3: Whitelist fixed (NORMAL/COMPRESSION/POST_LIQ → symmetric). Audit in `docs/diagnostics/DIRECTION_AUDIT_V1.md`
+- D4: 13 signal engine tests (was 8), 101/101 full suite green
+**Key finding:** Event study inverse edge (62-66% implied WR in 6/6 segments) does not translate to
+positive P&L through full execution stack. Root cause: `_infer_direction` uses CVD/TFI as direction
+determinant, filtering 95% of events. The 5% that pass (with aligned microstructure) perform worse.
+Architectural fix: derive direction FROM sweep_side, use CVD/TFI as confluence only. Beyond this
+milestone's scope — tracked for Claude Code strategic decision.
+
+## Previous Milestone
 
 **Milestone:** SIGNAL-ANALYSIS-V1 — Cross-regime signal diagnostic + volume lever audit before Run #5
 **Status:** DONE (audit 2026-04-10, commits cef73f6 + fea17aa, 94/94 tests green)
