@@ -16,6 +16,8 @@ class ParamSpec:
     choices: tuple[Any, ...] | None = None
     step: Any | None = None
     reason: str | None = None
+    volume_lever: bool = False
+    volume_direction: str | None = None
 
 
 @dataclass(frozen=True)
