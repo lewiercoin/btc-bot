@@ -34,6 +34,9 @@ _STUDY_END = "2026-03-01"
 _SYMBOL = "BTCUSDT"
 _TARGET_TRIAL_ID = "baseline-v3-trial-00195"
 
+# NOTE: D3 gate uses p < 0.05 (stricter) to justify a full backtest run.
+# D4 decision tree uses p < 0.10 (more permissive) for "edge exists" classification.
+# This is intentional: D3 requires stronger evidence before committing compute.
 _D2_CONDITION_P_THRESHOLD = 0.05
 _D2_CONDITION_MIN_SEGMENTS = 3
 
@@ -71,7 +74,6 @@ def _check_d2_condition(d2_path: Path) -> tuple[bool, str]:
     with open(d2_path, encoding="utf-8") as fh:
         d2 = json.load(fh)
 
-    edge_count = d2.get("p1_mature_edge_count", 0)
     p1_mature = d2.get("p1_mature_summary", {})
 
     qualifying: list[str] = []
