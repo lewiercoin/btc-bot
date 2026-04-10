@@ -93,21 +93,11 @@ class SignalEngine:
         )
 
     def _infer_direction(self, features: Features) -> str | None:
-        inferred_direction: str | None = None
-        if features.cvd_bullish_divergence and not features.cvd_bearish_divergence:
-            inferred_direction = "LONG"
-        elif features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
-            inferred_direction = "SHORT"
-        elif features.tfi_60s > self.config.direction_tfi_threshold:
-            inferred_direction = "LONG"
-        elif features.tfi_60s < self.config.direction_tfi_threshold_inverse:
-            inferred_direction = "SHORT"
-
-        if inferred_direction == "LONG" and features.sweep_side != "HIGH":
-            return None
-        if inferred_direction == "SHORT" and features.sweep_side != "LOW":
-            return None
-        return inferred_direction
+        if features.sweep_side == "LOW":
+            return "SHORT"
+        if features.sweep_side == "HIGH":
+            return "LONG"
+        return None
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
         score = 0.0

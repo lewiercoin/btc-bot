@@ -50,35 +50,35 @@ def _features(
 
 
 def test_infer_direction_short_on_low_sweep() -> None:
-    """Inverted: LOW sweep + bearish divergence → SHORT (failed reclaim thesis)."""
+    """LOW sweep → SHORT. Direction derived from sweep_side, CVD/TFI irrelevant."""
     engine = SignalEngine()
-    features = _features(sweep_side="LOW", bearish_divergence=True, tfi_60s=-0.2)
+    features = _features(sweep_side="LOW")
 
     assert engine._infer_direction(features) == "SHORT"
 
 
 def test_infer_direction_long_on_high_sweep() -> None:
-    """Inverted: HIGH sweep + bullish divergence → LONG (failed reclaim thesis)."""
+    """HIGH sweep → LONG. Direction derived from sweep_side, CVD/TFI irrelevant."""
     engine = SignalEngine()
-    features = _features(sweep_side="HIGH", bullish_divergence=True, tfi_60s=0.2)
+    features = _features(sweep_side="HIGH")
 
     assert engine._infer_direction(features) == "LONG"
 
 
-def test_infer_direction_rejects_long_on_low_sweep() -> None:
-    """Inverted: LOW sweep + bullish divergence → None (LONG requires HIGH sweep)."""
+def test_infer_direction_none_when_no_sweep_side() -> None:
+    """No sweep_side → None. No direction can be inferred."""
     engine = SignalEngine()
-    features = _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2)
+    features = _features(sweep_side=None)
 
     assert engine._infer_direction(features) is None
 
 
-def test_infer_direction_rejects_short_on_high_sweep() -> None:
-    """Inverted: HIGH sweep + bearish divergence → None (SHORT requires LOW sweep)."""
+def test_infer_direction_ignores_cvd_tfi() -> None:
+    """Direction is purely from sweep_side. Bullish CVD on LOW sweep still → SHORT."""
     engine = SignalEngine()
-    features = _features(sweep_side="HIGH", bearish_divergence=True, tfi_60s=-0.2)
+    features = _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.5)
 
-    assert engine._infer_direction(features) is None
+    assert engine._infer_direction(features) == "SHORT"
 
 
 def test_regime_special_bonus_changes_short_confluence_score() -> None:
@@ -197,15 +197,24 @@ def test_generate_long_on_high_sweep_end_to_end() -> None:
     assert candidate.tp_reference_1 > candidate.entry_reference
 
 
-def test_generate_rejects_long_on_low_sweep_end_to_end() -> None:
-    """Full pipeline: LOW sweep + bullish CVD → LONG inferred → rejected (LONG requires HIGH)."""
+def test_generate_rejects_none_sweep_side_end_to_end() -> None:
+    """Full pipeline: no sweep_side → no direction → rejected."""
+    engine = SignalEngine(SignalConfig(confluence_min=0.0))
+    features = _features(sweep_side=None, bullish_divergence=True, tfi_60s=0.2)
+    assert engine.generate(features, RegimeState.NORMAL) is None
+
+
+def test_generate_low_sweep_always_short_regardless_of_cvd() -> None:
+    """Full pipeline: LOW sweep + bullish CVD → still SHORT (CVD only affects confluence)."""
     engine = SignalEngine(SignalConfig(confluence_min=0.0))
     features = _features(
         sweep_side="LOW",
         bullish_divergence=True,
         tfi_60s=0.2,
     )
-    assert engine.generate(features, RegimeState.NORMAL) is None
+    candidate = engine.generate(features, RegimeState.NORMAL)
+    assert candidate is not None
+    assert candidate.direction == "SHORT"
 
 
 def test_inversion_deterministic_same_input_same_output() -> None:

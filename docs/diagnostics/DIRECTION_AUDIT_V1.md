@@ -221,3 +221,112 @@ use sweep_side as the primary direction source.
 
 This is beyond SIGNAL-INVERSION-V1 scope. Tracked as architectural finding
 for Claude Code's strategic decision.
+
+---
+
+## SIGNAL-ENGINE-REARCH-V1: Rearchitected _infer_direction Results
+
+### Change
+
+```python
+# Before (CVD/TFI as direction source):
+def _infer_direction(self, features):
+    if features.cvd_bullish_divergence and not features.cvd_bearish_divergence:
+        inferred_direction = "LONG"
+    elif features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
+        inferred_direction = "SHORT"
+    elif features.tfi_60s > threshold: inferred_direction = "LONG"
+    elif features.tfi_60s < -threshold: inferred_direction = "SHORT"
+    # + sweep_side validation → filtered 95% of events
+
+# After (sweep_side as direction source):
+def _infer_direction(self, features):
+    if features.sweep_side == "LOW": return "SHORT"
+    if features.sweep_side == "HIGH": return "LONG"
+    return None
+```
+
+### D2 Backtest — Rearchitected Direction, Default Params
+
+```
+Period:          2022-01-01 -> 2026-03-01
+Total trades:    750  (715 SHORT, 35 LONG)
+Win rate:        12.0%
+Expectancy R:    -0.8740
+Profit factor:   0.2546
+Total PnL:       -9,986.70
+
+Per regime:
+  compression        7  ExpR=-1.09  WR=14.3%  PF=0.185
+  crowded_leverage 100  ExpR=-0.99  WR= 9.0%  PF=0.276
+  downtrend        629  ExpR=-0.84  WR=12.7%  PF=0.263
+  normal            14  ExpR=-1.40  WR= 0.0%  PF=0.000
+
+Per direction:
+  LONG              35  ExpR=-1.08  WR= 8.6%
+  SHORT            715  ExpR=-0.86  WR=12.2%
+
+ACCEPTANCE CRITERIA:
+  Trade count >= 3000:  FAIL (750)
+  ExpR > 0:             FAIL (-0.8740)
+```
+
+### Analysis: Bottleneck Shifted, Not Removed
+
+| Metric | SIGNAL-INVERSION-V1 (CVD/TFI gate) | REARCH-V1 (sweep_side) |
+|---|---|---|
+| Total trades | 563 | 750 (+33%) |
+| Win rate | 10.5% | 12.0% |
+| ExpR | -0.9399 | -0.8740 |
+| Events reaching confluence | ~563 | ~all 11,841 |
+| Events passing confluence | 563 | 750 |
+
+Trade count increased only 33% (563 → 750), not the expected 10-20x.
+The bottleneck moved from `_infer_direction` to two downstream gates:
+
+**Gate 1: Confluence scoring (confluence_min=0.75)**
+
+The confluence weights were calibrated for the original direction thesis where
+CVD/TFI alignment was a prerequisite. With sweep-side-derived direction:
+
+- CVD bearish divergence on LOW sweep (SHORT): structurally rare — most LOW sweeps
+  have bullish or neutral CVD (sellers just swept support)
+- CVD weight = 0.75 (the single largest weight). Without it, max reachable score is:
+  force_order_spike(0.40) + regime_special(0.35) + ema_trend(0.25) + funding(0.20) = 1.20
+- But commonly only ema_trend(0.25) + funding(0.20) = 0.45 < 0.75 threshold
+
+So the confluence gate effectively re-implements the CVD/TFI filter, just at a
+different layer. Most events without matching CVD/TFI still fail.
+
+**Gate 2: SL/TP parameters**
+
+The event study used SL=1.0×ATR, TP=2.0×ATR. The full stack uses:
+- SL ≈ 0.75×ATR (invalidation_offset_atr) — 25% tighter
+- TP = 2.5×ATR (tp1_atr_mult) — 25% farther
+- min_rr = 2.8
+
+Tighter SL + farther TP = lower win rate. Event study implied ~62-66% inverse WR.
+Full stack delivers 12% WR — the SL/TP geometry is fundamentally different.
+
+### Conclusion
+
+The `_infer_direction` rearchitecture is architecturally correct — sweep_side
+is now the sole direction source, CVD/TFI are confluence factors only. But the
+acceptance criteria are not met because:
+
+1. **Confluence weights** need recalibration for inverted direction (CVD weight
+   dominance makes confluence gate equivalent to old CVD/TFI gate)
+2. **SL/TP parameters** need adjustment to match the exit geometry that shows
+   edge in the event study (wider SL, tighter TP)
+
+Both are parameter calibration issues, not architecture issues. The rearch is the
+correct foundation — parameters need tuning on top of it.
+
+### Strategic Options for Claude Code
+
+1. **Run Optuna campaign** on rearchitected engine — let optimizer find SL/TP and
+   confluence weights that capture the inverse edge
+2. **Manual parameter adjustment** — set SL=1.0×ATR, TP=2.0×ATR, lower
+   confluence_min to 0.45, then backtest
+3. **Restructure confluence weights** — reduce CVD weight, increase direction-
+   independent weights (force_order_spike, regime_special, funding)

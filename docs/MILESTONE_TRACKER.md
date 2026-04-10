@@ -2,14 +2,27 @@
 
 Last updated: 2026-04-10
 
-## Next Milestone
+## Active Milestone
 
 **Milestone:** SIGNAL-ENGINE-REARCH-V1 — Rearchitect _infer_direction: sweep_side as direction source, CVD/TFI as confluence only
-**Status:** AWAITING_DECISION
-**Active builder:** Cascade (recommended)
+**Status:** DONE — D2 backtest FAIL (750 trades, ExpR=-0.87). Architecture correct, parameters need recalibration.
+**Active builder:** Cascade
 **Decision date:** 2026-04-10
+**Scope:**
+- D1: Replace `_infer_direction` body — sweep_side determines direction (LOW→SHORT, HIGH→LONG)
+- D2: Full backtest 2022-2026, acceptance: trade count ≥3000, ExpR > 0
+- D3: Update signal engine tests for new architecture
+**Result:**
+- D1: `_infer_direction` reduced to 4 lines. CVD/TFI remain in `_confluence_score` ✓
+- D2: **FAIL** — 750 trades (need 3K+), ExpR=-0.87 (need >0), WR=12%
+- D3: 14 signal engine tests (was 13), 102/102 full suite green ✓
+**Key finding:** Bottleneck shifted from `_infer_direction` to confluence gate + SL/TP params.
+Confluence weights (CVD=0.75 dominant) effectively re-implement the CVD filter at a different layer.
+SL/TP geometry (0.75×ATR SL / 2.5×ATR TP) differs from event study (1.0×ATR / 2.0×ATR).
+Both are parameter calibration issues, not architecture issues. Full analysis in `docs/diagnostics/DIRECTION_AUDIT_V1.md`.
+**Strategic options:** (1) Optuna campaign on rearchitected engine, (2) manual SL/TP+confluence adjustment, (3) restructure confluence weights.
 
-## Previous Active Milestone
+## Previous Milestone
 
 **Milestone:** SIGNAL-INVERSION-V1 — Invert sweep+reclaim direction (failed reclaim thesis)
 **Status:** DONE (audit 2026-04-10, commit ab664e2, 101/101 tests) — D2 backtest NEGATIVE, architectural incompatibility discovered
