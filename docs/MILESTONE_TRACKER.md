@@ -2,10 +2,21 @@
 
 Last updated: 2026-04-10
 
-## Active Milestone
+## Next Milestone
+
+**Milestone:** RUN5-LAUNCH — Optuna campaign on rearchitected signal engine
+**Status:** AWAITING_DECISION
+**Active builder:** Cascade (recommended)
+**Decision date:** 2026-04-10
+**Prerequisites in scope:**
+- Trade count floor: reject trials with trade_count < 2000 or > 10000 (structural volume lever fix)
+- Search range verification: confluence_min [0.20, 0.75], weight_cvd_divergence [0.0, 0.50], SL/TP geometry
+- Campaign: 200+ trials, start date 2023-01-01, WF protocol unchanged
+
+## Previous Active Milestone
 
 **Milestone:** SIGNAL-ENGINE-REARCH-V1 — Rearchitect _infer_direction: sweep_side as direction source, CVD/TFI as confluence only
-**Status:** DONE — D2 backtest FAIL (750 trades, ExpR=-0.87). Architecture correct, parameters need recalibration.
+**Status:** DONE (audit 2026-04-10, commit cc0024c, 102/102 tests) — D2 FAIL (750 trades, ExpR=-0.87). Architecture correct, parameters need recalibration.
 **Active builder:** Cascade
 **Decision date:** 2026-04-10
 **Scope:**
