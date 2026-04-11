@@ -1,0 +1,20 @@
+[Unit]
+Description=BTC Bot Force Order Collector
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+EnvironmentFile=/home/btc-bot/btc-bot/.env
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/python scripts/server/run_force_order_collector.py
+Restart=always
+RestartSec=10
+TimeoutStopSec=30
+KillSignal=SIGTERM
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
