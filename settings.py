@@ -76,8 +76,8 @@ class StrategyConfig:
     min_stop_distance_pct: float = 0.0015
     tp1_atr_mult: float = 2.5
     tp2_atr_mult: float = 4.0
-    weight_sweep_detected: float = 0.0
-    weight_reclaim_confirmed: float = 0.0
+    weight_sweep_detected: float = 0.35
+    weight_reclaim_confirmed: float = 0.35
     weight_cvd_divergence: float = 0.75
     weight_tfi_impulse: float = 0.50
     weight_force_order_spike: float = 0.40

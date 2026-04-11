@@ -106,13 +106,13 @@ def test_short_tfi_impulse_requires_negative_flow() -> None:
         sweep_side="LOW",
         bearish_divergence=True,
         tfi_60s=0.2,
-        funding_8h=0.0001,
+        funding_8h=-0.0001,
     )
     negative_tfi = _features(
         sweep_side="LOW",
         bearish_divergence=True,
         tfi_60s=-0.2,
-        funding_8h=0.0001,
+        funding_8h=-0.0001,
     )
 
     positive_score, positive_reasons = engine._confluence_score(positive_tfi, RegimeState.NORMAL, "SHORT")

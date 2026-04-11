@@ -27,8 +27,8 @@ class SignalConfig:
     min_stop_distance_pct: float = 0.0015
     tp1_atr_mult: float = 2.5
     tp2_atr_mult: float = 4.0
-    weight_sweep_detected: float = 0.0
-    weight_reclaim_confirmed: float = 0.0
+    weight_sweep_detected: float = 0.35
+    weight_reclaim_confirmed: float = 0.35
     weight_cvd_divergence: float = 0.75
     weight_tfi_impulse: float = 0.50
     weight_force_order_spike: float = 0.40
@@ -102,6 +102,13 @@ class SignalEngine:
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
         score = 0.0
         reasons: list[str] = []
+
+        if features.sweep_detected:
+            score += self.config.weight_sweep_detected
+            reasons.append("sweep_detected")
+        if features.reclaim_detected:
+            score += self.config.weight_reclaim_confirmed
+            reasons.append("reclaim_detected")
 
         if direction == "LONG" and features.cvd_bullish_divergence:
             score += self.config.weight_cvd_divergence
