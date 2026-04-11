@@ -1,0 +1,11 @@
+[Unit]
+Description=BTC Bot Daily Data Collector Timer (DXY + ETF)
+Requires=btc-bot-daily-collector.service
+
+[Timer]
+OnCalendar=*-*-* 00:00:00 UTC
+Persistent=true
+AccuracySec=1h
+
+[Install]
+WantedBy=timers.target

@@ -130,6 +130,46 @@ sudo cp /home/btc-bot/btc-bot/scripts/server/btc-bot-logrotate.conf /etc/logrota
 Rotates: `optimize_*.log`, `autoresearch_*.log`, `refresh_data_*.log`, `autoresearch_cron.log`.
 Daily, 14 rotations, compressed. Does NOT rotate `btc_bot.log` (handled by Python `RotatingFileHandler`).
 
+### DATA COLLECTORS
+
+On the server:
+
+```sh
+cd /home/btc-bot/btc-bot
+
+# Install data collector unit files
+cp scripts/server/btc-bot-force-collector.service /etc/systemd/system/btc-bot-force-collector.service
+cp scripts/server/btc-bot-daily-collector.service /etc/systemd/system/btc-bot-daily-collector.service
+cp scripts/server/btc-bot-daily-collector.timer /etc/systemd/system/btc-bot-daily-collector.timer
+
+# Reload systemd
+systemctl daemon-reload
+
+# Enable and start the force-order WebSocket collector (runs continuously)
+systemctl enable btc-bot-force-collector
+systemctl start btc-bot-force-collector
+
+# Enable and start the daily DXY+ETF collector timer (runs at 00:00 UTC daily)
+systemctl enable btc-bot-daily-collector.timer
+systemctl start btc-bot-daily-collector.timer
+```
+
+Verify status:
+
+```sh
+# Check force-order collector (should be active/running)
+systemctl status btc-bot-force-collector
+
+# Check daily collector timer (should be active and waiting for next trigger)
+systemctl status btc-bot-daily-collector.timer
+
+# Manually trigger daily collector for immediate test
+systemctl start btc-bot-daily-collector.service
+
+# View daily collector logs
+journalctl -u btc-bot-daily-collector.service -f
+```
+
 ### SMOKE TEST
 
 ```sh
