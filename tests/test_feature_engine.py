@@ -206,10 +206,17 @@ def test_param_registry_contains_new_sweep_params() -> None:
     assert active["min_hits"].high == 5
     assert active["min_hits"].step == 1
 
-    assert "weight_sweep_detected" in frozen
-    assert "weight_reclaim_confirmed" in frozen
-    assert "always-true intercept" in (frozen["weight_sweep_detected"].reason or "")
-    assert "always-true intercept" in (frozen["weight_reclaim_confirmed"].reason or "")
+    # After SIGNAL-SCORE-RESTORE-V1: sweep/reclaim weights are ACTIVE with scoring restored
+    assert "weight_sweep_detected" in active
+    assert "weight_reclaim_confirmed" in active
+    assert active["weight_sweep_detected"].low == 0.0
+    assert active["weight_sweep_detected"].high == 1.0
+    assert active["weight_sweep_detected"].step == 0.05
+    assert active["weight_sweep_detected"].default_value == 0.35
+    assert active["weight_reclaim_confirmed"].low == 0.0
+    assert active["weight_reclaim_confirmed"].high == 1.0
+    assert active["weight_reclaim_confirmed"].step == 0.05
+    assert active["weight_reclaim_confirmed"].default_value == 0.35
 
     assert active["confluence_min"].low == 0.20
     assert active["confluence_min"].high == 0.75

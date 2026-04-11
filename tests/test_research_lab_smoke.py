@@ -1729,9 +1729,9 @@ def test_param_registry_confluence_range_updated_for_run5() -> None:
 def test_param_registry_weight_cvd_divergence_range_ceilinged_for_run5() -> None:
     registry = build_param_registry()
 
-    # P2: weight_cvd_divergence range ceilinged to [0.0, 0.50]
+    # After SIGNAL-SCORE-RESTORE-V1: range max raised to 0.75 to match baseline value (fix known issue #1)
     assert registry["weight_cvd_divergence"].low == 0.0
-    assert registry["weight_cvd_divergence"].high == 0.50
+    assert registry["weight_cvd_divergence"].high == 0.75
     assert registry["weight_cvd_divergence"].step == 0.05
 
 
