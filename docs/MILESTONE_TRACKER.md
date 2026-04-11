@@ -1,19 +1,45 @@
 # Milestone Tracker
 
-Last updated: 2026-04-10
+Last updated: 2026-04-11
 
 ## Next Milestone
 
-**Milestone:** RUN5-LAUNCH — Optuna campaign on rearchitected signal engine
-**Status:** DONE — prerequisites verified, campaign CLEAR TO LAUNCH
-**Active builder:** Cascade
-**Decision date:** 2026-04-10
-**Prerequisites in scope:**
-- Trade count floor: reject trials with trade_count < 2000 or > 10000 (structural volume lever fix)
-- Search range verification: confluence_min [0.20, 0.75], weight_cvd_divergence [0.0, 0.50], SL/TP geometry
-- Campaign: 200+ trials, start date 2023-01-01, WF protocol unchanged
+**Milestone:** RUN6-LAUNCH — Reconfigured Optuna campaign (min_trades↓, data range extended, n_trials↑)
+**Status:** ACTIVE — running on server (tmux `optimize6`, PID `71857`)
+**Active builder:** Codex
+**Decision date:** 2026-04-11
+**Commits:** `9053797` (min_trades 2000→750) + `3705d09` (launch script: study_name, n_trials, start_date)
+**Campaign config:**
+- study_name: run6-rearch-v1
+- n_trials: 300
+- start_date: 2022-01-01 (was 2023-01-01)
+- end_date: 2026-03-01
+- min_trades_full_candidate: 750 (was 2000)
+
+**Root cause fix from Run #5:** min_trades=2000 exceeded natural signal frequency (~562 trades/3yr on 2023–2026 range); bull market excluded SHORT-favorable 2022 bear data; TPE received zero reward signal.
+
+**Log:** `/home/btc-bot/btc-bot/logs/optimize_run6-rearch-v1_20260411T095752Z.log`
+**Journal:** continued from server-side file (prior trials in study may be present)
 
 ## Previous Active Milestone
+
+**Milestone:** RUN5-LAUNCH — Optuna campaign prerequisites + campaign execution
+**Status:** PREREQUISITES MVP_DONE (audit 2026-04-10, commit `3d6913b`) — **CAMPAIGN FAILED: 0 candidates, 200 trials all rejected**
+**Active builder:** Cascade
+**Decision date:** 2026-04-10
+**Prerequisites delivered:**
+- Trade count floor/ceiling: `evaluate_candidate()` rejects trials with trade_count < 2000 or > 10000
+- Search range aligned: confluence_min [0.20, 0.75], weight_cvd_divergence [0.0, 0.50]
+- direction_tfi_threshold frozen (no longer used post SIGNAL-ENGINE-REARCH-V1)
+- Campaign launched: 200 trials, start_date 2023-01-01, study_name run5-rearch-v1
+
+**Campaign result:** 0 candidates. All 200 trials returned objective values `[0.0, 0.0, 1.0]` (expectancy_r=0, profit_factor=0, max_drawdown=1.0).
+
+**Root cause:** min_trades_full_candidate=2000 exceeded natural signal frequency (~562 trades/3yr on 2023–2026 range). 2023–2026 bull market bias unfavorable for SHORT confluence → TPE received zero reward signal; could not learn parameter landscape.
+
+**Fix:** Reconfigured as Run #6 (min_trades→750, start_date→2022-01-01, n_trials→300, new study).
+
+## Previous Milestone (pre-RUN5)
 
 **Milestone:** SIGNAL-ENGINE-REARCH-V1 — Rearchitect _infer_direction: sweep_side as direction source, CVD/TFI as confluence only
 **Status:** DONE (audit 2026-04-10, commit cc0024c, 102/102 tests) — D2 FAIL (750 trades, ExpR=-0.87). Architecture correct, parameters need recalibration.
@@ -359,3 +385,5 @@ None - all blueprint stubs implemented.
 | AUDIT_014 | Tech Debt Cleanup (Resumed) - Issues #1 + #7 | 2026-04-01 | `8602727` | MVP_DONE |
 | AUDIT_015 | SERVER-DEPLOY-V2 — Hetzner cpx22 production deploy | 2026-04-08 | `713f826` | DONE |
 | AUDIT_016 | RUN4-CAMPAIGN — Run #4 Optuna results | 2026-04-10 | bfc78ba | NOT_PROMOTED |
+| AUDIT_017 | RUN5-LAUNCH prerequisites (trade count floor, search range, direction freeze) | 2026-04-10 | `3d6913b` | MVP_DONE |
+| AUDIT_018 | RUN5-CAMPAIGN — Run #5 campaign results | 2026-04-11 | — | NOT_PROMOTED (0 candidates, zero reward signal — min_trades floor structural mismatch) |
