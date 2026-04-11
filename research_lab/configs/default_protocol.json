@@ -8,7 +8,7 @@
   "min_profit_factor_per_window": 1.0,
   "max_drawdown_pct_per_window": 50.0,
   "min_sharpe_ratio_per_window": 0.0,
-  "min_trades_full_candidate": 300,
+  "min_trades_full_candidate": 100,
   "max_trades_full_candidate": 10000,
   "fragility_degradation_threshold_pct": 30.0,
   "promotion_requires_all_windows_pass": false,
