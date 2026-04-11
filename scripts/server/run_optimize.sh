@@ -42,9 +42,9 @@ sanitize_name() {
     printf '%s' "$1" | tr -c 'A-Za-z0-9._-' '_'
 }
 
-STUDY_NAME=${1:-run5-rearch-v1}
-N_TRIALS=${2:-200}
-START_DATE=${3:-2023-01-01}
+STUDY_NAME=${1:-run6-rearch-v1}
+N_TRIALS=${2:-300}
+START_DATE=${3:-2022-01-01}
 END_DATE=${4:-2026-03-01}
 MAX_SWEEP_RATE=${5:-}
 WARM_START=${6:-}
