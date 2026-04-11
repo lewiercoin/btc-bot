@@ -211,8 +211,8 @@ def test_param_registry_contains_new_sweep_params() -> None:
     assert "always-true intercept" in (frozen["weight_sweep_detected"].reason or "")
     assert "always-true intercept" in (frozen["weight_reclaim_confirmed"].reason or "")
 
-    assert active["confluence_min"].low == 0.0
-    assert active["confluence_min"].high == 2.0
+    assert active["confluence_min"].low == 0.20
+    assert active["confluence_min"].high == 0.75
     assert active["confluence_min"].step == 0.05
 
 
