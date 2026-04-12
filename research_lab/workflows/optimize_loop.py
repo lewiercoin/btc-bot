@@ -50,9 +50,6 @@ def check_signal_health(
             wick_min_atr=strategy.wick_min_atr,
             funding_window_days=strategy.funding_window_days,
             oi_z_window_days=strategy.oi_z_window_days,
-            level_min_age_bars=strategy.level_min_age_bars,
-            min_hits=strategy.min_hits,
-            sweep_proximity_atr=strategy.sweep_proximity_atr,
         )
     )
     db_uri = f"file:{source_db_path.resolve().as_posix()}?mode=ro"
