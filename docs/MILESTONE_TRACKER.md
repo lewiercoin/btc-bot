@@ -1,8 +1,27 @@
 # Milestone Tracker
 
-Last updated: 2026-04-11
+Last updated: 2026-04-12
 
 ## Next Milestone
+
+**Milestone:** SIGNAL-REVERT-V1 — Restore core signal files to commit 8f2c6f2 (WF-SNAPSHOT-CLEANUP)
+**Status:** COMMITTED — awaiting audit
+**Active builder:** Cascade
+**Decision date:** 2026-04-12
+**Commits:** `45cea8a` (restore core signal files to 8f2c6f2 + apply 7 realistic range changes + skip incompatible tests)
+**Scope:**
+- D1: Restore core signal files to 8f2c6f2 (5 files)
+- D2: Restore param_registry.py to 8f2c6f2, apply 7 realistic range changes from 6612dea
+- D3: Restore tests to 8f2c6f2, skip tests for features not present at 8f2c6f2
+- D4: Sanity backtest passed (1089 trades, non-zero PnL)
+- D5: Commit and push (done)
+- D6: Deploy and launch Run #11 (BLOCKED: research_lab infrastructure incompatible with 8f2c6f2 signal)
+
+**Known incompatibility:** research_lab/cli.py and research_lab/workflows/optimize_loop.py use level_min_age_bars, min_hits, sweep_proximity_atr which don't exist at 8f2c6f2. Scope prohibits modifying these files. Auditor to decide resolution.
+
+**Test results:** 63 passed, 24 skipped (for features not present at 8f2c6f2)
+
+## Previous Active Milestone
 
 **Milestone:** RUN6-LAUNCH — Reconfigured Optuna campaign (min_trades↓, data range extended, n_trials↑)
 **Status:** ACTIVE — running on server (tmux `optimize6`, PID `71857`)
