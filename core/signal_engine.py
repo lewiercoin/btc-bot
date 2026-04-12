@@ -9,26 +9,26 @@ from core.models import Features, RegimeState, SignalCandidate
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
-        RegimeState.NORMAL.value: ("LONG", "SHORT"),
-        RegimeState.COMPRESSION.value: ("LONG", "SHORT"),
+        RegimeState.NORMAL.value: ("LONG",),
+        RegimeState.COMPRESSION.value: ("LONG",),
         RegimeState.DOWNTREND.value: ("LONG", "SHORT"),
         RegimeState.UPTREND.value: (),
         RegimeState.CROWDED_LEVERAGE.value: ("SHORT",),
-        RegimeState.POST_LIQUIDATION.value: ("LONG", "SHORT"),
+        RegimeState.POST_LIQUIDATION.value: ("LONG",),
     }
 
 
 @dataclass(slots=True)
 class SignalConfig:
-    confluence_min: float = 0.75
+    confluence_min: float = 3.0
     min_sweep_depth_pct: float = 0.0001
     entry_offset_atr: float = 0.05
     invalidation_offset_atr: float = 0.75
     min_stop_distance_pct: float = 0.0015
     tp1_atr_mult: float = 2.5
     tp2_atr_mult: float = 4.0
-    weight_sweep_detected: float = 0.35
-    weight_reclaim_confirmed: float = 0.35
+    weight_sweep_detected: float = 1.25
+    weight_reclaim_confirmed: float = 1.25
     weight_cvd_divergence: float = 0.75
     weight_tfi_impulse: float = 0.50
     weight_force_order_spike: float = 0.40
@@ -93,11 +93,21 @@ class SignalEngine:
         )
 
     def _infer_direction(self, features: Features) -> str | None:
-        if features.sweep_side == "LOW":
-            return "SHORT"
-        if features.sweep_side == "HIGH":
-            return "LONG"
-        return None
+        inferred_direction: str | None = None
+        if features.cvd_bullish_divergence and not features.cvd_bearish_divergence:
+            inferred_direction = "LONG"
+        elif features.cvd_bearish_divergence and not features.cvd_bullish_divergence:
+            inferred_direction = "SHORT"
+        elif features.tfi_60s > self.config.direction_tfi_threshold:
+            inferred_direction = "LONG"
+        elif features.tfi_60s < self.config.direction_tfi_threshold_inverse:
+            inferred_direction = "SHORT"
+
+        if inferred_direction == "LONG" and features.sweep_side != "LOW":
+            return None
+        if inferred_direction == "SHORT" and features.sweep_side != "HIGH":
+            return None
+        return inferred_direction
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
         score = 0.0
@@ -105,10 +115,10 @@ class SignalEngine:
 
         if features.sweep_detected:
             score += self.config.weight_sweep_detected
-            reasons.append("sweep_detected")
+            reasons.append("liquidity_sweep_detected")
         if features.reclaim_detected:
             score += self.config.weight_reclaim_confirmed
-            reasons.append("reclaim_detected")
+            reasons.append("reclaim_confirmed")
 
         if direction == "LONG" and features.cvd_bullish_divergence:
             score += self.config.weight_cvd_divergence

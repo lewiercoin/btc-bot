@@ -16,12 +16,12 @@ class BotMode(StrEnum):
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
     return {
-        "normal": ("LONG", "SHORT"),
-        "compression": ("LONG", "SHORT"),
+        "normal": ("LONG",),
+        "compression": ("LONG",),
         "downtrend": ("LONG", "SHORT"),
         "uptrend": (),
         "crowded_leverage": ("SHORT",),
-        "post_liquidation": ("LONG", "SHORT"),
+        "post_liquidation": ("LONG",),
     }
 
 
@@ -57,13 +57,10 @@ class StrategyConfig:
     sweep_buf_atr: float = 0.15
     reclaim_buf_atr: float = 0.05
     wick_min_atr: float = 0.40
-    level_min_age_bars: int = 5
-    min_hits: int = 3
-    sweep_proximity_atr: float = 0.4
 
     funding_window_days: int = 60
     oi_z_window_days: int = 60
-    confluence_min: float = 0.75
+    confluence_min: float = 3.0
     ema_trend_gap_pct: float = 0.0025
     compression_atr_norm_max: float = 0.0055
     crowded_funding_extreme_pct: float = 85.0
@@ -76,8 +73,8 @@ class StrategyConfig:
     min_stop_distance_pct: float = 0.0015
     tp1_atr_mult: float = 2.5
     tp2_atr_mult: float = 4.0
-    weight_sweep_detected: float = 0.35
-    weight_reclaim_confirmed: float = 0.35
+    weight_sweep_detected: float = 1.25
+    weight_reclaim_confirmed: float = 1.25
     weight_cvd_divergence: float = 0.75
     weight_tfi_impulse: float = 0.50
     weight_force_order_spike: float = 0.40
