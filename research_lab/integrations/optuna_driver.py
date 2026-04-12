@@ -9,7 +9,7 @@ from backtest.backtest_runner import BacktestConfig
 from settings import AppSettings
 
 from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
-from research_lab.constraints import assert_valid
+from research_lab.constraints import validate_param_vector
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
 from research_lab.experiment_store import init_store, load_trials, save_trial
 from research_lab.objective import evaluate_candidate
@@ -162,8 +162,6 @@ def run_optuna_study(
     init_store(store_path)
     evaluations: list[TrialEvaluation] = []
 
-    sampler = optuna.samplers.TPESampler(seed=seed, multivariate=multivariate_tpe)
-
     if optuna_storage_path is not None:
         optuna_storage_path.parent.mkdir(parents=True, exist_ok=True)
         storage: Any = optuna.storages.JournalStorage(
@@ -171,6 +169,15 @@ def run_optuna_study(
         )
     else:
         storage = None
+
+    def _constraints_func(trial: Any) -> list[float]:
+        return list(trial.user_attrs.get("constraint_violations", []))
+
+    sampler = optuna.samplers.TPESampler(
+        seed=seed,
+        multivariate=multivariate_tpe,
+        constraints_func=_constraints_func,
+    )
 
     study = optuna.create_study(
         study_name=study_name,
@@ -196,10 +203,12 @@ def run_optuna_study(
 
         trial_id = f"{study_name}-trial-{trial.number:05d}"
         sampled_params = build_optuna_trial_params(trial)
-        try:
-            assert_valid(sampled_params)
-        except ValueError as exc:
-            rejection_reason = str(exc)
+
+        # --- Constraint violations: logical impossibilities (hard gate) ---
+        violations = validate_param_vector(sampled_params)
+        if violations:
+            rejection_reason = "; ".join(violations)
+            trial.set_user_attr("constraint_violations", [1.0] * len(violations))
             trial.set_user_attr("rejection_reason", rejection_reason)
             trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
             evaluation = dataclasses.replace(
@@ -208,7 +217,9 @@ def run_optuna_study(
             )
             evaluations.append(evaluation)
             save_trial(evaluation, store_path)
-            return (0.0, 0.0, 1.0)
+            return (-2.0, 0.1, 1.0)
+
+        trial.set_user_attr("constraint_violations", [])
 
         candidate_settings = build_candidate_settings(base_settings, sampled_params)
         snapshot_path = create_trial_snapshot(source_db_path, snapshots_dir, trial_id)
@@ -237,13 +248,22 @@ def run_optuna_study(
         if evaluation.rejected_reason is not None:
             trial.set_user_attr("rejection_reason", evaluation.rejected_reason)
         trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
-        if evaluation.rejected_reason is not None:
-            return (0.0, 0.0, 1.0)
-        return (
-            evaluation.metrics.expectancy_r,
-            evaluation.metrics.profit_factor,
-            evaluation.metrics.max_drawdown_pct,
-        )
+
+        trades = evaluation.metrics.trades_count
+        exp_r = evaluation.metrics.expectancy_r
+        pf = evaluation.metrics.profit_factor
+        dd = evaluation.metrics.max_drawdown_pct
+
+        # --- Soft Penalty: too few trades (gradient, not hard cliff) ---
+        _MIN_TRADES = int(min_trades)
+        if trades < _MIN_TRADES:
+            deficit = (_MIN_TRADES - trades) / _MIN_TRADES
+            penalty = 0.45 * (deficit ** 2)
+            exp_r = max(-1.5, exp_r - penalty)
+            pf = max(0.1, pf - 0.30 * (deficit ** 2))
+            dd = min(1.0, dd + 0.25 * (deficit ** 2))
+
+        return (exp_r, pf, dd)
 
     study.optimize(objective, n_trials=int(n_trials))
     return evaluations
