@@ -178,8 +178,8 @@ class FeatureEngine:
         lows = [float(candle["low"]) for candle in recent_15m]
         highs = [float(candle["high"]) for candle in recent_15m]
         level_tolerance = atr_15m * self.config.equal_level_tol_atr if atr_15m > 0 else 0.0
-        equal_lows = detect_equal_levels(lows, tolerance=level_tolerance, min_hits=2)
-        equal_highs = detect_equal_levels(highs, tolerance=level_tolerance, min_hits=2)
+        equal_lows = detect_equal_levels(lows, tolerance=level_tolerance, min_hits=3)
+        equal_highs = detect_equal_levels(highs, tolerance=level_tolerance, min_hits=3)
 
         sweep_detected, reclaim_detected, sweep_level, sweep_depth_pct, sweep_side = detect_sweep_reclaim(
             snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config
