@@ -23,9 +23,6 @@ class FeatureEngineConfig:
     oi_z_window_days: int = 60
     force_order_history_points: int = 180
     cvd_divergence_window_bars: int = 10
-    level_min_age_bars: int = 5
-    min_hits: int = 3
-    sweep_proximity_atr: float = 0.4
 
 
 def _mean(values: Iterable[float]) -> float:
@@ -89,34 +86,22 @@ def compute_atr(candles: list[dict], period: int) -> float:
     return _mean(window)
 
 
-def detect_equal_levels(
-    levels: list[tuple[int, float]],
-    tolerance: float,
-    min_hits: int,
-    min_age_bars: int,
-) -> list[float]:
+def detect_equal_levels(levels: list[float], tolerance: float, min_hits: int = 2) -> list[float]:
     if not levels:
         return []
-    sorted_levels = sorted(levels, key=lambda x: x[1])
-    clusters: list[list[tuple[int, float]]] = []
-    current_cluster: list[tuple[int, float]] = [sorted_levels[0]]
+    sorted_levels = sorted(float(v) for v in levels)
+    clusters: list[list[float]] = []
+    current_cluster: list[float] = [sorted_levels[0]]
 
-    for item in sorted_levels[1:]:
-        if abs(item[1] - current_cluster[-1][1]) <= tolerance:
-            current_cluster.append(item)
+    for level in sorted_levels[1:]:
+        if abs(level - current_cluster[-1]) <= tolerance:
+            current_cluster.append(level)
         else:
             clusters.append(current_cluster)
-            current_cluster = [item]
+            current_cluster = [level]
     clusters.append(current_cluster)
 
-    merged: list[float] = []
-    for cluster in clusters:
-        if len(cluster) < min_hits:
-            continue
-        indices = [idx for idx, _ in cluster]
-        if (max(indices) - min(indices)) < min_age_bars:
-            continue
-        merged.append(round(_mean([p for _, p in cluster]), 2))
+    merged = [round(_mean(cluster), 2) for cluster in clusters if len(cluster) >= min_hits]
     return merged
 
 
@@ -142,11 +127,7 @@ def detect_sweep_reclaim(
     reclaim_buffer = config.reclaim_buf_atr * atr_15m
     wick_min = config.wick_min_atr * atr_15m
 
-    proximity = config.sweep_proximity_atr * atr_15m
-
     for level in equal_lows:
-        if abs(open_price - level) > proximity:
-            continue
         swept = low_price < (level - sweep_buffer)
         reclaimed = close_price > (level + reclaim_buffer)
         wick_ok = (body_low - low_price) >= wick_min
@@ -155,8 +136,6 @@ def detect_sweep_reclaim(
             return True, bool(reclaimed and wick_ok), float(level), depth_pct, "LOW"
 
     for level in equal_highs:
-        if abs(open_price - level) > proximity:
-            continue
         swept = high_price > (level + sweep_buffer)
         reclaimed = close_price < (level - reclaim_buffer)
         wick_ok = (high_price - body_high) >= wick_min
@@ -196,21 +175,11 @@ class FeatureEngine:
         ema200_4h = compute_ema(closes_4h, self.config.ema_slow)
 
         recent_15m = snapshot.candles_15m[-self.config.equal_level_lookback :] if snapshot.candles_15m else []
-        lows = [(i, float(candle["low"])) for i, candle in enumerate(recent_15m)]
-        highs = [(i, float(candle["high"])) for i, candle in enumerate(recent_15m)]
+        lows = [float(candle["low"]) for candle in recent_15m]
+        highs = [float(candle["high"]) for candle in recent_15m]
         level_tolerance = atr_15m * self.config.equal_level_tol_atr if atr_15m > 0 else 0.0
-        equal_lows = detect_equal_levels(
-            lows,
-            tolerance=level_tolerance,
-            min_hits=self.config.min_hits,
-            min_age_bars=self.config.level_min_age_bars,
-        )
-        equal_highs = detect_equal_levels(
-            highs,
-            tolerance=level_tolerance,
-            min_hits=self.config.min_hits,
-            min_age_bars=self.config.level_min_age_bars,
-        )
+        equal_lows = detect_equal_levels(lows, tolerance=level_tolerance, min_hits=2)
+        equal_highs = detect_equal_levels(highs, tolerance=level_tolerance, min_hits=2)
 
         sweep_detected, reclaim_detected, sweep_level, sweep_depth_pct, sweep_side = detect_sweep_reclaim(
             snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config

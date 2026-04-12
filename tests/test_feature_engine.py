@@ -66,27 +66,19 @@ def _snapshot(
 
 def _low_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
     return [
-        _candle(ts - timedelta(minutes=105), 101.0, 103.0, 100.0, 102.0),
-        _candle(ts - timedelta(minutes=90),  102.0, 104.0, 101.5, 103.0),
-        _candle(ts - timedelta(minutes=75),  103.0, 104.0, 100.0, 103.5),
-        _candle(ts - timedelta(minutes=60),  103.5, 104.5, 101.0, 103.5),
-        _candle(ts - timedelta(minutes=45),  103.0, 104.0, 101.5, 103.0),
-        _candle(ts - timedelta(minutes=30),  103.0, 104.0, 100.0, 103.5),
-        _candle(ts - timedelta(minutes=15),  103.0, 103.5, 101.5, 103.0),
-        _candle(ts,                          101.0, 103.5,  97.0, 101.5),
+        _candle(ts - timedelta(minutes=60), 101.0, 103.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=45), 102.0, 104.0, 100.0, 103.0),
+        _candle(ts - timedelta(minutes=30), 103.0, 104.0, 101.0, 103.5),
+        _candle(ts - timedelta(minutes=15), 102.5, 103.0, 98.0, 101.5),
     ]
 
 
 def _high_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
     return [
-        _candle(ts - timedelta(minutes=105), 101.0, 104.0, 100.0, 102.0),
-        _candle(ts - timedelta(minutes=90),  102.0, 103.0, 101.0, 102.5),
-        _candle(ts - timedelta(minutes=75),  102.5, 104.0, 101.5, 103.0),
-        _candle(ts - timedelta(minutes=60),  103.0, 103.5, 101.5, 103.0),
-        _candle(ts - timedelta(minutes=45),  103.0, 103.5, 101.0, 103.0),
-        _candle(ts - timedelta(minutes=30),  103.0, 104.0, 101.5, 103.5),
-        _candle(ts - timedelta(minutes=15),  103.5, 103.5, 101.5, 103.0),
-        _candle(ts,                          103.0, 107.0, 102.5, 102.0),
+        _candle(ts - timedelta(minutes=60), 100.0, 104.0, 99.0, 101.0),
+        _candle(ts - timedelta(minutes=45), 101.0, 104.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=30), 102.0, 103.0, 101.0, 102.5),
+        _candle(ts - timedelta(minutes=15), 102.5, 106.0, 101.5, 102.0),
     ]
 
 
@@ -175,52 +167,6 @@ def test_compute_features_marks_high_sweep_side() -> None:
 
     assert features.sweep_detected is True
     assert features.sweep_side == "HIGH"
-
-
-def test_level_min_age_bars_filters_short_span_cluster() -> None:
-    from core.feature_engine import detect_equal_levels
-
-    levels_short = [(0, 100.0), (1, 100.0), (2, 100.0), (3, 100.0)]
-    result = detect_equal_levels(levels_short, tolerance=1.0, min_hits=3, min_age_bars=5)
-    assert result == []
-
-    levels_ok = [(0, 100.0), (1, 100.0), (2, 100.0), (3, 100.0), (4, 100.0), (5, 100.0)]
-    result2 = detect_equal_levels(levels_ok, tolerance=1.0, min_hits=3, min_age_bars=5)
-    assert result2 == [100.0]
-
-
-def test_param_registry_contains_new_sweep_params() -> None:
-    from research_lab.param_registry import build_param_registry, get_active_params, get_frozen_params
-
-    build_param_registry.cache_clear()
-    active = get_active_params()
-    frozen = get_frozen_params()
-
-    assert "level_min_age_bars" in active
-    assert active["level_min_age_bars"].low == 2
-    assert active["level_min_age_bars"].high == 20
-    assert active["level_min_age_bars"].step == 1
-
-    assert "min_hits" in active
-    assert active["min_hits"].low == 2
-    assert active["min_hits"].high == 5
-    assert active["min_hits"].step == 1
-
-    # After SIGNAL-SCORE-RESTORE-V1: sweep/reclaim weights are ACTIVE with scoring restored
-    assert "weight_sweep_detected" in active
-    assert "weight_reclaim_confirmed" in active
-    assert active["weight_sweep_detected"].low == 0.0
-    assert active["weight_sweep_detected"].high == 1.0
-    assert active["weight_sweep_detected"].step == 0.05
-    assert active["weight_sweep_detected"].default_value == 0.35
-    assert active["weight_reclaim_confirmed"].low == 0.0
-    assert active["weight_reclaim_confirmed"].high == 1.0
-    assert active["weight_reclaim_confirmed"].step == 0.05
-    assert active["weight_reclaim_confirmed"].default_value == 0.35
-
-    assert active["confluence_min"].low == 0.20
-    assert active["confluence_min"].high == 0.75
-    assert active["confluence_min"].step == 0.05
 
 
 def test_cvd_divergence_uses_windowed_swing_reference_not_last_bar_only() -> None:
