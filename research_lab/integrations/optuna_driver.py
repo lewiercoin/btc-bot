@@ -263,6 +263,18 @@ def run_optuna_study(
             pf = max(0.1, pf - 0.30 * (deficit ** 2))
             dd = min(1.0, dd + 0.25 * (deficit ** 2))
 
+        # --- Anti-overfitting guard: cap PF > 5.0, penalize zero-loss regimes ---
+        if pf > 5.0:
+            pf = 5.0
+        if pf > 3.0 and trades >= 80:
+            overfit_penalty = (pf - 3.0) * 0.8
+            exp_r = exp_r - overfit_penalty
+            pf = pf - overfit_penalty * 0.6
+
+        exp_r = max(-1.5, min(2.0, exp_r))
+        pf = max(0.1, min(5.0, pf))
+        dd = max(0.0, min(1.0, dd))
+
         return (exp_r, pf, dd)
 
     study.optimize(objective, n_trials=int(n_trials))
