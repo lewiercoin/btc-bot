@@ -135,6 +135,17 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### DASHBOARD_FIX_LIVE
+**Status:** DONE (2026-04-13)
+**Builder:** Cascade
+**What:** Fixed dashboard external access. systemd service had `--host 127.0.0.1` (localhost only). Changed to `--host 0.0.0.0` in `/etc/systemd/system/btc-bot-dashboard.service`, daemon-reloaded, restarted service.
+**Verified:**
+- Port 8080 now listening on `0.0.0.0:8080` (all interfaces) — externally accessible ✅
+- Dashboard service: active (running) PID 132835 ✅
+- Bot service: active (running) PID 128229, mode PAPER, uninterrupted ✅
+- `/api/status` returns dashboard_version: m3, mode: PAPER ✅
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### PAPER_TRADING_ACTIVATION_DEPLOY
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
