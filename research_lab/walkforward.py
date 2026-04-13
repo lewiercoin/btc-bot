@@ -53,6 +53,7 @@ def build_windows(
     train_days = int(protocol["train_days"])
     validation_days = int(protocol["validation_days"])
     step_days = int(protocol["step_days"])
+    window_mode = str(protocol.get("window_mode", "rolling")).strip().lower()
 
     start = _parse_iso_datetime(data_start, is_end=False)
     end = _parse_iso_datetime(data_end, is_end=True)
@@ -60,8 +61,16 @@ def build_windows(
     windows: list[WalkForwardWindow] = []
     cursor = start
     while True:
-        train_start = cursor
-        train_end = train_start + timedelta(days=train_days)
+        if window_mode == "anchored_expanding":
+            train_start = start
+        elif window_mode == "rolling":
+            train_start = cursor
+        else:
+            raise ValueError(
+                f"Unsupported window_mode={window_mode!r}. Use 'rolling' or 'anchored_expanding'."
+            )
+
+        train_end = cursor + timedelta(days=train_days)
         validation_start = train_end
         validation_end = validation_start + timedelta(days=validation_days)
         if validation_end > end:

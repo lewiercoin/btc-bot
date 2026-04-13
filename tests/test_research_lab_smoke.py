@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import sqlite3
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -30,6 +31,7 @@ from research_lab.types import (
     WalkForwardWindow,
 )
 from research_lab import autoresearch_loop as autoresearch_loop_module
+from research_lab.integrations import optuna_driver as optuna_driver_module
 from research_lab import walkforward as walkforward_module
 from research_lab.workflows import optimize_loop as optimize_loop_module
 from research_lab.workflows import replay_candidate as replay_candidate_module
@@ -123,6 +125,34 @@ class _FakeSnapshotConn:
         return None
 
 
+class _FakeOptunaTrial:
+    def __init__(self, number: int) -> None:
+        self.number = number
+        self.user_attrs: dict[str, object] = {}
+
+    def set_user_attr(self, key: str, value: object) -> None:
+        self.user_attrs[key] = value
+
+
+class _FakeOptunaStudy:
+    def __init__(self) -> None:
+        self.metric_names: list[str] | None = None
+        self.trials: list[_FakeOptunaTrial] = []
+        self.results: list[tuple[float, float, float]] = []
+
+    def set_metric_names(self, names: list[str]) -> None:
+        self.metric_names = names
+
+    def enqueue_trial(self, params: dict[str, object]) -> None:
+        return None
+
+    def optimize(self, objective, n_trials: int) -> None:
+        for number in range(int(n_trials)):
+            trial = _FakeOptunaTrial(number)
+            self.trials.append(trial)
+            self.results.append(objective(trial))
+
+
 def _patch_autoresearch_snapshot_io(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         autoresearch_loop_module,
@@ -152,6 +182,9 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["session_end_hour_utc"].status == PARAM_STATUS_FROZEN
     assert registry["allow_long_in_uptrend"].status == PARAM_STATUS_ACTIVE
     assert registry["allow_long_in_uptrend"].domain_type == "bool"
+    assert registry["weight_ema_trend_alignment"].status == PARAM_STATUS_ACTIVE
+    assert registry["weight_ema_trend_alignment"].low == 0.0
+    assert registry["weight_ema_trend_alignment"].high == 5.0
     assert registry["ema_trend_gap_pct"].default_value == 0.0025
     assert registry["compression_atr_norm_max"].default_value == 0.0055
     assert registry["crowded_funding_extreme_pct"].default_value == 85.0
@@ -160,6 +193,188 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert "allow_long_in_uptrend" in get_active_params()
     assert "ema_trend_gap_pct" in get_active_params()
     assert "compression_atr_norm_max" in get_active_params()
+    assert "weight_ema_trend_alignment" in get_active_params()
+
+
+def test_build_windows_defaults_to_rolling_mode() -> None:
+    windows = walkforward_module.build_windows(
+        data_start="2025-01-01",
+        data_end="2025-07-01",
+        protocol={
+            "train_days": 90,
+            "validation_days": 30,
+            "step_days": 30,
+        },
+    )
+
+    assert windows == [
+        WalkForwardWindow(
+            train_start="2025-01-01T00:00:00+00:00",
+            train_end="2025-04-01T00:00:00+00:00",
+            validation_start="2025-04-01T00:00:00+00:00",
+            validation_end="2025-05-01T00:00:00+00:00",
+        ),
+        WalkForwardWindow(
+            train_start="2025-01-31T00:00:00+00:00",
+            train_end="2025-05-01T00:00:00+00:00",
+            validation_start="2025-05-01T00:00:00+00:00",
+            validation_end="2025-05-31T00:00:00+00:00",
+        ),
+        WalkForwardWindow(
+            train_start="2025-03-02T00:00:00+00:00",
+            train_end="2025-05-31T00:00:00+00:00",
+            validation_start="2025-05-31T00:00:00+00:00",
+            validation_end="2025-06-30T00:00:00+00:00",
+        ),
+    ]
+
+
+def test_build_windows_supports_anchored_expanding_mode() -> None:
+    windows = walkforward_module.build_windows(
+        data_start="2022-01-01",
+        data_end="2026-03-01",
+        protocol={
+            "window_mode": "anchored_expanding",
+            "train_days": 730,
+            "validation_days": 365,
+            "step_days": 365,
+        },
+    )
+
+    assert windows == [
+        WalkForwardWindow(
+            train_start="2022-01-01T00:00:00+00:00",
+            train_end="2024-01-01T00:00:00+00:00",
+            validation_start="2024-01-01T00:00:00+00:00",
+            validation_end="2024-12-31T00:00:00+00:00",
+        ),
+        WalkForwardWindow(
+            train_start="2022-01-01T00:00:00+00:00",
+            train_end="2024-12-31T00:00:00+00:00",
+            validation_start="2024-12-31T00:00:00+00:00",
+            validation_end="2025-12-31T00:00:00+00:00",
+        ),
+    ]
+
+
+def _make_trial_evaluation(*, trades_count: int, rejected_reason: str | None) -> TrialEvaluation:
+    return TrialEvaluation(
+        trial_id="raw-evaluation",
+        params={},
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.2,
+            profit_factor=1.5,
+            max_drawdown_pct=0.1,
+            trades_count=trades_count,
+            sharpe_ratio=1.0,
+            pnl_abs=100.0,
+            win_rate=0.5,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=rejected_reason,
+    )
+
+
+def _run_optuna_driver_case(
+    *,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    evaluation: TrialEvaluation,
+) -> tuple[_FakeOptunaStudy, list[TrialEvaluation]]:
+    study = _FakeOptunaStudy()
+    saved_trials: list[TrialEvaluation] = []
+    fake_optuna = SimpleNamespace(
+        samplers=SimpleNamespace(TPESampler=lambda **kwargs: object()),
+        create_study=lambda **kwargs: study,
+    )
+
+    monkeypatch.setattr(optuna_driver_module, "_require_optuna", lambda: fake_optuna)
+    monkeypatch.setattr(optuna_driver_module, "build_optuna_trial_params", lambda trial: {})
+    monkeypatch.setattr(optuna_driver_module, "validate_param_vector", lambda params: [])
+    monkeypatch.setattr(optuna_driver_module, "build_candidate_settings", lambda base_settings, params: base_settings)
+    monkeypatch.setattr(
+        optuna_driver_module,
+        "create_trial_snapshot",
+        lambda *args, **kwargs: tmp_path / "snapshot.db",
+    )
+    monkeypatch.setattr(optuna_driver_module, "open_snapshot_connection", lambda _: _FakeSnapshotConn())
+    monkeypatch.setattr(optuna_driver_module, "verify_required_tables", lambda conn: None)
+    monkeypatch.setattr(optuna_driver_module, "evaluate_candidate", lambda *args, **kwargs: evaluation)
+    monkeypatch.setattr(optuna_driver_module, "init_store", lambda *args, **kwargs: None)
+    monkeypatch.setattr(
+        optuna_driver_module,
+        "save_trial",
+        lambda evaluation, store_path: saved_trials.append(evaluation),
+    )
+
+    settings = load_settings(project_root=tmp_path)
+    optuna_driver_module.run_optuna_study(
+        source_db_path=tmp_path / "source.db",
+        store_path=tmp_path / "research_lab.db",
+        snapshots_dir=tmp_path / "snapshots",
+        backtest_config=BacktestConfig(
+            start_date="2022-01-01",
+            end_date="2026-03-01",
+            symbol=settings.strategy.symbol,
+        ),
+        base_settings=settings,
+        n_trials=1,
+        study_name="run13-test",
+        min_trades=100,
+    )
+    return study, saved_trials
+
+
+def test_run_optuna_study_hard_blocks_trials_below_80_trades(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    study, saved_trials = _run_optuna_driver_case(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        evaluation=_make_trial_evaluation(
+            trades_count=79,
+            rejected_reason="MIN_TRADES_NOT_MET: trades_count=79 < min_trades=100",
+        ),
+    )
+
+    assert study.metric_names == ["expectancy_r", "profit_factor", "max_drawdown_pct"]
+    assert study.results == [(-2.0, 0.1, 1.0)]
+    assert study.trials[0].user_attrs["constraint_violations"] == [1.0]
+    assert study.trials[0].user_attrs["rejection_reason"] == (
+        "MIN_TRADES_HARD_BLOCK: trades_count=79 < hard_min_trades=80"
+    )
+    assert saved_trials[0].metrics.trades_count == 79
+
+
+def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    study, saved_trials = _run_optuna_driver_case(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        evaluation=_make_trial_evaluation(
+            trades_count=85,
+            rejected_reason="MIN_TRADES_NOT_MET: trades_count=85 < min_trades=100",
+        ),
+    )
+
+    exp_r, profit_factor, max_drawdown_pct = study.results[0]
+    assert exp_r == pytest.approx(0.189875)
+    assert profit_factor == pytest.approx(1.49325)
+    assert max_drawdown_pct == pytest.approx(0.105625)
+    assert study.trials[0].user_attrs["constraint_violations"] == []
+    assert study.trials[0].user_attrs["rejection_reason"] == (
+        "MIN_TRADES_NOT_MET: trades_count=85 < min_trades=100"
+    )
+    assert saved_trials[0].metrics.trades_count == 85
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
