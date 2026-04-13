@@ -135,6 +135,33 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### PAPER_BOT_MANUAL_RESTART
+**Status:** DONE (2026-04-14)
+**Builder:** Cascade
+**What:** Simple restart of btc-bot.service (paper mode) without any code changes to verify current state.
+**Status before restart:**
+- Active: active (running) since 2026-04-13 22:11:38 UTC (1h 16min uptime)
+- PID: 134513
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
+- Safe_mode: true (startup recovery entered safe mode)
+- Websocket: Connected to wss://fstream.binance.com/stream
+**Restart executed:**
+- systemctl restart btc-bot → successful
+- Active: active (running) since 2026-04-13 23:28:05 UTC
+- PID: 137248 (new process)
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718 (unchanged)
+- Safe_mode: true (startup recovery entered safe mode, then snapshot_build_failed)
+- Websocket: Connected to wss://fstream.binance.com/stream
+**Status after 30 seconds (/api/status):**
+- safe_mode: true
+- safe_mode_reason: "snapshot_build_failed:Failed request GET /fapi/v1/ticker/bookTicker after retries"
+- healthy: false
+- mode: PAPER
+- config_hash: e8c7180d... (unchanged)
+- last_trade_at: 2026-03-29T13:36:19+00:00 (no new trades)
+**Conclusion:** Bot restarts successfully but immediately enters safe_mode due to Binance API connectivity issue (bookTicker endpoint blocked by CloudFront). Config_hash remains e8c7180d... (Trial #63 configuration). No code changes were made. The issue is infrastructure-related (server IP blocked by Binance CloudFront), not code-related.
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### VPN_PROTON_DIAGNOSTICS
 **Status:** DONE (2026-04-14)
 **Builder:** Cascade
