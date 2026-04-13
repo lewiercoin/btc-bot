@@ -1,8 +1,9 @@
 {
   "walkforward_mode": "post_hoc",
-  "train_days": 180,
-  "validation_days": 90,
-  "step_days": 45,
+  "window_mode": "anchored_expanding",
+  "train_days": 730,
+  "validation_days": 365,
+  "step_days": 365,
   "min_trades_per_window": 5,
   "min_expectancy_r_per_window": 0.0,
   "min_profit_factor_per_window": 1.0,

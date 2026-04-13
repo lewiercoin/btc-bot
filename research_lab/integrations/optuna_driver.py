@@ -22,6 +22,9 @@ if TYPE_CHECKING:
     import optuna
 
 
+_HARD_MIN_TRADES_FLOOR = 80
+
+
 def _require_optuna():
     try:
         import optuna  # type: ignore
@@ -254,7 +257,16 @@ def run_optuna_study(
         pf = evaluation.metrics.profit_factor
         dd = evaluation.metrics.max_drawdown_pct
 
-        # --- Soft Penalty: too few trades (gradient, not hard cliff) ---
+        hard_min_trades = min(_HARD_MIN_TRADES_FLOOR, int(min_trades))
+        if trades < hard_min_trades:
+            rejection_reason = (
+                f"MIN_TRADES_HARD_BLOCK: trades_count={trades} < hard_min_trades={hard_min_trades}"
+            )
+            trial.set_user_attr("constraint_violations", [1.0])
+            trial.set_user_attr("rejection_reason", rejection_reason)
+            return (-2.0, 0.1, 1.0)
+
+        # --- Soft Penalty: too few trades above the hard floor ---
         _MIN_TRADES = int(min_trades)
         if trades < _MIN_TRADES:
             deficit = (_MIN_TRADES - trades) / _MIN_TRADES
