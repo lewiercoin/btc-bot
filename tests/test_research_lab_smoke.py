@@ -428,6 +428,114 @@ def test_enqueue_warm_start_trials_falls_back_to_history_when_protocol_hash_chan
     assert study.enqueued_params[1]["allow_long_in_uptrend"] is False
 
 
+def test_enqueue_warm_start_fallback_skips_incompatible_and_overfit_history(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    study = _FakeOptunaStudy()
+    store_path = tmp_path / "research_lab.db"
+    store_path.write_text("", encoding="utf-8")
+    incompatible_trial = TrialEvaluation(
+        trial_id="historical-incompatible",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 9.9,
+            "max_open_positions": 4,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.9,
+            profit_factor=1.8,
+            max_drawdown_pct=0.3,
+            trades_count=250,
+            sharpe_ratio=2.0,
+            pnl_abs=1000.0,
+            win_rate=0.5,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="old-hash",
+    )
+    overfit_trial = TrialEvaluation(
+        trial_id="historical-overfit",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.5,
+            "tp2_atr_mult": 4.0,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=1.5,
+            profit_factor=999999.0,
+            max_drawdown_pct=0.2,
+            trades_count=120,
+            sharpe_ratio=4.0,
+            pnl_abs=10000.0,
+            win_rate=0.9,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="old-hash",
+    )
+    compatible_trial = TrialEvaluation(
+        trial_id="historical-run12-26",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.5,
+            "tp2_atr_mult": 4.0,
+            "weight_ema_trend_alignment": 0.25,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.6363,
+            profit_factor=1.6165,
+            max_drawdown_pct=0.4049,
+            trades_count=339,
+            sharpe_ratio=3.33,
+            pnl_abs=118433.35,
+            win_rate=0.277,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="run12-protocol-hash",
+    )
+
+    monkeypatch.setattr(
+        optuna_driver_module,
+        "load_trials",
+        lambda store_path: [incompatible_trial, overfit_trial, compatible_trial],
+    )
+    monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
+    monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
+
+    optuna_driver_module._enqueue_warm_start_trials(
+        study,
+        base_settings=settings,
+        store_path=store_path,
+        protocol_hash="run13-protocol-hash",
+        warm_start_top_n=3,
+    )
+
+    assert study.enqueued_params[0] == compatible_trial.params
+    assert study.enqueued_params[1]["allow_long_in_uptrend"] is False
+
+
 def test_constraints_rejects_invalid_vectors() -> None:
     violations = validate_param_vector(
         {

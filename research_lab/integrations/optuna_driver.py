@@ -35,6 +35,60 @@ def _require_optuna():
     return optuna
 
 
+def _is_param_value_within_spec(value: Any, spec: Any) -> bool:
+    if spec.domain_type == "bool":
+        return isinstance(value, bool)
+    if spec.domain_type == "int":
+        if isinstance(value, bool):
+            return False
+        if not isinstance(value, int):
+            return False
+        if spec.low is not None and value < int(spec.low):
+            return False
+        if spec.high is not None and value > int(spec.high):
+            return False
+        return True
+    if spec.domain_type == "float":
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            return False
+        numeric = float(value)
+        if spec.low is not None and numeric < float(spec.low):
+            return False
+        if spec.high is not None and numeric > float(spec.high):
+            return False
+        return True
+    if spec.domain_type == "categorical":
+        choices = spec.choices if spec.choices is not None else ()
+        return value in choices if choices else True
+    return True
+
+
+def _is_warm_start_candidate_compatible(params: dict[str, Any], *, credible_history: bool) -> bool:
+    active_specs = get_active_params()
+    warm_params = {k: v for k, v in params.items() if k in active_specs}
+    if not warm_params:
+        return False
+    for name, value in warm_params.items():
+        if not _is_param_value_within_spec(value, active_specs[name]):
+            return False
+    violations = validate_param_vector(warm_params)
+    if violations:
+        return False
+    if credible_history:
+        tp1 = warm_params.get("tp1_atr_mult")
+        tp2 = warm_params.get("tp2_atr_mult")
+        if tp1 is not None and tp2 is not None and float(tp1) >= float(tp2):
+            return False
+    return True
+
+
+def _is_credible_history_trial(trial: TrialEvaluation) -> bool:
+    return (
+        trial.metrics.trades_count >= _HARD_MIN_TRADES_FLOOR
+        and trial.metrics.profit_factor <= 3.0
+    )
+
+
 def build_optuna_trial_params(trial: optuna.Trial) -> dict[str, Any]:
     """Samples ACTIVE params from param_registry using trial.suggest_*."""
 
@@ -122,11 +176,28 @@ def _enqueue_warm_start_trials(
     if store_path.exists():
         existing = load_trials(store_path)
         if protocol_hash is not None:
-            candidates = [t for t in existing if t.protocol_hash == protocol_hash and t.rejected_reason is None]
+            candidates = [
+                t
+                for t in existing
+                if t.protocol_hash == protocol_hash
+                and t.rejected_reason is None
+                and _is_warm_start_candidate_compatible(t.params, credible_history=False)
+            ]
         else:
-            candidates = [t for t in existing if t.rejected_reason is None]
+            candidates = [
+                t
+                for t in existing
+                if t.rejected_reason is None
+                and _is_warm_start_candidate_compatible(t.params, credible_history=False)
+            ]
         if not candidates and protocol_hash is not None:
-            candidates = [t for t in existing if t.rejected_reason is None]
+            candidates = [
+                t
+                for t in existing
+                if t.rejected_reason is None
+                and _is_warm_start_candidate_compatible(t.params, credible_history=True)
+                and _is_credible_history_trial(t)
+            ]
         pareto = rank_pareto_candidates(compute_pareto_frontier(candidates))
         for winner in pareto[:warm_start_top_n]:
             warm_params = {k: v for k, v in winner.params.items() if k in active_names}
