@@ -135,6 +135,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### DASHBOARD_PROD_POLISH
+**Status:** DONE (commit db340f0, 2026-04-13)
+**Builder:** Cascade
+**What:** Signal traceability panel (reasons[], regime, confluence_score, promoted status), daily metrics panel, alerts panel, CSV export for trades+signals, dark mode toggle, config hash display, enriched trade columns (regime, confluence, exit_reason, fees, mae, mfe). 7 new DB reader functions + 7 new tests.
+**Why:** Dashboard M1/M3 MVP_DONE but did not surface existing DB data (signal_candidates, daily_metrics, alerts_errors tables already populated by core engine). Polish milestone to expose all traceable data and harden UI.
+**Files changed:** dashboard/db_reader.py, dashboard/server.py, dashboard/static/index.html, dashboard/static/app.js, dashboard/static/style.css, tests/test_dashboard_db_reader.py
+**Tests:** 79 passed, 24 skipped, 0 failed (7 new tests for signals/metrics/alerts readers)
+**Layer separation:** Zero imports from core/**, execution/**, risk/**, governance/**. All reads via storage.* + SQL only.
+
 ### SIGNAL-REVERT-V1 + SIGNAL-REVERT-V1-FIX
 **Status:** DONE (commits 45cea8a + 51513f2, 2026-04-12)
 **What:** Restored core signal files to commit 8f2c6f2 (pre-SWEEP-RECLAIM-FIX-V1). Applied cherry-pick min_hits=3. Fixed optimize_loop.py incompatibility (removed deleted FeatureEngineConfig fields).
