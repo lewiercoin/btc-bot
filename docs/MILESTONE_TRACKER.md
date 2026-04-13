@@ -135,6 +135,43 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### PAPER_BOT_SAFE_RESTART
+**Status:** BLOCKED (2026-04-13)
+**Builder:** Cascade
+**What:** Attempted to restart btc-bot.service to exit safe_mode and start generating Trial #63 data. Bot restarted successfully but immediately re-enters safe_mode due to Binance API connectivity issue.
+**Status before restart:**
+- Active: active (running) since 17:48:24 UTC (4h 23min uptime)
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
+- Safe_mode: true (snapshot_build_failed: bookTicker)
+**Restart executed:**
+- systemctl restart btc-bot → successful
+- Active: active (running) since 22:11:38 UTC
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718 (unchanged)
+- Safe_mode: true (snapshot_build_failed: bookTicker) — IMMEDIATE RE-ENTRY
+**Root cause:**
+- Bot cannot reach Binance Futures API endpoint `/fapi/v1/ticker/bookTicker`
+- Error: "Failed request GET /fapi/v1/ticker/bookTicker after retries"
+- This is a network/infrastructure issue, not a configuration issue
+- Restart cannot fix this — the bot needs working Binance API connectivity
+**Config_hash mismatch:**
+- Expected: f807b7057... (Trial #63)
+- Actual: e8c7180d... (current server configuration)
+- The bot is using a different config_hash than expected
+- This may require settings deployment or configuration update on the server
+**Database verification:**
+- storage/btc_bot.db exists (697 MB) — correct location
+- Empty btc-bot.db and storage.db files in root are artifacts (ignored)
+- Bot is correctly using storage/btc_bot.db
+**Acceptance criteria NOT met:**
+- ❌ Bot did NOT exit safe_mode (re-entered immediately due to API failure)
+- ❌ Config_hash is NOT f807b7057... (it's e8c7180d...)
+- ❌ Dashboard still shows old data (no new signals/trades generated)
+**Next steps required:**
+1. Fix Binance API connectivity (network/firewall/VPN issue)
+2. Verify/update server configuration to use Trial #63 config_hash (f807b7057...)
+3. Once API is reachable, bot should exit safe_mode automatically
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### DASHBOARD_DATA_INTEGRITY_DEPLOY
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
