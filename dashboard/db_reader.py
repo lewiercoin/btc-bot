@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -54,6 +54,22 @@ def _parse_json_list(value: Any) -> list:
         return result if isinstance(result, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
+
+
+def _get_current_config_hash(conn: sqlite3.Connection) -> str | None:
+    """Read the current config_hash from the most recent trade_log entry (or signal_candidates as fallback)."""
+    # Try to get from most recent trade first
+    row = conn.execute(
+        "SELECT config_hash FROM trade_log WHERE config_hash IS NOT NULL ORDER BY closed_at DESC LIMIT 1"
+    ).fetchone()
+    if row:
+        return row["config_hash"]
+    
+    # Fallback to most recent signal
+    row = conn.execute(
+        "SELECT config_hash FROM signal_candidates WHERE config_hash IS NOT NULL ORDER BY timestamp DESC LIMIT 1"
+    ).fetchone()
+    return row["config_hash"] if row else None
 
 
 def read_status_from_conn(conn: sqlite3.Connection) -> dict[str, Any]:
@@ -111,18 +127,21 @@ def read_positions_from_conn(conn: sqlite3.Connection, *, now: datetime | None =
     }
 
 
-def read_trades_from_conn(conn: sqlite3.Connection, *, limit: int = 50) -> dict[str, Any]:
-    rows = conn.execute(
-        """
+def read_trades_from_conn(conn: sqlite3.Connection, *, limit: int = 50, config_hash: str | None = None) -> dict[str, Any]:
+    current_config = config_hash or _get_current_config_hash(conn)
+    query = """
         SELECT trade_id, direction, entry_price, exit_price, pnl_abs, pnl_r, closed_at,
-               regime, confluence_score, exit_reason, fees_total, mae, mfe
+               regime, confluence_score, exit_reason, fees_total, mae, mfe, config_hash
         FROM trade_log
         WHERE closed_at IS NOT NULL
-        ORDER BY closed_at DESC
-        LIMIT ?
-        """,
-        (int(limit),),
-    ).fetchall()
+    """
+    params = []
+    if current_config:
+        query += " AND config_hash = ?"
+        params.append(current_config)
+    query += " ORDER BY closed_at DESC LIMIT ?"
+    params.append(int(limit))
+    rows = conn.execute(query, tuple(params)).fetchall()
 
     return {
         "trades": [
@@ -141,15 +160,16 @@ def read_trades_from_conn(conn: sqlite3.Connection, *, limit: int = 50) -> dict[
                 "fees_total": float(row["fees_total"]) if row["fees_total"] is not None else 0.0,
                 "mae": float(row["mae"]) if row["mae"] is not None else 0.0,
                 "mfe": float(row["mfe"]) if row["mfe"] is not None else 0.0,
+                "config_hash": str(row["config_hash"]) if "config_hash" in row.keys() else None,
             }
             for row in rows
         ]
     }
 
 
-def read_signals_from_conn(conn: sqlite3.Connection, *, limit: int = 20) -> dict[str, Any]:
-    rows = conn.execute(
-        """
+def read_signals_from_conn(conn: sqlite3.Connection, *, limit: int = 20, config_hash: str | None = None) -> dict[str, Any]:
+    current_config = config_hash or _get_current_config_hash(conn)
+    query = """
         SELECT
             sc.signal_id,
             sc.timestamp,
@@ -166,11 +186,14 @@ def read_signals_from_conn(conn: sqlite3.Connection, *, limit: int = 20) -> dict
             es.governance_notes_json
         FROM signal_candidates sc
         LEFT JOIN executable_signals es ON sc.signal_id = es.signal_id
-        ORDER BY sc.timestamp DESC
-        LIMIT ?
-        """,
-        (int(limit),),
-    ).fetchall()
+    """
+    params = []
+    if current_config:
+        query += " WHERE sc.config_hash = ?"
+        params.append(current_config)
+    query += " ORDER BY sc.timestamp DESC LIMIT ?"
+    params.append(int(limit))
+    rows = conn.execute(query, tuple(params)).fetchall()
 
     return {
         "signals": [
@@ -196,14 +219,17 @@ def read_signals_from_conn(conn: sqlite3.Connection, *, limit: int = 20) -> dict
 
 
 def read_daily_metrics_from_conn(conn: sqlite3.Connection, *, days: int = 14) -> dict[str, Any]:
+    # Filter to last 7 days for paper trading dashboard (metrics table has no config_hash)
+    cutoff_date = (datetime.now(timezone.utc) - timedelta(days=7)).strftime("%Y-%m-%d")
     rows = conn.execute(
         """
         SELECT date, trades_count, wins, losses, pnl_abs, pnl_r_sum, daily_dd_pct, expectancy_r
         FROM daily_metrics
+        WHERE date >= ?
         ORDER BY date DESC
         LIMIT ?
         """,
-        (int(days),),
+        (cutoff_date, int(days)),
     ).fetchall()
 
     return {
@@ -224,14 +250,17 @@ def read_daily_metrics_from_conn(conn: sqlite3.Connection, *, days: int = 14) ->
 
 
 def read_alerts_from_conn(conn: sqlite3.Connection, *, limit: int = 20) -> dict[str, Any]:
+    # Filter to last 24 hours for paper trading dashboard (alerts table has no config_hash)
+    cutoff_timestamp = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
     rows = conn.execute(
         """
         SELECT id, timestamp, type, severity, component, message
         FROM alerts_errors
+        WHERE timestamp >= ?
         ORDER BY timestamp DESC
         LIMIT ?
         """,
-        (int(limit),),
+        (cutoff_timestamp, int(limit)),
     ).fetchall()
 
     return {
