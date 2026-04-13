@@ -76,6 +76,15 @@ python -m research_lab build-report \
   --output-json research_lab_runs/reports/search-v1.json
 ```
 
+### Cleanup starych snapshotów i benchmarków
+
+```bash
+python -m research_lab cleanup-artifacts --days 7 --dry-run
+python -m research_lab cleanup-artifacts --days 7
+```
+
+Polecenie czyści tylko generowane artefakty z `research_lab/snapshots`, `research_lab_runs/*/snapshots` oraz `research_lab_runs/snapshot_benchmark/`. Nie usuwa `storage/*.db`, `research_lab/research_lab.db` ani store'ów wyników w `research_lab_runs/*/store.db`.
+
 ### Replay wybranego kandydata
 
 ```bash

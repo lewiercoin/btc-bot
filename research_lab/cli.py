@@ -12,6 +12,7 @@ from backtest.backtest_runner import BacktestConfig
 from settings import load_settings
 
 from research_lab.approval import write_approval_bundle
+from research_lab.artifact_cleanup import cleanup_artifacts
 from research_lab.autoresearch_loop import run_autoresearch_loop
 from research_lab.constants import PROMOTION_BLOCKING_RISKS
 from research_lab.reporter import build_experiment_report, write_experiment_report
@@ -122,6 +123,11 @@ def _build_parser() -> argparse.ArgumentParser:
     report.add_argument("--store-path", type=Path, default=None)
     report.add_argument("--output-json", type=Path, required=True)
 
+    cleanup = sub.add_parser("cleanup-artifacts", help="Delete stale generated Research Lab snapshot artifacts.")
+    cleanup.add_argument("--project-root", type=Path, default=None)
+    cleanup.add_argument("--days", type=int, default=7)
+    cleanup.add_argument("--dry-run", action="store_true", default=False)
+
     approval = sub.add_parser("build-approval-bundle", help="Generate human approval artifacts.")
     approval.add_argument("--candidate-id", required=True, type=str)
     approval.add_argument("--store-path", type=Path, default=None)
@@ -224,6 +230,16 @@ def main(argv: list[str] | None = None) -> None:
         report = build_experiment_report(store_path)
         output_path = write_experiment_report(report=report, output_path=args.output_json)
         print(output_path)
+        return
+
+    if args.command == "cleanup-artifacts":
+        project_root = args.project_root if args.project_root is not None else settings.storage.project_root
+        summary = cleanup_artifacts(
+            project_root=project_root,
+            older_than_days=int(args.days),
+            dry_run=bool(args.dry_run),
+        )
+        print(json.dumps(summary, indent=2, sort_keys=True))
         return
 
     if args.command == "build-approval-bundle":
