@@ -183,6 +183,26 @@ Grok makes the technical selection. Builder (Codex or Cascade) can flag implemen
 5. If VETO: Grok re-evaluates, presents revised recommendation
 ```
 
+### Mandatory Builder Exit Protocol (od 2026-04-13)
+
+Każdy builder (Cascade / Codex) po zakończeniu milestone musi:
+- wykonać `git push origin <branch>`
+- uruchomić pełne smoke testy (`python -m pytest tests/smoke/ -q --tb=no`)
+- przygotować i wkleić w ostatniej wiadomości **BUILDER REPORT** w dokładnie takim formacie:
+
+```
+BUILDER REPORT
+Milestone: <nazwa>
+Commit: <full hash>
+Branch: <branch>
+Working tree: clean
+Smoke test: PASSED / FAILED (X/Y)
+[output smoke]
+Status: READY_FOR_AUDIT
+```
+
+Bez spełnienia tych trzech warunków Grok nie przyjmie pracy do audytu.
+
 ### Builder Selection
 
 - Default: **Codex** (for path-sensitive, environment-dependent tasks)
@@ -199,6 +219,8 @@ Grok makes the technical selection. Builder (Codex or Cascade) can flag implemen
 ---
 
 ## Audit Standard
+
+- Czy builder wykonał push + smoke test + BUILDER REPORT?
 
 ### What to check (in order)
 
