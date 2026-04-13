@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="light">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -13,7 +13,10 @@
           <p class="eyebrow">Observability</p>
           <h1>BTC Bot Dashboard</h1>
         </div>
-        <div class="badge badge--unknown" id="status-badge">No data</div>
+        <div class="hero-right">
+          <div class="badge badge--unknown" id="status-badge">No data</div>
+          <button id="btn-theme" class="btn btn--theme" title="Toggle dark mode">🌙</button>
+        </div>
       </header>
 
       <section class="panel panel--control">
@@ -80,6 +83,10 @@
               <dd id="status-timestamp">-</dd>
             </div>
             <div class="stat-row">
+              <dt>Config hash</dt>
+              <dd id="status-config-hash" class="mono">-</dd>
+            </div>
+            <div class="stat-row">
               <dt>Process mode</dt>
               <dd id="status-process-mode">-</dd>
             </div>
@@ -103,7 +110,7 @@
             <h2>Open Positions</h2>
             <span class="panel__meta" id="positions-age">Age: -</span>
           </div>
-          <p class="panel__note">Unrealized PnL is not shown in M1.</p>
+          <p class="panel__note">Unrealized PnL is not shown in paper mode.</p>
           <div class="table-wrap">
             <table>
               <thead>
@@ -130,28 +137,119 @@
       <section class="panel">
         <div class="panel__header">
           <h2>Recent Trades</h2>
-          <span class="panel__meta">Last 20 closed trades</span>
+          <div class="panel__actions">
+            <span class="panel__meta">Last 20 closed trades</span>
+            <a href="/api/trades/export?limit=200" class="btn btn--export" download>Export CSV</a>
+          </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" id="trades-loading">
           <table>
             <thead>
               <tr>
-                <th>Direction</th>
+                <th>Dir</th>
                 <th>Entry</th>
                 <th>Exit</th>
                 <th>PnL</th>
                 <th>PnL R</th>
+                <th>Regime</th>
+                <th>Confluence</th>
+                <th>Exit Reason</th>
                 <th>Outcome</th>
                 <th>Closed</th>
               </tr>
             </thead>
             <tbody id="trades-body">
               <tr>
-                <td colspan="7" class="empty">No closed trades.</td>
+                <td colspan="10" class="empty">Loading…</td>
               </tr>
             </tbody>
           </table>
         </div>
+      </section>
+
+      <section class="panel">
+        <div class="panel__header">
+          <h2>Recent Signals</h2>
+          <div class="panel__actions">
+            <span class="panel__meta">Last 20 signal candidates</span>
+            <a href="/api/signals/export?limit=200" class="btn btn--export" download>Export CSV</a>
+          </div>
+        </div>
+        <p class="panel__note">Promoted = passed governance and became an executable signal.</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Time</th>
+                <th>Dir</th>
+                <th>Regime</th>
+                <th>Confluence</th>
+                <th>Reasons</th>
+                <th>Promoted</th>
+                <th>RR</th>
+                <th>Entry</th>
+              </tr>
+            </thead>
+            <tbody id="signals-body">
+              <tr>
+                <td colspan="8" class="empty">Loading…</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section class="grid grid--bottom">
+        <article class="panel">
+          <div class="panel__header">
+            <h2>Daily Metrics</h2>
+            <span class="panel__meta">Last 14 days</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Trades</th>
+                  <th>Wins</th>
+                  <th>Losses</th>
+                  <th>PnL</th>
+                  <th>Exp R</th>
+                  <th>DD</th>
+                </tr>
+              </thead>
+              <tbody id="metrics-body">
+                <tr>
+                  <td colspan="7" class="empty">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
+
+        <article class="panel">
+          <div class="panel__header">
+            <h2>Alerts &amp; Errors</h2>
+            <span class="panel__meta" id="alerts-count">-</span>
+          </div>
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Time</th>
+                  <th>Severity</th>
+                  <th>Component</th>
+                  <th>Message</th>
+                </tr>
+              </thead>
+              <tbody id="alerts-body">
+                <tr>
+                  <td colspan="4" class="empty">Loading…</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </article>
       </section>
 
       <section class="panel panel--logs">

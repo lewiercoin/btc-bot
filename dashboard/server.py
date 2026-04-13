@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import csv
+import io
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Literal
@@ -99,3 +101,56 @@ async def start_bot(request: Request, payload: StartBotRequest) -> dict:
 async def stop_bot(request: Request, payload: StopBotRequest | None = None) -> dict:
     body = payload or StopBotRequest()
     return request.app.state.process_manager.stop(reason=body.reason)
+
+
+@app.get("/api/signals")
+async def get_signals(request: Request, limit: int = Query(default=20, ge=1, le=100)) -> dict:
+    return request.app.state.reader.read_signals(limit=limit)
+
+
+@app.get("/api/metrics")
+async def get_metrics(request: Request, days: int = Query(default=14, ge=1, le=90)) -> dict:
+    return request.app.state.reader.read_daily_metrics(days=days)
+
+
+@app.get("/api/alerts")
+async def get_alerts(request: Request, limit: int = Query(default=20, ge=1, le=100)) -> dict:
+    return request.app.state.reader.read_alerts(limit=limit)
+
+
+@app.get("/api/trades/export")
+async def export_trades(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
+    payload = request.app.state.reader.read_trades(limit=limit)
+    trades = payload["trades"]
+    output = io.StringIO()
+    if trades:
+        writer = csv.DictWriter(output, fieldnames=trades[0].keys())
+        writer.writeheader()
+        writer.writerows(trades)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=trades.csv"},
+    )
+
+
+@app.get("/api/signals/export")
+async def export_signals(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
+    payload = request.app.state.reader.read_signals(limit=limit)
+    signals = payload["signals"]
+    output = io.StringIO()
+    if signals:
+        rows = []
+        for sig in signals:
+            row = {k: v for k, v in sig.items() if k not in ("reasons", "governance_notes")}
+            row["reasons"] = "; ".join(str(r) for r in sig.get("reasons", []))
+            row["governance_notes"] = "; ".join(str(n) for n in sig.get("governance_notes", []))
+            rows.append(row)
+        writer = csv.DictWriter(output, fieldnames=rows[0].keys())
+        writer.writeheader()
+        writer.writerows(rows)
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=signals.csv"},
+    )

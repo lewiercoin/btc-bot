@@ -3,6 +3,10 @@ const dashboardVersion = document.getElementById("dashboard-version");
 const positionsAge = document.getElementById("positions-age");
 const positionsBody = document.getElementById("positions-body");
 const tradesBody = document.getElementById("trades-body");
+const signalsBody = document.getElementById("signals-body");
+const metricsBody = document.getElementById("metrics-body");
+const alertsBody = document.getElementById("alerts-body");
+const alertsCount = document.getElementById("alerts-count");
 const logStream = document.getElementById("log-stream");
 const logFilter = document.getElementById("log-filter");
 const processStatus = document.getElementById("process-status");
@@ -10,6 +14,7 @@ const controlMessage = document.getElementById("control-message");
 const botModeSelect = document.getElementById("bot-mode");
 const startButton = document.getElementById("btn-start");
 const stopButton = document.getElementById("btn-stop");
+const themeButton = document.getElementById("btn-theme");
 
 const statusFields = {
   mode: document.getElementById("status-mode"),
@@ -22,6 +27,7 @@ const statusFields = {
   weeklyDd: document.getElementById("status-weekly-dd"),
   lastTrade: document.getElementById("status-last-trade"),
   timestamp: document.getElementById("status-timestamp"),
+  configHash: document.getElementById("status-config-hash"),
   processMode: document.getElementById("status-process-mode"),
   processPid: document.getElementById("status-process-pid"),
   processExitCode: document.getElementById("status-process-exit-code"),
@@ -131,6 +137,7 @@ function renderStatus(payload) {
     statusFields.weeklyDd.textContent = "-";
     statusFields.lastTrade.textContent = "-";
     statusFields.timestamp.textContent = "-";
+    statusFields.configHash.textContent = "-";
   } else {
     statusFields.mode.textContent = state.mode;
     statusFields.healthy.textContent = state.healthy ? "Yes" : "No";
@@ -144,6 +151,7 @@ function renderStatus(payload) {
     statusFields.timestamp.textContent = formatDate(state.state_timestamp);
   }
 
+  statusFields.configHash.textContent = payload.config_hash ? payload.config_hash.slice(0, 12) + "…" : "-";
   statusFields.processMode.textContent = process.mode || "-";
   statusFields.processPid.textContent = process.pid === null ? "-" : String(process.pid);
   statusFields.processExitCode.textContent = process.exit_code === null ? "-" : String(process.exit_code);
@@ -197,23 +205,98 @@ function renderPositions(payload) {
 
 function renderTrades(payload) {
   if (!payload.trades.length) {
-    renderEmptyTableRow(tradesBody, 7, "No closed trades.");
+    renderEmptyTableRow(tradesBody, 10, "No closed trades.");
     return;
   }
 
   tradesBody.replaceChildren();
   for (const trade of payload.trades) {
     const row = document.createElement("tr");
+    if (trade.outcome === "WIN") row.classList.add("row--win");
+    if (trade.outcome === "LOSS") row.classList.add("row--loss");
     appendCells(row, [
       trade.direction,
       formatNumber(trade.entry_price),
       trade.exit_price === null ? "-" : formatNumber(trade.exit_price),
       trade.pnl_abs === null ? "-" : formatNumber(trade.pnl_abs),
       trade.pnl_r === null ? "-" : formatNumber(trade.pnl_r, 3),
+      trade.regime || "-",
+      trade.confluence_score === null ? "-" : formatNumber(trade.confluence_score, 2),
+      trade.exit_reason || "-",
       trade.outcome || "-",
       formatDate(trade.closed_at),
     ]);
     tradesBody.appendChild(row);
+  }
+}
+
+function renderSignals(payload) {
+  if (!payload.signals.length) {
+    renderEmptyTableRow(signalsBody, 8, "No signals recorded.");
+    return;
+  }
+
+  signalsBody.replaceChildren();
+  for (const sig of payload.signals) {
+    const row = document.createElement("tr");
+    if (!sig.promoted) row.classList.add("row--vetoed");
+    const reasonsText = Array.isArray(sig.reasons) ? sig.reasons.join(", ") : "-";
+    appendCells(row, [
+      formatDate(sig.timestamp),
+      sig.direction,
+      sig.regime,
+      formatNumber(sig.confluence_score, 2),
+      reasonsText || "-",
+      sig.promoted ? "✓" : "✗",
+      sig.rr_ratio === null ? "-" : formatNumber(sig.rr_ratio, 2),
+      sig.entry_price === null ? "-" : formatNumber(sig.entry_price),
+    ]);
+    signalsBody.appendChild(row);
+  }
+}
+
+function renderMetrics(payload) {
+  if (!payload.metrics.length) {
+    renderEmptyTableRow(metricsBody, 7, "No daily metrics yet.");
+    return;
+  }
+
+  metricsBody.replaceChildren();
+  for (const m of payload.metrics) {
+    const row = document.createElement("tr");
+    appendCells(row, [
+      m.date,
+      String(m.trades_count),
+      String(m.wins),
+      String(m.losses),
+      formatNumber(m.pnl_abs),
+      formatNumber(m.expectancy_r, 3),
+      formatPercent(m.daily_dd_pct),
+    ]);
+    metricsBody.appendChild(row);
+  }
+}
+
+function renderAlerts(payload) {
+  const count = payload.alerts.length;
+  alertsCount.textContent = count === 0 ? "None" : `${count} alert${count === 1 ? "" : "s"}`;
+
+  if (!count) {
+    renderEmptyTableRow(alertsBody, 4, "No alerts.");
+    return;
+  }
+
+  alertsBody.replaceChildren();
+  for (const alert of payload.alerts) {
+    const row = document.createElement("tr");
+    row.classList.add(`alert--${alert.severity.toLowerCase()}`);
+    appendCells(row, [
+      formatDate(alert.timestamp),
+      alert.severity,
+      alert.component,
+      alert.message,
+    ]);
+    alertsBody.appendChild(row);
   }
 }
 
@@ -295,8 +378,52 @@ async function refreshTrades() {
   try {
     renderTrades(await loadJson("/api/trades?limit=20"));
   } catch (error) {
-    renderEmptyTableRow(tradesBody, 7, "Trades unavailable.");
+    renderEmptyTableRow(tradesBody, 10, "Trades unavailable.");
   }
+}
+
+async function refreshSignals() {
+  try {
+    renderSignals(await loadJson("/api/signals?limit=20"));
+  } catch (error) {
+    renderEmptyTableRow(signalsBody, 8, "Signals unavailable.");
+  }
+}
+
+async function refreshMetrics() {
+  try {
+    renderMetrics(await loadJson("/api/metrics?days=14"));
+  } catch (error) {
+    renderEmptyTableRow(metricsBody, 7, "Metrics unavailable.");
+  }
+}
+
+async function refreshAlerts() {
+  try {
+    renderAlerts(await loadJson("/api/alerts?limit=20"));
+  } catch (error) {
+    renderEmptyTableRow(alertsBody, 4, "Alerts unavailable.");
+  }
+}
+
+function handleThemeToggle() {
+  const html = document.documentElement;
+  const isDark = html.getAttribute("data-theme") === "dark";
+  html.setAttribute("data-theme", isDark ? "light" : "dark");
+  themeButton.textContent = isDark ? "🌙" : "☀️";
+  try {
+    localStorage.setItem("dashboard-theme", isDark ? "light" : "dark");
+  } catch (_) {}
+}
+
+function initTheme() {
+  try {
+    const saved = localStorage.getItem("dashboard-theme");
+    if (saved === "dark") {
+      document.documentElement.setAttribute("data-theme", "dark");
+      themeButton.textContent = "☀️";
+    }
+  } catch (_) {}
 }
 
 async function handleStart() {
@@ -359,13 +486,21 @@ function connectLogs() {
 logFilter.addEventListener("change", renderLogStream);
 startButton.addEventListener("click", handleStart);
 stopButton.addEventListener("click", handleStop);
+themeButton.addEventListener("click", handleThemeToggle);
 
+initTheme();
 setControlEnabled(false);
 refreshStatus();
 refreshPositions();
 refreshTrades();
+refreshSignals();
+refreshMetrics();
+refreshAlerts();
 connectLogs();
 
 window.setInterval(refreshStatus, 5000);
 window.setInterval(refreshPositions, 10000);
 window.setInterval(refreshTrades, 30000);
+window.setInterval(refreshSignals, 60000);
+window.setInterval(refreshMetrics, 120000);
+window.setInterval(refreshAlerts, 60000);
