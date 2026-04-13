@@ -135,6 +135,22 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### DASHBOARD_DATA_INTEGRITY_RESEARCH
+**Status:** DONE (2026-04-13)
+**Builder:** Cascade
+**What:** Fixed dashboard showing old backtest data (December 2025/March 2026) instead of current paper trading data. Root cause: SQL queries in `read_trades_from_conn` and `read_signals_from_conn` had NO config_hash filter, returning ALL historical data. Added:
+- `_get_current_config_hash()` helper: reads config_hash from most recent trade_log (fallback to signal_candidates)
+- `read_trades_from_conn`: now filters by current config_hash (optional parameter for override)
+- `read_signals_from_conn`: now filters by current config_hash (optional parameter for override)
+- `read_daily_metrics_from_conn`: added timestamp filter (last 7 days) — table has no config_hash column
+- `read_alerts_from_conn`: added timestamp filter (last 24 hours) — table has no config_hash column
+- Added config_hash field to trade payload for verification
+**Files changed:** dashboard/db_reader.py, tests/test_dashboard_db_reader.py
+**Tests:** 81 passed, 24 skipped (2 new tests for config_hash filtering)
+**Layer separation:** clean — only dashboard/db_reader.py, no core/ changes
+**Determinism:** preserved — no automatic data cleanup, only read-time filtering
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### DASHBOARD_FIX_EXTERNAL_ACCESS
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
