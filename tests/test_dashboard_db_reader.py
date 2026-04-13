@@ -5,7 +5,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
-from dashboard.db_reader import read_positions_from_conn, read_status_from_conn, read_trades_from_conn
+from dashboard.db_reader import (
+    read_alerts_from_conn,
+    read_daily_metrics_from_conn,
+    read_positions_from_conn,
+    read_signals_from_conn,
+    read_status_from_conn,
+    read_trades_from_conn,
+)
 from storage.db import init_db
 from storage.repositories import insert_position, insert_trade_log_open, upsert_bot_state
 
@@ -165,3 +172,148 @@ def test_read_status_positions_and_trades_from_conn() -> None:
     assert trades_payload["trades"][0]["trade_id"] == "trd-1"
     assert trades_payload["trades"][0]["outcome"] == "WIN"
     assert trades_payload["trades"][0]["closed_at"] == closed_at.isoformat()
+    assert trades_payload["trades"][0]["regime"] == "normal"
+    assert trades_payload["trades"][0]["confluence_score"] == 3.4
+    assert trades_payload["trades"][0]["exit_reason"] == "tp1"
+    assert trades_payload["trades"][0]["fees_total"] == 0.0
+
+
+def test_read_signals_from_conn_empty() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    try:
+        payload = read_signals_from_conn(conn)
+    finally:
+        conn.close()
+    assert payload["signals"] == []
+
+
+def test_read_signals_from_conn_with_candidate_and_executable() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    ts = datetime(2026, 4, 13, 12, 0, tzinfo=timezone.utc)
+    try:
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-a", ts.isoformat(), "SHORT", "sweep_reclaim", 5.2, "downtrend",
+             '["cvd_divergence", "reclaim_confirmed"]', "{}", "v1.0", "hash-abc"),
+        )
+        conn.execute(
+            """
+            INSERT INTO executable_signals (
+                signal_id, timestamp, direction, entry_price, stop_loss, take_profit_1,
+                take_profit_2, rr_ratio, governance_notes_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-a", ts.isoformat(), "SHORT", 84000.0, 85000.0, 82000.0, 80000.0, 2.1, '[]'),
+        )
+        conn.commit()
+        payload = read_signals_from_conn(conn, limit=10)
+    finally:
+        conn.close()
+    assert len(payload["signals"]) == 1
+    sig = payload["signals"][0]
+    assert sig["signal_id"] == "sig-a"
+    assert sig["direction"] == "SHORT"
+    assert sig["regime"] == "downtrend"
+    assert sig["confluence_score"] == 5.2
+    assert sig["reasons"] == ["cvd_divergence", "reclaim_confirmed"]
+    assert sig["promoted"] is True
+    assert sig["rr_ratio"] == 2.1
+    assert sig["config_hash"] == "hash-abc"
+
+
+def test_read_signals_from_conn_not_promoted() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    ts = datetime(2026, 4, 13, 12, 0, tzinfo=timezone.utc)
+    try:
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-b", ts.isoformat(), "LONG", "sweep_reclaim", 2.8, "normal",
+             '[]', "{}", "v1.0", "hash-def"),
+        )
+        conn.commit()
+        payload = read_signals_from_conn(conn)
+    finally:
+        conn.close()
+    assert len(payload["signals"]) == 1
+    assert payload["signals"][0]["promoted"] is False
+    assert payload["signals"][0]["entry_price"] is None
+
+
+def test_read_daily_metrics_from_conn_empty() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    try:
+        payload = read_daily_metrics_from_conn(conn)
+    finally:
+        conn.close()
+    assert payload["metrics"] == []
+
+
+def test_read_daily_metrics_from_conn_with_rows() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    try:
+        conn.execute(
+            """
+            INSERT INTO daily_metrics (date, trades_count, wins, losses, pnl_abs, pnl_r_sum, daily_dd_pct, expectancy_r)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("2026-04-13", 3, 2, 1, 120.0, 0.6, 0.005, 0.2),
+        )
+        conn.commit()
+        payload = read_daily_metrics_from_conn(conn, days=7)
+    finally:
+        conn.close()
+    assert len(payload["metrics"]) == 1
+    row = payload["metrics"][0]
+    assert row["date"] == "2026-04-13"
+    assert row["trades_count"] == 3
+    assert row["wins"] == 2
+    assert row["losses"] == 1
+    assert row["expectancy_r"] == 0.2
+
+
+def test_read_alerts_from_conn_empty() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    try:
+        payload = read_alerts_from_conn(conn)
+    finally:
+        conn.close()
+    assert payload["alerts"] == []
+
+
+def test_read_alerts_from_conn_with_rows() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    ts = datetime(2026, 4, 13, 10, 0, tzinfo=timezone.utc)
+    try:
+        conn.execute(
+            """
+            INSERT INTO alerts_errors (timestamp, type, severity, component, message)
+            VALUES (?, ?, ?, ?, ?)
+            """,
+            (ts.isoformat(), "health_check", "ERROR", "orchestrator", "Bot entered safe mode"),
+        )
+        conn.commit()
+        payload = read_alerts_from_conn(conn, limit=10)
+    finally:
+        conn.close()
+    assert len(payload["alerts"]) == 1
+    alert = payload["alerts"][0]
+    assert alert["severity"] == "ERROR"
+    assert alert["component"] == "orchestrator"
+    assert alert["message"] == "Bot entered safe mode"
