@@ -11,6 +11,6 @@ def test_build_candidate_settings_is_immutable_and_preserves_non_strategy_sectio
     candidate = build_candidate_settings(base, {"tp1_atr_mult": 3.0})
 
     assert candidate.strategy.tp1_atr_mult == 3.0
-    assert base.strategy.tp1_atr_mult == 2.5
+    assert base.strategy.tp1_atr_mult == 1.9
     assert candidate.execution == base.execution
 
