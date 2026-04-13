@@ -135,6 +135,23 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### VPN_PROTON_DIAGNOSTICS
+**Status:** DONE (2026-04-14)
+**Builder:** Cascade
+**What:** Checked if ProtonVPN (or any VPN) is configured on the server and what exit IP was used as "protection".
+**Diagnostic results:**
+- Current public IP: 204.168.146.253 (direct server IP, no VPN)
+- Active interfaces: Only eth0 (no tun/wg/proton interfaces)
+- Routing: default via 172.31.1.1 dev eth0 (no VPN routes)
+- WireGuard: no WireGuard
+- ProtonVPN service: no protonvpn service
+- VPN processes: No proton/wireguard/openvpn processes running
+- VPN config files: No /etc/wireguard/, no ~/.config/protonvpn, only /etc/apparmor.d/vpnns (system default)
+- VPN logs: No vpn/proton/wireguard/cloudfront entries in recent logs
+- Package history: No proton/wireguard/openvpn packages ever installed (dpkg.log/apt history clean)
+**Conclusion:** ❌ ProtonVPN NEVER configured on this server. ❌ NO VPN (WireGuard, OpenVPN) is running. ✅ Server uses direct IP: 204.168.146.253. ✅ No old Proton configurations exist. The Binance API CloudFront 404 issue is caused by IP blocking of the server's direct IP (204.168.146.253), NOT by VPN. VPN was never used as "protection".
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### SAFE_MODE_HARDCODE_CHECK
 **Status:** DONE (2026-04-14)
 **Builder:** Cascade
