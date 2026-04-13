@@ -202,3 +202,69 @@ This protocol is mandatory at the end of every milestone. No exceptions.
    ```
 
 4. **No exceptions** — Never end a milestone without completing all three steps above (push → smoke → report). A milestone is not closed until the BUILDER REPORT is posted.
+
+## Persistent SSH Key Initialization
+
+Every Cascade session that performs server operations MUST initialize the SSH key before running any `ssh` or `scp` command.
+
+### Key Location
+
+```
+c:\development\btc-bot\btc-bot-deploy       ← private key
+c:\development\btc-bot\btc-bot-deploy.pub   ← public key
+Server: root@204.168.146.253
+```
+
+### Method A — Direct flag (recommended, always works)
+
+Use the absolute path with `-i` in every command. No ssh-agent required.
+
+```powershell
+ssh -i "c:\development\btc-bot\btc-bot-deploy" root@204.168.146.253 "COMMAND"
+scp -i "c:\development\btc-bot\btc-bot-deploy" file.txt root@204.168.146.253:/remote/path
+```
+
+If CWD is already `c:\development\btc-bot`, the relative path also works:
+
+```powershell
+ssh -i btc-bot-deploy root@204.168.146.253 "COMMAND"
+scp -i btc-bot-deploy file.txt root@204.168.146.253:/remote/path
+```
+
+### Method B — ssh-agent (use when Method A is blocked)
+
+```powershell
+# Start agent and add key
+Start-Service ssh-agent   # Windows: ensure OpenSSH Agent service is running
+ssh-add "c:\development\btc-bot\btc-bot-deploy"
+
+# Verify
+ssh-add -l
+
+# Then connect without -i
+ssh root@204.168.146.253 "COMMAND"
+```
+
+### Session startup checklist (server operations milestones)
+
+1. Verify key file exists:
+   ```powershell
+   Test-Path "c:\development\btc-bot\btc-bot-deploy"
+   ```
+2. Test connection:
+   ```powershell
+   ssh -i "c:\development\btc-bot\btc-bot-deploy" -o StrictHostKeyChecking=no root@204.168.146.253 "echo SSH_OK"
+   ```
+3. Expected output: `SSH_OK`
+4. If connection fails: check that `btc-bot-deploy` is not listed in `.gitignore` and exists on disk.
+
+### Root cause of cross-session failures
+
+Windsurf opens each new session without inheriting ssh-agent state from the previous one. The default OpenSSH client attempts `~/.ssh/id_ed25519` when no `-i` flag is given — this key is NOT authorized on the server. Always use `-i` explicitly or ensure ssh-agent is loaded before the first SSH call in any new session.
+
+### Never do this
+
+```powershell
+# WRONG — uses default key, will be rejected
+ssh root@204.168.146.253 "COMMAND"
+```
