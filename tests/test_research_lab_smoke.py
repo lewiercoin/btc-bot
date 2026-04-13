@@ -139,12 +139,13 @@ class _FakeOptunaStudy:
         self.metric_names: list[str] | None = None
         self.trials: list[_FakeOptunaTrial] = []
         self.results: list[tuple[float, float, float]] = []
+        self.enqueued_params: list[dict[str, object]] = []
 
     def set_metric_names(self, names: list[str]) -> None:
         self.metric_names = names
 
     def enqueue_trial(self, params: dict[str, object]) -> None:
-        return None
+        self.enqueued_params.append(dict(params))
 
     def optimize(self, objective, n_trials: int) -> None:
         for number in range(int(n_trials)):
@@ -375,6 +376,56 @@ def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
         "MIN_TRADES_NOT_MET: trades_count=85 < min_trades=100"
     )
     assert saved_trials[0].metrics.trades_count == 85
+
+
+def test_enqueue_warm_start_trials_falls_back_to_history_when_protocol_hash_changes(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    study = _FakeOptunaStudy()
+    store_path = tmp_path / "research_lab.db"
+    store_path.write_text("", encoding="utf-8")
+    historical_trial = TrialEvaluation(
+        trial_id="historical-winner",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.5,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.6363,
+            profit_factor=1.6165,
+            max_drawdown_pct=0.4049,
+            trades_count=339,
+            sharpe_ratio=3.33,
+            pnl_abs=118433.35,
+            win_rate=0.277,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="run12-protocol-hash",
+    )
+
+    monkeypatch.setattr(optuna_driver_module, "load_trials", lambda store_path: [historical_trial])
+    monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
+    monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
+
+    optuna_driver_module._enqueue_warm_start_trials(
+        study,
+        base_settings=settings,
+        store_path=store_path,
+        protocol_hash="run13-protocol-hash",
+        warm_start_top_n=1,
+    )
+
+    assert study.enqueued_params[0]["allow_long_in_uptrend"] is False
+    assert study.enqueued_params[1] == historical_trial.params
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
