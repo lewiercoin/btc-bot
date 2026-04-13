@@ -136,6 +136,8 @@ def _enqueue_warm_start_trials(
             candidates = [t for t in existing if t.protocol_hash == protocol_hash and t.rejected_reason is None]
         else:
             candidates = [t for t in existing if t.rejected_reason is None]
+        if not candidates and protocol_hash is not None:
+            candidates = [t for t in existing if t.rejected_reason is None]
         pareto = rank_pareto_candidates(compute_pareto_frontier(candidates))
         for winner in pareto[:warm_start_top_n]:
             warm_params = {k: v for k, v in winner.params.items() if k in active_names}
