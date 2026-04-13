@@ -172,3 +172,33 @@ When working on research lab milestones, follow the scope rules in `AGENTS.md` s
 - Grok is the ONLY auditor. Neither Codex nor Cascade audits.
 - Builder selection is per-milestone, recorded in `docs/MILESTONE_TRACKER.md`.
 - All agents share `AGENTS.md` as the common engineering discipline.
+
+## Mandatory Builder Exit Protocol
+
+This protocol is mandatory at the end of every milestone. No exceptions.
+
+### Steps (in order)
+
+1. **Push** — After the last commit, always run:
+   ```
+   git push origin <branch>
+   ```
+
+2. **Smoke test** — Immediately after push, run the full smoke test suite:
+   ```
+   python -m pytest tests/smoke/ -q --tb=no
+   ```
+
+3. **Builder Report** — Prepare and paste the builder report in the last message using exactly this format:
+   ```
+   BUILDER REPORT
+   Milestone: <name>
+   Commit: <full hash>
+   Branch: <branch>
+   Working tree: clean
+   Smoke test: PASSED / FAILED (X/Y)
+   [paste smoke test output]
+   Status: READY_FOR_AUDIT
+   ```
+
+4. **No exceptions** — Never end a milestone without completing all three steps above (push → smoke → report). A milestone is not closed until the BUILDER REPORT is posted.
