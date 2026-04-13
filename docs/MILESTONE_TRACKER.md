@@ -135,6 +135,22 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### DASHBOARD_DATA_INTEGRITY_DEPLOY
+**Status:** DONE (2026-04-13)
+**Builder:** Cascade
+**What:** Deployed config_hash/timestamp filtering fix (commit 6e34649) to production server. Server updated from 131e9e7a → ccceccb5 via `git pull github main`. Restarted `btc-bot-dashboard.service`.
+**Deployment steps:**
+1. git pull github main → 3 files changed (db_reader.py +69/-20, MILESTONE_TRACKER.md +56, tests +180)
+2. systemctl restart btc-bot-dashboard → active (running) PID 134016
+**Verification (2026-04-13 22:04 UTC):**
+- `/api/trades`: Returns trades filtered by most recent config_hash (all trades show same config_hash: 778678b05b5f...)
+- `/api/signals`: Returns signals filtered by most recent config_hash (all signals show same config_hash: 778678b05b5f...)
+- `/api/metrics`: Timestamp filter working → shows only last 7 days (2026-04-11 to 2026-04-13), trades_count=0
+- `/api/alerts`: Timestamp filter working → shows only last 24 hours (2026-04-13 safe mode alerts)
+- Bot status: PAPER mode, safe_mode=true (snapshot_build_failed: bookTicker)
+**Important note:** The bot is in safe_mode and has not executed any paper trades yet. The most recent config_hash in the database is from the backtest (March 2026). Once the bot exits safe_mode and generates paper trades with Trial #63 config_hash (starts with f807b7057...), the dashboard will automatically filter to the new config_hash. The filtering logic is working correctly — it just needs new paper trading data to establish the current config_hash.
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### DASHBOARD_DATA_INTEGRITY_RESEARCH
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
