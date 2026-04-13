@@ -1,53 +1,100 @@
 # Milestone Tracker
 
-Last updated: 2026-04-12
+Last updated: 2026-04-13
 
 ---
 
 ## Current Active Milestone
 
-**Milestone:** RUN12-SOFT-PENALTY — First campaign with working TPE gradient
-**Status:** ACTIVE — Run #12 running on server (tmux `optimize12`, ~88+ of 300 trials)
-**Active builder:** Claude Code (auditor executed directly)
-**Decision date:** 2026-04-12
+**Milestone:** RUN13-REGIME-AWARE — Regime-robust campaign with anchored walk-forward
+**Status:** ACTIVE — Run #13 running on server (tmux `optimize13`, PID 120863, started 2026-04-13 10:50 UTC)
+**Active builder:** Codex (D1-D4) + Cascade (commit cleanup)
+**Decision date:** 2026-04-13
 **Commits:**
-- `45cea8a` SIGNAL-REVERT-V1: restore core signal files to 8f2c6f2 + cherry-pick min_hits=3
-- `51513f2` SIGNAL-REVERT-V1-FIX: remove deleted FeatureEngineConfig fields from optimize_loop
-- `92df4b4` SOFT-PENALTY-V1: replace zero-vector with soft penalty + constraints_func
-- `92bbbfd` SOFT-PENALTY-V1: add anti-overfitting guard for PF > 5.0
+- `85cbdc2` RUN13-REGIME-AWARE: hard-block low-trade trials + anchored WF
+- `2980a6b` RUN13-WARM-START-FALLBACK: reuse prior winners across protocol changes
+- `2f7e047` RUN13-WARM-START-ORDER: seed prior winners before baseline
+- `3b81285` RUN13-WARM-START-FILTER: skip stale incompatible history seeds
+- `376095f` RUN13-REGIME-AWARE: add artifact cleanup CLI + README update
 
 **Campaign config:**
-- study_name: run12-soft-penalty
+- study_name: run13-regime-aware
 - n_trials: 300
 - start_date: 2022-01-01 / end_date: 2026-03-01
-- max_sweep_rate: 1.0 (bypass health gate — sweep rate 99.49% is implementation artifact, not signal flaw)
-- warm_start: yes
-- min_trades_full_candidate: 100 (from default_protocol.json)
+- max_sweep_rate: 1.0
+- warm_start: yes — seeded from Run #12 winners (trial #26 and #31)
 
-**Key changes vs all prior campaigns:**
-- `min_hits=2 → 3` in feature_engine.py (cherry-pick from ba1d6d1; Test B: -6.3% trades, +0.001 expectancy — safe)
-- Zero-vector [0.0, 0.0, 1.0] replaced with quadratic soft penalty (LAMBDA=0.45/0.30/0.25)
-- Constraint violations return (-2.0, 0.1, 1.0) + constraints_func for TPE hard-blocking
-- Anti-overfitting guard: PF capped at 5.0; PF>3.0 with trades>=80 → additional penalty
+**Key changes vs Run #12:**
+- Hard min_trades floor: trades<80 → constraint violation (hard block), not soft penalty
+- Walk-forward: anchored_expanding mode, train_days=730, validation_days=365, step_days=365
+  (was rolling 180/90 — too short to evaluate 2022-2026 regime robustness)
+- Warm start: loads Run #12 Pareto winners before baseline (fixed ordering + compatibility filter)
+- Protocol: 2 anchored windows — train 2022-2024 + val 2024-2025, train 2022-2025 + val 2025-2026
 
-**Run #12 results so far (after 87 trials):**
+**Run #13 early results (trials 0-1):**
 
-| Trial | exp_r | PF | DD | Status |
-|-------|-------|-----|-----|--------|
-| #0 | -0.057 | 0.930 | 76.7% | warm start baseline |
-| #1 | +0.058 | 1.030 | 22.5% | first TPE positive |
-| #13 | +0.225 | 1.235 | 32.1% | |
-| #26 | **+0.636** | **1.617** | 40.5% | **best credible** |
-| #31 | +0.384 | 1.359 | 30.2% | |
-| #41 | +0.284 | 1.338 | 25.4% | |
-| #42 | +0.309 | 1.294 | 31.0% | |
-| #47/#56/#73 | ~+1.5–1.9 | 999,999 | 24.5% | overfitted (PF=inf, zero losses) |
+| Trial | exp_r | PF | DD | trades | Note |
+|-------|-------|-----|-----|--------|------|
+| #0 | **+0.636** | **1.617** | 40.5% | 339 | warm start = Run #12 trial #26 ✓ |
+| #1 | **+0.636** | **1.617** | 40.5% | 339 | warm start duplicate confirmed |
+| #2 | in progress | | | | |
 
-**Zero zero-vectors confirmed.** Death spiral broken. TPE finds positive region immediately.
+**Warm start confirmed working.** Trial #0/#1 = Run #12 best winner, not baseline.
 
-**Anti-overfitting guard deployed mid-campaign** (trial #88+): caps PF≤5.0, penalizes zero-loss regimes.
+---
 
-**Next step after campaign:** filter PF>3.0, take top 5-7 credible trials, run anchored walk-forward (2022-2024 train / 2024-2025 test / 2025-2026 test).
+## Completed Milestone: RUN12-SOFT-PENALTY
+**Status:** DONE — 310 trials, 2026-04-12/13
+**Active builder:** Claude Code (auditor executed directly) + Cascade (anti-overfitting guard)
+**Commits:** `45cea8a` + `51513f2` + `92df4b4` + `92bbbfd` + `e8abab3`
+
+**Final results (310 trials):**
+
+| Category | Count | % |
+|----------|-------|---|
+| Max penalty (0 trades) | 176 | 56% |
+| Constraint violations | 63 | 20% |
+| Real backtest | 71 | 22% |
+| Credible positive (PF≤3) | 15 | 4% |
+
+**Top credible candidates (PF≤3.0):**
+
+| Trial | exp_r | PF | DD | trades | Note |
+|-------|-------|-----|-----|--------|------|
+| #26/#93 | **+0.636** | 1.617 | 40.5% | 339 | **best — confirmed twice** |
+| #31/#94 | +0.384 | 1.359 | 30.2% | ~150 | solid |
+| #221 | +0.342 | 1.493 | 25.5% | ~130 | good DD |
+
+Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only 20-30 trades).
+
+**Walk-forward result for trial #26:**
+- Protocol: 28 rolling nested windows, 2022-2026
+- Result: PASSED (15/28 windows = 54%), fragile=false
+- **Degradation: -238%** — NOT suitable for live trading
+- Root cause: signal works in bear/chop 2022, fails in bull market 2023-2024
+- Windows 006-010 (2023-2024): expectancy -0.18 to -1.40 on both train and validation
+
+**Why Run #13:** Run #12 proved edge exists but is regime-dependent. Run #13 tests with anchored WF that explicitly covers 2024-2025 bull market in validation window.
+
+---
+
+## Diagnostic Results (2026-04-12)
+
+### Crash Test (confluence_min=0.0, min_rr=1.0, 8f2c6f2 signal)
+- 1,262 trades / 4 years
+- expectancy_r = **-0.054** (not anti-edge; headroom to Run #3 best = +0.195 R)
+- profit_factor = 0.934
+- Regime blocked 53% of signals (healthy filtering)
+- Governance blocked 26%
+
+### Test B (min_hits=3 cherry-pick, same conditions)
+- 1,183 trades (-6.3% vs baseline)
+- expectancy_r = **-0.053** (marginally better)
+- **Verdict: safe cherry-pick. min_hits=3 cleans noise without killing signal.**
+
+### Run #3 reference (best historical result, pre-SWEEP-RECLAIM-FIX-V1)
+- study: baseline-v3-trial-00195
+- expectancy_r = +0.141, profit_factor = 1.192, **607 trades**
 
 ---
 
