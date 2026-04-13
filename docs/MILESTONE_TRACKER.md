@@ -135,6 +135,19 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### PAPER_TRADING_ACTIVATION_DEPLOY
+**Status:** DONE (2026-04-13)
+**Builder:** Cascade
+**What:** Deployed DASHBOARD_PROD_POLISH changes (db340f0 + a17ac49 + 131e9e7a) to production server. Server updated from d2456178 → 131e9e7a via `git pull github main`. Restarted `btc-bot-dashboard.service` (systemctl). SSH key: `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253).
+**Verified live on server:**
+- `/api/signals` → 20 live signal entries from paper bot DB
+- `/api/metrics` → 2026-04-13 daily metrics row
+- `/api/alerts` → live alerts (id 949, decision/orchestrator)
+- `/api/trades/export` → CSV with correct headers + rows
+- `btc-bot.service` → PAPER mode, PID 128229, uninterrupted
+- Dashboard version: m3
+**Note:** Bot in safe_mode=true due to `snapshot_build_failed: bookTicker` (Binance WS connectivity issue — pre-existing, unrelated to this deployment).
+
 ### DASHBOARD_PROD_POLISH
 **Status:** DONE (commit db340f0, 2026-04-13)
 **Builder:** Cascade
