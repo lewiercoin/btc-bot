@@ -119,17 +119,6 @@ def _enqueue_warm_start_trials(
 ) -> None:
     """Enqueue baseline config + top-N Pareto winners from store as warm-start trials."""
     active_names = set(get_active_params().keys())
-
-    baseline_params: dict[str, Any] = {}
-    for k, v in dataclasses.asdict(base_settings.strategy).items():
-        if k in active_names:
-            baseline_params[k] = v
-    for k, v in dataclasses.asdict(base_settings.risk).items():
-        if k in active_names:
-            baseline_params[k] = v
-    if baseline_params:
-        study.enqueue_trial(baseline_params)
-
     if store_path.exists():
         existing = load_trials(store_path)
         if protocol_hash is not None:
@@ -143,6 +132,16 @@ def _enqueue_warm_start_trials(
             warm_params = {k: v for k, v in winner.params.items() if k in active_names}
             if warm_params:
                 study.enqueue_trial(warm_params)
+
+    baseline_params: dict[str, Any] = {}
+    for k, v in dataclasses.asdict(base_settings.strategy).items():
+        if k in active_names:
+            baseline_params[k] = v
+    for k, v in dataclasses.asdict(base_settings.risk).items():
+        if k in active_names:
+            baseline_params[k] = v
+    if baseline_params:
+        study.enqueue_trial(baseline_params)
 
 
 def run_optuna_study(
