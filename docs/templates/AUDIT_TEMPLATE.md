@@ -1,7 +1,7 @@
 # AUDIT: <milestone_name>
 
 Date: <YYYY-MM-DD>
-Auditor: Cascade
+Auditor: Grok
 Commit: <hash>
 
 ## Verdict: DONE | MVP_DONE | NOT_DONE | BLOCKED
