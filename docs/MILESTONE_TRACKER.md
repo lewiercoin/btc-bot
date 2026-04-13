@@ -135,6 +135,57 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### SAFE_MODE_HARDCODE_CHECK
+**Status:** DONE (2026-04-14)
+**Builder:** Cascade
+**What:** Verified that safe_mode is NOT hardcoded to True anywhere in the production code.
+**Grep results:**
+- `safe_mode.*=.*True`: Found in test files (smoke_recovery.py expected values), message template (telegram_notifier.py default), and RecoveryReport returns — none set safe_mode directly
+- `safe_mode = True`: No results ✅
+- `safe_mode=True`: No results ✅
+- `enter_safe_mode`: No results ✅
+**Where safe_mode is set to True (conditional only):**
+- orchestrator.py: `_activate_safe_mode()` (health check failures, critical execution errors), feed start failures
+- execution\recovery.py: exchange sync failures, recovery inconsistencies
+- scripts\smoke_orchestrator.py: Manual override for testing only (not production)
+**Initialization:**
+- storage\state_store.py: safe_mode initialized to FALSE (line 49) ✅
+- execution\recovery.py: Sets safe_mode to FALSE after successful recovery
+**Conclusion:** ❌ NO hardcoded safe_mode = True in production code. safe_mode enters TRUE only as a reactive measure to errors (e.g., Binance API connectivity failure). The bot's persistent safe_mode is caused by the Binance API connectivity issue, not a code bug.
+
+### PAPER_BOT_CONFIG_AND_CONNECTIVITY_FIX
+**Status:** BLOCKED (2026-04-14)
+**Builder:** Cascade
+**What:** Attempted to fix two blockers from PAPER_BOT_SAFE_RESTART: (1) upload Trial #63 config_hash f807b7057..., (2) diagnose/fix Binance API connectivity.
+**Config_hash findings:**
+- Local config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
+- Server config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
+- Both identical — no sync needed
+- Commit d245617 (PAPER-TRADING-TRIAL63) is ancestor of HEAD
+- settings.py unchanged since d245617
+- Current config_hash e8c7180d... IS the Trial #63 configuration
+- Expected f807b7057... was from April 2 logs; current settings produce e8c7180d...
+**Connectivity diagnostics:**
+- Google (https://www.google.com): HTTP/2 200 ✅
+- Binance ping (/fapi/v1/ping): HTTP/2 404 ❌
+- Binance bookTicker (/fapi/v1/ticker/bookTicker): HTTP/2 404 ❌
+- Response: "x-cache: Error from cloudfront", "x-amz-cf-pop: HEL51-P3" (Helsinki edge)
+- DNS resolves correctly to CloudFront IPs
+- No proxy configured
+- Direct IP access also returns 404
+- User-Agent header does not help
+**Root cause:** Server IP (204.168.146.253) blocked by Binance's CloudFront CDN. All requests to fapi.binance.com return HTTP 404 with "Error from cloudfront". This is a geolocation/IP blocking issue, not code or configuration.
+**Acceptance criteria NOT met:**
+- ❌ Cannot fix Binance connectivity via code/configuration changes
+- ❌ Bot will continue to enter safe_mode due to API unreachability
+- ❌ Config_hash already correct (e8c7180d...), not f807b7057... as expected
+**Next steps required (infrastructure):**
+1. Use VPN/proxy to route Binance API traffic through allowed IP
+2. Contact Binance support to whitelist server IP
+3. Move server to different IP/location
+4. Use alternative data provider (if available)
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### PAPER_BOT_SAFE_RESTART
 **Status:** BLOCKED (2026-04-13)
 **Builder:** Cascade
