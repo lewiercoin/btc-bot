@@ -135,6 +135,22 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### DASHBOARD_FIX_EXTERNAL_ACCESS
+**Status:** DONE (2026-04-13)
+**Builder:** Cascade
+**What:** Fixed external access blocked by UFW firewall. Dashboard was binding correctly to `0.0.0.0:8080` but UFW only allowed port 22 (SSH). Added `ufw allow 8080/tcp` to open the firewall.
+**Diagnostic findings:**
+- `ss -tlnp`: Port 8080 listening on `0.0.0.0:8080` ✅
+- `curl 127.0.0.1`: Server responded (HTTP 405 on HEAD, but GET works) ✅
+- `ufw status`: Only port 22 allowed, port 8080 blocked ❌
+- `journalctl`: uvicorn running correctly on `0.0.0.0:8080`
+**Fix executed:** `ufw allow 8080/tcp` (added rule for both IPv4 and IPv6)
+**Verified:**
+- `ufw status`: Now shows 8080/tcp ALLOWED ✅
+- External curl from Windows: `curl.exe http://204.168.146.253:8080/api/status` returns live JSON ✅
+- Dashboard accessible at http://204.168.146.253:8080 ✅
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### DASHBOARD_FIX_LIVE
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
