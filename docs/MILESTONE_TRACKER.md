@@ -31,15 +31,27 @@ Last updated: 2026-04-13
 - Warm start: loads Run #12 Pareto winners before baseline (fixed ordering + compatibility filter)
 - Protocol: 2 anchored windows — train 2022-2024 + val 2024-2025, train 2022-2025 + val 2025-2026
 
-**Run #13 early results (trials 0-1):**
+**Run #13 mid-campaign results (119+ trials, 2026-04-13 ~15:00 UTC):**
 
 | Trial | exp_r | PF | DD | trades | Note |
 |-------|-------|-----|-----|--------|------|
-| #0 | **+0.636** | **1.617** | 40.5% | 339 | warm start = Run #12 trial #26 ✓ |
-| #1 | **+0.636** | **1.617** | 40.5% | 339 | warm start duplicate confirmed |
-| #2 | in progress | | | | |
+| #0/#1 | +0.636 | 1.617 | 40.5% | 339 | warm start = Run #12 #26 |
+| **#63** | **+0.994** | **2.486** | **5.4%** | **183** | **NEW BEST — anchored WF PASSED** |
+| #19 | +0.155 | 1.292 | 12.7% | 464 | stable backup |
 
-**Warm start confirmed working.** Trial #0/#1 = Run #12 best winner, not baseline.
+**Trial #63 walk-forward result (anchored expanding, 730/365 days):**
+- passed: TRUE — 2/2 windows (100%)
+- fragile: FALSE
+- **degradation: -11.2%** ← exceptional (Run #12 trial #26 had -238%)
+- failures: ZERO
+
+**DECISION (2026-04-13, confirmed by Grok):** Trial #63 approved for paper trading.
+- Degradation -11.2% far below Grok's threshold of -55%
+- 2/2 windows passed including 2024-2025 and 2025-2026 bull market windows
+- Note: allow_long_in_uptrend=False — bot very selective in bull markets (shorts in corrections only)
+- Note: max_leverage=high_vol_leverage=8 — monitor closely in live
+
+**Campaign still running** (~7h remaining). Trial #63 is locked in as paper trading candidate.
 
 ---
 
