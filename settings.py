@@ -52,62 +52,62 @@ class StrategyConfig:
     ema_fast: int = 50
     ema_slow: int = 200
 
-    equal_level_lookback: int = 50
-    equal_level_tol_atr: float = 0.25
-    sweep_buf_atr: float = 0.15
-    reclaim_buf_atr: float = 0.05
-    wick_min_atr: float = 0.40
+    equal_level_lookback: int = 196
+    equal_level_tol_atr: float = 0.02
+    sweep_buf_atr: float = 0.17
+    reclaim_buf_atr: float = 0.19
+    wick_min_atr: float = 0.15
 
-    funding_window_days: int = 60
-    oi_z_window_days: int = 60
-    confluence_min: float = 3.0
-    ema_trend_gap_pct: float = 0.0025
-    compression_atr_norm_max: float = 0.0055
+    funding_window_days: int = 82
+    oi_z_window_days: int = 62
+    confluence_min: float = 3.6
+    ema_trend_gap_pct: float = 0.0063
+    compression_atr_norm_max: float = 0.0023
     crowded_funding_extreme_pct: float = 85.0
     crowded_oi_zscore_min: float = 1.5
-    post_liq_tfi_abs_min: float = 0.2
+    post_liq_tfi_abs_min: float = 0.53
 
-    min_sweep_depth_pct: float = 0.0001
-    entry_offset_atr: float = 0.05
-    invalidation_offset_atr: float = 0.75
-    min_stop_distance_pct: float = 0.0015
-    tp1_atr_mult: float = 2.5
-    tp2_atr_mult: float = 4.0
-    weight_sweep_detected: float = 1.25
-    weight_reclaim_confirmed: float = 1.25
-    weight_cvd_divergence: float = 0.75
-    weight_tfi_impulse: float = 0.50
+    min_sweep_depth_pct: float = 0.00286
+    entry_offset_atr: float = 0.01
+    invalidation_offset_atr: float = 0.01
+    min_stop_distance_pct: float = 0.0032
+    tp1_atr_mult: float = 1.9
+    tp2_atr_mult: float = 3.9
+    weight_sweep_detected: float = 2.1
+    weight_reclaim_confirmed: float = 4.25
+    weight_cvd_divergence: float = 3.9
+    weight_tfi_impulse: float = 1.4
     weight_force_order_spike: float = 0.40
-    weight_regime_special: float = 0.35
-    weight_ema_trend_alignment: float = 0.25
-    weight_funding_supportive: float = 0.20
-    direction_tfi_threshold: float = 0.05
+    weight_regime_special: float = 2.35
+    weight_ema_trend_alignment: float = 5.0
+    weight_funding_supportive: float = 4.45
+    direction_tfi_threshold: float = 0.08
     direction_tfi_threshold_inverse: float = -0.05
-    tfi_impulse_threshold: float = 0.10
+    tfi_impulse_threshold: float = 0.13
     allow_long_in_uptrend: bool = False
     regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
 @dataclass(frozen=True)
 class RiskConfig:
-    risk_per_trade_pct: float = 0.01
-    max_leverage: int = 5
-    high_vol_leverage: int = 3
-    min_rr: float = 2.8
+    risk_per_trade_pct: float = 0.007
+    max_leverage: int = 8
+    high_vol_leverage: int = 8
+    min_rr: float = 2.1
 
-    max_open_positions: int = 2
+    max_open_positions: int = 1
     max_trades_per_day: int = 3
-    max_consecutive_losses: int = 3
-    daily_dd_limit: float = 0.03
-    weekly_dd_limit: float = 0.06
-    max_hold_hours: int = 24
-    high_vol_stop_distance_pct: float = 0.01
-    partial_exit_pct: float = 0.5
-    trailing_atr_mult: float = 1.0
+    max_consecutive_losses: int = 5
+    daily_dd_limit: float = 0.185
+    weekly_dd_limit: float = 0.063
+    max_hold_hours: int = 3
+    high_vol_stop_distance_pct: float = 0.035
+    partial_exit_pct: float = 0.26
+    trailing_atr_mult: float = 2.9
 
-    cooldown_minutes_after_loss: int = 60
-    duplicate_level_tolerance_pct: float = 0.001
-    duplicate_level_window_hours: int = 24
+    cooldown_minutes_after_loss: int = 95
+    duplicate_level_tolerance_pct: float = 0.0007
+    duplicate_level_window_hours: int = 114
     session_start_hour_utc: int = 0
     session_end_hour_utc: int = 23
     no_trade_windows_utc: tuple[tuple[int, int], ...] = ()

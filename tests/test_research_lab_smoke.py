@@ -186,8 +186,8 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["weight_ema_trend_alignment"].status == PARAM_STATUS_ACTIVE
     assert registry["weight_ema_trend_alignment"].low == 0.0
     assert registry["weight_ema_trend_alignment"].high == 5.0
-    assert registry["ema_trend_gap_pct"].default_value == 0.0025
-    assert registry["compression_atr_norm_max"].default_value == 0.0055
+    assert registry["ema_trend_gap_pct"].default_value == 0.0063
+    assert registry["compression_atr_norm_max"].default_value == 0.0023
     assert registry["crowded_funding_extreme_pct"].default_value == 85.0
     assert registry["crowded_oi_zscore_min"].default_value == 1.5
     assert registry["force_order_history_points"].status == PARAM_STATUS_UNSUPPORTED
@@ -584,8 +584,8 @@ def test_settings_adapter_roundtrip(tmp_path: Path) -> None:
     settings_diff = diff_settings(base, candidate)
 
     assert candidate.strategy.tp1_atr_mult == 3.3
-    assert base.strategy.tp1_atr_mult == 2.5
-    assert settings_diff == {"tp1_atr_mult": {"from": 2.5, "to": 3.3}}
+    assert base.strategy.tp1_atr_mult == 1.9
+    assert settings_diff == {"tp1_atr_mult": {"from": 1.9, "to": 3.3}}
 
 
 def test_pareto_frontier_dominance() -> None:
