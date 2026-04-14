@@ -129,6 +129,28 @@ Blueprint: [`docs/BLUEPRINT_V1.md`](docs/BLUEPRINT_V1.md)
 
 ---
 
+## Egress Configuration
+
+When the server IP is blocked by Binance CloudFront, route REST traffic through a SOCKS5 exit node.
+
+### Setup
+
+See [`docs/infra/egress-vultr.md`](docs/infra/egress-vultr.md) for full setup instructions.
+
+### Quick configuration (`.env`)
+
+```bash
+PROXY_ENABLED=true
+PROXY_URL=<exit-node-ip>:1080   # SOCKS5 exit node
+PROXY_TYPE=socks5
+PROXY_STICKY_MINUTES=60
+PROXY_FAILOVER_LIST=            # optional: comma-separated backup proxies
+```
+
+See [`.env.example`](.env.example) for all available options.
+
+---
+
 ## Testy i CI
 
 ```bash
