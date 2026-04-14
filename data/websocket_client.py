@@ -17,6 +17,7 @@ LOG = logging.getLogger(__name__)
 @dataclass(slots=True)
 class WebsocketClientConfig:
     ws_base_url: str
+    ws_market_base_url: str
     heartbeat_seconds: int
     reconnect_seconds: int
     agg_trade_buffer_size: int = 20_000
@@ -93,7 +94,12 @@ class BinanceFuturesWebsocketClient:
     def _thread_main(self) -> None:
         asyncio.run(self._run_forever())
 
-    def _build_stream_url(self) -> str:
+    def _build_market_stream_url(self) -> str:
+        base = self.config.ws_market_base_url.rstrip("/")
+        symbol = self._symbol.lower()
+        return f"{base}?streams={symbol}@aggTrade/{symbol}@forceOrder"
+
+    def _build_legacy_stream_url(self) -> str:
         base = self.config.ws_base_url.rstrip("/")
         symbol = self._symbol.lower()
 
@@ -104,10 +110,16 @@ class BinanceFuturesWebsocketClient:
             return f"{base}?streams={symbol}@aggTrade/{symbol}@forceOrder"
         return f"{base}/stream?streams={symbol}@aggTrade/{symbol}@forceOrder"
 
+    def _build_stream_url(self) -> str:
+        return self._build_market_stream_url()
+
     async def _run_forever(self) -> None:
-        stream_url = self._build_stream_url()
+        use_market = True
 
         while not self._stop_event.is_set():
+            stream_url = self._build_market_stream_url() if use_market else self._build_legacy_stream_url()
+            url_type = "market" if use_market else "legacy"
+
             try:
                 async with websockets.connect(
                     stream_url,
@@ -116,13 +128,18 @@ class BinanceFuturesWebsocketClient:
                     close_timeout=5,
                     max_queue=4096,
                 ) as socket:
-                    LOG.info("Connected websocket stream: %s", stream_url)
+                    LOG.info("Connected websocket stream (%s): %s", url_type, stream_url)
                     await self._consume(socket)
             except Exception as exc:
-                LOG.warning("Websocket stream failure: %s", exc)
+                LOG.warning("Websocket stream failure (%s): %s", url_type, exc)
                 if self._stop_event.is_set():
                     break
-                await asyncio.sleep(self.config.reconnect_seconds)
+
+                if use_market:
+                    LOG.info("Falling back to legacy /stream/ path")
+                    use_market = False
+                else:
+                    await asyncio.sleep(self.config.reconnect_seconds)
 
     async def _consume(self, socket: websockets.ClientConnection) -> None:
         while not self._stop_event.is_set():
