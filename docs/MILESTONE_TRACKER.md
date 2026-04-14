@@ -135,6 +135,36 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Completed Milestones (reverse chronological)
 
+### PAPER_BOT_MANUAL_RESTART_RAM_FREED
+**Status:** DONE (2026-04-14)
+**Builder:** Cascade
+**What:** Simple restart of btc-bot.service (paper mode) after freeing RAM by stopping research_lab optimize process.
+**RAM before restart:** 3.2GiB available (after stopping research_lab which consumed 66.2% RAM / 2.5GB)
+**Status before restart:**
+- Active: active (running) since 2026-04-13 23:28:05 UTC (42min uptime)
+- PID: 137248
+- Memory: 39.5M (peak: 40.2M)
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
+- Safe_mode: true (startup recovery entered safe mode)
+- Websocket: Connected to wss://fstream.binance.com/stream
+**Restart executed:**
+- systemctl restart btc-bot → successful
+- Active: active (running) since 2026-04-14 00:10:59 UTC
+- PID: 141498 (new process)
+- Memory: 26.7M (peak: 27.1M) - reduced from 39.5M
+- Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718 (unchanged)
+- Safe_mode: true (startup recovery entered safe mode, then snapshot_build_failed)
+- Websocket: Connected to wss://fstream.binance.com/stream
+**Status after 30 seconds (/api/status):**
+- safe_mode: true
+- safe_mode_reason: "snapshot_build_failed:Failed request GET /fapi/v1/ticker/bookTicker after retries"
+- healthy: false
+- mode: PAPER
+- config_hash: e8c7180d... (unchanged)
+- last_trade_at: 2026-03-29T13:36:19+00:00 (no new trades)
+**Conclusion:** Bot restarts successfully with reduced memory usage (26.7M vs 39.5M) but still enters safe_mode due to Binance API connectivity issue (bookTicker endpoint blocked by CloudFront). RAM availability is NOT the root cause - the issue is infrastructure-related (server IP 204.168.146.253 blocked by Binance CloudFront), not resource-related.
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### PAPER_BOT_MANUAL_RESTART
 **Status:** DONE (2026-04-14)
 **Builder:** Cascade
