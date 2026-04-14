@@ -165,6 +165,44 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 **Conclusion:** Bot restarts successfully with reduced memory usage (26.7M vs 39.5M) but still enters safe_mode due to Binance API connectivity issue (bookTicker endpoint blocked by CloudFront). RAM availability is NOT the root cause - the issue is infrastructure-related (server IP 204.168.146.253 blocked by Binance CloudFront), not resource-related.
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
+### PROTONVPN_SERVER_INSTALL
+**Status:** BLOCKED (2026-04-14)
+**Builder:** Cascade
+**What:** Installation of ProtonVPN CLI on server to bypass Binance CloudFront IP block.
+**Resource diagnostics before installation:**
+- RAM: 3.7Gi total, 2.9Gi used, 801Mi available
+- CPU: Load average 1.00, 52.4% user, 47.6% idle
+- Top consumer: research_lab optimize (66.2% RAM, 100% CPU)
+**Research_lab stopped:** Process 120863 killed to free resources
+**Resource diagnostics after stopping research_lab:**
+- RAM: 3.7Gi total, 492Mi used, 3.2Gi available (+2.4GB freed)
+- CPU: Load average 0.90, 90.9% idle (+43.3% freed)
+**Installation steps:**
+- apt install python3-pip → success
+- pip3 install --break-system-packages protonvpn-cli → success (v2.2.11)
+- apt install openvpn dialog → success
+- Command: protonvpn (not protonvpn-cli)
+**Login attempt:**
+- OpenVPN username: g8qf5eiLrxfMAWlr
+- OpenVPN password: ejXSlrHkYxaelVm2rGXCaGFPqKBs0qRI
+- protonvpn init → HTTP Error Code: 422
+**Root cause diagnosis:**
+- curl -I https://api.protonvpn.ch → HTTP/2 404
+- Server IP 204.168.146.253 is BLOCKED by:
+  - Binance CloudFront (fapi.binance.com) → HTTP 404
+  - ProtonVPN API (api.protonvpn.ch) → HTTP 404
+**Conclusion:** ❌ ProtonVPN CLI cannot be initialized because ProtonVPN API also blocks the server IP. This is not a credentials issue but a CDN/CloudFront IP blocking issue affecting multiple services. The server IP (204.168.146.253) appears to be on a blocklist used by major CDNs.
+**Acceptance criteria NOT met:**
+- ❌ ProtonVPN CLI cannot be initialized (API blocked)
+- ❌ Cannot connect to VPN server
+- ❌ Cannot bypass Binance CloudFront block via VPN
+**Next steps required (infrastructure):**
+1. Migrate server to different IP/location (Hetzner may have other IP ranges)
+2. Use proxy/VPN on a different IP
+3. Contact Binance/ProtonVPN support for IP whitelisting
+4. Use alternative data provider (not Binance)
+**SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
+
 ### PAPER_BOT_MANUAL_RESTART
 **Status:** DONE (2026-04-14)
 **Builder:** Cascade
