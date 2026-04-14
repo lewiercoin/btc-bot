@@ -33,6 +33,12 @@ const riskBars = {
   positions: { bar: document.getElementById("risk-bar-positions"), val: document.getElementById("risk-val-positions") },
 };
 
+const serverMeta = document.getElementById("server-meta");
+const serverCpu = document.getElementById("server-cpu");
+const serverMemory = document.getElementById("server-memory");
+const serverLoad = document.getElementById("server-load");
+const serverDisk = document.getElementById("server-disk");
+
 const egressFields = {
   enabled: document.getElementById("egress-enabled"),
   type: document.getElementById("egress-type"),
@@ -612,6 +618,36 @@ async function refreshRisk() {
   }
 }
 
+function renderServerResources(payload) {
+  const cpuPct = payload.cpu_percent || 0;
+  const memPct = payload.memory_percent || 0;
+  const diskPct = payload.disk_percent || 0;
+
+  serverCpu.textContent = `${cpuPct}%`;
+  serverCpu.className = cpuPct >= 80 ? "badge badge--warn" : cpuPct >= 95 ? "badge badge--error" : "badge badge--ok";
+
+  serverMemory.textContent = `${memPct}% (${payload.memory_used_gb || 0} / ${payload.memory_total_gb || 0} GB)`;
+  serverMemory.className = memPct >= 80 ? "badge badge--warn" : memPct >= 95 ? "badge badge--error" : "badge badge--ok";
+
+  const load1 = payload.load_avg?.["1m"] || 0;
+  const load5 = payload.load_avg?.["5m"] || 0;
+  const load15 = payload.load_avg?.["15m"] || 0;
+  serverLoad.textContent = `${load1} / ${load5} / ${load15}`;
+
+  serverDisk.textContent = `${diskPct}% (${payload.disk_used_gb || 0} / ${payload.disk_total_gb || 0} GB)`;
+  serverDisk.className = diskPct >= 80 ? "badge badge--warn" : diskPct >= 95 ? "badge badge--error" : "badge badge--ok";
+
+  serverMeta.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+}
+
+async function refreshServerResources() {
+  try {
+    renderServerResources(await loadJson("/api/server-resources"));
+  } catch (error) {
+    if (serverMeta) serverMeta.textContent = "Server resources unavailable";
+  }
+}
+
 function handleThemeToggle() {
   const html = document.documentElement;
   const isDark = html.getAttribute("data-theme") === "dark";
@@ -704,6 +740,7 @@ refreshMetrics();
 refreshAlerts();
 refreshEgress();
 refreshRisk();
+refreshServerResources();
 connectLogs();
 
 window.setInterval(refreshStatus, 5000);
@@ -714,3 +751,4 @@ window.setInterval(refreshMetrics, 120000);
 window.setInterval(refreshAlerts, 60000);
 window.setInterval(refreshEgress, 10000);
 window.setInterval(refreshRisk, 10000);
+window.setInterval(refreshServerResources, 10000);
