@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal
 
+import psutil
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
@@ -334,6 +335,29 @@ async def get_risk(request: Request) -> dict:
         "governance_blocked": governance_blocked,
         "risk_blocked": risk_blocked,
         "safe_mode": safe_mode,
+    }
+
+
+@app.get("/api/server-resources")
+async def get_server_resources(request: Request) -> dict:
+    cpu_percent = psutil.cpu_percent(interval=0.1)
+    memory = psutil.virtual_memory()
+    load_avg = psutil.getloadavg() if hasattr(psutil, "getloadavg") else (0.0, 0.0, 0.0)
+    disk = psutil.disk_usage("/")
+
+    return {
+        "cpu_percent": round(cpu_percent, 1),
+        "memory_percent": round(memory.percent, 1),
+        "memory_total_gb": round(memory.total / (1024**3), 2),
+        "memory_used_gb": round(memory.used / (1024**3), 2),
+        "load_avg": {
+            "1m": round(load_avg[0], 2),
+            "5m": round(load_avg[1], 2),
+            "15m": round(load_avg[2], 2),
+        },
+        "disk_percent": round(disk.percent, 1),
+        "disk_total_gb": round(disk.total / (1024**3), 2),
+        "disk_used_gb": round(disk.used / (1024**3), 2),
     }
 
 
