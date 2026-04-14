@@ -19,6 +19,10 @@
         </div>
       </header>
 
+      <div class="safe-mode-alert" id="safe-mode-alert" style="display:none">
+        ⚠ Bot is in <strong>Safe Mode</strong> — trading is paused. Reason: <span id="safe-mode-alert-reason">unknown</span>
+      </div>
+
       <section class="panel panel--control">
         <div class="panel__header">
           <h2>Bot Control</h2>
@@ -132,6 +136,55 @@
             </table>
           </div>
         </article>
+      </section>
+
+      <section class="panel panel--egress">
+        <div class="panel__header">
+          <h2>Egress Health</h2>
+          <span class="panel__meta" id="egress-meta">-</span>
+        </div>
+        <dl class="stat-list" id="egress-list">
+          <div class="stat-row">
+            <dt>Proxy enabled</dt>
+            <dd id="egress-enabled">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Type</dt>
+            <dd id="egress-type">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Exit node</dt>
+            <dd id="egress-host" class="mono">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Sticky session</dt>
+            <dd id="egress-sticky">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Session age</dt>
+            <dd id="egress-session-age">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Last session start</dt>
+            <dd id="egress-session-start">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Bans detected (24h)</dt>
+            <dd id="egress-fail-count">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Last ban at</dt>
+            <dd id="egress-last-ban">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Last rotation at</dt>
+            <dd id="egress-last-rotation">-</dd>
+          </div>
+          <div class="stat-row">
+            <dt>Safe mode</dt>
+            <dd id="egress-safe-mode">-</dd>
+          </div>
+        </dl>
       </section>
 
       <section class="panel">

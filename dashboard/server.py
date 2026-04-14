@@ -2,9 +2,11 @@ from __future__ import annotations
 
 import csv
 import io
+import re
 from contextlib import asynccontextmanager
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 
 from fastapi import FastAPI, Query, Request
 from fastapi.responses import FileResponse, StreamingResponse
@@ -16,6 +18,78 @@ from dashboard.log_streamer import stream_log_lines
 from dashboard.process_manager import ProcessManager
 from settings import load_settings
 
+_LOG_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+_TAIL_BYTES = 256 * 1024
+
+
+def _extract_log_ts(line: str) -> datetime | None:
+    m = _LOG_TS_RE.match(line)
+    if not m:
+        return None
+    try:
+        return datetime.strptime(m.group(1), "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    except ValueError:
+        return None
+
+
+def _tail_lines(path: Path, max_bytes: int = _TAIL_BYTES) -> list[str]:
+    """Read last max_bytes of file and return lines (avoids loading entire file)."""
+    if not path.exists():
+        return []
+    try:
+        with open(path, "rb") as f:
+            f.seek(0, 2)
+            size = f.tell()
+            offset = max(0, size - max_bytes)
+            f.seek(offset)
+            raw = f.read()
+        return raw.decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return []
+
+
+def _parse_egress_events(log_path: Path) -> dict[str, Any]:
+    """Parse proxy/egress events from bot log tail. No import of ProxyTransport."""
+    now = datetime.now(timezone.utc)
+    cutoff = now - timedelta(hours=24)
+
+    last_session_start: datetime | None = None
+    last_ban_at: datetime | None = None
+    last_rotation_at: datetime | None = None
+    fail_count_24h = 0
+
+    for line in _tail_lines(log_path):
+        ts = _extract_log_ts(line)
+
+        if "Proxy transport enabled" in line or "Proxy session expired, reinitializing" in line:
+            if ts:
+                last_session_start = ts
+
+        elif "CloudFront ban detected" in line:
+            if ts and ts >= cutoff:
+                fail_count_24h += 1
+            if ts:
+                last_ban_at = ts
+
+        elif "Proxy rotation:" in line:
+            if ts:
+                last_rotation_at = ts
+
+    session_age_minutes: float | None = None
+    if last_session_start is not None:
+        session_age_minutes = round((now - last_session_start).total_seconds() / 60, 1)
+
+    def _iso(dt: datetime | None) -> str | None:
+        return dt.isoformat() if dt else None
+
+    return {
+        "last_session_start": _iso(last_session_start),
+        "session_age_minutes": session_age_minutes,
+        "fail_count_24h": fail_count_24h,
+        "last_ban_at": _iso(last_ban_at),
+        "last_rotation_at": _iso(last_rotation_at),
+    }
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = PROJECT_ROOT / "dashboard" / "static"
 
@@ -24,6 +98,7 @@ STATIC_DIR = PROJECT_ROOT / "dashboard" / "static"
 async def lifespan(app: FastAPI):
     settings = load_settings(project_root=PROJECT_ROOT)
     assert settings.storage is not None
+    app.state.settings = settings
     app.state.reader = DashboardReader(settings.storage.db_path)
     app.state.log_path = settings.storage.logs_dir / "btc_bot.log"
     app.state.process_manager = ProcessManager(
@@ -41,7 +116,7 @@ class StopBotRequest(BaseModel):
     reason: str = "operator_stop"
 
 
-app = FastAPI(title="BTC Bot Dashboard", version="m3", lifespan=lifespan)
+app = FastAPI(title="BTC Bot Dashboard", version="m4", lifespan=lifespan)
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 
@@ -132,6 +207,52 @@ async def export_trades(request: Request, limit: int = Query(default=200, ge=1, 
         media_type="text/csv",
         headers={"Content-Disposition": "attachment; filename=trades.csv"},
     )
+
+
+@app.get("/api/egress")
+async def get_egress(request: Request) -> dict:
+    settings = request.app.state.settings
+    proxy = settings.proxy
+
+    proxy_host: str | None = None
+    proxy_port: int | None = None
+    raw_url = proxy.proxy_url
+    if raw_url and ":" in raw_url:
+        parts = raw_url.rsplit(":", 1)
+        proxy_host = parts[0] or None
+        try:
+            proxy_port = int(parts[1])
+        except (ValueError, IndexError):
+            proxy_port = None
+
+    events = _parse_egress_events(request.app.state.log_path)
+
+    safe_mode: bool | None = None
+    safe_mode_reason: str | None = None
+    try:
+        status = request.app.state.reader.read_status()
+        bot_state = status.get("bot_state")
+        if bot_state:
+            safe_mode = bool(bot_state.get("safe_mode", False))
+            safe_mode_reason = bot_state.get("safe_mode_reason")
+    except Exception:
+        pass
+
+    return {
+        "proxy_enabled": proxy.proxy_enabled,
+        "proxy_type": proxy.proxy_type if proxy.proxy_enabled else None,
+        "proxy_host": proxy_host,
+        "proxy_port": proxy_port,
+        "sticky_minutes": proxy.sticky_minutes if proxy.proxy_enabled else None,
+        "failover_count": len(proxy.failover_list),
+        "last_session_start": events["last_session_start"],
+        "session_age_minutes": events["session_age_minutes"],
+        "fail_count_24h": events["fail_count_24h"],
+        "last_ban_at": events["last_ban_at"],
+        "last_rotation_at": events["last_rotation_at"],
+        "safe_mode": safe_mode,
+        "safe_mode_reason": safe_mode_reason,
+    }
 
 
 @app.get("/api/signals/export")
