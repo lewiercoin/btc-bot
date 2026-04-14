@@ -15,6 +15,22 @@ const botModeSelect = document.getElementById("bot-mode");
 const startButton = document.getElementById("btn-start");
 const stopButton = document.getElementById("btn-stop");
 const themeButton = document.getElementById("btn-theme");
+const safeModeAlert = document.getElementById("safe-mode-alert");
+const safeModeAlertReason = document.getElementById("safe-mode-alert-reason");
+
+const egressFields = {
+  enabled: document.getElementById("egress-enabled"),
+  type: document.getElementById("egress-type"),
+  host: document.getElementById("egress-host"),
+  sticky: document.getElementById("egress-sticky"),
+  sessionAge: document.getElementById("egress-session-age"),
+  sessionStart: document.getElementById("egress-session-start"),
+  failCount: document.getElementById("egress-fail-count"),
+  lastBan: document.getElementById("egress-last-ban"),
+  lastRotation: document.getElementById("egress-last-rotation"),
+  safeMode: document.getElementById("egress-safe-mode"),
+  meta: document.getElementById("egress-meta"),
+};
 
 const statusFields = {
   mode: document.getElementById("status-mode"),
@@ -116,11 +132,73 @@ function setBadge(state) {
   statusBadge.textContent = "Unhealthy";
 }
 
+function updateSafeModeAlert(state) {
+  if (state && state.safe_mode) {
+    safeModeAlertReason.textContent = state.safe_mode_reason || "unknown";
+    safeModeAlert.style.display = "";
+  } else {
+    safeModeAlert.style.display = "none";
+  }
+}
+
+function renderEgress(payload) {
+  const enabled = payload.proxy_enabled;
+  egressFields.enabled.textContent = enabled ? "Yes" : "No";
+  egressFields.enabled.className = enabled ? "badge badge--ok" : "badge badge--warn";
+
+  egressFields.type.textContent = payload.proxy_type || "-";
+
+  if (payload.proxy_host && payload.proxy_port) {
+    egressFields.host.textContent = `${payload.proxy_host}:${payload.proxy_port}`;
+  } else {
+    egressFields.host.textContent = "-";
+  }
+
+  egressFields.sticky.textContent = payload.sticky_minutes !== null
+    ? `${payload.sticky_minutes} min`
+    : "-";
+
+  egressFields.sessionAge.textContent = payload.session_age_minutes !== null
+    ? `${payload.session_age_minutes} min`
+    : "-";
+
+  egressFields.sessionStart.textContent = formatDate(payload.last_session_start);
+
+  const bans = payload.fail_count_24h;
+  egressFields.failCount.textContent = String(bans);
+  egressFields.failCount.className = bans > 0 ? "badge badge--error" : "";
+
+  egressFields.lastBan.textContent = payload.last_ban_at ? formatDate(payload.last_ban_at) : "None";
+  egressFields.lastRotation.textContent = payload.last_rotation_at ? formatDate(payload.last_rotation_at) : "None";
+
+  const safe = payload.safe_mode;
+  if (safe === null || safe === undefined) {
+    egressFields.safeMode.textContent = "-";
+    egressFields.safeMode.className = "";
+  } else if (safe) {
+    egressFields.safeMode.textContent = "Active";
+    egressFields.safeMode.className = "badge badge--warn";
+  } else {
+    egressFields.safeMode.textContent = "Off";
+    egressFields.safeMode.className = "badge badge--ok";
+  }
+
+  egressFields.meta.textContent = `Updated ${new Date().toLocaleTimeString()}`;
+
+  if (safe) {
+    safeModeAlertReason.textContent = payload.safe_mode_reason || "unknown";
+    safeModeAlert.style.display = "";
+  } else {
+    safeModeAlert.style.display = "none";
+  }
+}
+
 function renderStatus(payload) {
-  dashboardVersion.textContent = payload.dashboard_version || "m3";
+  dashboardVersion.textContent = payload.dashboard_version || "m4";
   const state = payload.bot_state;
   const process = payload.process || { running: false, pid: null, mode: null, exit_code: null };
   setBadge(state);
+  updateSafeModeAlert(state);
   processStatus.textContent = process.running
     ? `Running PID ${process.pid} (${process.mode})`
     : "Stopped";
@@ -406,6 +484,14 @@ async function refreshAlerts() {
   }
 }
 
+async function refreshEgress() {
+  try {
+    renderEgress(await loadJson("/api/egress"));
+  } catch (error) {
+    egressFields.meta.textContent = "Egress unavailable";
+  }
+}
+
 function handleThemeToggle() {
   const html = document.documentElement;
   const isDark = html.getAttribute("data-theme") === "dark";
@@ -496,6 +582,7 @@ refreshTrades();
 refreshSignals();
 refreshMetrics();
 refreshAlerts();
+refreshEgress();
 connectLogs();
 
 window.setInterval(refreshStatus, 5000);
@@ -504,3 +591,4 @@ window.setInterval(refreshTrades, 30000);
 window.setInterval(refreshSignals, 60000);
 window.setInterval(refreshMetrics, 120000);
 window.setInterval(refreshAlerts, 60000);
+window.setInterval(refreshEgress, 10000);
