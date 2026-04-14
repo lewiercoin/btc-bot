@@ -1,10 +1,45 @@
 # Milestone Tracker
 
-Last updated: 2026-04-13
+Last updated: 2026-04-14
 
 ---
 
 ## Current Active Milestone
+
+**Milestone:** INFRA-EGRESS-VULTR — Dedicated SOCKS5 exit node via Vultr
+**Status:** DONE (branch: infra/egress-vultr-fix, commit 590064c, 2026-04-14)
+**Active builder:** Cascade
+**Commits:** 590064c chore: add Vultr SOCKS5 egress node documentation and config
+
+**What:** Configured dedicated Vultr VPS (80.240.17.161) as SOCKS5 exit node (dante-server v1.4.2, port 1080). UFW firewall whitelists only Hetzner IP (204.168.146.253). Bot configured with PROXY_TYPE=socks5, PROXY_URL=80.240.17.161:1080.
+
+**Why:** IPRoyal residential proxy exit IP was partially blocked by Binance CloudFront (bookTicker and critical endpoints returned 404). Vultr exit node routes REST traffic through a clean IP — all critical endpoints (ping, time, bookTicker) return HTTP 200.
+
+**Acceptance criteria:**
+- ✅ SOCKS5 daemon running and stable on Vultr (danted active, port 1080)
+- ✅ Firewall: only Hetzner IP allowed on port 1080
+- ✅ `/fapi/v1/ping` → HTTP 200 via SOCKS5
+- ✅ `/fapi/v1/time` → HTTP 200 via SOCKS5
+- ✅ `/fapi/v1/ticker/bookTicker?symbol=BTCUSDT` → HTTP 200 via SOCKS5
+- ✅ Bot log: `Proxy transport enabled: type=socks5, sticky=60 min, failover_count=0`
+- ✅ No REST retry errors after restart
+- ✅ 1h paper mode stability (zero REST errors, session reinit at 10:22:35 UTC as expected)
+
+**Changes (repo only — no code changes):**
+- Added `docs/infra/egress-vultr.md` (IP, port, config, destroy instructions)
+- Added `.env.example` (PROXY_SOCKS5_URL template + all env vars documented)
+- Updated `README.md` (Egress Configuration section)
+- Updated `docs/MILESTONE_TRACKER.md` (this entry)
+
+**Known remaining issue:**
+- `/fapi/v1/exchangeInfo` still returns HTTP 404 from CloudFront on Vultr exit IP. This endpoint is not in the bot's critical runtime loop.
+
+**In-scope:** Vultr SOCKS5 configuration + documentation + .env.example + README
+**Out-of-scope:** ProxyTransport code, safe mode, WebSocket, WireGuard, core/execution layers
+
+---
+
+## Previous Milestones
 
 **Milestone:** INFRA-RESILIENCE-PROXY-2026 — Configurable proxy layer for Binance REST client
 **Status:** MVP_DONE (commit 7622f8b, 2026-04-14)
