@@ -133,13 +133,38 @@ Blueprint: [`docs/BLUEPRINT_V1.md`](docs/BLUEPRINT_V1.md)
 
 Read-only observability UI (FastAPI m4, SSE log stream, polling).
 
-Access: `http://<server-ip>:8080`
+**Production URL:** `http://204.168.146.253:8080`
 
-**Panels:** Bot Status, Open Positions, Egress Health, Recent Trades, Signals, Daily Metrics, Alerts, Log Stream
+**Panels:** Bot Status, Bot Control (start/stop), Open Positions, Egress Health, Recent Trades, Signals, Daily Metrics, Alerts, Log Stream
 
-**Egress Health panel** — live SOCKS5 proxy status (exit node IP, session age, bans/24h, safe mode). Auto-refreshes every 10s. Safe mode alert banner appears at top when trading is paused.
+**Egress Health panel** — live SOCKS5 proxy status (exit node IP, session age, bans/24h, safe mode). Auto-refreshes every 10s. Safe mode alert banner appears at top of page in red when trading is paused.
 
-See [`docs/dashboard/egress-integration.md`](docs/dashboard/egress-integration.md) for API docs.
+### How to run & access Dashboard
+
+**Start via systemd (production):**
+
+```bash
+sudo systemctl start btc-bot-dashboard
+sudo systemctl status btc-bot-dashboard
+```
+
+**Quick health check:**
+
+```bash
+curl -s http://localhost:8080/api/status | python3 -m json.tool | head -10
+curl -s http://localhost:8080/api/egress  | python3 -m json.tool
+```
+
+**SSH tunnel (no firewall change needed):**
+
+```bash
+ssh -i btc-bot-deploy -L 8080:127.0.0.1:8080 btc-bot@204.168.146.253 -N
+# then open http://localhost:8080
+```
+
+Full step-by-step guide (UFW, external binding, log rotation, deploy updates): [`docs/dashboard/access-guide.md`](docs/dashboard/access-guide.md)
+
+API docs (Egress Health endpoint): [`docs/dashboard/egress-integration.md`](docs/dashboard/egress-integration.md)
 
 ---
 
