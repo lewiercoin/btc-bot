@@ -7,7 +7,7 @@ Last updated: 2026-04-14 (12:53 UTC)
 ## Current Active Milestone
 
 **Milestone:** WEBSOCKET-MIGRATION — Migrate WebSocket URLs to new Binance official /market/ paths
-**Status:** MVP_DONE (branch: websocket-migration, 2026-04-14)
+**Status:** DONE (branch: websocket-migration, commit dcc0105, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Migrated WebSocket URLs from legacy `/stream/` to new official `/market/` paths:
