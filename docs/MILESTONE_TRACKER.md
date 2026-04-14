@@ -7,9 +7,9 @@ Last updated: 2026-04-14
 ## Current Active Milestone
 
 **Milestone:** INFRA-EGRESS-VULTR — Dedicated SOCKS5 exit node via Vultr
-**Status:** MVP_DONE (branch: infra/egress-vultr-fix, 2026-04-14)
+**Status:** DONE (branch: infra/egress-vultr-fix, commit 590064c, 2026-04-14)
 **Active builder:** Cascade
-**Commits:** (see branch infra/egress-vultr-fix)
+**Commits:** 590064c chore: add Vultr SOCKS5 egress node documentation and config
 
 **What:** Configured dedicated Vultr VPS (80.240.17.161) as SOCKS5 exit node (dante-server v1.4.2, port 1080). UFW firewall whitelists only Hetzner IP (204.168.146.253). Bot configured with PROXY_TYPE=socks5, PROXY_URL=80.240.17.161:1080.
 
@@ -23,7 +23,7 @@ Last updated: 2026-04-14
 - ✅ `/fapi/v1/ticker/bookTicker?symbol=BTCUSDT` → HTTP 200 via SOCKS5
 - ✅ Bot log: `Proxy transport enabled: type=socks5, sticky=60 min, failover_count=0`
 - ✅ No REST retry errors after restart
-- ⏳ 1h paper mode stability (in progress)
+- ✅ 1h paper mode stability (zero REST errors, session reinit at 10:22:35 UTC as expected)
 
 **Changes (repo only — no code changes):**
 - Added `docs/infra/egress-vultr.md` (IP, port, config, destroy instructions)
