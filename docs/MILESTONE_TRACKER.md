@@ -7,7 +7,7 @@ Last updated: 2026-04-14 (12:53 UTC)
 ## Current Active Milestone
 
 **Milestone:** DASHBOARD-RISK-VISUALISATION — Live Risk & Governance panel in dashboard
-**Status:** MVP_DONE (branch: dashboard-risk-visualisation, 2026-04-14)
+**Status:** DONE (branch: dashboard-risk-visualisation, commit 24b1bff, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Extended dashboard with Risk & Governance panel:
