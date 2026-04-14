@@ -6,6 +6,48 @@ Last updated: 2026-04-13
 
 ## Current Active Milestone
 
+**Milestone:** INFRA-RESILIENCE-PROXY-2026 — Configurable proxy layer for Binance REST client
+**Status:** MVP_DONE (commit 7622f8b, 2026-04-14)
+**Active builder:** Cascade
+**Commits:**
+- `7622f8b` INFRA-RESILIENCE-PROXY-2026: add configurable proxy layer for Binance REST client
+
+**What:** Added residential/static proxy support with sticky sessions and automatic failover for Binance REST API calls to bypass CloudFront IP blocking.
+
+**Why:** Server IP (204.168.146.253) is blocked by Binance CloudFront, causing bookTicker requests to fail with HTTP 404. Proxy layer routes REST calls through residential IPs to avoid CDN blocking.
+
+**Changes:**
+- Added ProxyConfig to settings.py (PROXY_URL, PROXY_TYPE, PROXY_STICKY_MINUTES, PROXY_FAILOVER_LIST env vars)
+- Created data/proxy_transport.py with ProxyTransport class (HTTP/SOCKS5 support, sticky sessions, CloudFront ban detection, automatic failover)
+- Updated RestClientConfig to accept proxy_transport
+- Modified BinanceFuturesRestClient._request_with_retry to use proxy transport
+- Updated orchestrator.py build_default_bundle to initialize ProxyTransport when enabled
+- Added PySocks>=1.7.1 to requirements.txt for SOCKS5 support
+- Added tests/test_proxy_transport.py with 12 tests (all passing)
+
+**Acceptance criteria met:**
+- ✅ Proxy transport layer implemented with HTTP/SOCKS5 support
+- ✅ Sticky session logic (configurable 30-60 min via PROXY_STICKY_MINUTES)
+- ✅ CloudFront ban detection (x-cache header + HTTP 404)
+- ✅ Automatic failover (PROXY_FAILOVER_LIST with rotation logic)
+- ✅ Logging + alert on ban detection (ERROR log for ban, WARNING for rotation)
+- ✅ Smoke tests PASSED (93 passed, 24 skipped)
+- ✅ Zero regression in existing logic (all existing tests still pass)
+- ✅ Zero changes in core logic, feature_engine, regime_engine, signal path, WebSocket
+- ✅ Determinism preserved (no randomness in core path)
+
+**Pending deployment verification:**
+- Configure proxy credentials via .env (PROXY_URL, PROXY_TYPE, PROXY_STICKY_MINUTES, PROXY_FAILOVER_LIST)
+- Deploy to server
+- Verify bookTicker succeeds through proxy (HTTP 404 should disappear)
+- Verify sticky session works (proxy persists for configured duration)
+- Verify failover works on CloudFront ban (requires simulating ban or waiting for real ban)
+
+**In-scope:** Proxy transport layer + config + monitoring + failover
+**Out-of-scope:** VPS IP changes, whitelisting, WebSocket changes, core/models.py, research_lab/
+
+---
+
 **Milestone:** RUN13-REGIME-AWARE — Regime-robust campaign with anchored walk-forward
 **Status:** ACTIVE — Run #13 running on server (tmux `optimize13`, PID 120863, started 2026-04-13 10:50 UTC)
 **Active builder:** Codex (D1-D4) + Cascade (commit cleanup)
