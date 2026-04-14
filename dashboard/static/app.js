@@ -18,6 +18,21 @@ const themeButton = document.getElementById("btn-theme");
 const safeModeAlert = document.getElementById("safe-mode-alert");
 const safeModeAlertReason = document.getElementById("safe-mode-alert-reason");
 
+const riskMeta = document.getElementById("risk-meta");
+const riskAlert = document.getElementById("risk-alert");
+const riskAlertText = document.getElementById("risk-alert-text");
+const riskRegime = document.getElementById("risk-regime");
+const riskRegimeAsOf = document.getElementById("risk-regime-as-of");
+const riskSignalCard = document.getElementById("risk-signal-card");
+const riskBlocked = document.getElementById("risk-blocked");
+
+const riskBars = {
+  dailyDd: { bar: document.getElementById("risk-bar-daily-dd"), val: document.getElementById("risk-val-daily-dd") },
+  weeklyDd: { bar: document.getElementById("risk-bar-weekly-dd"), val: document.getElementById("risk-val-weekly-dd") },
+  losses: { bar: document.getElementById("risk-bar-losses"), val: document.getElementById("risk-val-losses") },
+  positions: { bar: document.getElementById("risk-bar-positions"), val: document.getElementById("risk-val-positions") },
+};
+
 const egressFields = {
   enabled: document.getElementById("egress-enabled"),
   type: document.getElementById("egress-type"),
@@ -139,6 +154,103 @@ function updateSafeModeAlert(state) {
   } else {
     safeModeAlert.style.display = "none";
   }
+}
+
+function setRiskBar(entry, usage, limit, formatFn) {
+  const pct = limit > 0 ? Math.min((usage / limit) * 100, 100) : 0;
+  entry.bar.style.width = `${pct}%`;
+  entry.bar.className = "risk-bar";
+  if (pct >= 100) {
+    entry.bar.classList.add("risk-bar--full");
+  } else if (pct >= 80) {
+    entry.bar.classList.add("risk-bar--warn");
+  }
+  entry.val.textContent = formatFn ? formatFn(usage, limit) : `${usage} / ${limit}`;
+}
+
+function renderRisk(payload) {
+  const limits = payload.risk_limits || {};
+  const usage = payload.risk_usage || {};
+
+  riskRegime.textContent = payload.regime ? payload.regime.toUpperCase() : "-";
+  riskRegime.className = payload.regime ? `regime-badge regime--${payload.regime.toLowerCase().replace("_", "-")}` : "";
+  riskRegimeAsOf.textContent = formatDate(payload.regime_as_of);
+
+  setRiskBar(
+    riskBars.dailyDd,
+    usage.daily_dd_pct || 0,
+    limits.daily_dd_limit_pct || 1,
+    (u, l) => `${formatPercent(u)} / ${formatPercent(l)}`
+  );
+  setRiskBar(
+    riskBars.weeklyDd,
+    usage.weekly_dd_pct || 0,
+    limits.weekly_dd_limit_pct || 1,
+    (u, l) => `${formatPercent(u)} / ${formatPercent(l)}`
+  );
+  setRiskBar(
+    riskBars.losses,
+    usage.consecutive_losses || 0,
+    limits.max_consecutive_losses || 1,
+    (u, l) => `${u} / ${l}`
+  );
+  setRiskBar(
+    riskBars.positions,
+    usage.open_positions_count || 0,
+    limits.max_open_positions || 1,
+    (u, l) => `${u} / ${l}`
+  );
+
+  const blocked = payload.risk_blocked || payload.safe_mode;
+  riskBlocked.textContent = blocked ? "Yes" : "No";
+  riskBlocked.className = blocked ? "badge badge--error" : "badge badge--ok";
+
+  const sig = payload.latest_signal;
+  if (!sig) {
+    riskSignalCard.innerHTML = '<p class="empty">No signals recorded.</p>';
+  } else {
+    const promotedClass = sig.promoted ? "promoted" : "vetoed";
+    const promotedLabel = sig.promoted ? "Promoted ✓" : "Vetoed ✗";
+    const reasonsHtml = Array.isArray(sig.reasons) && sig.reasons.length
+      ? sig.reasons.map((r) => `<li>${r}</li>`).join("")
+      : "<li>-</li>";
+    const govNotesHtml = Array.isArray(sig.governance_notes) && sig.governance_notes.length
+      ? `<div class="sig-gov-notes"><strong>Governance:</strong> ${sig.governance_notes.join("; ")}</div>`
+      : "";
+    riskSignalCard.innerHTML = `
+      <div class="sig-header">
+        <span class="sig-direction sig-direction--${(sig.direction || "").toLowerCase()}">${sig.direction || "-"}</span>
+        <span class="sig-badge sig-badge--${promotedClass}">${promotedLabel}</span>
+        <span class="sig-setup">${sig.setup_type || "-"}</span>
+      </div>
+      <dl class="stat-list sig-stats">
+        <div class="stat-row"><dt>Regime</dt><dd>${sig.regime ? sig.regime.toUpperCase() : "-"}</dd></div>
+        <div class="stat-row"><dt>Confluence</dt><dd>${sig.confluence_score !== null && sig.confluence_score !== undefined ? formatNumber(sig.confluence_score, 2) : "-"} <small>(min ${formatNumber(limits.confluence_min, 1)})</small></dd></div>
+        <div class="stat-row"><dt>RR ratio</dt><dd>${sig.rr_ratio !== null && sig.rr_ratio !== undefined ? formatNumber(sig.rr_ratio, 2) : "-"} <small>(min ${formatNumber(limits.min_rr, 1)})</small></dd></div>
+        <div class="stat-row"><dt>Entry</dt><dd>${sig.entry_price !== null && sig.entry_price !== undefined ? formatNumber(sig.entry_price) : "-"}</dd></div>
+        <div class="stat-row"><dt>Time</dt><dd>${formatDate(sig.timestamp)}</dd></div>
+      </dl>
+      <div class="sig-reasons"><strong>Reasons:</strong><ul>${reasonsHtml}</ul></div>
+      ${govNotesHtml}
+    `;
+  }
+
+  const alerts = [];
+  if (payload.governance_blocked) alerts.push("Governance blocked latest signal.");
+  if (payload.risk_blocked && !payload.governance_blocked) alerts.push("RiskGate is blocking new trades.");
+  const dailyUsagePct = limits.daily_dd_limit_pct > 0 ? (usage.daily_dd_pct / limits.daily_dd_limit_pct) : 0;
+  const weeklyUsagePct = limits.weekly_dd_limit_pct > 0 ? (usage.weekly_dd_pct / limits.weekly_dd_limit_pct) : 0;
+  if (dailyUsagePct >= 0.8 && dailyUsagePct < 1.0) alerts.push(`Daily DD at ${formatPercent(usage.daily_dd_pct)} (${Math.round(dailyUsagePct * 100)}% of limit).`);
+  if (weeklyUsagePct >= 0.8 && weeklyUsagePct < 1.0) alerts.push(`Weekly DD at ${formatPercent(usage.weekly_dd_pct)} (${Math.round(weeklyUsagePct * 100)}% of limit).`);
+
+  if (alerts.length > 0) {
+    riskAlertText.textContent = alerts.join(" ");
+    riskAlert.style.display = "";
+  } else {
+    riskAlert.style.display = "none";
+  }
+
+  riskMeta.textContent = `Updated ${new Date().toLocaleTimeString()}`;
 }
 
 function renderEgress(payload) {
@@ -492,6 +604,14 @@ async function refreshEgress() {
   }
 }
 
+async function refreshRisk() {
+  try {
+    renderRisk(await loadJson("/api/risk"));
+  } catch (error) {
+    if (riskMeta) riskMeta.textContent = "Risk data unavailable";
+  }
+}
+
 function handleThemeToggle() {
   const html = document.documentElement;
   const isDark = html.getAttribute("data-theme") === "dark";
@@ -583,6 +703,7 @@ refreshSignals();
 refreshMetrics();
 refreshAlerts();
 refreshEgress();
+refreshRisk();
 connectLogs();
 
 window.setInterval(refreshStatus, 5000);
@@ -592,3 +713,4 @@ window.setInterval(refreshSignals, 60000);
 window.setInterval(refreshMetrics, 120000);
 window.setInterval(refreshAlerts, 60000);
 window.setInterval(refreshEgress, 10000);
+window.setInterval(refreshRisk, 10000);

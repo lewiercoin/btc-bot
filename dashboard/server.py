@@ -255,6 +255,88 @@ async def get_egress(request: Request) -> dict:
     }
 
 
+@app.get("/api/risk")
+async def get_risk(request: Request) -> dict:
+    settings = request.app.state.settings
+    risk = settings.risk
+    strategy = settings.strategy
+
+    risk_limits = {
+        "daily_dd_limit_pct": risk.daily_dd_limit,
+        "weekly_dd_limit_pct": risk.weekly_dd_limit,
+        "max_consecutive_losses": risk.max_consecutive_losses,
+        "max_open_positions": risk.max_open_positions,
+        "max_trades_per_day": risk.max_trades_per_day,
+        "confluence_min": strategy.confluence_min,
+        "min_rr": risk.min_rr,
+    }
+
+    risk_usage: dict = {
+        "daily_dd_pct": 0.0,
+        "weekly_dd_pct": 0.0,
+        "consecutive_losses": 0,
+        "open_positions_count": 0,
+    }
+    safe_mode = False
+
+    try:
+        status = request.app.state.reader.read_status()
+        bot_state = status.get("bot_state")
+        if bot_state:
+            risk_usage["daily_dd_pct"] = float(bot_state.get("daily_dd_pct", 0.0))
+            risk_usage["weekly_dd_pct"] = float(bot_state.get("weekly_dd_pct", 0.0))
+            risk_usage["consecutive_losses"] = int(bot_state.get("consecutive_losses", 0))
+            risk_usage["open_positions_count"] = int(bot_state.get("open_positions_count", 0))
+            safe_mode = bool(bot_state.get("safe_mode", False))
+    except Exception:
+        pass
+
+    latest_signal: dict | None = None
+    regime: str | None = None
+    regime_as_of: str | None = None
+    governance_blocked = False
+
+    try:
+        signals_payload = request.app.state.reader.read_signals(limit=1)
+        signals = signals_payload.get("signals", [])
+        if signals:
+            sig = signals[0]
+            latest_signal = {
+                "signal_id": sig.get("signal_id"),
+                "timestamp": sig.get("timestamp"),
+                "direction": sig.get("direction"),
+                "setup_type": sig.get("setup_type"),
+                "confluence_score": sig.get("confluence_score"),
+                "reasons": sig.get("reasons", []),
+                "promoted": sig.get("promoted", False),
+                "governance_notes": sig.get("governance_notes", []),
+                "entry_price": sig.get("entry_price"),
+                "rr_ratio": sig.get("rr_ratio"),
+            }
+            regime = sig.get("regime")
+            regime_as_of = sig.get("timestamp")
+            governance_blocked = not sig.get("promoted", True)
+    except Exception:
+        pass
+
+    daily_pct = risk_usage["daily_dd_pct"] / risk_limits["daily_dd_limit_pct"] if risk_limits["daily_dd_limit_pct"] else 0.0
+    weekly_pct = risk_usage["weekly_dd_pct"] / risk_limits["weekly_dd_limit_pct"] if risk_limits["weekly_dd_limit_pct"] else 0.0
+    losses_pct = risk_usage["consecutive_losses"] / risk_limits["max_consecutive_losses"] if risk_limits["max_consecutive_losses"] else 0.0
+    positions_pct = risk_usage["open_positions_count"] / risk_limits["max_open_positions"] if risk_limits["max_open_positions"] else 0.0
+    risk_blocked = any(v >= 1.0 for v in (daily_pct, weekly_pct, losses_pct, positions_pct)) or safe_mode
+
+    return {
+        "regime": regime,
+        "regime_as_of": regime_as_of,
+        "latest_signal": latest_signal,
+        "risk_limits": risk_limits,
+        "risk_usage": risk_usage,
+        "governance_blocked": governance_blocked,
+        "risk_blocked": risk_blocked,
+        "safe_mode": safe_mode,
+    }
+
+
 @app.get("/api/signals/export")
 async def export_signals(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
     payload = request.app.state.reader.read_signals(limit=limit)
