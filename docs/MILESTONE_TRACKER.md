@@ -7,7 +7,7 @@ Last updated: 2026-04-14 (12:53 UTC)
 ## Current Active Milestone
 
 **Milestone:** DASHBOARD-SERVER-RESOURCES — Server resource monitoring panel in dashboard
-**Status:** MVP_DONE (branch: dashboard-server-resources, 2026-04-14)
+**Status:** DONE (branch: dashboard-server-resources, commit 6cb9421, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Extended dashboard with Server Resources panel:
