@@ -7,7 +7,7 @@ Last updated: 2026-04-14 (12:53 UTC)
 ## Current Active Milestone
 
 **Milestone:** DASHBOARD-EGRESS-INTEGRATION — Live egress/proxy health panel in dashboard
-**Status:** MVP_DONE (branch: dashboard-egress-integration, 2026-04-14)
+**Status:** DONE (branch: dashboard-egress-integration, commit 153659a, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Extended existing dashboard (FastAPI m3→m4) with:
