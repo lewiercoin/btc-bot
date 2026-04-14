@@ -204,6 +204,29 @@ Configuration in `settings.py`: `ExchangeConfig.futures_ws_market_base_url`, `Ex
 
 ---
 
+## Diagnostyka
+
+Jeśli bot pozostaje w safe mode lub ma problemy z połączeniem WebSocket, użyj skryptu diagnostycznego:
+
+```bash
+ssh -i btc-bot-deploy root@204.168.146.253
+cd /home/btc-bot/btc-bot
+bash scripts/diagnostics/check_safe_mode.sh
+```
+
+Skrypt sprawdza:
+- Status usług (btc-bot.service, btc-bot-dashboard.service)
+- Ostatnie 100 linii logu bota
+- API dashboard: Egress Health
+- API dashboard: Server Resources
+- Stan bazy danych (bot_state)
+- Konfigurację WebSocket URL
+- Ostatnie próby połączenia WebSocket
+
+Szczegółowy przewodnik: [`docs/diagnostics/safe-mode-check.md`](docs/diagnostics/safe-mode-check.md)
+
+---
+
 ## Testy i CI
 
 ```bash
