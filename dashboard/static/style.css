@@ -539,6 +539,10 @@ code {
 .regime--crowded-leverage { background: rgba(184, 135, 25, 0.14); color: var(--warn); }
 .regime--post-liquidation { background: rgba(140, 94, 52, 0.14); color: var(--accent); }
 
+.server-body {
+  padding: 4px 0;
+}
+
 @media (max-width: 900px) {
   .grid--top,
   .grid--bottom {

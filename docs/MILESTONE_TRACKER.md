@@ -6,6 +6,35 @@ Last updated: 2026-04-14 (12:53 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** DASHBOARD-SERVER-RESOURCES — Server resource monitoring panel in dashboard
+**Status:** MVP_DONE (branch: dashboard-server-resources, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Extended dashboard with Server Resources panel:
+- Added `psutil` to `requirements.txt` (lightweight cross-platform system metrics library)
+- `/api/server-resources` endpoint: reads CPU %, memory % (total/used GB), load average (1m/5m/15m), disk % (total/used GB) via psutil
+- Server Resources panel in UI: after Risk & Governance, displays CPU/Memory/Load/Disk with color-coded badges (green <80%, amber ≥80%, red ≥95%)
+- Auto-refreshes every 10s (same pattern as Egress/Risk panels)
+
+**Why:** Operator visibility into server health without SSH. Detects resource pressure (CPU/RAM/Disk) early before it affects bot performance. Lightweight, read-only, no impact on core pipeline.
+
+**Acceptance criteria:**
+- ✅ `/api/server-resources` returns correct schema (cpu_percent, memory_percent, memory_total_gb, memory_used_gb, load_avg, disk_percent, disk_total_gb, disk_used_gb)
+- ✅ Server Resources panel visible after Risk & Governance section (10s refresh)
+- ✅ Display: CPU %, Memory % (GB), Load (1m/5m/15m), Disk % (GB)
+- ✅ Color-coded badges: green <80%, amber ≥80%, red ≥95%
+- ✅ `psutil` added to `requirements.txt`
+- ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
+- ✅ `docs/dashboard/server-resources.md` created
+- ✅ All existing tests pass (93/93)
+
+**In-scope:** `requirements.txt`, `dashboard/server.py`, `dashboard/static/index.html`, `dashboard/static/app.js`, `dashboard/static/style.css`, `docs/dashboard/server-resources.md`, `docs/MILESTONE_TRACKER.md`
+**Out-of-scope:** All trading pipeline code — `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
+
+---
+
+## Previous Milestones
+
 **Milestone:** DASHBOARD-RISK-VISUALISATION — Live Risk & Governance panel in dashboard
 **Status:** DONE (branch: dashboard-risk-visualisation, commit 24b1bff, 2026-04-14)
 **Active builder:** Cascade
