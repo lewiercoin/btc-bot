@@ -6,6 +6,35 @@ Last updated: 2026-04-14 (12:53 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** DASHBOARD-RISK-VISUALISATION — Live Risk & Governance panel in dashboard
+**Status:** MVP_DONE (branch: dashboard-risk-visualisation, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Extended dashboard with Risk & Governance panel:
+- `/api/risk` endpoint: reads `AppSettings.risk` + `AppSettings.strategy` (limits) + `bot_state` (usage) + `signal_candidates`/`executable_signals` (latest signal)
+- Risk & Governance panel in UI: current regime, progress bars for Daily DD / Weekly DD / consecutive losses / open positions (usage vs limit), latest signal card with direction, confluence_score, reasons[], Promoted/Vetoed badge, governance_notes
+- Yellow alert row when governance blocked OR risk limit near breach (≥80%) OR RiskGate blocking
+- Auto-refreshes every 10s (same pattern as Egress panel)
+
+**Why:** Operator visibility into RiskGate + Governance decisions without SSH. Shows exactly why a signal was vetoed (governance_notes) and whether trading is currently blocked by risk limits.
+
+**Acceptance criteria:**
+- ✅ `/api/risk` returns correct schema (regime, latest_signal, risk_limits, risk_usage, governance_blocked, risk_blocked, safe_mode)
+- ✅ Risk & Governance panel visible after Egress Health section (10s refresh)
+- ✅ Risk limit progress bars: daily DD, weekly DD, consecutive losses, open positions
+- ✅ Latest signal card: direction, regime, confluence_score, reasons[], Promoted/Vetoed badge, governance_notes
+- ✅ Alert row for governance veto / risk block / DD ≥80% warning
+- ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`, `ProxyTransport`
+- ✅ `docs/dashboard/risk-visualisation.md` created
+- ✅ All existing tests pass (93/93)
+
+**In-scope:** `dashboard/server.py`, `dashboard/static/index.html`, `dashboard/static/app.js`, `dashboard/static/style.css`, `docs/dashboard/risk-visualisation.md`, `docs/MILESTONE_TRACKER.md`
+**Out-of-scope:** All trading pipeline code — `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`
+
+---
+
+## Previous Milestones
+
 **Milestone:** DASHBOARD-ACCESS-GUIDE — Production run/access documentation for dashboard
 **Status:** DONE (branch: dashboard-access-guide, commit 3e034a0, 2026-04-14)
 **Active builder:** Cascade

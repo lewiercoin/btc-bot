@@ -187,6 +187,78 @@
         </dl>
       </section>
 
+      <section class="panel panel--risk">
+        <div class="panel__header">
+          <h2>Risk &amp; Governance</h2>
+          <span class="panel__meta" id="risk-meta">-</span>
+        </div>
+
+        <div class="risk-alert" id="risk-alert" style="display:none">
+          <span id="risk-alert-text">-</span>
+        </div>
+
+        <div class="risk-body">
+          <div class="risk-col">
+            <h3 class="risk-section-title">Current Regime</h3>
+            <dl class="stat-list">
+              <div class="stat-row">
+                <dt>Regime</dt>
+                <dd id="risk-regime">-</dd>
+              </div>
+              <div class="stat-row">
+                <dt>As of</dt>
+                <dd id="risk-regime-as-of">-</dd>
+              </div>
+            </dl>
+
+            <h3 class="risk-section-title">Risk Gate</h3>
+            <div class="risk-bar-group">
+              <div class="risk-bar-row">
+                <span class="risk-bar-label">Daily DD</span>
+                <div class="risk-bar-wrap">
+                  <div class="risk-bar" id="risk-bar-daily-dd"></div>
+                </div>
+                <span class="risk-bar-value" id="risk-val-daily-dd">-</span>
+              </div>
+              <div class="risk-bar-row">
+                <span class="risk-bar-label">Weekly DD</span>
+                <div class="risk-bar-wrap">
+                  <div class="risk-bar" id="risk-bar-weekly-dd"></div>
+                </div>
+                <span class="risk-bar-value" id="risk-val-weekly-dd">-</span>
+              </div>
+              <div class="risk-bar-row">
+                <span class="risk-bar-label">Consec. losses</span>
+                <div class="risk-bar-wrap">
+                  <div class="risk-bar" id="risk-bar-losses"></div>
+                </div>
+                <span class="risk-bar-value" id="risk-val-losses">-</span>
+              </div>
+              <div class="risk-bar-row">
+                <span class="risk-bar-label">Open positions</span>
+                <div class="risk-bar-wrap">
+                  <div class="risk-bar" id="risk-bar-positions"></div>
+                </div>
+                <span class="risk-bar-value" id="risk-val-positions">-</span>
+              </div>
+            </div>
+            <dl class="stat-list" style="margin-top:12px">
+              <div class="stat-row">
+                <dt>Risk blocked</dt>
+                <dd id="risk-blocked">-</dd>
+              </div>
+            </dl>
+          </div>
+
+          <div class="risk-col">
+            <h3 class="risk-section-title">Latest Signal</h3>
+            <div id="risk-signal-card" class="risk-signal-card">
+              <p class="empty">No signals recorded.</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="panel__header">
           <h2>Recent Trades</h2>
