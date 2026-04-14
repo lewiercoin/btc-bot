@@ -129,6 +129,20 @@ Blueprint: [`docs/BLUEPRINT_V1.md`](docs/BLUEPRINT_V1.md)
 
 ---
 
+## Dashboard
+
+Read-only observability UI (FastAPI m4, SSE log stream, polling).
+
+Access: `http://<server-ip>:8080`
+
+**Panels:** Bot Status, Open Positions, Egress Health, Recent Trades, Signals, Daily Metrics, Alerts, Log Stream
+
+**Egress Health panel** — live SOCKS5 proxy status (exit node IP, session age, bans/24h, safe mode). Auto-refreshes every 10s. Safe mode alert banner appears at top when trading is paused.
+
+See [`docs/dashboard/egress-integration.md`](docs/dashboard/egress-integration.md) for API docs.
+
+---
+
 ## Egress Configuration
 
 When the server IP is blocked by Binance CloudFront, route REST traffic through a SOCKS5 exit node.
