@@ -67,7 +67,7 @@ def build_default_bundle(
     
     # Initialize proxy transport if enabled
     proxy_transport = None
-    if settings.proxy.enabled and settings.proxy.proxy_url:
+    if settings.proxy.proxy_enabled and settings.proxy.proxy_url:
         proxy_transport = ProxyTransport(
             proxy_url=settings.proxy.proxy_url,
             proxy_type=settings.proxy.proxy_type,

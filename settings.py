@@ -132,10 +132,16 @@ class ExecutionConfig:
 @dataclass(frozen=True)
 class ProxyConfig:
     enabled: bool = False
+    proxy_enabled_env: str = "PROXY_ENABLED"
     proxy_url_env: str = "PROXY_URL"
     proxy_type_env: str = "PROXY_TYPE"
     sticky_minutes_env: str = "PROXY_STICKY_MINUTES"
     failover_list_env: str = "PROXY_FAILOVER_LIST"
+
+    @property
+    def proxy_enabled(self) -> bool:
+        raw = os.getenv(self.proxy_enabled_env, "false").lower()
+        return raw in ("true", "1", "yes", "y")
 
     @property
     def proxy_url(self) -> str:
