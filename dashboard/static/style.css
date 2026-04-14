@@ -347,6 +347,22 @@ code {
   color: var(--warn);
 }
 
+.safe-mode-alert {
+  background: rgba(181, 69, 53, 0.12);
+  border: 1px solid var(--error);
+  border-radius: 6px;
+  color: var(--error);
+  font-size: 0.92rem;
+  margin-bottom: 16px;
+  padding: 10px 16px;
+}
+
+.panel--egress .stat-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 4px 24px;
+}
+
 @media (max-width: 900px) {
   .grid--top,
   .grid--bottom {

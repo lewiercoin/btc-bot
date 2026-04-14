@@ -1,10 +1,36 @@
 # Milestone Tracker
 
-Last updated: 2026-04-14
+Last updated: 2026-04-14 (12:53 UTC)
 
 ---
 
 ## Current Active Milestone
+
+**Milestone:** DASHBOARD-EGRESS-INTEGRATION — Live egress/proxy health panel in dashboard
+**Status:** MVP_DONE (branch: dashboard-egress-integration, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Extended existing dashboard (FastAPI m3→m4) with:
+- `/api/egress` endpoint: reads `settings.proxy` (env vars) + parses bot log tail for ProxyTransport events + reads `bot_state.safe_mode` from SQLite
+- Egress Health panel in UI: exit node IP, session age, bans (24h), rotation, safe mode status — auto-refresh 10s
+- Safe mode alert banner: red banner at top of page when `safe_mode = true`
+
+**Why:** Operator visibility into egress health without SSH. Confirms SOCKS5 proxy is active and no bans are occurring. Safe mode alert replaces need to monitor journalctl.
+
+**Acceptance criteria:**
+- ✅ `/api/egress` returns correct schema
+- ✅ Egress Health panel visible in UI (10s refresh)
+- ✅ Safe mode alert banner functional
+- ✅ Zero changes to ProxyTransport, orchestrator.py, core/, execution/, settings.py
+- ✅ All existing tests pass (93/93)
+- ✅ `docs/dashboard/egress-integration.md` created
+
+**In-scope:** `dashboard/**` only + docs
+**Out-of-scope:** ProxyTransport code, orchestrator, core/, execution/, DB schema
+
+---
+
+## Previous Milestones
 
 **Milestone:** INFRA-EGRESS-VULTR — Dedicated SOCKS5 exit node via Vultr
 **Status:** DONE (branch: infra/egress-vultr-fix, commit 590064c, 2026-04-14)

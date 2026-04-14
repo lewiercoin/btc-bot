@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -299,7 +299,7 @@ def test_read_alerts_from_conn_empty() -> None:
 def test_read_alerts_from_conn_with_rows() -> None:
     schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
     conn = _make_conn(schema_path)
-    ts = datetime(2026, 4, 13, 10, 0, tzinfo=timezone.utc)
+    ts = datetime.now(timezone.utc).replace(microsecond=0) - timedelta(hours=1)
     try:
         conn.execute(
             """
