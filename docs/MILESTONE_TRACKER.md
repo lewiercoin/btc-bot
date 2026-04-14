@@ -7,7 +7,7 @@ Last updated: 2026-04-14 (12:53 UTC)
 ## Current Active Milestone
 
 **Milestone:** DASHBOARD-ACCESS-GUIDE — Production run/access documentation for dashboard
-**Status:** MVP_DONE (branch: dashboard-access-guide, 2026-04-14)
+**Status:** DONE (branch: dashboard-access-guide, commit 3e034a0, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Added complete operational documentation for running and accessing the dashboard in production:
