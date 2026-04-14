@@ -170,6 +170,8 @@ class ProxyConfig:
 class ExchangeConfig:
     futures_rest_base_url: str = "https://fapi.binance.com"
     futures_ws_base_url: str = "wss://fstream.binance.com/ws"
+    futures_ws_market_base_url: str = "wss://fstream.binance.com/market"
+    futures_ws_stream_base_url: str = "wss://fstream.binance.com/stream"
     recv_window_ms: int = 5000
     isolated_only: bool = True
     api_key_env: str = "BINANCE_API_KEY"

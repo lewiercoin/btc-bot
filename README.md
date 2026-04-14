@@ -190,6 +190,20 @@ See [`.env.example`](.env.example) for all available options.
 
 ---
 
+## WebSocket
+
+Bot connects to Binance Futures WebSocket for live market data (aggTrade, forceOrder).
+
+**URLs:**
+- New official path: `wss://fstream.binance.com/market?streams=btcusdt@aggTrade/btcusdt@forceOrder`
+- Legacy fallback path: `wss://fstream.binance.com/stream?streams=...`
+
+**Migration:** Bot uses new `/market/` path by default. If connection fails, it automatically falls back to legacy `/stream/` path with logging. This ensures future-proof connectivity while preventing production downtime.
+
+Configuration in `settings.py`: `ExchangeConfig.futures_ws_market_base_url`, `ExchangeConfig.futures_ws_stream_base_url`
+
+---
+
 ## Testy i CI
 
 ```bash

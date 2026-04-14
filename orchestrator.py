@@ -96,6 +96,7 @@ def build_default_bundle(
     websocket_client = BinanceFuturesWebsocketClient(
         WebsocketClientConfig(
             ws_base_url=settings.exchange.futures_ws_base_url,
+            ws_market_base_url=settings.exchange.futures_ws_market_base_url,
             heartbeat_seconds=settings.execution.ws_heartbeat_seconds,
             reconnect_seconds=settings.execution.ws_reconnect_seconds,
         )
