@@ -6,6 +6,34 @@ Last updated: 2026-04-14 (12:53 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** TERMINAL-DIAGNOSTICS-SAFE-MODE — Prepare copy-paste terminal diagnostic script for safe mode troubleshooting
+**Status:** MVP_DONE (branch: terminal-diagnostics-safe-mode, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Created ready-to-use diagnostic script and documentation for troubleshooting safe mode issues:
+- `scripts/diagnostics/check_safe_mode.sh`: read-only bash script with 7 diagnostic sections (service status, bot log tail, dashboard API egress, dashboard API server resources, DB bot_state query, WebSocket URL config, WebSocket connection attempts)
+- `docs/diagnostics/safe-mode-check.md`: step-by-step copy-paste instructions, manual diagnostic commands, common causes (WebSocket failure, egress proxy issues, resource exhaustion, DB corruption), next steps guidance
+- `README.md`: added Diagnostyka section with quick start command and reference to detailed guide
+- Script is read-only — zero mutations, no service restarts, no DB writes
+
+**Why:** Bot remains in safe mode after WebSocket migration. Diagnostic script provides operator with ready-to-run commands to gather information without manual command recall. Read-only design prevents accidental state changes during diagnosis.
+
+**Acceptance criteria:**
+- ✅ `scripts/diagnostics/check_safe_mode.sh` created with all 7 diagnostic sections
+- ✅ `docs/diagnostics/safe-mode-check.md` created with step-by-step instructions and common causes
+- ✅ `README.md` Diagnostyka section added with quick start
+- ✅ `docs/MILESTONE_TRACKER.md` updated with milestone entry
+- ✅ Zero changes to `core/**`, `execution/**`, `dashboard/**`, `ProxyTransport`
+- ✅ Script is read-only (no mutations, no restarts)
+- ✅ All existing tests pass (93/93, 24 skipped)
+
+**In-scope:** `scripts/diagnostics/check_safe_mode.sh` (new), `docs/diagnostics/safe-mode-check.md` (new), `docs/MILESTONE_TRACKER.md`, `README.md`
+**Out-of-scope:** `core/**`, `execution/**`, `dashboard/**`, `ProxyTransport`, any production code mutations, service restart commands, DB write operations
+
+---
+
+## Previous Milestones
+
 **Milestone:** WEBSOCKET-MIGRATION — Migrate WebSocket URLs to new Binance official /market/ paths
 **Status:** DONE (branch: websocket-migration, commit dcc0105, 2026-04-14)
 **Active builder:** Cascade
