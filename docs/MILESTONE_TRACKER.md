@@ -6,6 +6,30 @@ Last updated: 2026-04-14 (12:53 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** DASHBOARD-ACCESS-GUIDE — Production run/access documentation for dashboard
+**Status:** MVP_DONE (branch: dashboard-access-guide, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Added complete operational documentation for running and accessing the dashboard in production:
+- `docs/dashboard/access-guide.md` (new): step-by-step — SSH access, systemd start/stop/enable, external binding override, UFW rule, SSH tunnel, health check, log rotation, deploy update procedure, Egress Health interpretation table
+- `README.md`: expanded Dashboard section with "How to run & access Dashboard" (systemd, health check, SSH tunnel, links)
+- `docs/MILESTONE_TRACKER.md`: this entry
+
+**Why:** Post DASHBOARD-EGRESS-INTEGRATION, the dashboard is fully functional but had no single authoritative doc covering how to start it, open the firewall, and verify it is working. Access guide fills that gap.
+
+**Acceptance criteria:**
+- ✅ `docs/dashboard/access-guide.md` covers: start (systemd + manual), UFW, external binding, SSH tunnel, health check, log rotation, deploy updates, Egress Health interpretation
+- ✅ `README.md` "How to run & access Dashboard" section present with key commands
+- ✅ Zero code changes (docs only)
+- ✅ All existing tests pass (93/93)
+
+**In-scope:** `README.md`, `docs/dashboard/access-guide.md`, `docs/MILESTONE_TRACKER.md`
+**Out-of-scope:** All code — `dashboard/**`, `core/**`, `data/**`, `execution/**`, `orchestrator.py`, `settings.py`
+
+---
+
+## Previous Milestones
+
 **Milestone:** DASHBOARD-EGRESS-INTEGRATION — Live egress/proxy health panel in dashboard
 **Status:** DONE (branch: dashboard-egress-integration, commit 153659a, 2026-04-14)
 **Active builder:** Cascade
