@@ -6,6 +6,36 @@ Last updated: 2026-04-14 (12:53 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** WEBSOCKET-MIGRATION — Migrate WebSocket URLs to new Binance official /market/ paths
+**Status:** MVP_DONE (branch: websocket-migration, 2026-04-14)
+**Active builder:** Cascade
+
+**What:** Migrated WebSocket URLs from legacy `/stream/` to new official `/market/` paths:
+- Added `futures_ws_market_base_url` and `futures_ws_stream_base_url` constants to `ExchangeConfig` in `settings.py`
+- Added `ws_market_base_url` parameter to `WebsocketClientConfig` in `data/websocket_client.py`
+- Implemented `_build_market_stream_url()` for new `/market/` path: `wss://fstream.binance.com/market?streams=btcusdt@aggTrade/btcusdt@forceOrder`
+- Retained `_build_legacy_stream_url()` for fallback to `/stream/` path: `wss://fstream.binance.com/stream?streams=...`
+- Modified `_run_forever()` to try `/market/` first, fallback to `/stream/` on connection failure with logging
+- Updated `orchestrator.py` to pass `ws_market_base_url` to `WebsocketClientConfig`
+
+**Why:** Binance announced deprecation of legacy `/stream/` WebSocket paths in favor of new `/market/` paths. Migration ensures future-proof connectivity. Fallback logic prevents production downtime if new path has issues.
+
+**Acceptance criteria:**
+- ✅ `settings.py` has new `futures_ws_market_base_url` and `futures_ws_stream_base_url` constants
+- ✅ `data/websocket_client.py` uses `/market/` path by default via `_build_market_stream_url()`
+- ✅ Fallback logic implemented: if `/market/` fails, retry with `/stream/` (legacy)
+- ✅ Logging added to track which path is being used (market vs legacy)
+- ✅ `orchestrator.py` updated to pass `ws_market_base_url` parameter
+- ✅ All existing tests pass (93/93, 24 skipped)
+- ✅ Zero changes to `core/**`, `execution/**` beyond `orchestrator.py` URL parameter
+
+**In-scope:** `settings.py`, `data/websocket_client.py`, `orchestrator.py`, `docs/MILESTONE_TRACKER.md`, `README.md`
+**Out-of-scope:** `core/**`, `execution/**` (except `orchestrator.py`), new WebSocket features, stream reconnection logic changes
+
+---
+
+## Previous Milestones
+
 **Milestone:** DASHBOARD-SERVER-RESOURCES — Server resource monitoring panel in dashboard
 **Status:** DONE (branch: dashboard-server-resources, commit 6cb9421, 2026-04-14)
 **Active builder:** Cascade
