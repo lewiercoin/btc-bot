@@ -130,6 +130,37 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class ProxyConfig:
+    enabled: bool = False
+    proxy_url_env: str = "PROXY_URL"
+    proxy_type_env: str = "PROXY_TYPE"
+    sticky_minutes_env: str = "PROXY_STICKY_MINUTES"
+    failover_list_env: str = "PROXY_FAILOVER_LIST"
+
+    @property
+    def proxy_url(self) -> str:
+        return os.getenv(self.proxy_url_env, "")
+
+    @property
+    def proxy_type(self) -> str:
+        return os.getenv(self.proxy_type_env, "http").lower()
+
+    @property
+    def sticky_minutes(self) -> int:
+        try:
+            return int(os.getenv(self.sticky_minutes_env, "30"))
+        except ValueError:
+            return 30
+
+    @property
+    def failover_list(self) -> list[str]:
+        raw = os.getenv(self.failover_list_env, "")
+        if not raw:
+            return []
+        return [url.strip() for url in raw.split(",") if url.strip()]
+
+
+@dataclass(frozen=True)
 class ExchangeConfig:
     futures_rest_base_url: str = "https://fapi.binance.com"
     futures_ws_base_url: str = "wss://fstream.binance.com/ws"
@@ -178,6 +209,7 @@ class AppSettings:
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     exchange: ExchangeConfig = field(default_factory=ExchangeConfig)
+    proxy: ProxyConfig = field(default_factory=ProxyConfig)
     storage: StorageConfig | None = None
     alerts: AlertConfig = field(default_factory=AlertConfig)
 

@@ -11,6 +11,8 @@ from urllib.parse import urlencode
 
 import requests
 
+from data.proxy_transport import ProxyTransport
+
 LOG = logging.getLogger(__name__)
 
 
@@ -23,6 +25,7 @@ class RestClientConfig:
     api_key: str = ""
     api_secret: str = ""
     recv_window_ms: int = 5000
+    proxy_transport: Any = None  # ProxyTransport instance
 
 
 class RestClientError(RuntimeError):
@@ -217,13 +220,24 @@ class BinanceFuturesRestClient:
                 ).hexdigest()
 
             try:
+                # Get proxy configuration if available
+                proxies = None
+                if self.config.proxy_transport:
+                    proxies = self.config.proxy_transport.get_proxies()
+                
                 response = self.session.request(
                     method_upper,
                     url,
                     params=request_params,
                     headers=headers or None,
                     timeout=self.config.timeout_seconds,
+                    proxies=proxies,
                 )
+                
+                # Handle proxy ban detection
+                if self.config.proxy_transport:
+                    self.config.proxy_transport.handle_response(response)
+                
                 if response.status_code >= 400:
                     request_error = self._parse_binance_error(path, method_upper, response)
                     if response.status_code >= 500 and attempt < self.config.max_retries:

@@ -15,6 +15,7 @@ from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
 from data.market_data import MarketDataAssembler
+from data.proxy_transport import ProxyTransport
 from data.rest_client import BinanceFuturesRestClient, RestClientConfig
 from data.websocket_client import BinanceFuturesWebsocketClient, WebsocketClientConfig
 from execution.execution_engine import ExecutionEngine
@@ -63,6 +64,23 @@ def build_default_bundle(
 ) -> EngineBundle:
     signal_whitelist = build_signal_regime_direction_whitelist(settings.strategy)
     audit_logger = AuditLogger(connection=conn)
+    
+    # Initialize proxy transport if enabled
+    proxy_transport = None
+    if settings.proxy.enabled and settings.proxy.proxy_url:
+        proxy_transport = ProxyTransport(
+            proxy_url=settings.proxy.proxy_url,
+            proxy_type=settings.proxy.proxy_type,
+            sticky_minutes=settings.proxy.sticky_minutes,
+            failover_list=settings.proxy.failover_list,
+        )
+        LOG.info(
+            "Proxy transport enabled: type=%s, sticky=%d min, failover_count=%d",
+            settings.proxy.proxy_type,
+            settings.proxy.sticky_minutes,
+            len(settings.proxy.failover_list),
+        )
+    
     rest_client = BinanceFuturesRestClient(
         RestClientConfig(
             base_url=settings.exchange.futures_rest_base_url,
@@ -72,6 +90,7 @@ def build_default_bundle(
             api_key=settings.exchange.api_key,
             api_secret=settings.exchange.api_secret,
             recv_window_ms=settings.exchange.recv_window_ms,
+            proxy_transport=proxy_transport,
         )
     )
     websocket_client = BinanceFuturesWebsocketClient(
