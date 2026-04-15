@@ -295,17 +295,21 @@ class BotOrchestrator:
             )
 
         self._start_data_feeds()
-        print(f"[DIAGNOSTIC] _start_data_feeds() completed", flush=True)
         now = self._now()
-        print(f"[DIAGNOSTIC] _now() completed", flush=True)
         self._initialize_runtime_schedule(now)
-        print(f"[DIAGNOSTIC] _initialize_runtime_schedule() completed", flush=True)
+        LOG.info(
+            "Runtime loop started | mode=%s | symbol=%s | next_decision_at=%s | next_health_at=%s | next_monitor_at=%s",
+            self.settings.mode.value,
+            self.settings.strategy.symbol,
+            self._next_decision_at.isoformat() if self._next_decision_at else "none",
+            self._next_health_at.isoformat() if self._next_health_at else "none",
+            self._next_monitor_at.isoformat() if self._next_monitor_at else "none",
+        )
         self.bundle.audit_logger.log_info(
             "orchestrator",
             "Runtime loop started.",
             payload={"mode": self.settings.mode.value, "symbol": self.settings.strategy.symbol},
         )
-        print(f"[DIAGNOSTIC] audit_logger.log_info('Runtime loop started') completed", flush=True)
         try:
             self._run_event_loop()
         finally:
@@ -321,11 +325,14 @@ class BotOrchestrator:
     def run_decision_cycle(self, now: datetime | None = None) -> None:
         cycle_started = time.perf_counter()
         timestamp = (now or self._now()).astimezone(timezone.utc)
+        cycle_outcome = "unknown"
+        LOG.info("Decision cycle started | timestamp=%s", timestamp.isoformat())
         try:
             self.state_store.refresh_runtime_state(timestamp)
             try:
                 snapshot = self._build_snapshot(timestamp)
             except Exception as exc:
+                cycle_outcome = "snapshot_failed"
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
                 self.state_store.mark_error(f"snapshot_build_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
@@ -343,6 +350,7 @@ class BotOrchestrator:
                     )
                     self._notify_closed_trades(closed_events)
             except Exception as exc:
+                cycle_outcome = "lifecycle_failed"
                 self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
                 self.state_store.mark_error(f"lifecycle_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
@@ -351,6 +359,7 @@ class BotOrchestrator:
 
             state = self.state_store.load()
             if state and state.safe_mode:
+                cycle_outcome = "safe_mode_skip"
                 self.bundle.audit_logger.log_decision(
                     "orchestrator",
                     "Safe mode active. New trade decisions skipped.",
@@ -366,6 +375,7 @@ class BotOrchestrator:
             regime = self.bundle.regime_engine.classify(features)
             candidate = self.bundle.signal_engine.generate(features, regime)
             if candidate is None:
+                cycle_outcome = "no_signal"
                 self.bundle.audit_logger.log_decision("decision", "No signal candidate.")
                 self.state_store.mark_healthy()
                 return
@@ -386,6 +396,7 @@ class BotOrchestrator:
 
             governance_decision = self.bundle.governance.evaluate(candidate)
             if not governance_decision.approved:
+                cycle_outcome = "governance_veto"
                 self.bundle.audit_logger.log_decision(
                     "governance",
                     "Candidate rejected by governance.",
@@ -405,6 +416,7 @@ class BotOrchestrator:
                 open_positions=self.state_store.get_open_positions(),
             )
             if not risk_decision.allowed:
+                cycle_outcome = "risk_block"
                 self.bundle.audit_logger.log_decision(
                     "risk",
                     f"Trade blocked: {risk_decision.reason}",
@@ -432,9 +444,11 @@ class BotOrchestrator:
                     "size": risk_decision.size,
                     "leverage": risk_decision.leverage,
                 }
+                cycle_outcome = "trade_opened"
                 self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
                 self._send_telegram_alert(TelegramNotifier.ALERT_ENTRY, trade_payload)
             except Exception as exc:
+                cycle_outcome = "execution_failed"
                 self._critical_execution_errors += 1
                 self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
                 self.state_store.mark_error(f"execution_failed:{exc}")
@@ -443,6 +457,12 @@ class BotOrchestrator:
         finally:
             duration_ms = (time.perf_counter() - cycle_started) * 1000.0
             self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
+            LOG.info(
+                "Decision cycle finished | timestamp=%s | outcome=%s | duration_ms=%.1f",
+                timestamp.isoformat(),
+                cycle_outcome,
+                duration_ms,
+            )
 
     def send_daily_summary(self, day: date | None = None) -> None:
         summary_day = day or self._now().date()
@@ -644,11 +664,9 @@ class BotOrchestrator:
             return
 
         try:
-            print(f"[DIAGNOSTIC] About to call websocket_client.start()", flush=True)
             websocket_client.start(symbol=self.settings.strategy.symbol)
-            print(f"[DIAGNOSTIC] websocket_client.start() returned", flush=True)
+            LOG.info("Market data feed thread started for %s.", self.settings.strategy.symbol)
             self.bundle.audit_logger.log_info("orchestrator", "Market data feeds started.")
-            print(f"[DIAGNOSTIC] audit_logger.log_info completed", flush=True)
         except Exception as exc:
             reason = f"feed_start_failed:{exc}"
             self.bundle.audit_logger.log_error("orchestrator", "Failed to start market data feeds.", payload={"error": str(exc)})
