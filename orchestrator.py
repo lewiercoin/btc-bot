@@ -478,20 +478,31 @@ class BotOrchestrator:
         self._send_telegram_alert(TelegramNotifier.ALERT_DAILY_SUMMARY, payload)
 
     def _run_event_loop(self) -> None:
+        LOG.info("[DEBUG] _run_event_loop: Entered loop")
+        _loop_count = 0
         while not self._stop_event.is_set():
+            _loop_count += 1
+            if _loop_count <= 3:
+                LOG.info("[DEBUG] _run_event_loop: iteration %d", _loop_count)
             now = self._now()
             self._handle_daily_rollover(now)
 
             if self._next_health_at and now >= self._next_health_at:
+                LOG.info("[DEBUG] _run_event_loop: calling _run_health_check")
                 self._run_health_check(now)
+                LOG.info("[DEBUG] _run_event_loop: _run_health_check completed")
                 self._next_health_at = now + timedelta(seconds=self.settings.execution.health_check_interval_seconds)
 
             if self._next_monitor_at and now >= self._next_monitor_at:
+                LOG.info("[DEBUG] _run_event_loop: calling _run_position_monitor_cycle")
                 self._run_position_monitor_cycle(now)
+                LOG.info("[DEBUG] _run_event_loop: _run_position_monitor_cycle completed")
                 self._next_monitor_at = now + timedelta(seconds=self.settings.execution.position_monitor_interval_seconds)
 
             if self._next_decision_at and now >= self._next_decision_at:
+                LOG.info("[DEBUG] _run_event_loop: calling run_decision_cycle")
                 self.run_decision_cycle(now=now)
+                LOG.info("[DEBUG] _run_event_loop: run_decision_cycle completed")
                 self._next_decision_at = self._advance_decision_deadline(self._next_decision_at, now)
 
             self._evaluate_kill_switch(now)
@@ -519,7 +530,9 @@ class BotOrchestrator:
             self._send_critical_error_alert("lifecycle", f"Monitor lifecycle failed: {exc}")
 
     def _run_health_check(self, now: datetime) -> None:
+        LOG.info("[DEBUG] _run_health_check: calling health_monitor.check()")
         status = self.health_monitor.check()
+        LOG.info("[DEBUG] _run_health_check: health_monitor.check() returned, healthy=%s", status.healthy)
         if status.healthy:
             self._consecutive_health_failures = 0
             return
