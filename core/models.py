@@ -164,6 +164,7 @@ class BotState:
     weekly_dd_pct: float
     last_trade_at: datetime | None
     last_error: str | None
+    safe_mode_entry_at: datetime | None = None
 
 
 @dataclass(slots=True)

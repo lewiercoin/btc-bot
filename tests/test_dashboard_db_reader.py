@@ -56,6 +56,7 @@ def test_read_status_positions_and_trades_from_conn() -> None:
                 weekly_dd_pct=0.02,
                 last_trade_at=closed_at,
                 last_error=None,
+                safe_mode_entry_at=None,
             ),
             timestamp=closed_at,
         )
