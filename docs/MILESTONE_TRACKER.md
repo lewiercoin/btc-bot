@@ -1,10 +1,49 @@
 # Milestone Tracker
 
-Last updated: 2026-04-14 (12:53 UTC)
+Last updated: 2026-04-15 (07:37 UTC)
 
 ---
 
 ## Current Active Milestone
+
+**Milestone:** REPO-CONSISTENCY-VERIFICATION-2026-04-15 — Verify full code consistency between main and all side branches
+**Status:** IN_PROGRESS (branch: main, 2026-04-15)
+**Active builder:** Cascade
+
+**What:** Verified full code consistency between branch `main` and all 7 side branches in the repository:
+- Listed all branches (local and remote) with merge status
+- Verified each branch is fully merged into main with proper merge commits
+- Analyzed implementation quality for all merged changes (layer separation, AGENTS.md compliance, commit discipline)
+- Documented discrepancies, duplicates, and implementation errors (none found)
+- Provided cleanup recommendations for branch management
+
+**Branches analyzed:**
+- `main` (HEAD): 0f6c129 — TERMINAL-DIAGNOSTICS-SAFE-MODE
+- `terminal-diagnostics-safe-mode` (local + remote): 0f6c129 — same as main (fully merged, up-to-date)
+- `websocket-migration` (remote): dcc0105 — merged at 820024b
+- `dashboard-server-resources` (remote): 6cb9421 — merged at 5991b09
+- `dashboard-risk-visualisation` (remote): 24b1bff — merged at 787a67d
+- `dashboard-access-guide` (remote): 3e034a0 — merged at ff1e0b3
+- `dashboard-egress-integration` (remote): 153659a — merged at aae0226
+- `infra/egress-vultr-fix` (local + remote): f5baaf0 — merged at 3afa91c
+
+**Why:** Uncertainty about whether previous feature branches were correctly merged into main. Risk of code duplicates or incomplete merges breaking architecture. Full verification ensures branch hygiene and architectural integrity.
+
+**Acceptance criteria:**
+- ✅ All 8 branches enumerated with merge status
+- ✅ All branches verified as fully merged into main (no unique commits in branches)
+- ✅ Implementation quality verified for all merged changes (layer separation, contracts, determinism, AGENTS.md compliance)
+- ✅ No discrepancies, duplicates, or implementation errors found
+- ✅ Cleanup recommendations documented
+- ✅ MILESTONE_TRACKER.md updated with milestone entry
+- ⏳ git push origin main + smoke tests (pending)
+
+**In-scope:** All git branches in repository, diff analysis, implementation quality verification, branch cleanup recommendations, MILESTONE_TRACKER.md update, smoke tests
+**Out-of-scope:** Modifying production code (no fix commits required), changing merge history (rebase/force push), remote repository configuration
+
+---
+
+## Previous Milestones
 
 **Milestone:** TERMINAL-DIAGNOSTICS-SAFE-MODE — Prepare copy-paste terminal diagnostic script for safe mode troubleshooting
 **Status:** MVP_DONE (branch: terminal-diagnostics-safe-mode, 2026-04-14)
