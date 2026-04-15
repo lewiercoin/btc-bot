@@ -284,46 +284,24 @@ class BotOrchestrator:
     def start(self) -> None:
         self._stop_event.clear()
         LOG.info("Bot started in %s mode", self.settings.mode.value)
-
-        LOG.info("[DEBUG] Step 1: Calling state_store.ensure_initialized()")
         self.state_store.ensure_initialized()
-        LOG.info("[DEBUG] Step 2: ensure_initialized() completed")
-
-        LOG.info("[DEBUG] Step 3: Calling state_store.refresh_runtime_state()")
         self.state_store.refresh_runtime_state(self._now())
-        LOG.info("[DEBUG] Step 4: refresh_runtime_state() completed")
 
-        LOG.info("[DEBUG] Step 5: Calling recovery.run_startup_sync()")
         recovery_report = self.recovery.run_startup_sync()
-        LOG.info("[DEBUG] Step 6: run_startup_sync() completed, safe_mode=%s", recovery_report.safe_mode)
-
         if recovery_report.safe_mode:
             LOG.warning(
                 "Startup recovery entered safe mode. New trades are blocked but lifecycle monitoring will continue. issues=%s",
                 recovery_report.issues,
             )
 
-        LOG.info("[DEBUG] Step 7: Calling _start_data_feeds()")
         self._start_data_feeds()
-        LOG.info("[DEBUG] Step 8: _start_data_feeds() completed")
-
-        LOG.info("[DEBUG] Step 9: Calling _now()")
         now = self._now()
-        LOG.info("[DEBUG] Step 10: _now() completed, now=%s", now.isoformat())
-
-        LOG.info("[DEBUG] Step 11: Calling _initialize_runtime_schedule()")
         self._initialize_runtime_schedule(now)
-        LOG.info("[DEBUG] Step 12: _initialize_runtime_schedule() completed")
-
-        LOG.info("[DEBUG] Step 13: Calling audit_logger.log_info()")
         self.bundle.audit_logger.log_info(
             "orchestrator",
             "Runtime loop started.",
             payload={"mode": self.settings.mode.value, "symbol": self.settings.strategy.symbol},
         )
-        LOG.info("[DEBUG] Step 14: audit_logger.log_info() completed")
-
-        LOG.info("[DEBUG] Step 15: Entering _run_event_loop()")
         try:
             self._run_event_loop()
         finally:
@@ -657,26 +635,18 @@ class BotOrchestrator:
         return result
 
     def _start_data_feeds(self) -> None:
-        LOG.info("[DEBUG] _start_data_feeds: Entry")
         websocket_client = self.bundle.market_data.websocket_client
         if websocket_client is None:
-            LOG.info("[DEBUG] _start_data_feeds: websocket_client is None, returning")
             return
 
         try:
-            LOG.info("[DEBUG] _start_data_feeds: Calling websocket_client.start()")
             websocket_client.start(symbol=self.settings.strategy.symbol)
-            LOG.info("[DEBUG] _start_data_feeds: websocket_client.start() returned")
             self.bundle.audit_logger.log_info("orchestrator", "Market data feeds started.")
-            LOG.info("[DEBUG] _start_data_feeds: audit_logger.log_info() completed")
         except Exception as exc:
-            LOG.error("[DEBUG] _start_data_feeds: Exception caught: %s", exc)
             reason = f"feed_start_failed:{exc}"
             self.bundle.audit_logger.log_error("orchestrator", "Failed to start market data feeds.", payload={"error": str(exc)})
             self.state_store.set_safe_mode(True, reason=reason, now=self._now())
             self._send_critical_error_alert("orchestrator", f"Failed to start market data feeds: {exc}")
-
-        LOG.info("[DEBUG] _start_data_feeds: Exit")
 
     def _stop_data_feeds(self) -> None:
         websocket_client = self.bundle.market_data.websocket_client
@@ -689,20 +659,14 @@ class BotOrchestrator:
             self.bundle.audit_logger.log_warning("orchestrator", "Failed to stop market data feeds.", payload={"error": str(exc)})
 
     def _initialize_runtime_schedule(self, now: datetime) -> None:
-        LOG.info("[DEBUG] _initialize_runtime_schedule: Entry, now=%s", now.isoformat())
         now_utc = now.astimezone(timezone.utc)
-        LOG.info("[DEBUG] _initialize_runtime_schedule: now_utc=%s", now_utc.isoformat())
         self._current_utc_day = now_utc.date()
         self._next_monitor_at = now_utc
         self._next_health_at = now_utc
-        LOG.info("[DEBUG] _initialize_runtime_schedule: Checking 15m boundary")
         if self._is_15m_boundary(now_utc):
             self._next_decision_at = now_utc
-            LOG.info("[DEBUG] _initialize_runtime_schedule: At 15m boundary, next_decision_at=%s", now_utc.isoformat())
         else:
             self._next_decision_at = self._next_15m_boundary(now_utc)
-            LOG.info("[DEBUG] _initialize_runtime_schedule: Not at 15m boundary, next_decision_at=%s", self._next_decision_at.isoformat())
-        LOG.info("[DEBUG] _initialize_runtime_schedule: Exit")
 
     def _handle_daily_rollover(self, now: datetime) -> None:
         now_utc = now.astimezone(timezone.utc)
