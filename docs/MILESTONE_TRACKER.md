@@ -6,6 +6,53 @@ Last updated: 2026-04-15 (07:37 UTC)
 
 ## Current Active Milestone
 
+**Milestone:** None — all milestones closed
+
+---
+
+**Milestone:** DIAGNOSE-RUNTIME-LOOP-HANG — Diagnose why bot never reaches decision cycles
+**Status:** CLOSED — FALSE ALARM / RESOLVED BY MVP (2026-04-15)
+**Active builder:** Cascade
+
+**Findings:**
+- No infrastructure hang existed
+- Event loop entered correctly, health check passed (healthy=True), position monitor ran
+- Decision cycle fired at exactly 12:30:00 UTC and completed in <1 second
+- Root cause of perceived "hang": old Fix #8 sticky safe_mode code silently blocked all
+  decision cycles via audit_logger only (no output to btc_bot.log)
+- Test windows never reached a 15-minute boundary before restart — cycles were simply scheduled
+  for the next 15m slot
+
+**Resolution:** SAFE-MODE-AUTO-RECOVERY-MVP (commit 93faed56) already resolved the underlying
+issue. safe_mode=False confirmed. Bot is operational and running cycles normally.
+
+**Debug commits (reverted):**
+- `30b40b9` — 25 debug logs in startup methods
+- `49c4a95` — debug logs in event loop and health check
+- `bc76968` — revert event loop debug
+- `91597da` — revert startup debug (current HEAD)
+
+**Report:** docs/audits/DIAGNOSTIC_RUNTIME_LOOP_HANG.md
+
+---
+
+## Previous Milestones
+
+**Milestone:** SAFE-MODE-AUTO-RECOVERY-MVP — Fix sticky safe_mode + DB divergence bug
+**Status:** MVP_DONE + DEPLOYED (commit 93faed56, 2026-04-15)
+**Active builder:** Cascade
+
+**What:** Deployed to production and verified:
+- Trigger-aware recovery: technical triggers clear safe_mode on restart; capital triggers preserved
+- safe_mode_entry_at column migration ran successfully
+- safe_mode_events audit table created
+- safe_mode=0, healthy=1 confirmed in DB
+- Decision cycles confirmed firing at 15-minute boundaries post-deploy
+
+**Audit:** docs/audits/AUDIT_008_SAFE_MODE_MVP.md
+
+---
+
 **Milestone:** REPO-CONSISTENCY-VERIFICATION-2026-04-15 — Verify full code consistency between main and all side branches
 **Status:** DONE (branch: main, commit d07ddd0, 2026-04-15)
 **Active builder:** Cascade
