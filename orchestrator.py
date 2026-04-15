@@ -295,13 +295,17 @@ class BotOrchestrator:
             )
 
         self._start_data_feeds()
+        print(f"[DIAGNOSTIC] _start_data_feeds() completed", flush=True)
         now = self._now()
+        print(f"[DIAGNOSTIC] _now() completed", flush=True)
         self._initialize_runtime_schedule(now)
+        print(f"[DIAGNOSTIC] _initialize_runtime_schedule() completed", flush=True)
         self.bundle.audit_logger.log_info(
             "orchestrator",
             "Runtime loop started.",
             payload={"mode": self.settings.mode.value, "symbol": self.settings.strategy.symbol},
         )
+        print(f"[DIAGNOSTIC] audit_logger.log_info('Runtime loop started') completed", flush=True)
         try:
             self._run_event_loop()
         finally:
@@ -640,8 +644,11 @@ class BotOrchestrator:
             return
 
         try:
+            print(f"[DIAGNOSTIC] About to call websocket_client.start()", flush=True)
             websocket_client.start(symbol=self.settings.strategy.symbol)
+            print(f"[DIAGNOSTIC] websocket_client.start() returned", flush=True)
             self.bundle.audit_logger.log_info("orchestrator", "Market data feeds started.")
+            print(f"[DIAGNOSTIC] audit_logger.log_info completed", flush=True)
         except Exception as exc:
             reason = f"feed_start_failed:{exc}"
             self.bundle.audit_logger.log_error("orchestrator", "Failed to start market data feeds.", payload={"error": str(exc)})
