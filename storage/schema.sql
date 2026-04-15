@@ -144,7 +144,19 @@ CREATE TABLE IF NOT EXISTS bot_state (
     daily_dd_pct REAL NOT NULL DEFAULT 0,
     weekly_dd_pct REAL NOT NULL DEFAULT 0,
     last_trade_at TEXT,
-    last_error TEXT
+    last_error TEXT,
+    safe_mode_entry_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS safe_mode_events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_type TEXT NOT NULL,
+    trigger TEXT,
+    reason TEXT,
+    probe_successes INTEGER DEFAULT 0,
+    probe_failures INTEGER DEFAULT 0,
+    remaining_triggers TEXT,
+    timestamp TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS daily_metrics (

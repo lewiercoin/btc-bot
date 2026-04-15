@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
@@ -26,6 +27,8 @@ from storage.repositories import (
     upsert_daily_metrics,
 )
 
+LOG = logging.getLogger(__name__)
+
 
 @dataclass(slots=True)
 class OpenTradeRecord:
@@ -38,8 +41,41 @@ class StateStore:
         self.connection = connection
         self.mode = mode
         self.reference_equity = max(reference_equity, 1e-8)
+        self._migrations_applied: bool = False
+
+    def _apply_migrations(self) -> None:
+        """Apply schema migrations idempotently. Runs once per StateStore instance."""
+        if self._migrations_applied:
+            return
+
+        cursor = self.connection.cursor()
+
+        cursor.execute("PRAGMA table_info(bot_state)")
+        columns = {row[1] for row in cursor.fetchall()}
+
+        if "safe_mode_entry_at" not in columns:
+            cursor.execute("ALTER TABLE bot_state ADD COLUMN safe_mode_entry_at TEXT DEFAULT NULL")
+            self.connection.commit()
+            LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS safe_mode_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_type TEXT NOT NULL,
+                trigger TEXT,
+                reason TEXT,
+                probe_successes INTEGER DEFAULT 0,
+                probe_failures INTEGER DEFAULT 0,
+                remaining_triggers TEXT,
+                timestamp TEXT NOT NULL
+            )
+        """)
+        self.connection.commit()
+
+        self._migrations_applied = True
 
     def ensure_initialized(self) -> BotState:
+        self._apply_migrations()
         existing = self.load()
         if existing is not None:
             return existing
@@ -65,6 +101,7 @@ class StateStore:
         raw = get_bot_state(self.connection)
         if raw is None:
             return None
+        raw_entry_at = raw.get("safe_mode_entry_at")
         return BotState(
             mode=raw["mode"],
             healthy=bool(raw["healthy"]),
@@ -75,6 +112,7 @@ class StateStore:
             weekly_dd_pct=raw["weekly_dd_pct"],
             last_trade_at=datetime.fromisoformat(raw["last_trade_at"]) if raw["last_trade_at"] else None,
             last_error=raw["last_error"],
+            safe_mode_entry_at=datetime.fromisoformat(raw_entry_at) if raw_entry_at else None,
         )
 
     def get_open_positions(self) -> int:
@@ -104,16 +142,41 @@ class StateStore:
         return positions
 
     def set_safe_mode(self, enabled: bool, reason: str | None = None, now: datetime | None = None) -> BotState:
-        state = self.refresh_runtime_state(now)
+        ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        state = self.refresh_runtime_state(ts)
         assert state is not None
+
+        if enabled and not state.safe_mode:
+            new_entry_at: datetime | None = ts
+        elif enabled and state.safe_mode:
+            new_entry_at = state.safe_mode_entry_at
+        else:
+            new_entry_at = None
+
         updated = replace(
             state,
             healthy=False if enabled else True,
             safe_mode=enabled,
             open_positions_count=self.get_open_positions(),
             last_error=reason if enabled else None,
+            safe_mode_entry_at=new_entry_at,
         )
         self.save(updated)
+
+        trigger = (reason or "").split(":")[0].strip() if reason else None
+        event_type = "entered" if enabled else "cleared"
+        try:
+            self.connection.execute(
+                """
+                INSERT INTO safe_mode_events (event_type, trigger, reason, timestamp)
+                VALUES (?, ?, ?, ?)
+                """,
+                (event_type, trigger, reason, ts.isoformat()),
+            )
+            self.connection.commit()
+        except Exception as evt_exc:
+            LOG.warning("Failed to write safe_mode event to audit table: %s", evt_exc)
+
         return updated
 
     def get_governance_state(self, now: datetime | None = None) -> GovernanceRuntimeState:

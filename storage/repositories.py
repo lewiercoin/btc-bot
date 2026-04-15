@@ -60,8 +60,8 @@ def upsert_bot_state(conn: sqlite3.Connection, state: BotState, timestamp: datet
         """
         INSERT INTO bot_state (
             id, timestamp, mode, healthy, safe_mode, open_positions_count, consecutive_losses,
-            daily_dd_pct, weekly_dd_pct, last_trade_at, last_error
-        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            daily_dd_pct, weekly_dd_pct, last_trade_at, last_error, safe_mode_entry_at
+        ) VALUES (1, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ON CONFLICT(id) DO UPDATE SET
             timestamp = excluded.timestamp,
             mode = excluded.mode,
@@ -72,7 +72,8 @@ def upsert_bot_state(conn: sqlite3.Connection, state: BotState, timestamp: datet
             daily_dd_pct = excluded.daily_dd_pct,
             weekly_dd_pct = excluded.weekly_dd_pct,
             last_trade_at = excluded.last_trade_at,
-            last_error = excluded.last_error
+            last_error = excluded.last_error,
+            safe_mode_entry_at = excluded.safe_mode_entry_at
         """,
         (
             ts,
@@ -85,6 +86,7 @@ def upsert_bot_state(conn: sqlite3.Connection, state: BotState, timestamp: datet
             state.weekly_dd_pct,
             state.last_trade_at.isoformat() if state.last_trade_at else None,
             state.last_error,
+            state.safe_mode_entry_at.isoformat() if state.safe_mode_entry_at else None,
         ),
     )
 

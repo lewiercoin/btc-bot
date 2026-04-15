@@ -77,6 +77,14 @@ class BinanceRecoverySyncSource:
         return orders
 
 
+_TECHNICAL_TRIGGERS: frozenset[str] = frozenset({
+    "snapshot_build_failed",
+    "health_check_failure_threshold",
+    "feed_start_failed",
+    "exchange_sync_failed",
+})
+
+
 class NoOpRecoverySyncSource:
     """Paper-mode startup sync source: no exchange state, deterministic cold start."""
 
@@ -115,18 +123,31 @@ class RecoveryCoordinator:
 
         if isinstance(self.exchange_sync, NoOpRecoverySyncSource):
             if last_state and last_state.safe_mode:
-                self.audit_logger.log_warning(
-                    "recovery",
-                    "Paper-mode startup recovery preserved existing safe mode.",
-                    payload={
-                        "symbol": self.symbol,
-                        "local_positions": len(local_positions),
-                        "exchange_positions": 0,
-                        "exchange_orders": 0,
-                        "previous_safe_mode": True,
-                    },
-                )
-                return RecoveryReport(healthy=False, safe_mode=True, issues=[])
+                trigger = (last_state.last_error or "").split(":")[0].strip()
+                if trigger in _TECHNICAL_TRIGGERS:
+                    self.audit_logger.log_info(
+                        "recovery",
+                        "Paper-mode startup: clearing technical safe_mode trigger (optimistic recovery).",
+                        payload={
+                            "trigger": trigger,
+                            "previous_safe_mode": True,
+                            "rationale": "Restart signals operator intervention; technical issue likely resolved",
+                        },
+                    )
+                    self.state_store.set_safe_mode(False, reason=None, now=now)
+                    return RecoveryReport(healthy=True, safe_mode=False, issues=[])
+                else:
+                    self.audit_logger.log_warning(
+                        "recovery",
+                        "Paper-mode startup: preserving capital-protection safe_mode trigger.",
+                        payload={
+                            "trigger": trigger,
+                            "previous_safe_mode": True,
+                            "rationale": "Capital/state triggers require calendar rollover or manual intervention",
+                        },
+                    )
+                    self.state_store.set_safe_mode(True, reason=last_state.last_error, now=now)
+                    return RecoveryReport(healthy=False, safe_mode=True, issues=[])
             self.state_store.set_safe_mode(False, reason=None, now=now)
             self.audit_logger.log_info(
                 "recovery",
