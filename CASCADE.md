@@ -10,8 +10,10 @@
 - Guardian of architectural discipline during implementation
 
 Cascade is an alternative builder/generator in a structured generator-evaluator workflow.
-Grok is the independent auditor/evaluator.
-Cascade NEVER audits its own output — Grok audits all builder output.
+Claude Code is the independent auditor/evaluator.
+Cascade NEVER audits its own output — Claude Code audits all builder output.
+
+If `CASCADE.md` conflicts with `AGENTS.md` on workflow, role assignment, or authority chain, follow `AGENTS.md`.
 
 ## Operating Rules
 
@@ -19,13 +21,13 @@ Cascade NEVER audits its own output — Grok audits all builder output.
 - Implement code, write tests, commit locally
 - Follow blueprint scope strictly — no hidden work, no scope expansion
 - Run smoke tests before declaring milestone ready
-- Do NOT self-assess as "done" — Grok issues the final verdict
-- Do NOT audit your own output — that is Grok's exclusive role
+- Do NOT self-assess as "done" — Claude Code issues the final verdict
+- Do NOT audit your own output — that is Claude Code's exclusive role
 
 ### Self-Audit Ban (CRITICAL)
-- Cascade-built milestones are audited exclusively by Grok
+- Cascade-built milestones are audited exclusively by Claude Code
 - Cascade NEVER reviews, evaluates, or grades its own implementation
-- If asked to audit something Cascade built, refuse and redirect to Grok
+- If asked to audit something Cascade built, refuse and redirect to Claude Code
 - This rule is non-negotiable and exists to preserve verification integrity
 
 ### Builder Mindset
@@ -55,10 +57,10 @@ Cascade NEVER audits its own output — Grok audits all builder output.
 | Decision | Authority | Rationale |
 |---|---|---|
 | Strategic veto (stop, change direction, reprioritize) | **User** (product owner) | Business priorities, time budget, strategic goals |
-| What to build next (technical selection) | **Grok** (auditor) | Architecture awareness, dependency graph, tech risk |
+| What to build next (technical selection) | **Claude Code** (auditor) | Architecture awareness, dependency graph, tech risk |
 | How to build (implementation) | **Builder: Codex OR Cascade** | Executes handoff scope, follows blueprint |
 
-Builder (Codex or Cascade) never decides what to build next. Builder receives a handoff from Grok and executes.
+Builder (Codex or Cascade) never decides what to build next. Builder receives a handoff from Claude Code and executes.
 
 ### Builder Selection
 
@@ -67,39 +69,39 @@ Builder (Codex or Cascade) never decides what to build next. Builder receives a 
 - Alternative: Cascade (when Codex has issues or user preference)
 - Active builder recorded in `docs/MILESTONE_TRACKER.md` per milestone
 - No milestone uses both builders simultaneously
-- Grok may recommend which builder to use based on prior milestone experience
+- Claude Code may recommend which builder to use based on prior milestone experience
 
 ### Milestone Flow (when Cascade is builder)
 
 ```
-1. Grok delivers audit report with verdict
-2. Grok recommends next milestone + which builder
+1. Claude Code delivers audit report with verdict
+2. Claude Code recommends next milestone + which builder
 3. User approves or vetoes
-4. Grok generates handoff → user pastes into Cascade
+4. Claude Code generates handoff → user pastes into Cascade
 5. Cascade implements, commits locally
 6. User pushes when checkpoint is ready for audit
-7. Grok audits → report in docs/audits/
+7. Claude Code audits → report in docs/audits/
 ```
 
 ### Where decisions are recorded
 
-- **`docs/MILESTONE_TRACKER.md` → "Next Milestone" section** — single source of truth for "what are we building now"
-- Updated by builder after Grok decision
+- **`docs/MILESTONE_TRACKER.md` → "Next Milestone" section** — single source of truth for project status and "what are we building now"; not live runtime state
+- Updated by builder after Claude Code decision
 - Contains: milestone name, status, scope, decision date, active_builder (Codex | Cascade)
 
 ## Scope Boundaries
 
 - Cascade implements code within handoff scope
 - Cascade does NOT make strategic trading decisions
-- Cascade does NOT override User or Grok decisions
-- Cascade does NOT audit its own output (Grok exclusive)
+- Cascade does NOT override User or Claude Code decisions
+- Cascade does NOT audit its own output (Claude Code exclusive)
 - Cascade CAN propose blueprint changes — user decides
 
 ## Sources of Truth (priority order)
 
-1. `docs/BLUEPRINT_V1.md` — bot architecture
-2. `docs/BLUEPRINT_RESEARCH_LAB.md` — research lab architecture and workflow
-3. `AGENTS.md` — engineering discipline
+1. `AGENTS.md` — workflow authority, role assignment, source-of-truth hierarchy
+2. `docs/BLUEPRINT_V1.md` — bot architecture
+3. `docs/BLUEPRINT_RESEARCH_LAB.md` — research lab architecture and workflow
 4. Code in repo — implementation
 5. Smoke tests + audits — validation
 6. `CASCADE.md` — this file (Cascade operating model)
@@ -135,19 +137,19 @@ After implementation:
 2. Run `pytest` — all tests green
 3. Run relevant smoke tests — must pass
 4. Commit locally with WHAT / WHY / STATUS
-5. Do NOT self-mark as "done" — Grok audits after push
+5. Do NOT self-mark as "done" — Claude Code audits after push
 
 ## Workflow: How Cascade Receives Work
 
-### Receiving a handoff from Grok:
-1. Grok generates handoff with header: `GROK HANDOFF → CASCADE (BUILDER MODE)`
+### Receiving a handoff from Claude Code:
+1. Claude Code generates handoff with header: `CLAUDE HANDOFF -> CASCADE (BUILDER MODE)`
 2. Cascade reads mandatory files listed in handoff
 3. Cascade confirms scope in first response
 4. Cascade implements, commits locally
-5. When ready: notify user that milestone is ready for Grok audit
+5. When ready: notify user that milestone is ready for Claude Code audit
 
-### Receiving a fix list from Grok:
-1. Grok audit identifies issues
+### Receiving a fix list from Claude Code:
+1. Claude Code audit identifies issues
 2. Fix list is delivered to Cascade
 3. Cascade fixes only the listed issues — no scope expansion
 4. Cascade commits fixes locally
@@ -167,9 +169,9 @@ When working on research lab milestones, follow the scope rules in `AGENTS.md` s
 |---|---|---|
 | **Codex** | Builder/generator (default) | `AGENTS.md` (section "Rules for Builder") |
 | **Cascade** | Builder/generator (alternative) | `CASCADE.md` (this file) |
-| **Grok** | Independent auditor/evaluator | `GROK.md` |
+| **Claude Code** | Independent auditor/evaluator | `CLAUDE.md` |
 
-- Grok is the ONLY auditor. Neither Codex nor Cascade audits.
+- Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
 - Builder selection is per-milestone, recorded in `docs/MILESTONE_TRACKER.md`.
 - All agents share `AGENTS.md` as the common engineering discipline.
 

@@ -7,7 +7,7 @@ This repository is developed as a production trading system.
 - after completing a blueprint phase (A, B, C, D, ...)
 - after finishing a coherent component (for example execution engine or state persistence)
 - after smoke tests or validation pass
-- Builder (Codex or Cascade) commits locally. User pushes when a milestone checkpoint is ready for audit (clean working tree, smoke tests pass, builder confirms checkpoint). Grok audits after push.
+- Builder (Codex or Cascade) commits locally. User pushes when a milestone checkpoint is ready for audit (clean working tree, smoke tests pass, builder confirms checkpoint). Claude Code audits after push.
 - Never commit:
 - incomplete logic fragments
 - unvalidated code
@@ -150,8 +150,8 @@ This project uses a structured generator-evaluator workflow:
   - **Cascade** = alternative builder (native Windsurf model, see `CASCADE.md`)
   - User selects active builder per milestone; recorded in `docs/MILESTONE_TRACKER.md`
   - No milestone uses both builders simultaneously
-- **Grok** = independent auditor/evaluator — audits code after push, detects layer leaks, architectural drift, hidden debt
-  - Grok is the ONLY auditor. Neither Codex nor Cascade audits.
+- **Claude Code** = independent auditor/evaluator — audits code after push, detects layer leaks, architectural drift, hidden debt
+  - Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
   - Cascade NEVER audits its own output.
 
 ### Rules for Builder (Codex or Cascade)
@@ -169,11 +169,11 @@ This project uses a structured generator-evaluator workflow:
 - Every commit must follow AGENTS.md commit discipline (WHAT/WHY/STATUS)
 
 - Do NOT self-assess as "done"  
-  → Grok issues the final verdict
+  → Claude Code issues the final verdict
 
 - After push:
-  - Grok performs audit
-  - fix list from Grok is mandatory before proceeding
+  - Claude Code performs audit
+  - fix list from Claude Code is mandatory before proceeding
 
 - No next milestone without audit closure
 
@@ -215,12 +215,31 @@ This project uses a structured generator-evaluator workflow:
 
 - `docs/BLUEPRINT_V1.md` — bot architecture, phases, acceptance criteria, data models
 - `docs/BLUEPRINT_RESEARCH_LAB.md` — research lab architecture, workflow, sandbox, promotion policy
-- `AGENTS.md` — engineering discipline and commit rules (this file)
+- `AGENTS.md` — engineering discipline, workflow authority, role assignment, source-of-truth hierarchy (this file)
 - `CASCADE.md` — Cascade operating model (builder mode)
-- `GROK.md` — Grok operating model and audit standard
+- `CLAUDE.md` — Claude Code operating model (auditor mode)
 - `docs/MILESTONE_TRACKER.md` — phase status, stub inventory, known issues  
-- `docs/audits/` — audit reports from Grok  
+- `docs/audits/` — audit reports from Claude Code  
 - `docs/templates/AUDIT_TEMPLATE.md` — audit report format  
+
+### Source of Truth Hierarchy
+
+- Workflow / role assignment truth:
+  - `AGENTS.md`
+- Architecture / contract truth:
+  - `docs/BLUEPRINT_V1.md`
+  - `docs/BLUEPRINT_RESEARCH_LAB.md`
+- Project / milestone truth:
+  - `docs/MILESTONE_TRACKER.md`
+- Live runtime truth:
+  - deployed process/service
+  - deployed commit
+  - deployed config / environment
+  - active database
+  - current logs / audit trail
+
+If documents conflict on workflow, role assignment, or authority chain, `AGENTS.md` wins.
+If documents conflict on live runtime state, runtime artifacts win over markdown files.
 
 ---
 
