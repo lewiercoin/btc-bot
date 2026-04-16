@@ -181,14 +181,14 @@ This protocol is mandatory at the end of every milestone. No exceptions.
 
 ### Steps (in order)
 
-1. **Push** — After the last commit, always run:
-   ```
-   git push origin <branch>
-   ```
-
-2. **Smoke test** — Immediately after push, run the full smoke test suite:
+1. **Smoke test** — After the last commit, run the full smoke test suite:
    ```
    python -m pytest tests/smoke/ -q --tb=no
+   ```
+
+2. **Push** — After smoke tests pass, push to remote:
+   ```
+   git push origin <branch>
    ```
 
 3. **Builder Report** — Prepare and paste the builder report in the last message using exactly this format:
@@ -203,7 +203,7 @@ This protocol is mandatory at the end of every milestone. No exceptions.
    Status: READY_FOR_AUDIT
    ```
 
-4. **No exceptions** — Never end a milestone without completing all three steps above (push → smoke → report). A milestone is not closed until the BUILDER REPORT is posted.
+4. **No exceptions** — Never end a milestone without completing all three steps above (smoke → push → report). A milestone is not closed until the BUILDER REPORT is posted.
 
 ## Persistent SSH Key Initialization
 
