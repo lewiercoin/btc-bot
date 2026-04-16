@@ -113,8 +113,6 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
-
 **Milestone:** TERMINAL-DIAGNOSTICS-SAFE-MODE — Prepare copy-paste terminal diagnostic script for safe mode troubleshooting
 **Status:** MVP_DONE (branch: terminal-diagnostics-safe-mode, 2026-04-14)
 **Active builder:** Cascade
@@ -141,8 +139,6 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
-
 **Milestone:** WEBSOCKET-MIGRATION — Migrate WebSocket URLs to new Binance official /market/ paths
 **Status:** DONE (branch: websocket-migration, commit dcc0105, 2026-04-14)
 **Active builder:** Cascade
@@ -165,13 +161,11 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - ✅ `orchestrator.py` updated to pass `ws_market_base_url` parameter
 - ✅ All existing tests pass (93/93, 24 skipped)
 - ✅ Zero changes to `core/**`, `execution/**` beyond `orchestrator.py` URL parameter
-
-**In-scope:** `settings.py`, `data/websocket_client.py`, `orchestrator.py`, `docs/MILESTONE_TRACKER.md`, `README.md`
 **Out-of-scope:** `core/**`, `execution/**` (except `orchestrator.py`), new WebSocket features, stream reconnection logic changes
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** DASHBOARD-SERVER-RESOURCES — Server resource monitoring panel in dashboard
 **Status:** DONE (branch: dashboard-server-resources, commit 6cb9421, 2026-04-14)
@@ -192,15 +186,13 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - ✅ Color-coded badges: green <80%, amber ≥80%, red ≥95%
 - ✅ `psutil` added to `requirements.txt`
 - ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
-- ✅ `docs/dashboard/server-resources.md` created
-- ✅ All existing tests pass (93/93)
 
 **In-scope:** `requirements.txt`, `dashboard/server.py`, `dashboard/static/index.html`, `dashboard/static/app.js`, `dashboard/static/style.css`, `docs/dashboard/server-resources.md`, `docs/MILESTONE_TRACKER.md`
 **Out-of-scope:** All trading pipeline code — `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** DASHBOARD-RISK-VISUALISATION — Live Risk & Governance panel in dashboard
 **Status:** DONE (branch: dashboard-risk-visualisation, commit 24b1bff, 2026-04-14)
@@ -217,8 +209,6 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 **Acceptance criteria:**
 - ✅ `/api/risk` returns correct schema (regime, latest_signal, risk_limits, risk_usage, governance_blocked, risk_blocked, safe_mode)
 - ✅ Risk & Governance panel visible after Egress Health section (10s refresh)
-- ✅ Risk limit progress bars: daily DD, weekly DD, consecutive losses, open positions
-- ✅ Latest signal card: direction, regime, confluence_score, reasons[], Promoted/Vetoed badge, governance_notes
 - ✅ Alert row for governance veto / risk block / DD ≥80% warning
 - ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`, `ProxyTransport`
 - ✅ `docs/dashboard/risk-visualisation.md` created
@@ -229,7 +219,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** DASHBOARD-ACCESS-GUIDE — Production run/access documentation for dashboard
 **Status:** DONE (branch: dashboard-access-guide, commit 3e034a0, 2026-04-14)
@@ -239,8 +229,6 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - `docs/dashboard/access-guide.md` (new): step-by-step — SSH access, systemd start/stop/enable, external binding override, UFW rule, SSH tunnel, health check, log rotation, deploy update procedure, Egress Health interpretation table
 - `README.md`: expanded Dashboard section with "How to run & access Dashboard" (systemd, health check, SSH tunnel, links)
 - `docs/MILESTONE_TRACKER.md`: this entry
-
-**Why:** Post DASHBOARD-EGRESS-INTEGRATION, the dashboard is fully functional but had no single authoritative doc covering how to start it, open the firewall, and verify it is working. Access guide fills that gap.
 
 **Acceptance criteria:**
 - ✅ `docs/dashboard/access-guide.md` covers: start (systemd + manual), UFW, external binding, SSH tunnel, health check, log rotation, deploy updates, Egress Health interpretation
@@ -253,7 +241,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** DASHBOARD-EGRESS-INTEGRATION — Live egress/proxy health panel in dashboard
 **Status:** DONE (branch: dashboard-egress-integration, commit 153659a, 2026-04-14)
@@ -263,8 +251,6 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - `/api/egress` endpoint: reads `settings.proxy` (env vars) + parses bot log tail for ProxyTransport events + reads `bot_state.safe_mode` from SQLite
 - Egress Health panel in UI: exit node IP, session age, bans (24h), rotation, safe mode status — auto-refresh 10s
 - Safe mode alert banner: red banner at top of page when `safe_mode = true`
-
-**Why:** Operator visibility into egress health without SSH. Confirms SOCKS5 proxy is active and no bans are occurring. Safe mode alert replaces need to monitor journalctl.
 
 **Acceptance criteria:**
 - ✅ `/api/egress` returns correct schema
@@ -279,14 +265,12 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** INFRA-EGRESS-VULTR — Dedicated SOCKS5 exit node via Vultr
 **Status:** DONE (branch: infra/egress-vultr-fix, commit 590064c, 2026-04-14)
 **Active builder:** Cascade
 **Commits:** 590064c chore: add Vultr SOCKS5 egress node documentation and config
-
-**What:** Configured dedicated Vultr VPS (192.0.2.20) as SOCKS5 exit node (dante-server v1.4.2, port 1080). UFW firewall whitelists only Hetzner IP (192.0.2.10). Bot configured with PROXY_TYPE=socks5, PROXY_URL=192.0.2.20:1080.
 
 **Why:** IPRoyal residential proxy exit IP was partially blocked by Binance CloudFront (bookTicker and critical endpoints returned 404). Vultr exit node routes REST traffic through a clean IP — all critical endpoints (ping, time, bookTicker) return HTTP 200.
 
@@ -314,7 +298,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-## Previous Milestones
+---
 
 **Milestone:** INFRA-RESILIENCE-PROXY-2026 — Configurable proxy layer for Binance REST client
 **Status:** MVP_DONE (commit 7622f8b, 2026-04-14)
@@ -460,30 +444,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - study: baseline-v3-trial-00195
 - expectancy_r = +0.141, profit_factor = 1.192, **607 trades**
 
----
-
-## Diagnostic Results (2026-04-12)
-
-### Crash Test (confluence_min=0.0, min_rr=1.0, 8f2c6f2 signal)
-- 1,262 trades / 4 years
-- expectancy_r = **-0.054** (not anti-edge; headroom to Run #3 best = +0.195 R)
-- profit_factor = 0.934
-- Regime blocked 53% of signals (healthy filtering)
-- Governance blocked 26%
-- Risk rejected <1% (min_rr=1.0 passes everything)
-
-### Test B (min_hits=3 cherry-pick, same conditions)
-- 1,183 trades (-6.3% vs baseline)
-- expectancy_r = **-0.053** (marginally better)
-- profit_factor = 0.939
-- **Verdict: safe cherry-pick. min_hits=3 cleans noise without killing signal.**
-
-### Run #3 reference (best historical result, pre-SWEEP-RECLAIM-FIX-V1)
-- study: baseline-v3-trial-00195
-- expectancy_r = +0.141, profit_factor = 1.192, **607 trades**
-- Walk-forward: mixed (some windows failed — normal for trend-following in regime-mixed 2022-2025)
-
----
 
 ## Completed Milestones (reverse chronological)
 
