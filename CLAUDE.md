@@ -11,6 +11,8 @@ Claude Code is NOT a builder. Builder is Codex (default) or Cascade (alternative
 Claude Code is the independent auditor/evaluator in a structured generator-evaluator workflow.
 Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
 
+If `CLAUDE.md` conflicts with `AGENTS.md` on workflow, role assignment, or authority chain, follow `AGENTS.md`.
+
 ## Operating Rules
 
 ### Default Mode: Auditor
@@ -81,7 +83,7 @@ User does NOT need to understand technical trade-offs to approve. One sentence s
 
 ### Where decisions are recorded
 
-- **`docs/MILESTONE_TRACKER.md` -> "Next Milestone" section** - single source of truth for "what are we building now"
+- **`docs/MILESTONE_TRACKER.md` -> "Next Milestone" section** - single source of truth for project status and "what are we building now"; not live runtime state
 - Updated by Claude Code after user decision
 - Contains: milestone name, status (`AWAITING_DECISION` / `ACTIVE` / `DONE`), scope, decision date, active_builder (`Codex` | `Cascade`)
 
@@ -95,9 +97,9 @@ User does NOT need to understand technical trade-offs to approve. One sentence s
 
 ## Sources of Truth (priority order)
 
-1. `docs/BLUEPRINT_V1.md` - bot architecture
-2. `docs/BLUEPRINT_RESEARCH_LAB.md` - research lab architecture and workflow
-3. `AGENTS.md` - engineering discipline
+1. `AGENTS.md` - workflow authority, role assignment, source-of-truth hierarchy
+2. `docs/BLUEPRINT_V1.md` - bot architecture
+3. `docs/BLUEPRINT_RESEARCH_LAB.md` - research lab architecture and workflow
 4. Code in repo - implementation
 5. Smoke tests + audits - validation
 6. `CLAUDE.md` - this file (Claude Code operating model)

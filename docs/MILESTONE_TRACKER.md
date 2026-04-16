@@ -1,12 +1,64 @@
 # Milestone Tracker
 
-Last updated: 2026-04-15 (07:37 UTC)
+Last updated: 2026-04-16 (14:37 UTC)
 
 ---
 
 ## Current Active Milestone
 
-**Milestone:** None — all milestones closed
+**Milestone:** RUNTIME-RECONCILIATION-2026-04-16
+**Status:** ACTIVE (2026-04-16)
+**Active builder:** Codex
+
+**What:** Reconcile actual runtime/deployment state before any further bot/runtime changes. Establish one verified operational picture across deployed commit, service/process state, deployed config, active database, and current logs/audit trail.
+
+**Why:** Workflow control documents are now aligned, but runtime truth is still unverified. Current evidence shows historical drift between local repo state, local SQLite state, deployment state, log timestamps, and safe_mode diagnosis. No further bot/runtime milestone should proceed until this runtime picture is verified.
+
+**Acceptance criteria:**
+- ✅ Deployed commit on target runtime is identified and recorded
+- ✅ Process/service state is verified (`running` / `stopped` / `failed`) on target runtime
+- ✅ Active database path is verified
+- ✅ Current `bot_state` is verified, including `healthy`, `safe_mode`, `last_error`, `safe_mode_entry_at` if present
+- ✅ Current `config_hash` is reconciled between deployed settings/runtime DB
+- ✅ Freshness of logs and audit trail is verified
+- ✅ Schema drift between deployed DB and current `storage/schema.sql` is identified explicitly
+- ✅ Root cause is classified as one of: infrastructure / config / schema drift / stale environment / code regression / still unknown
+- ✅ `docs/MILESTONE_TRACKER.md` updated with findings and next action
+
+**In-scope:**
+- runtime/deployment inspection
+- commit/config/db/log reconciliation
+- safe_mode and non-trading diagnosis
+- schema/version drift verification
+- documentation update limited to tracker findings
+
+**Out-of-scope:**
+- strategy redesign
+- signal/risk/governance tuning
+- dashboard feature work
+- broad documentation rewrite
+- production fixes before reconciliation is complete
+
+---
+
+## Reconciliation Note
+
+Last reconciled: 2026-04-16
+
+- Tracker scope:
+  - `docs/MILESTONE_TRACKER.md` is the source of truth for project status, active milestone, builder selection, and known issues.
+  - `docs/MILESTONE_TRACKER.md` is not the source of truth for live runtime state.
+- Live runtime truth must come from:
+  - deployed process/service status
+  - deployed commit
+  - deployed config / environment
+  - active SQLite database
+  - current logs and audit trail
+- Workflow role reconciliation:
+  - `Codex` = default builder
+  - `Cascade` = alternative builder
+  - `Claude Code` = independent auditor
+- If workflow documents conflict, `AGENTS.md` is the controlling document.
 
 ---
 
@@ -381,8 +433,8 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - **degradation: -11.2%** ← exceptional (Run #12 trial #26 had -238%)
 - failures: ZERO
 
-**DECISION (2026-04-13, confirmed by Grok):** Trial #63 approved for paper trading.
-- Degradation -11.2% far below Grok's threshold of -55%
+**DECISION (2026-04-13, prior audit verdict):** Trial #63 approved for paper trading.
+- Degradation -11.2% far below the audit threshold of -55%
 - 2/2 windows passed including 2024-2025 and 2025-2026 bull market windows
 - Note: allow_long_in_uptrend=False — bot very selective in bull markets (shorts in corrections only)
 - Note: max_leverage=high_vol_leverage=8 — monitor closely in live
@@ -393,7 +445,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ## Completed Milestone: RUN12-SOFT-PENALTY
 **Status:** DONE — 310 trials, 2026-04-12/13
-**Active builder:** Claude Code (auditor executed directly) + Cascade (anti-overfitting guard)
+**Active builder:** Cascade
 **Commits:** `45cea8a` + `51513f2` + `92df4b4` + `92bbbfd` + `e8abab3`
 
 **Final results (310 trials):**
