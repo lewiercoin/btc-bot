@@ -1,13 +1,13 @@
 # Milestone Tracker
 
-Last updated: 2026-04-16 (14:37 UTC)
+Last updated: 2026-04-16
 
 ---
 
 ## Current Active Milestone
 
 **Milestone:** RUNTIME-RECONCILIATION-2026-04-16
-**Status:** ACTIVE (2026-04-16)
+**Status:** READY FOR AUDIT (2026-04-16)
 **Active builder:** Codex
 
 **What:** Reconcile actual runtime/deployment state before any further bot/runtime changes. Establish one verified operational picture across deployed commit, service/process state, deployed config, active database, and current logs/audit trail.
@@ -38,6 +38,64 @@ Last updated: 2026-04-16 (14:37 UTC)
 - dashboard feature work
 - broad documentation rewrite
 - production fixes before reconciliation is complete
+
+**Verified findings (production runtime, checked 2026-04-16):**
+- `btc-bot.service` is `running` in `PAPER` mode on `/home/btc-bot/btc-bot`, active since `2026-04-15 14:48:55 UTC`
+- `btc-bot-dashboard.service` is `running`, active since `2026-04-14 17:14:29 UTC`
+- Deployed bot commit is `d24561789691062f25adfe04930612e685f22490` on `main`, but the deployment worktree is dirty:
+  - `M orchestrator.py`
+  - `orchestrator.py.backup-20260415T1447Z`
+  - `storage/btc_bot.db.backup-20260414T134301`
+  - `storage/btc_bot.db.backup-20260414T134324`
+- Active database path is `/home/btc-bot/btc-bot/storage/btc_bot.db`
+- Runtime artifacts are fresh on the server:
+  - `logs/btc_bot.log` updated on `2026-04-16 20:15 UTC`
+  - `storage/btc_bot.db-wal` updated on `2026-04-16 20:16 UTC`
+- `bot_state` at `2026-04-16T20:17:15Z`:
+  - `healthy=1`
+  - `safe_mode=0`
+  - `last_error=null`
+  - `safe_mode_entry_at=null`
+  - `open_positions_count=0`
+- Current runtime is not stuck and not skipping on `safe_mode`:
+  - `journalctl` and `btc_bot.log` show decision cycles every 15 minutes
+  - current cycle outcome is `no_signal`
+- Current deployed settings hash is `e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718`
+- Latest stored signal, executable signal, and trade still belong to old config hash `778678b05b5f0d2f48c137364cf26fddbb9b7e2364935f646e8b2a7103b17917` from `2026-03-29`
+- Data freshness is uneven and materially stale:
+  - `candles` and `open_interest` stop at `2026-04-11 15:30 UTC`
+  - `funding` stops at `2026-04-11 08:00 UTC`
+  - `aggtrade_buckets` stop at `2026-03-28 21:14 UTC`
+  - `force_orders` has `0` rows
+  - `daily_external_bias` is fresh through `2026-04-15`
+  - `daily_metrics` is fresh on `2026-04-16`
+- `btc-bot-force-collector.service` is `inactive/dead`
+  - recent errors include `BinanceApiError(http=401, code=-2014, msg=API-key format invalid.)`
+  - recent errors also include `BinanceApiError(http=400, code=-1130, msg=Data sent for parameter 'limit' is not valid.)`
+- Deployment drift is explicit:
+  - deployed `settings.py`, `orchestrator.py`, and `storage/schema.sql` all differ from the current local repo
+  - deployed DB already contains `safe_mode_events`, so DB state and deployed schema history are not aligned with the local repo snapshot
+
+**Root cause classification:**
+- Primary: `stale environment`
+- Contributing: `deployment drift` and `data pipeline/infrastructure drift`
+- Not current primary cause:
+  - service down
+  - sticky `safe_mode`
+  - event loop hang
+- Residual unknown:
+  - whether the current strategy would still produce `no_signal` on fully fresh data
+
+**Current interpretation:**
+- The production bot is alive and cycling, but it is operating on an environment with stale or missing upstream data and a dirty, out-of-sync deployment baseline.
+- The historical `safe_mode` diagnosis from `2026-04-02` is no longer the current blocker on `2026-04-16`.
+- The current non-trading state is best explained by stale environment drift, not by a dead service.
+
+**Next action:**
+- Open a follow-up milestone for read-write remediation of deployment drift and data freshness, starting with:
+  - choosing the deployment baseline commit
+  - cleaning the dirty server worktree
+  - restoring collectors and verifying fresh market data before any strategy or governance tuning
 
 ---
 
