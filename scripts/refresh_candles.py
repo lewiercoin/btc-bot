@@ -9,22 +9,30 @@ from pathlib import Path
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from data.rest_api_client import BinanceFuturesRestClient, RestApiClientConfig
+from data.rest_client import BinanceFuturesRestClient, RestClientConfig
+from data.proxy_transport import ProxyTransport, ProxyConfig
 from storage.repositories import get_connection, upsert_candles
 
 
 def main():
     """Fetch and store latest candles."""
     # Get config from env
-    api_key = os.getenv("BINANCE_API_KEY", "")
-    api_secret = os.getenv("BINANCE_API_SECRET", "")
     proxy_enabled = os.getenv("PROXY_ENABLED", "false").lower() == "true"
 
-    config = RestApiClientConfig(
-        api_base_url="https://fapi.binance.com",
-        api_key=api_key,
-        api_secret=api_secret,
-        proxy_enabled=proxy_enabled,
+    # Setup proxy if enabled
+    proxy_transport = None
+    if proxy_enabled:
+        proxy_config = ProxyConfig(
+            proxy_url=os.getenv("SOCKS_PROXY_URL", "socks5://80.240.17.161:1080"),
+            sticky_session_minutes=60,
+        )
+        proxy_transport = ProxyTransport(proxy_config)
+
+    config = RestClientConfig(
+        base_url="https://fapi.binance.com",
+        timeout_seconds=30,
+        max_retries=3,
+        proxy_transport=proxy_transport,
     )
 
     client = BinanceFuturesRestClient(config)
