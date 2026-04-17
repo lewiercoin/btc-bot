@@ -2,6 +2,7 @@
 """Manual script to refresh candles from Binance REST API."""
 
 import os
+import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
@@ -11,7 +12,45 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.rest_client import BinanceFuturesRestClient, RestClientConfig
 from data.proxy_transport import ProxyTransport
-from storage.repositories import get_connection, upsert_candles
+
+
+def get_connection() -> sqlite3.Connection:
+    """Get database connection."""
+    db_path = Path(__file__).parent.parent / "storage" / "btc_bot.db"
+    return sqlite3.connect(str(db_path))
+
+
+def upsert_candles(conn: sqlite3.Connection, symbol: str, timeframe: str, klines: list[list]) -> int:
+    """Insert or update candles from Binance klines format."""
+    # Binance klines format: [open_time, open, high, low, close, volume, close_time, ...]
+    rows = [
+        (
+            symbol,
+            timeframe,
+            datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).isoformat(),
+            float(k[1]),  # open
+            float(k[2]),  # high
+            float(k[3]),  # low
+            float(k[4]),  # close
+            float(k[5]),  # volume
+        )
+        for k in klines
+    ]
+
+    conn.executemany(
+        """
+        INSERT INTO candles (symbol, timeframe, open_time, open, high, low, close, volume)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        ON CONFLICT(symbol, timeframe, open_time) DO UPDATE SET
+            open = excluded.open,
+            high = excluded.high,
+            low = excluded.low,
+            close = excluded.close,
+            volume = excluded.volume
+        """,
+        rows,
+    )
+    return len(rows)
 
 
 def main():
@@ -44,10 +83,11 @@ def main():
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(days=7)
 
-    print(f"Fetching {symbol} {interval} candles from {start_time} to {end_time}")
+    print(f"Fetching {symbol} {interval} candles...")
+    print(f"  Period: {start_time.strftime('%Y-%m-%d %H:%M')} → {end_time.strftime('%Y-%m-%d %H:%M')}")
 
     try:
-        candles = client.get_klines(
+        klines = client.get_klines(
             symbol=symbol,
             interval=interval,
             start_time=int(start_time.timestamp() * 1000),
@@ -55,17 +95,21 @@ def main():
             limit=1000,
         )
 
-        if candles:
-            upsert_candles(conn, symbol, interval, candles)
+        if klines:
+            count = upsert_candles(conn, symbol, interval, klines)
             conn.commit()
-            print(f"✅ Stored {len(candles)} candles")
-            print(f"   First: {candles[0]['open_time']}")
-            print(f"   Last:  {candles[-1]['open_time']}")
+            first_time = datetime.fromtimestamp(klines[0][0] / 1000, tz=timezone.utc)
+            last_time = datetime.fromtimestamp(klines[-1][0] / 1000, tz=timezone.utc)
+            print(f"✅ Stored {count} candles")
+            print(f"   First: {first_time.isoformat()}")
+            print(f"   Last:  {last_time.isoformat()}")
         else:
-            print("❌ No candles returned")
+            print("❌ No candles returned from API")
 
     except Exception as exc:
         print(f"❌ Error: {exc}")
+        import traceback
+        traceback.print_exc()
         conn.rollback()
         raise
     finally:
