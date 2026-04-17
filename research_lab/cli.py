@@ -40,7 +40,7 @@ def _parse_iso_datetime(raw: str, *, is_end: bool) -> datetime:
 
 
 def _default_paths() -> tuple[Path, Path, Path]:
-    settings = load_settings()
+    settings = load_settings(profile="research")
     if settings.storage is None:
         raise ValueError("settings.storage is required for research_lab CLI defaults.")
     root = settings.storage.project_root
@@ -138,7 +138,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> None:
     args = _build_parser().parse_args(argv)
-    settings = load_settings()
+    settings = load_settings(profile="research")
     if settings.storage is None:
         raise ValueError("settings.storage is required to run research_lab CLI.")
 

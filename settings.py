@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import hashlib
 import json
 import os
@@ -253,20 +254,31 @@ def _serialize_settings(settings: AppSettings) -> dict[str, Any]:
     return payload
 
 
-def load_settings(project_root: Path | None = None) -> AppSettings:
+def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:
     root = project_root or Path(__file__).resolve().parent
     mode = _parse_mode(os.getenv("BOT_MODE", "PAPER"))
+    if profile not in {"research", "live"}:
+        raise ValueError(f"Invalid settings profile {profile!r}. Use 'research' or 'live'.")
     storage = StorageConfig(
         project_root=root,
         db_path=root / "storage" / "btc_bot.db",
         schema_path=root / "storage" / "schema.sql",
         logs_dir=root / "logs",
     )
-    return AppSettings(
+    settings = AppSettings(
         schema_version="v1.0",
         mode=mode,
         storage=storage,
     )
+    if profile == "research":
+        return settings
+
+    live_strategy = dataclasses.replace(
+        settings.strategy,
+        min_sweep_depth_pct=0.0001,
+        confluence_min=3.0,
+    )
+    return dataclasses.replace(settings, strategy=live_strategy)
 
 
 SETTINGS = load_settings()

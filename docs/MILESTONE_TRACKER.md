@@ -943,6 +943,29 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 | 2026-04-12 | SIGNAL-REVERT-V1: restore 8f2c6f2 + min_hits=3 | ACTIVE — Crash Test confirmed safe |
 | 2026-04-12 | SOFT-PENALTY-V1: replace zero-vector cliff | ACTIVE — TPE death spiral broken |
 | 2026-04-12 | Anti-overfitting guard: cap PF>5.0 | ACTIVE — deployed at trial #88 |
+| 2026-04-17 | Live vs Research Settings Split | ACTIVE — live overrides for relaxed signal thresholds |
+
+## Live vs Research Settings Split (2026-04-17)
+
+ **Decision:** Live bot and research lab use different signal thresholds.
+
+ **Why:**
+ - Trial #63 params (`min_sweep_depth_pct=0.00286`, `confluence_min=3.6`) passed walk-forward on 2022-2026 backtest data.
+ - The same params produce zero signals in the live April 2026 market.
+ - Research reproducibility requires stable dataclass defaults.
+ - Live incident recovery needs immediate threshold relaxation.
+
+ **Implementation:**
+ - `settings.py`: `StrategyConfig` dataclass defaults remain Trial #63 values as the research baseline.
+ - `load_settings(profile="live")`: applies live runtime overrides `min_sweep_depth_pct=0.0001` and `confluence_min=3.0`.
+ - `load_settings(profile="research")`: uses the unmodified dataclass defaults.
+ - `main.py`: calls `load_settings(profile="live")`.
+ - `research_lab/cli.py`: calls `load_settings(profile="research")`.
+
+ **Important:**
+ - `settings.py` is not a candidate promotion channel.
+ - Live overrides are runtime-only and do not affect the research param registry or warm-start baseline.
+ - Future research campaigns continue using the Trial #63 baseline unless the dataclass defaults are changed explicitly.
 
 ---
 
