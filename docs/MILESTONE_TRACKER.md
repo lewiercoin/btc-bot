@@ -1,101 +1,107 @@
 # Milestone Tracker
 
-Last updated: 2026-04-16
+Last updated: 2026-04-17
 
 ---
 
 ## Current Active Milestone
 
-**Milestone:** RUNTIME-RECONCILIATION-2026-04-16
-**Status:** READY FOR AUDIT (2026-04-16)
+**Milestone:** DEPLOYMENT-REMEDIATION-2026-04-17
+**Status:** READY FOR AUDIT (2026-04-17)
 **Active builder:** Codex
 
-**What:** Reconcile actual runtime/deployment state before any further bot/runtime changes. Establish one verified operational picture across deployed commit, service/process state, deployed config, active database, and current logs/audit trail.
+**What:** Clean the production deployment baseline, remove dirty server drift, restore collector/data freshness, and verify whether the current `no_signal` state is still infrastructure-driven or is now strategy-driven.
 
-**Why:** Workflow control documents are now aligned, but runtime truth is still unverified. Current evidence shows historical drift between local repo state, local SQLite state, deployment state, log timestamps, and safe_mode diagnosis. No further bot/runtime milestone should proceed until this runtime picture is verified.
+**Why:** Runtime reconciliation confirmed that the bot was alive but the server was stale and dirty: deployed commit drift, ad-hoc `orchestrator.py` patch, dead force collector, and stale DB-side market history. This milestone closes the infrastructure/data drift first, before any strategy conclusions.
 
 **Acceptance criteria:**
-- ✅ Deployed commit on target runtime is identified and recorded
-- ✅ Process/service state is verified (`running` / `stopped` / `failed`) on target runtime
-- ✅ Active database path is verified
-- ✅ Current `bot_state` is verified, including `healthy`, `safe_mode`, `last_error`, `safe_mode_entry_at` if present
-- ✅ Current `config_hash` is reconciled between deployed settings/runtime DB
-- ✅ Freshness of logs and audit trail is verified
-- ✅ Schema drift between deployed DB and current `storage/schema.sql` is identified explicitly
-- ✅ Root cause is classified as one of: infrastructure / config / schema drift / stale environment / code regression / still unknown
+- ✅ Deployment baseline commit is chosen and justified explicitly
+- ✅ Dirty server worktree is backed up, classified, and removed from the live repo
+- ✅ Server repo is redeployed cleanly to the chosen commit
+- ✅ `btc-bot.service` is stable on the remediated deploy
+- ✅ `btc-bot-force-collector.service` is restored end-to-end
+- ✅ `btc-bot-daily-collector.timer` and service are verified
+- ✅ DB-side freshness is restored for critical tables that should be refreshed in this milestone
+- ✅ Current `bot_state` is verified after remediation (`healthy`, `safe_mode`, `last_error`)
+- ✅ `no_signal` is re-classified after remediation, not before
 - ✅ `docs/MILESTONE_TRACKER.md` updated with findings and next action
 
 **In-scope:**
-- runtime/deployment inspection
-- commit/config/db/log reconciliation
-- safe_mode and non-trading diagnosis
-- schema/version drift verification
+- deployment baseline choice
+- dirty worktree backup and cleanup
+- clean redeploy to the selected commit
+- collector restoration and data refresh
+- post-remediation runtime verification
 - documentation update limited to tracker findings
 
 **Out-of-scope:**
-- strategy redesign
-- signal/risk/governance tuning
+- strategy/signal/risk/governance tuning
+- forcing trades
 - dashboard feature work
 - broad documentation rewrite
-- production fixes before reconciliation is complete
+- production fixes outside this remediation scope
 
-**Verified findings (production runtime, checked 2026-04-16):**
-- `btc-bot.service` is `running` in `PAPER` mode on `/home/btc-bot/btc-bot`, active since `2026-04-15 14:48:55 UTC`
-- `btc-bot-dashboard.service` is `running`, active since `2026-04-14 17:14:29 UTC`
-- Deployed bot commit is `d24561789691062f25adfe04930612e685f22490` on `main`, but the deployment worktree is dirty:
-  - `M orchestrator.py`
-  - `orchestrator.py.backup-20260415T1447Z`
-  - `storage/btc_bot.db.backup-20260414T134301`
-  - `storage/btc_bot.db.backup-20260414T134324`
-- Active database path is `/home/btc-bot/btc-bot/storage/btc_bot.db`
-- Runtime artifacts are fresh on the server:
-  - `logs/btc_bot.log` updated on `2026-04-16 20:15 UTC`
-  - `storage/btc_bot.db-wal` updated on `2026-04-16 20:16 UTC`
-- `bot_state` at `2026-04-16T20:17:15Z`:
+**Baseline choice and rationale:**
+- Selected deployment target: `1efa7e55051196702aa123f7e3d55d94957bbc9b` (`main`)
+- Rejected `d24561789691062f25adfe04930612e685f22490`:
+  - missing `WEBSOCKET-MIGRATION`
+  - missing `SAFE-MODE-AUTO-RECOVERY-MVP`
+  - required an ad-hoc dirty `orchestrator.py` patch just for runtime visibility
+- Rejected `7a7a74388d68b616bc74d2f83a49c30ee8aae8fa` as the final target:
+  - included safe-mode recovery, but still missed the later runtime-loop visibility patch that had already been hot-patched on the server
+- Chose current `main` tip because:
+  - all commits between `0950215` and the pre-remediation tip were documentation-only
+  - `1efa7e5` adds the targeted force-collector fix without introducing further runtime drift
+  - it restores alignment between `server repo` and `origin/main`
+
+**Verified findings (production runtime, checked 2026-04-17):**
+- Dirty server worktree was backed up to `/home/btc-bot/deployment-backups/20260417T133246Z-deployment-remediation`
+- Dirty worktree classification:
+  - `M orchestrator.py` matched the exact runtime visibility patch from `0950215`
+  - `orchestrator.py.backup-20260415T1447Z` and two DB backup files were ad-hoc local artifacts, not source-of-truth state
+- Server repo was reset cleanly to `1efa7e55051196702aa123f7e3d55d94957bbc9b`
+- `btc-bot.service` restarted cleanly at `2026-04-17 13:32:54 UTC`
+- Runtime status after remediation:
+  - `mode=PAPER`
+  - `config_hash=e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718`
   - `healthy=1`
   - `safe_mode=0`
   - `last_error=null`
-  - `safe_mode_entry_at=null`
-  - `open_positions_count=0`
-- Current runtime is not stuck and not skipping on `safe_mode`:
-  - `journalctl` and `btc_bot.log` show decision cycles every 15 minutes
-  - current cycle outcome is `no_signal`
-- Current deployed settings hash is `e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718`
-- Latest stored signal, executable signal, and trade still belong to old config hash `778678b05b5f0d2f48c137364cf26fddbb9b7e2364935f646e8b2a7103b17917` from `2026-03-29`
-- Data freshness is uneven and materially stale:
-  - `candles` and `open_interest` stop at `2026-04-11 15:30 UTC`
-  - `funding` stops at `2026-04-11 08:00 UTC`
-  - `aggtrade_buckets` stop at `2026-03-28 21:14 UTC`
-  - `force_orders` has `0` rows
-  - `daily_external_bias` is fresh through `2026-04-15`
-  - `daily_metrics` is fresh on `2026-04-16`
-- `btc-bot-force-collector.service` is `inactive/dead`
-  - recent errors include `BinanceApiError(http=401, code=-2014, msg=API-key format invalid.)`
-  - recent errors also include `BinanceApiError(http=400, code=-1130, msg=Data sent for parameter 'limit' is not valid.)`
-- Deployment drift is explicit:
-  - deployed `settings.py`, `orchestrator.py`, and `storage/schema.sql` all differ from the current local repo
-  - deployed DB already contains `safe_mode_events`, so DB state and deployed schema history are not aligned with the local repo snapshot
+- WebSocket behavior after clean deploy:
+  - `/market` path still returns `HTTP 404`
+  - automatic fallback to legacy `/stream` works
+  - bot feed connects successfully on `wss://fstream.binance.com/stream?...`
+- Data refresh status after remediation:
+  - `candles.max_ts = 2026-04-17T14:00:00+00:00`
+  - `open_interest.max_ts = 2026-04-17T14:00:00+00:00`
+  - `aggtrade_buckets.max_ts = 2026-04-17T14:04:00+00:00`
+  - `force_orders.max_ts = 2026-04-17T14:15:35.128000+00:00` with `count = 5`
+  - `daily_external_bias.max_ts = 2026-04-17`
+  - `daily_metrics.max_ts = 2026-04-17`
+  - `funding.max_ts = 2026-04-17T08:00:00.011000+00:00` which matches the latest published 8h funding interval, not a stale collector failure
+- `btc-bot-daily-collector.service` is healthy on its timer and updates DXY daily
+- `btc-bot-force-collector.service` is restored:
+  - bootstrap no longer crashes
+  - service remains `active/running`
+  - WS connection established
+  - live `force_orders` rows are now arriving
+- Bot decision cycles after remediation:
+  - `13:45 UTC` -> `outcome=no_signal`
+  - `14:00 UTC` -> `outcome=no_signal`
+  - `14:15 UTC` -> `outcome=no_signal`
 
-**Root cause classification:**
-- Primary: `stale environment`
-- Contributing: `deployment drift` and `data pipeline/infrastructure drift`
-- Not current primary cause:
-  - service down
-  - sticky `safe_mode`
-  - event loop hang
-- Residual unknown:
-  - whether the current strategy would still produce `no_signal` on fully fresh data
-
-**Current interpretation:**
-- The production bot is alive and cycling, but it is operating on an environment with stale or missing upstream data and a dirty, out-of-sync deployment baseline.
-- The historical `safe_mode` diagnosis from `2026-04-02` is no longer the current blocker on `2026-04-16`.
-- The current non-trading state is best explained by stale environment drift, not by a dead service.
+**Current classification:**
+- Deployment/data remediation succeeded for the live runtime blockers
+- Current `no_signal` is best classified as `strategy / current market conditions`, not as `safe_mode`, service failure, dead collector, or stale-environment blocker
+- Residual caveat:
+  - the force-order REST bootstrap path returns `0` rows and should not be treated as authoritative historical market-liquidation backfill
+  - live WS collection is now functioning and supplying fresh `force_orders`
 
 **Next action:**
-- Open a follow-up milestone for read-write remediation of deployment drift and data freshness, starting with:
-  - choosing the deployment baseline commit
-  - cleaning the dirty server worktree
-  - restoring collectors and verifying fresh market data before any strategy or governance tuning
+- Do not reopen deployment remediation unless the auditor finds a concrete regression
+- If the audit passes, the next milestone should move back to controlled strategy assessment on the now-clean runtime
+- Low-priority follow-up:
+  - document or redesign the force-order REST bootstrap assumption so future operators do not confuse `0 historical rows` with a dead live collector
 
 ---
 
@@ -914,12 +920,11 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
-| K1 | BINANCE_API_KEY format invalid on server | LOW | force-collector failing with 401; not blocking optimization |
-| K2 | force_orders table has 0 rows | LOW | No historical liquidation data; feature frozen in param_registry |
-| K3 | daily_external_bias (ETF/DXY) table empty | LOW | EtfBiasCollector runs but ETF data incomplete |
-| K4 | Walk-forward uses 6 windows over 4 years | MEDIUM | ~150 trades/window may be insufficient; defer to post-Run#12 |
-| K5 | level_min_age_bars not yet in 8f2c6f2 codebase | LOW | Deferred to Run #13; add as tunable [2, 6] |
-| K6 | PF=999999 trials (#47/#56/#73) in Run #12 journal | LOW | Anti-overfitting guard deployed at trial #88; future trials unaffected |
+| K1 | Force-order REST bootstrap semantics remain ambiguous | LOW | Live collector is restored and `force_orders` rows are flowing; remaining follow-up is to document or redesign the historical REST bootstrap assumption |
+| K2 | ETF bias is still partial | LOW | Daily collector updates DXY, but ETF sources still warn on missing `SOSO/COINGLASS` API keys |
+| K3 | Walk-forward uses 6 windows over 4 years | MEDIUM | ~150 trades/window may be insufficient; defer to post-Run#12 |
+| K4 | level_min_age_bars not yet in 8f2c6f2 codebase | LOW | Deferred to Run #13; add as tunable [2, 6] |
+| K5 | PF=999999 trials (#47/#56/#73) in Run #12 journal | LOW | Anti-overfitting guard deployed at trial #88; future trials unaffected |
 
 ---
 
