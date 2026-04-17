@@ -10,7 +10,7 @@ from typing import Callable
 
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
-from core.models import GovernanceRuntimeState, MarketSnapshot, RiskRuntimeState
+from core.models import GovernanceRuntimeState, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
@@ -373,10 +373,16 @@ class BotOrchestrator:
                 config_hash=self.settings.config_hash,
             )
             regime = self.bundle.regime_engine.classify(features)
-            candidate = self.bundle.signal_engine.generate(features, regime)
+            diagnostics = self.bundle.signal_engine.diagnose(features, regime)
+            candidate = self.bundle.signal_engine.generate(features, regime, diagnostics=diagnostics)
             if candidate is None:
                 cycle_outcome = "no_signal"
-                self.bundle.audit_logger.log_decision("decision", "No signal candidate.")
+                self._log_no_signal_diagnostics(timestamp, diagnostics)
+                self.bundle.audit_logger.log_decision(
+                    "decision",
+                    "No signal candidate.",
+                    payload=self._signal_diagnostics_payload(diagnostics),
+                )
                 self.state_store.mark_healthy()
                 return
 
@@ -599,6 +605,41 @@ class BotOrchestrator:
             timestamp=timestamp,
         )
 
+    def _log_no_signal_diagnostics(self, timestamp: datetime, diagnostics: SignalDiagnostics) -> None:
+        LOG.info(
+            "Decision diagnostics | timestamp=%s | outcome=no_signal | blocked_by=%s | "
+            "sweep_detected=%s | reclaim_detected=%s | sweep_side=%s | sweep_depth_pct=%s | "
+            "direction_inferred=%s | regime=%s | direction_allowed=%s | confluence_preview=%s",
+            timestamp.isoformat(),
+            self._log_optional_value(diagnostics.blocked_by),
+            self._log_bool(diagnostics.sweep_detected),
+            self._log_bool(diagnostics.reclaim_detected),
+            self._log_optional_value(diagnostics.sweep_side),
+            self._log_optional_float(diagnostics.sweep_depth_pct),
+            self._log_optional_value(diagnostics.direction_inferred),
+            diagnostics.regime.value,
+            self._log_bool(diagnostics.direction_allowed),
+            self._log_optional_float(diagnostics.confluence_preview),
+        )
+
+    @staticmethod
+    def _signal_diagnostics_payload(diagnostics: SignalDiagnostics) -> dict[str, object]:
+        return {
+            "timestamp": diagnostics.timestamp.isoformat(),
+            "config_hash": diagnostics.config_hash,
+            "blocked_by": diagnostics.blocked_by,
+            "sweep_detected": diagnostics.sweep_detected,
+            "reclaim_detected": diagnostics.reclaim_detected,
+            "sweep_side": diagnostics.sweep_side,
+            "sweep_level": diagnostics.sweep_level,
+            "sweep_depth_pct": diagnostics.sweep_depth_pct,
+            "direction_inferred": diagnostics.direction_inferred,
+            "regime": diagnostics.regime.value,
+            "direction_allowed": diagnostics.direction_allowed,
+            "confluence_preview": diagnostics.confluence_preview,
+            "candidate_reasons_preview": diagnostics.candidate_reasons_preview,
+        }
+
     def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> list[dict]:
         open_records = self.state_store.get_open_trade_records()
         if not open_records:
@@ -746,6 +787,24 @@ class BotOrchestrator:
         if value.tzinfo is None:
             return value.replace(tzinfo=timezone.utc)
         return value.astimezone(timezone.utc)
+
+    @staticmethod
+    def _log_bool(value: bool | None) -> str:
+        if value is None:
+            return "none"
+        return str(value).lower()
+
+    @staticmethod
+    def _log_optional_float(value: float | None) -> str:
+        if value is None:
+            return "none"
+        return f"{value:.6f}"
+
+    @staticmethod
+    def _log_optional_value(value: object | None) -> str:
+        if value is None:
+            return "none"
+        return str(value)
 
     @staticmethod
     def _is_15m_boundary(now: datetime) -> bool:

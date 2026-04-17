@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from core.models import MarketSnapshot, RegimeState
+from core.models import MarketSnapshot, RegimeState, SignalDiagnostics
 from monitoring.audit_logger import AuditLogger
 from monitoring.health import HealthStatus
 from orchestrator import BotOrchestrator, EngineBundle
@@ -107,9 +107,27 @@ class FakeRegimeEngine:
 
 
 class FakeSignalEngine:
-    def generate(self, features, regime):  # type: ignore[no-untyped-def]
+    def diagnose(self, features, regime):  # type: ignore[no-untyped-def]
+        return SignalDiagnostics(
+            timestamp=features["timestamp"],
+            config_hash="test-config",
+            regime=regime,
+            blocked_by="no_reclaim",
+            sweep_detected=True,
+            reclaim_detected=False,
+            sweep_side="HIGH",
+            sweep_level=100.0,
+            sweep_depth_pct=0.001,
+            direction_inferred="SHORT",
+            direction_allowed=True,
+            confluence_preview=None,
+            candidate_reasons_preview=[],
+        )
+
+    def generate(self, features, regime, diagnostics=None):  # type: ignore[no-untyped-def]
         _ = features
         _ = regime
+        _ = diagnostics
         return None
 
 
@@ -240,6 +258,11 @@ def test_decision_cycle_logs_no_signal_outcome(caplog: pytest.LogCaptureFixture,
 
     messages = [record.getMessage() for record in caplog.records if record.name == "orchestrator"]
     assert any("Decision cycle started | timestamp=2026-04-15T12:15:00+00:00" in message for message in messages)
+    assert any(
+        "Decision diagnostics | timestamp=2026-04-15T12:15:00+00:00 | outcome=no_signal | blocked_by=no_reclaim"
+        in message
+        for message in messages
+    )
     assert any(
         "Decision cycle finished | timestamp=2026-04-15T12:15:00+00:00 | outcome=no_signal" in message
         for message in messages

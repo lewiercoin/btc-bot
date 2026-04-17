@@ -89,6 +89,23 @@ class SignalCandidate:
 
 
 @dataclass(slots=True)
+class SignalDiagnostics:
+    timestamp: datetime
+    config_hash: str
+    regime: RegimeState
+    blocked_by: str | None
+    sweep_detected: bool
+    reclaim_detected: bool
+    sweep_side: str | None
+    sweep_level: float | None
+    sweep_depth_pct: float | None
+    direction_inferred: Direction | None
+    direction_allowed: bool | None
+    confluence_preview: float | None
+    candidate_reasons_preview: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
 class ExecutableSignal:
     signal_id: str
     timestamp: datetime

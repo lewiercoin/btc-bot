@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from core.models import Features, RegimeState, SignalCandidate
+from core.models import Features, RegimeState, SignalCandidate, SignalDiagnostics
 
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
@@ -45,24 +45,63 @@ class SignalEngine:
     def __init__(self, config: SignalConfig | None = None) -> None:
         self.config = config or SignalConfig()
 
-    def generate(self, features: Features, regime: RegimeState) -> SignalCandidate | None:
+    def diagnose(self, features: Features, regime: RegimeState) -> SignalDiagnostics:
+        direction: str | None = None
+        direction_allowed: bool | None = None
+        confluence_preview: float | None = None
+        candidate_reasons_preview: list[str] = []
+        blocked_by: str | None = None
+
         if not features.sweep_detected:
-            return None
-        if not features.reclaim_detected:
-            return None
-        if features.sweep_level is None:
-            return None
-        if features.sweep_depth_pct is not None and features.sweep_depth_pct < self.config.min_sweep_depth_pct:
+            blocked_by = "no_sweep"
+        elif not features.reclaim_detected:
+            blocked_by = "no_reclaim"
+        elif features.sweep_level is None:
+            blocked_by = "missing_sweep_level"
+        elif features.sweep_depth_pct is not None and features.sweep_depth_pct < self.config.min_sweep_depth_pct:
+            blocked_by = "sweep_too_shallow"
+        else:
+            direction = self._infer_direction(features)
+            if direction is None:
+                blocked_by = "direction_unresolved"
+            else:
+                direction_allowed = self._is_direction_allowed_for_regime(direction=direction, regime=regime)
+                if not direction_allowed:
+                    blocked_by = "regime_direction_whitelist"
+                else:
+                    confluence_preview, candidate_reasons_preview = self._confluence_score(features, regime, direction)
+                    if confluence_preview < self.config.confluence_min:
+                        blocked_by = "confluence_below_min"
+
+        return SignalDiagnostics(
+            timestamp=features.timestamp,
+            config_hash=features.config_hash,
+            regime=regime,
+            blocked_by=blocked_by,
+            sweep_detected=features.sweep_detected,
+            reclaim_detected=features.reclaim_detected,
+            sweep_side=features.sweep_side,
+            sweep_level=features.sweep_level,
+            sweep_depth_pct=features.sweep_depth_pct,
+            direction_inferred=direction,
+            direction_allowed=direction_allowed,
+            confluence_preview=confluence_preview,
+            candidate_reasons_preview=candidate_reasons_preview,
+        )
+
+    def generate(
+        self,
+        features: Features,
+        regime: RegimeState,
+        diagnostics: SignalDiagnostics | None = None,
+    ) -> SignalCandidate | None:
+        resolved_diagnostics = diagnostics or self.diagnose(features, regime)
+        if resolved_diagnostics.blocked_by is not None:
             return None
 
-        direction = self._infer_direction(features)
-        if direction is None:
-            return None
-        if not self._is_direction_allowed_for_regime(direction=direction, regime=regime):
-            return None
-
-        confluence_score, reasons = self._confluence_score(features, regime, direction)
-        if confluence_score < self.config.confluence_min:
+        direction = resolved_diagnostics.direction_inferred
+        confluence_score = resolved_diagnostics.confluence_preview
+        if direction is None or confluence_score is None:
             return None
 
         entry, invalidation, tp1, tp2 = self._build_levels(features, direction)
@@ -78,7 +117,7 @@ class SignalEngine:
             tp_reference_2=tp2,
             confluence_score=confluence_score,
             regime=regime,
-            reasons=reasons,
+            reasons=list(resolved_diagnostics.candidate_reasons_preview),
             features_json={
                 "atr_15m": features.atr_15m,
                 "sweep_depth_pct": features.sweep_depth_pct,
