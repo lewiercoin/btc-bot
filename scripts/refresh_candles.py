@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from data.rest_client import BinanceFuturesRestClient, RestClientConfig
-from data.proxy_transport import ProxyTransport, ProxyConfig
+from data.proxy_transport import ProxyTransport
 from storage.repositories import get_connection, upsert_candles
 
 
@@ -22,11 +22,11 @@ def main():
     # Setup proxy if enabled
     proxy_transport = None
     if proxy_enabled:
-        proxy_config = ProxyConfig(
+        proxy_transport = ProxyTransport(
             proxy_url=os.getenv("SOCKS_PROXY_URL", "socks5://80.240.17.161:1080"),
-            sticky_session_minutes=60,
+            proxy_type="socks5",
+            sticky_minutes=60,
         )
-        proxy_transport = ProxyTransport(proxy_config)
 
     config = RestClientConfig(
         base_url="https://fapi.binance.com",
