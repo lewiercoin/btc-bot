@@ -63,7 +63,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.mode:
         os.environ["BOT_MODE"] = args.mode.upper()
 
-    settings = load_settings()
+    settings = load_settings(profile="live")
     assert settings.storage is not None
 
     configure_logging(logs_dir=settings.storage.logs_dir, level=args.log_level)
