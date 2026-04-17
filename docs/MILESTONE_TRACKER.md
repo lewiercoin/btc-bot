@@ -6,102 +6,93 @@ Last updated: 2026-04-17
 
 ## Current Active Milestone
 
-**Milestone:** DEPLOYMENT-REMEDIATION-2026-04-17
+**Milestone:** STRATEGY-ASSESSMENT-2026-04-17
 **Status:** READY FOR AUDIT (2026-04-17)
 **Active builder:** Codex
 
-**What:** Clean the production deployment baseline, remove dirty server drift, restore collector/data freshness, and verify whether the current `no_signal` state is still infrastructure-driven or is now strategy-driven.
+**What:** Read-only assessment of why fresh-data decision cycles still end in `no_signal` after deployment remediation, with exact pipeline-stage classification and a market-vs-edge comparison for Trial #63.
 
-**Why:** Runtime reconciliation confirmed that the bot was alive but the server was stale and dirty: deployed commit drift, ad-hoc `orchestrator.py` patch, dead force collector, and stale DB-side market history. This milestone closes the infrastructure/data drift first, before any strategy conclusions.
+**Why:** `DEPLOYMENT-REMEDIATION-2026-04-17` removed the live blockers (`healthy=1`, `safe_mode=0`, fresh collectors, fresh DB). The next required truth is whether the remaining `no_signal` comes from current market conditions or from an overly restrictive strategy setup.
 
 **Acceptance criteria:**
-- ✅ Deployment baseline commit is chosen and justified explicitly
-- ✅ Dirty server worktree is backed up, classified, and removed from the live repo
-- ✅ Server repo is redeployed cleanly to the chosen commit
-- ✅ `btc-bot.service` is stable on the remediated deploy
-- ✅ `btc-bot-force-collector.service` is restored end-to-end
-- ✅ `btc-bot-daily-collector.timer` and service are verified
-- ✅ DB-side freshness is restored for critical tables that should be refreshed in this milestone
-- ✅ Current `bot_state` is verified after remediation (`healthy`, `safe_mode`, `last_error`)
-- ✅ `no_signal` is re-classified after remediation, not before
-- ✅ `docs/MILESTONE_TRACKER.md` updated with findings and next action
+- ✅ Fresh-data decision cycles after `2026-04-17T13:32:54Z` inspected
+- ✅ Exact rejection stage identified in the live pipeline
+- ✅ Counts documented for `decision -> signal_candidates -> executable_signals -> trades`
+- ✅ Current market snapshot compared to Trial #63 edge requirements
+- ✅ ETF-bias partiality assessed for relevance to the active signal path
+- ✅ Evidence-backed verdict written to tracker and analysis doc
 
 **In-scope:**
-- deployment baseline choice
-- dirty worktree backup and cleanup
-- clean redeploy to the selected commit
-- collector restoration and data refresh
-- post-remediation runtime verification
-- documentation update limited to tracker findings
+- read-only pipeline-stage breakdown on fresh runtime data
+- recent-cycle analysis from audit tables / SQLite
+- Trial #63 requirement check against current market state
+- documentation update limited to tracker findings and analysis report
 
 **Out-of-scope:**
-- strategy/signal/risk/governance tuning
-- forcing trades
-- dashboard feature work
-- broad documentation rewrite
-- production fixes outside this remediation scope
-
-**Baseline choice and rationale:**
-- Selected deployment target: `1efa7e55051196702aa123f7e3d55d94957bbc9b` (`main`)
-- Rejected `d24561789691062f25adfe04930612e685f22490`:
-  - missing `WEBSOCKET-MIGRATION`
-  - missing `SAFE-MODE-AUTO-RECOVERY-MVP`
-  - required an ad-hoc dirty `orchestrator.py` patch just for runtime visibility
-- Rejected `7a7a74388d68b616bc74d2f83a49c30ee8aae8fa` as the final target:
-  - included safe-mode recovery, but still missed the later runtime-loop visibility patch that had already been hot-patched on the server
-- Chose current `main` tip because:
-  - all commits between `0950215` and the pre-remediation tip were documentation-only
-  - `1efa7e5` adds the targeted force-collector fix without introducing further runtime drift
-  - it restores alignment between `server repo` and `origin/main`
+- strategy / settings tuning
+- forcing trades or bypassing governance
+- research-lab optimization work
+- runtime or deployment mutations
 
 **Verified findings (production runtime, checked 2026-04-17):**
-- Dirty server worktree was backed up to `/home/btc-bot/deployment-backups/20260417T133246Z-deployment-remediation`
-- Dirty worktree classification:
-  - `M orchestrator.py` matched the exact runtime visibility patch from `0950215`
-  - `orchestrator.py.backup-20260415T1447Z` and two DB backup files were ad-hoc local artifacts, not source-of-truth state
-- Server repo was reset cleanly to `1efa7e55051196702aa123f7e3d55d94957bbc9b`
-- `btc-bot.service` restarted cleanly at `2026-04-17 13:32:54 UTC`
-- Runtime status after remediation:
-  - `mode=PAPER`
-  - `config_hash=e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718`
-  - `healthy=1`
-  - `safe_mode=0`
-  - `last_error=null`
-- WebSocket behavior after clean deploy:
-  - `/market` path still returns `HTTP 404`
-  - automatic fallback to legacy `/stream` works
-  - bot feed connects successfully on `wss://fstream.binance.com/stream?...`
-- Data refresh status after remediation:
-  - `candles.max_ts = 2026-04-17T14:00:00+00:00`
-  - `open_interest.max_ts = 2026-04-17T14:00:00+00:00`
-  - `aggtrade_buckets.max_ts = 2026-04-17T14:04:00+00:00`
-  - `force_orders.max_ts = 2026-04-17T14:15:35.128000+00:00` with `count = 5`
-  - `daily_external_bias.max_ts = 2026-04-17`
-  - `daily_metrics.max_ts = 2026-04-17`
-  - `funding.max_ts = 2026-04-17T08:00:00.011000+00:00` which matches the latest published 8h funding interval, not a stale collector failure
-- `btc-bot-daily-collector.service` is healthy on its timer and updates DXY daily
-- `btc-bot-force-collector.service` is restored:
-  - bootstrap no longer crashes
-  - service remains `active/running`
-  - WS connection established
-  - live `force_orders` rows are now arriving
-- Bot decision cycles after remediation:
-  - `13:45 UTC` -> `outcome=no_signal`
-  - `14:00 UTC` -> `outcome=no_signal`
-  - `14:15 UTC` -> `outcome=no_signal`
+- Fresh-data sample since clean restart at `2026-04-17T13:32:54Z`:
+  - decision cycles observed: `13:45`, `14:00`, `14:15`, `14:30` UTC
+  - audit rows: `4x decision -> "No signal candidate."`
+  - `signal_candidates_since = 0`
+  - `executable_signals_since = 0`
+  - `closed_trades_since = 0`
+- Exact pipeline-stage rejection:
+  - rejection happens at `SignalCandidate` generation
+  - nothing reaches governance, risk, executable-signal, or trade-execution stages
+- Current market probe at `2026-04-17T14:40:01Z`:
+  - `price = 77823.15`
+  - `regime = uptrend`
+  - `sweep_detected = true`
+  - `reclaim_detected = false`
+  - `sweep_side = HIGH`
+  - `sweep_depth_pct = 0.04980` vs `min_sweep_depth_pct = 0.00286`
+  - `cvd_bullish_divergence = false`
+  - `cvd_bearish_divergence = false`
+  - `force_order_spike = false`
+- Counterfactual probe at `2026-04-17T14:36:06Z`:
+  - direction could resolve to `SHORT`
+  - counterfactual `confluence_score = 7.95` vs `confluence_min = 3.6`
+  - candidate still stays `null` because `reclaim_detected = false`
+  - even with reclaim, Trial #63 allows no entries in `uptrend`
+- Trial #63 edge requirements relevant to this rejection:
+  - `sweep + reclaim` must both exist before a candidate is created
+  - regime whitelist allows:
+    - `normal -> LONG`
+    - `compression -> LONG`
+    - `downtrend -> LONG/SHORT`
+    - `uptrend -> none`
+    - `crowded_leverage -> SHORT`
+    - `post_liquidation -> LONG`
+  - `confluence_min = 3.6` is not the active bottleneck in the observed fresh-data sample
+- K2 impact assessment:
+  - `daily_external_bias` / ETF fields remain partial
+  - current `SignalEngine` and `RegimeEngine` do not consume ETF bias in the active decision path
+  - therefore K2 does not explain the observed `no_signal`
 
 **Current classification:**
-- Deployment/data remediation succeeded for the live runtime blockers
-- Current `no_signal` is best classified as `strategy / current market conditions`, not as `safe_mode`, service failure, dead collector, or stale-environment blocker
-- Residual caveat:
-  - the force-order REST bootstrap path returns `0` rows and should not be treated as authoritative historical market-liquidation backfill
-  - live WS collection is now functioning and supplying fresh `force_orders`
+- Current `no_signal` is best classified as `market conditions / outside Trial #63 domain`
+- The live runtime is healthy and using fresh data; the missing trade comes from strategy gating, not from deployment drift
+- The active market is a strong `uptrend` without reclaim confirmation and without the reversal structure required by the current edge
+- This is not a governance veto, risk veto, stale-data issue, or obvious `confluence_min too high` problem
+
+**Report:** `docs/analysis/STRATEGY_ASSESSMENT_2026-04-17.md`
 
 **Next action:**
-- Do not reopen deployment remediation unless the auditor finds a concrete regression
-- If the audit passes, the next milestone should move back to controlled strategy assessment on the now-clean runtime
-- Low-priority follow-up:
-  - document or redesign the force-order REST bootstrap assumption so future operators do not confuse `0 historical rows` with a dead live collector
+- Await Claude Code audit for this assessment checkpoint
+- If the audit agrees, choose between:
+  - monitor/wait on the healthy runtime
+  - future research/tuning if more uptrend participation is desired
+- Do not modify strategy parameters inside this assessment milestone
+
+**Previous milestone:** `DEPLOYMENT-REMEDIATION-2026-04-17` — CLOSED / AUDITED
+- Clean redeploy to `1efa7e55051196702aa123f7e3d55d94957bbc9b`
+- Collectors restored, DB freshness recovered, runtime verified `healthy=1`, `safe_mode=0`
+- Audit baseline: `docs/audits/AUDIT_DEPLOYMENT_REMEDIATION_2026-04-17.md`
 
 ---
 
@@ -921,7 +912,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 | # | Issue | Priority | Notes |
 |---|-------|----------|-------|
 | K1 | Force-order REST bootstrap semantics remain ambiguous | LOW | Live collector is restored and `force_orders` rows are flowing; remaining follow-up is to document or redesign the historical REST bootstrap assumption |
-| K2 | ETF bias is still partial | LOW | Daily collector updates DXY, but ETF sources still warn on missing `SOSO/COINGLASS` API keys |
+| K2 | ETF bias is still partial | LOW | Daily collector updates DXY, but ETF sources still warn on missing `SOSO/COINGLASS` API keys; non-blocking for current signal path because `SignalEngine` / `RegimeEngine` do not consume ETF bias |
 | K3 | Walk-forward uses 6 windows over 4 years | MEDIUM | ~150 trades/window may be insufficient; defer to post-Run#12 |
 | K4 | level_min_age_bars not yet in 8f2c6f2 codebase | LOW | Deferred to Run #13; add as tunable [2, 6] |
 | K5 | PF=999999 trials (#47/#56/#73) in Run #12 journal | LOW | Anti-overfitting guard deployed at trial #88; future trials unaffected |
