@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from datetime import datetime, timezone
 
 from core.models import Features, RegimeState
@@ -119,3 +120,53 @@ def test_direction_whitelist_can_allow_long_in_uptrend_via_config() -> None:
     )
 
     assert engine._is_direction_allowed_for_regime(direction="LONG", regime=RegimeState.UPTREND) is True
+
+
+def test_diagnose_reports_regime_whitelist_block_for_long_uptrend() -> None:
+    engine = SignalEngine()
+    features = _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2)
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "regime_direction_whitelist"
+    assert diagnostics.direction_inferred == "LONG"
+    assert diagnostics.direction_allowed is False
+    assert diagnostics.reclaim_detected is True
+
+
+def test_diagnose_preserves_gate_order_and_stops_at_no_reclaim() -> None:
+    engine = SignalEngine()
+    features = replace(
+        _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "no_reclaim"
+    assert diagnostics.direction_inferred is None
+    assert diagnostics.direction_allowed is None
+    assert diagnostics.confluence_preview is None
+
+
+def test_generate_accepts_precomputed_diagnostics_without_changing_candidate() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            }
+        )
+    )
+    features = _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2)
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    direct = engine.generate(features, RegimeState.UPTREND)
+    precomputed = engine.generate(features, RegimeState.UPTREND, diagnostics=diagnostics)
+
+    assert diagnostics.blocked_by is None
+    assert direct is not None
+    assert precomputed is not None
+    assert precomputed.direction == direct.direction
+    assert precomputed.confluence_score == direct.confluence_score
+    assert precomputed.reasons == direct.reasons
+    assert precomputed.entry_reference == direct.entry_reference
