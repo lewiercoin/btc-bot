@@ -105,6 +105,46 @@ _CHOICES_OVERRIDES: dict[str, tuple[Any, ...]] = {
     "flow_bucket_tf": ("60s",),
 }
 
+_RESEARCH_PARAM_SPECS: dict[str, ParamSpec] = {
+    "allow_uptrend_continuation": ParamSpec(
+        name="allow_uptrend_continuation",
+        target_section="research",
+        default_value=False,
+        status=PARAM_STATUS_ACTIVE,
+        domain_type="bool",
+    ),
+    "uptrend_continuation_reclaim_strength_min": ParamSpec(
+        name="uptrend_continuation_reclaim_strength_min",
+        target_section="research",
+        default_value=0.5,
+        status=PARAM_STATUS_ACTIVE,
+        domain_type="float",
+        low=0.1,
+        high=1.5,
+        step=0.1,
+    ),
+    "uptrend_continuation_participation_min": ParamSpec(
+        name="uptrend_continuation_participation_min",
+        target_section="research",
+        default_value=0.3,
+        status=PARAM_STATUS_ACTIVE,
+        domain_type="float",
+        low=0.1,
+        high=0.7,
+        step=0.05,
+    ),
+    "uptrend_continuation_confluence_multiplier": ParamSpec(
+        name="uptrend_continuation_confluence_multiplier",
+        target_section="research",
+        default_value=1.2,
+        status=PARAM_STATUS_ACTIVE,
+        domain_type="float",
+        low=1.1,
+        high=1.8,
+        step=0.1,
+    ),
+}
+
 
 def _field_default(field: Field[Any]) -> Any:
     if field.default is not MISSING:
@@ -166,6 +206,7 @@ def build_param_registry() -> dict[str, ParamSpec]:
     registry = {}
     registry.update(_build_section_specs("strategy", StrategyConfig))
     registry.update(_build_section_specs("risk", RiskConfig))
+    registry.update(_RESEARCH_PARAM_SPECS)
     registry["force_order_history_points"] = ParamSpec(
         name="force_order_history_points",
         target_section="strategy",
@@ -197,10 +238,11 @@ def get_default_vector() -> dict[str, Any]:
     return defaults
 
 
-def split_to_strategy_risk(params: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+def split_param_targets(params: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any], dict[str, Any]]:
     registry = build_param_registry()
     strategy_params: dict[str, Any] = {}
     risk_params: dict[str, Any] = {}
+    research_params: dict[str, Any] = {}
 
     unknown = [name for name in params if name not in registry]
     if unknown:
@@ -216,6 +258,14 @@ def split_to_strategy_risk(params: dict[str, Any]) -> tuple[dict[str, Any], dict
         if spec.target_section == "risk":
             risk_params[name] = value
             continue
+        if spec.target_section == "research":
+            research_params[name] = value
+            continue
         raise ValueError(f"Unsupported target section for parameter {name}: {spec.target_section}")
 
+    return strategy_params, risk_params, research_params
+
+
+def split_to_strategy_risk(params: dict[str, Any]) -> tuple[dict[str, Any], dict[str, Any]]:
+    strategy_params, risk_params, _ = split_param_targets(params)
     return strategy_params, risk_params

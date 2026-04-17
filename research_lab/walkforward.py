@@ -98,6 +98,7 @@ def _degradation_pct(in_sample: float, out_of_sample: float) -> float:
 def _evaluate_window_segment(
     *,
     candidate_settings: AppSettings,
+    candidate_params: dict[str, Any] | None,
     source_db_path: Path,
     snapshots_dir: Path,
     segment_id: str,
@@ -112,6 +113,7 @@ def _evaluate_window_segment(
         return evaluate_candidate(
             conn,
             settings=candidate_settings,
+            candidate_params=candidate_params,
             backtest_config=BacktestConfig(
                 start_date=start_ts,
                 end_date=end_ts,
@@ -242,6 +244,7 @@ def run_walkforward(
         val_segment_id = f"wf-val-{index:03d}"
         train_evaluation = _evaluate_window_segment(
             candidate_settings=candidate_settings,
+            candidate_params=candidate_params,
             source_db_path=source_db_path,
             snapshots_dir=snapshots_dir,
             segment_id=train_segment_id,
@@ -251,6 +254,7 @@ def run_walkforward(
         )
         val_evaluation = _evaluate_window_segment(
             candidate_settings=candidate_settings,
+            candidate_params=candidate_params,
             source_db_path=source_db_path,
             snapshots_dir=snapshots_dir,
             segment_id=val_segment_id,
@@ -332,6 +336,7 @@ def run_nested_walkforward(
     base_n_trials: int,
     study_name_prefix: str,
     seed: int,
+    active_param_names: tuple[str, ...] | None = None,
 ) -> NestedWalkForwardReport:
     min_trades_per_window = int(protocol["min_trades_per_window"])
     min_expectancy_r = float(protocol.get("min_expectancy_r_per_window", 0.0))
@@ -369,6 +374,7 @@ def run_nested_walkforward(
             seed=window_seed,
             min_trades=min_trades_per_window,
             protocol_hash=protocol_hash,
+            active_param_names=active_param_names,
         )
         train_trials_total += len(train_trials)
         frontier = rank_pareto_candidates(compute_pareto_frontier(train_trials))
@@ -397,6 +403,7 @@ def run_nested_walkforward(
         champion_settings = build_candidate_settings(base_settings, champion_train.params)
         validation_raw = _evaluate_window_segment(
             candidate_settings=champion_settings,
+            candidate_params=champion_train.params,
             source_db_path=source_db_path,
             snapshots_dir=snapshots_dir,
             segment_id=f"{study_name_prefix}-window-{index:03d}-validation",

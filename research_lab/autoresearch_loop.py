@@ -547,6 +547,7 @@ def run_autoresearch_loop(
             evaluation_raw = evaluate_candidate(
                 conn,
                 settings=candidate_settings,
+                candidate_params=vector,
                 backtest_config=backtest_config,
                 min_trades=min_trades_full_candidate,
             )

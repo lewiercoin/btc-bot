@@ -6,6 +6,8 @@ from typing import Any
 from backtest.backtest_runner import BacktestConfig, BacktestResult, BacktestRunner
 from settings import AppSettings
 
+from research_lab.research_backtest_runner import ResearchBacktestRunner, build_uptrend_continuation_config
+from research_lab.settings_adapter import extract_research_params
 from research_lab.types import SignalFunnel
 
 
@@ -104,9 +106,18 @@ def run_backtest_with_funnel(
     connection: sqlite3.Connection,
     *,
     settings: AppSettings,
+    candidate_params: dict[str, Any] | None = None,
     backtest_config: BacktestConfig,
 ) -> tuple[BacktestResult, SignalFunnel]:
-    runner = InstrumentedBacktestRunner(connection, settings=settings)
+    research_params = extract_research_params(candidate_params or {})
+    if research_params:
+        runner: Any = ResearchBacktestRunner(
+            connection,
+            settings=settings,
+            uptrend_continuation=build_uptrend_continuation_config(research_params),
+        )
+    else:
+        runner = InstrumentedBacktestRunner(connection, settings=settings)
     result = runner.run(backtest_config)
     funnel = SignalFunnel(
         signals_generated=runner.signals_generated,
@@ -116,4 +127,3 @@ def run_backtest_with_funnel(
         signals_executed=len(result.trades),
     )
     return result, funnel
-

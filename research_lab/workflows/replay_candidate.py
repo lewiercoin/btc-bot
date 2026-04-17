@@ -58,6 +58,7 @@ def replay_candidate(
         evaluation_raw = evaluate_candidate(
             conn,
             settings=candidate_settings,
+            candidate_params=selected.params,
             backtest_config=backtest_config,
             min_trades=min_trades_full_candidate,
         )

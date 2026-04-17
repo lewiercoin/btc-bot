@@ -296,7 +296,11 @@ def _run_optuna_driver_case(
     )
 
     monkeypatch.setattr(optuna_driver_module, "_require_optuna", lambda: fake_optuna)
-    monkeypatch.setattr(optuna_driver_module, "build_optuna_trial_params", lambda trial: {})
+    monkeypatch.setattr(
+        optuna_driver_module,
+        "build_optuna_trial_params",
+        lambda trial, active_param_names=None: {},
+    )
     monkeypatch.setattr(optuna_driver_module, "validate_param_vector", lambda params: [])
     monkeypatch.setattr(optuna_driver_module, "build_candidate_settings", lambda base_settings, params: base_settings)
     monkeypatch.setattr(
@@ -910,7 +914,7 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
         def close(self) -> None:
             return None
 
-    def fake_evaluate_candidate(connection, *, settings, backtest_config, min_trades):
+    def fake_evaluate_candidate(connection, *, settings, backtest_config, min_trades, candidate_params=None):
         captured_min_trades.append(int(min_trades))
         return TrialEvaluation(
             trial_id="candidate-001",
@@ -1471,7 +1475,7 @@ def test_autoresearch_loop_single_pass_produces_ranked_loop_report(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
             trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult),
@@ -1539,7 +1543,7 @@ def test_autoresearch_loop_all_candidates_blocked_writes_no_bundle(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
             trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult),
@@ -1651,7 +1655,7 @@ def test_autoresearch_loop_ranking_is_deterministic(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
             trial_id=f"candidate-{settings.config_hash[:12]}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult) + float(settings.strategy.tp2_atr_mult) / 10.0,
