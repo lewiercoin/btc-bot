@@ -87,7 +87,7 @@ def main():
     print(f"  Period: {start_time.strftime('%Y-%m-%d %H:%M')} → {end_time.strftime('%Y-%m-%d %H:%M')}")
 
     try:
-        klines = client.get_klines(
+        klines = client.fetch_klines(
             symbol=symbol,
             interval=interval,
             start_time=int(start_time.timestamp() * 1000),
