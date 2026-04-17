@@ -49,6 +49,7 @@ def evaluate_candidate(
     connection,
     *,
     settings: AppSettings,
+    candidate_params: dict[str, Any] | None = None,
     backtest_config: BacktestConfig,
     min_trades: int = MIN_TRADES_DEFAULT,
     max_trades: int = MAX_TRADES_DEFAULT,
@@ -58,6 +59,7 @@ def evaluate_candidate(
     result, funnel = run_backtest_with_funnel(
         connection,
         settings=settings,
+        candidate_params=candidate_params,
         backtest_config=backtest_config,
     )
     metrics = metrics_from_result(result)

@@ -49,6 +49,30 @@ def validate_param_vector(params: dict[str, Any]) -> list[str]:
     ):
         violations.append("session_start_hour_utc must be <= session_end_hour_utc")
 
+    allow_long_in_uptrend = params.get("allow_long_in_uptrend")
+    allow_uptrend_continuation = params.get("allow_uptrend_continuation")
+    if bool(allow_long_in_uptrend) and bool(allow_uptrend_continuation):
+        violations.append("allow_long_in_uptrend and allow_uptrend_continuation cannot both be enabled")
+
+    reclaim_strength_min = params.get("uptrend_continuation_reclaim_strength_min")
+    if reclaim_strength_min is not None and not (float(reclaim_strength_min) > 0.0):
+        violations.append("uptrend_continuation_reclaim_strength_min must be > 0")
+
+    participation_min = params.get("uptrend_continuation_participation_min")
+    if participation_min is not None and not (float(participation_min) > 0.0):
+        violations.append("uptrend_continuation_participation_min must be > 0")
+
+    confluence_multiplier = params.get("uptrend_continuation_confluence_multiplier")
+    if confluence_multiplier is not None and not (float(confluence_multiplier) > 1.0):
+        violations.append("uptrend_continuation_confluence_multiplier must be > 1.0")
+
+    direction_tfi_threshold = params.get("direction_tfi_threshold")
+    if participation_min is not None and direction_tfi_threshold is not None:
+        if float(participation_min) < float(direction_tfi_threshold):
+            violations.append(
+                "uptrend_continuation_participation_min must be >= direction_tfi_threshold"
+            )
+
     return violations
 
 

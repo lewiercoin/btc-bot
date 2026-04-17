@@ -63,8 +63,13 @@ def _is_param_value_within_spec(value: Any, spec: Any) -> bool:
     return True
 
 
-def _is_warm_start_candidate_compatible(params: dict[str, Any], *, credible_history: bool) -> bool:
-    active_specs = get_active_params()
+def _is_warm_start_candidate_compatible(
+    params: dict[str, Any],
+    *,
+    credible_history: bool,
+    active_param_names: tuple[str, ...] | None = None,
+) -> bool:
+    active_specs = _filter_active_specs(active_param_names)
     warm_params = {k: v for k, v in params.items() if k in active_specs}
     if not warm_params:
         return False
@@ -89,11 +94,26 @@ def _is_credible_history_trial(trial: TrialEvaluation) -> bool:
     )
 
 
-def build_optuna_trial_params(trial: optuna.Trial) -> dict[str, Any]:
+def _filter_active_specs(active_param_names: tuple[str, ...] | None) -> dict[str, Any]:
+    active_specs = get_active_params()
+    if active_param_names is None:
+        return active_specs
+
+    unknown = [name for name in active_param_names if name not in active_specs]
+    if unknown:
+        raise ValueError(f"Unknown active parameter(s) requested: {', '.join(sorted(unknown))}")
+    return {name: active_specs[name] for name in active_param_names}
+
+
+def build_optuna_trial_params(
+    trial: optuna.Trial,
+    *,
+    active_param_names: tuple[str, ...] | None = None,
+) -> dict[str, Any]:
     """Samples ACTIVE params from param_registry using trial.suggest_*."""
 
     sampled: dict[str, Any] = {}
-    for name, spec in sorted(get_active_params().items()):
+    for name, spec in sorted(_filter_active_specs(active_param_names).items()):
         # Coupled pair: ema_slow must be > ema_fast
         if name == "ema_slow":
             if spec.low is None or spec.high is None:
@@ -170,9 +190,10 @@ def _enqueue_warm_start_trials(
     store_path: Path,
     protocol_hash: str | None,
     warm_start_top_n: int,
+    active_param_names: tuple[str, ...] | None = None,
 ) -> None:
     """Enqueue baseline config + top-N Pareto winners from store as warm-start trials."""
-    active_names = set(get_active_params().keys())
+    active_names = set(_filter_active_specs(active_param_names).keys())
     if store_path.exists():
         existing = load_trials(store_path)
         if protocol_hash is not None:
@@ -181,21 +202,33 @@ def _enqueue_warm_start_trials(
                 for t in existing
                 if t.protocol_hash == protocol_hash
                 and t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(t.params, credible_history=False)
+                and _is_warm_start_candidate_compatible(
+                    t.params,
+                    credible_history=False,
+                    active_param_names=active_param_names,
+                )
             ]
         else:
             candidates = [
                 t
                 for t in existing
                 if t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(t.params, credible_history=False)
+                and _is_warm_start_candidate_compatible(
+                    t.params,
+                    credible_history=False,
+                    active_param_names=active_param_names,
+                )
             ]
         if not candidates and protocol_hash is not None:
             candidates = [
                 t
                 for t in existing
                 if t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(t.params, credible_history=True)
+                and _is_warm_start_candidate_compatible(
+                    t.params,
+                    credible_history=True,
+                    active_param_names=active_param_names,
+                )
                 and _is_credible_history_trial(t)
             ]
         pareto = rank_pareto_candidates(compute_pareto_frontier(candidates))
@@ -204,13 +237,19 @@ def _enqueue_warm_start_trials(
             if warm_params:
                 study.enqueue_trial(warm_params)
 
+    active_specs = _filter_active_specs(active_param_names)
+    strategy_values = dataclasses.asdict(base_settings.strategy)
+    risk_values = dataclasses.asdict(base_settings.risk)
     baseline_params: dict[str, Any] = {}
-    for k, v in dataclasses.asdict(base_settings.strategy).items():
-        if k in active_names:
-            baseline_params[k] = v
-    for k, v in dataclasses.asdict(base_settings.risk).items():
-        if k in active_names:
-            baseline_params[k] = v
+    for name, spec in active_specs.items():
+        if spec.target_section == "strategy" and name in strategy_values:
+            baseline_params[name] = strategy_values[name]
+            continue
+        if spec.target_section == "risk" and name in risk_values:
+            baseline_params[name] = risk_values[name]
+            continue
+        if spec.target_section == "research":
+            baseline_params[name] = spec.default_value
     if baseline_params:
         study.enqueue_trial(baseline_params)
 
@@ -232,6 +271,7 @@ def run_optuna_study(
     multivariate_tpe: bool = False,
     warm_start_from_store: bool = False,
     warm_start_top_n: int = 3,
+    active_param_names: tuple[str, ...] | None = None,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
     init_store(store_path)
@@ -270,6 +310,7 @@ def run_optuna_study(
             store_path=store_path,
             protocol_hash=protocol_hash,
             warm_start_top_n=warm_start_top_n,
+            active_param_names=active_param_names,
         )
 
     def objective(trial: optuna.Trial) -> tuple[float, float, float]:
@@ -277,7 +318,7 @@ def run_optuna_study(
         trial.set_user_attr("protocol_hash", protocol_hash or "")
 
         trial_id = f"{study_name}-trial-{trial.number:05d}"
-        sampled_params = build_optuna_trial_params(trial)
+        sampled_params = build_optuna_trial_params(trial, active_param_names=active_param_names)
 
         # --- Constraint violations: logical impossibilities (hard gate) ---
         violations = validate_param_vector(sampled_params)
@@ -304,6 +345,7 @@ def run_optuna_study(
             raw_evaluation = evaluate_candidate(
                 conn,
                 settings=candidate_settings,
+                candidate_params=sampled_params,
                 backtest_config=backtest_config,
                 min_trades=int(min_trades),
                 max_trades=int(max_trades),

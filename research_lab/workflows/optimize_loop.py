@@ -127,6 +127,7 @@ def run_optimize_loop(
     protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
     max_trades_full_candidate = int(protocol.get("max_trades_full_candidate", MAX_TRADES_DEFAULT))
+    active_param_names = tuple(protocol.get("active_params_whitelist", ())) or None
 
     check_baseline(
         source_db_path=source_db_path,
@@ -156,6 +157,7 @@ def run_optimize_loop(
             base_n_trials=int(n_trials),
             study_name_prefix=study_name,
             seed=int(seed),
+            active_param_names=active_param_names,
         )
         report_id = report.selected_evaluation.trial_id if report.selected_evaluation is not None else f"{study_name}-nested-summary"
         save_walkforward(report_id, report, store_path)
@@ -202,6 +204,7 @@ def run_optimize_loop(
         optuna_storage_path=optuna_storage_path,
         multivariate_tpe=multivariate_tpe,
         warm_start_from_store=warm_start_from_store,
+        active_param_names=active_param_names,
     )
     frontier = rank_pareto_candidates(compute_pareto_frontier(trials))
 
