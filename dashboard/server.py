@@ -17,6 +17,7 @@ from pydantic import BaseModel
 from dashboard.db_reader import DashboardReader
 from dashboard.log_streamer import stream_log_lines
 from dashboard.process_manager import ProcessManager
+from dashboard.runtime_config import extract_runtime_config_hash
 from settings import load_settings
 
 _LOG_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
@@ -90,7 +91,6 @@ def _parse_egress_events(log_path: Path) -> dict[str, Any]:
         "last_ban_at": _iso(last_ban_at),
         "last_rotation_at": _iso(last_rotation_at),
     }
-
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = PROJECT_ROOT / "dashboard" / "static"
 
@@ -148,7 +148,8 @@ async def get_positions(request: Request) -> dict:
 
 @app.get("/api/trades")
 async def get_trades(request: Request, limit: int = Query(default=50, ge=1, le=200)) -> dict:
-    return request.app.state.reader.read_trades(limit=limit)
+    runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+    return request.app.state.reader.read_trades(limit=limit, config_hash=runtime_config_hash)
 
 
 @app.get("/api/logs/stream")
@@ -181,7 +182,8 @@ async def stop_bot(request: Request, payload: StopBotRequest | None = None) -> d
 
 @app.get("/api/signals")
 async def get_signals(request: Request, limit: int = Query(default=20, ge=1, le=100)) -> dict:
-    return request.app.state.reader.read_signals(limit=limit)
+    runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+    return request.app.state.reader.read_signals(limit=limit, config_hash=runtime_config_hash)
 
 
 @app.get("/api/metrics")
@@ -196,7 +198,8 @@ async def get_alerts(request: Request, limit: int = Query(default=20, ge=1, le=1
 
 @app.get("/api/trades/export")
 async def export_trades(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
-    payload = request.app.state.reader.read_trades(limit=limit)
+    runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+    payload = request.app.state.reader.read_trades(limit=limit, config_hash=runtime_config_hash)
     trades = payload["trades"]
     output = io.StringIO()
     if trades:
@@ -298,7 +301,8 @@ async def get_risk(request: Request) -> dict:
     governance_blocked = False
 
     try:
-        signals_payload = request.app.state.reader.read_signals(limit=1)
+        runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+        signals_payload = request.app.state.reader.read_signals(limit=1, config_hash=runtime_config_hash)
         signals = signals_payload.get("signals", [])
         if signals:
             sig = signals[0]
@@ -363,7 +367,8 @@ async def get_server_resources(request: Request) -> dict:
 
 @app.get("/api/signals/export")
 async def export_signals(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
-    payload = request.app.state.reader.read_signals(limit=limit)
+    runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+    payload = request.app.state.reader.read_signals(limit=limit, config_hash=runtime_config_hash)
     signals = payload["signals"]
     output = io.StringIO()
     if signals:
