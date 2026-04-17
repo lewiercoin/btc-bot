@@ -498,3 +498,171 @@ def test_read_signals_filters_by_config_hash() -> None:
     assert len(payload["signals"]) == 1
     assert payload["signals"][0]["signal_id"] == "sig-current"
     assert payload["signals"][0]["config_hash"] == "current"
+
+
+def test_read_trades_honors_explicit_config_hash_override() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    current_closed_at = datetime(2026, 4, 13, 12, 0, tzinfo=timezone.utc)
+    old_closed_at = datetime(2026, 4, 14, 12, 0, tzinfo=timezone.utc)
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-current", current_closed_at.isoformat(), "LONG", "test", 3.0, "normal", "[]", "{}", "v1.0", "current"),
+        )
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-old", old_closed_at.isoformat(), "LONG", "test", 3.0, "normal", "[]", "{}", "v1.0", "old"),
+        )
+        conn.execute(
+            """
+            INSERT INTO executable_signals (
+                signal_id, timestamp, direction, entry_price, stop_loss, take_profit_1,
+                take_profit_2, rr_ratio, governance_notes_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-current", current_closed_at.isoformat(), "LONG", 83000.0, 82000.0, 84000.0, 85000.0, 3.0, "[]"),
+        )
+        conn.execute(
+            """
+            INSERT INTO executable_signals (
+                signal_id, timestamp, direction, entry_price, stop_loss, take_profit_1,
+                take_profit_2, rr_ratio, governance_notes_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-old", old_closed_at.isoformat(), "LONG", 83000.0, 82000.0, 84000.0, 85000.0, 3.0, "[]"),
+        )
+        insert_position(
+            conn,
+            position_id="pos-current",
+            signal_id="sig-current",
+            symbol="BTCUSDT",
+            direction="LONG",
+            status="CLOSED",
+            entry_price=83000.0,
+            size=0.1,
+            leverage=2,
+            stop_loss=82000.0,
+            take_profit_1=84000.0,
+            take_profit_2=85000.0,
+            opened_at=current_closed_at,
+            updated_at=current_closed_at,
+        )
+        insert_position(
+            conn,
+            position_id="pos-old",
+            signal_id="sig-old",
+            symbol="BTCUSDT",
+            direction="LONG",
+            status="CLOSED",
+            entry_price=83000.0,
+            size=0.1,
+            leverage=2,
+            stop_loss=82000.0,
+            take_profit_1=84000.0,
+            take_profit_2=85000.0,
+            opened_at=old_closed_at,
+            updated_at=old_closed_at,
+        )
+        insert_trade_log_open(
+            conn,
+            trade_id="trd-current",
+            signal_id="sig-current",
+            position_id="pos-current",
+            opened_at=current_closed_at,
+            direction="LONG",
+            regime="normal",
+            confluence_score=3.0,
+            entry_price=83000.0,
+            size=0.1,
+            features_at_entry_json={},
+            schema_version="v1.0",
+            config_hash="current",
+        )
+        insert_trade_log_open(
+            conn,
+            trade_id="trd-old",
+            signal_id="sig-old",
+            position_id="pos-old",
+            opened_at=old_closed_at,
+            direction="LONG",
+            regime="normal",
+            confluence_score=3.0,
+            entry_price=83000.0,
+            size=0.1,
+            features_at_entry_json={},
+            schema_version="v1.0",
+            config_hash="old",
+        )
+        conn.execute(
+            """
+            UPDATE trade_log
+            SET exit_price = ?, pnl_abs = ?, pnl_r = ?, closed_at = ?, exit_reason = ?
+            WHERE trade_id = ?
+            """,
+            (83500.0, 50.0, 0.5, current_closed_at.isoformat(), "tp1", "trd-current"),
+        )
+        conn.execute(
+            """
+            UPDATE trade_log
+            SET exit_price = ?, pnl_abs = ?, pnl_r = ?, closed_at = ?, exit_reason = ?
+            WHERE trade_id = ?
+            """,
+            (83500.0, 50.0, 0.5, old_closed_at.isoformat(), "tp1", "trd-old"),
+        )
+        conn.commit()
+
+        payload = read_trades_from_conn(conn, limit=10, config_hash="current")
+    finally:
+        conn.close()
+
+    assert len(payload["trades"]) == 1
+    assert payload["trades"][0]["trade_id"] == "trd-current"
+    assert payload["trades"][0]["config_hash"] == "current"
+
+
+def test_read_signals_honors_explicit_config_hash_override() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    current_ts = datetime(2026, 4, 13, 12, 0, tzinfo=timezone.utc)
+    old_ts = datetime(2026, 4, 14, 12, 0, tzinfo=timezone.utc)
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-current", current_ts.isoformat(), "LONG", "sweep_reclaim", 5.2, "normal", '["cvd_divergence"]', "{}", "v1.0", "current"),
+        )
+        conn.execute(
+            """
+            INSERT INTO signal_candidates (
+                signal_id, timestamp, direction, setup_type, confluence_score, regime,
+                reasons_json, features_json, schema_version, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("sig-old", old_ts.isoformat(), "SHORT", "sweep_reclaim", 2.8, "normal", "[]", "{}", "v1.0", "old"),
+        )
+        conn.commit()
+
+        payload = read_signals_from_conn(conn, limit=10, config_hash="current")
+    finally:
+        conn.close()
+
+    assert len(payload["signals"]) == 1
+    assert payload["signals"][0]["signal_id"] == "sig-current"
+    assert payload["signals"][0]["config_hash"] == "current"

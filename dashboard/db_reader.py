@@ -319,7 +319,12 @@ class DashboardReader:
         finally:
             conn.close()
 
-    def read_trades(self, *, limit: int = 50) -> dict[str, Any]:
+    def read_trades(
+        self,
+        *,
+        limit: int = 50,
+        config_hash: str | None = None,
+    ) -> dict[str, Any]:
         try:
             conn = self._connect_fn(self.db_path)
         except sqlite3.OperationalError as exc:
@@ -327,11 +332,16 @@ class DashboardReader:
                 return {"trades": []}
             raise
         try:
-            return read_trades_from_conn(conn, limit=limit)
+            return read_trades_from_conn(conn, limit=limit, config_hash=config_hash)
         finally:
             conn.close()
 
-    def read_signals(self, *, limit: int = 20) -> dict[str, Any]:
+    def read_signals(
+        self,
+        *,
+        limit: int = 20,
+        config_hash: str | None = None,
+    ) -> dict[str, Any]:
         try:
             conn = self._connect_fn(self.db_path)
         except sqlite3.OperationalError as exc:
@@ -339,7 +349,7 @@ class DashboardReader:
                 return {"signals": []}
             raise
         try:
-            return read_signals_from_conn(conn, limit=limit)
+            return read_signals_from_conn(conn, limit=limit, config_hash=config_hash)
         finally:
             conn.close()
 
