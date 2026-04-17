@@ -20,19 +20,18 @@ def get_connection() -> sqlite3.Connection:
     return sqlite3.connect(str(db_path))
 
 
-def upsert_candles(conn: sqlite3.Connection, symbol: str, timeframe: str, klines: list[list]) -> int:
-    """Insert or update candles from Binance klines format."""
-    # Binance klines format: [open_time, open, high, low, close, volume, close_time, ...]
+def upsert_candles(conn: sqlite3.Connection, klines: list[dict]) -> int:
+    """Insert or update candles from normalized klines format."""
     rows = [
         (
-            symbol,
-            timeframe,
-            datetime.fromtimestamp(k[0] / 1000, tz=timezone.utc).isoformat(),
-            float(k[1]),  # open
-            float(k[2]),  # high
-            float(k[3]),  # low
-            float(k[4]),  # close
-            float(k[5]),  # volume
+            k["symbol"],
+            k["timeframe"],
+            k["open_time"].isoformat(),
+            k["open"],
+            k["high"],
+            k["low"],
+            k["close"],
+            k["volume"],
         )
         for k in klines
     ]
@@ -90,19 +89,17 @@ def main():
         klines = client.fetch_klines(
             symbol=symbol,
             interval=interval,
-            start_time=int(start_time.timestamp() * 1000),
-            end_time=int(end_time.timestamp() * 1000),
+            start_time_ms=int(start_time.timestamp() * 1000),
+            end_time_ms=int(end_time.timestamp() * 1000),
             limit=1000,
         )
 
         if klines:
-            count = upsert_candles(conn, symbol, interval, klines)
+            count = upsert_candles(conn, klines)
             conn.commit()
-            first_time = datetime.fromtimestamp(klines[0][0] / 1000, tz=timezone.utc)
-            last_time = datetime.fromtimestamp(klines[-1][0] / 1000, tz=timezone.utc)
             print(f"✅ Stored {count} candles")
-            print(f"   First: {first_time.isoformat()}")
-            print(f"   Last:  {last_time.isoformat()}")
+            print(f"   First: {klines[0]['open_time'].isoformat()}")
+            print(f"   Last:  {klines[-1]['open_time'].isoformat()}")
         else:
             print("❌ No candles returned from API")
 
