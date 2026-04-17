@@ -3,13 +3,20 @@ from __future__ import annotations
 from datetime import date, datetime, timezone
 from pathlib import Path
 
+import pytest
+
 from scripts.server.run_daily_data_collector import (
     compute_rolling_bias_5d,
     extract_coinglass_flow_usd,
     merge_preferred_etf_flows,
     resolve_collection_start,
 )
-from scripts.server.run_force_order_collector import insert_force_orders, normalize_rest_force_order_event
+from scripts.server.run_force_order_collector import (
+    MAX_FORCE_ORDER_LIMIT,
+    BinanceForceOrdersRestClient,
+    insert_force_orders,
+    normalize_rest_force_order_event,
+)
 from storage.db import connect, init_db, transaction
 
 
@@ -60,6 +67,69 @@ def test_insert_force_orders_is_idempotent_without_unique_constraint(tmp_path: P
     assert first_inserted == 1
     assert second_inserted == 0
     assert stored_rows == 1
+
+
+def test_fetch_force_orders_page_uses_signed_request_and_caps_limit(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("BINANCE_API_KEY", "a" * 64)
+    monkeypatch.setenv("BINANCE_API_SECRET", "b" * 64)
+    client = BinanceForceOrdersRestClient()
+    calls: list[tuple[dict[str, int | str], bool]] = []
+
+    def fake_request(params: dict[str, int | str], *, signed: bool) -> list[dict[str, str]]:
+        calls.append((dict(params), signed))
+        return [
+            {
+                "symbol": "BTCUSDT",
+                "side": "SELL",
+                "executedQty": "1.25",
+                "price": "82000.0",
+                "avgPrice": "81950.5",
+                "time": "1700000000000",
+                "updateTime": "1700000010000",
+            }
+        ]
+
+    monkeypatch.setattr(client, "_request", fake_request)
+
+    try:
+        payload, effective_limit = client.fetch_force_orders_page(
+            symbol="BTCUSDT",
+            start_time_ms=1700000000000,
+            end_time_ms=1700003600000,
+            limit=1000,
+        )
+    finally:
+        client.close()
+
+    assert payload and payload[0]["symbol"] == "BTCUSDT"
+    assert effective_limit == MAX_FORCE_ORDER_LIMIT
+    assert calls == [
+        (
+            {
+                "symbol": "BTCUSDT",
+                "startTime": 1700000000000,
+                "endTime": 1700003600000,
+                "limit": MAX_FORCE_ORDER_LIMIT,
+            },
+            True,
+        )
+    ]
+
+
+def test_fetch_force_orders_page_requires_credentials(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.delenv("BINANCE_API_KEY", raising=False)
+    monkeypatch.delenv("BINANCE_API_SECRET", raising=False)
+    client = BinanceForceOrdersRestClient()
+
+    try:
+        with pytest.raises(RuntimeError, match="requires API credentials"):
+            client.fetch_force_orders_page(
+                symbol="BTCUSDT",
+                start_time_ms=1700000000000,
+                end_time_ms=1700003600000,
+            )
+    finally:
+        client.close()
 
 
 def test_resolve_collection_start_uses_initial_for_first_run() -> None:

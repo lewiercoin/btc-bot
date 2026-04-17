@@ -33,7 +33,8 @@ LOG = logging.getLogger(__name__)
 BINANCE_FORCE_ORDERS_URL = "https://fapi.binance.com/fapi/v1/forceOrders"
 BINANCE_FORCE_ORDER_STREAM_URL = "wss://fstream.binance.com/stream?streams=btcusdt@forceOrder"
 DEFAULT_BOOTSTRAP_DAYS = 7
-DEFAULT_FORCE_ORDER_LIMIT = 1000
+DEFAULT_FORCE_ORDER_LIMIT = 100
+MAX_FORCE_ORDER_LIMIT = 100
 REST_TIMEOUT_SECONDS = 10
 REST_MAX_RETRIES = 3
 REST_RETRY_BACKOFF_SECONDS = 1.0
@@ -175,41 +176,29 @@ class BinanceForceOrdersRestClient:
         end_time_ms: int,
         limit: int = DEFAULT_FORCE_ORDER_LIMIT,
     ) -> tuple[list[dict[str, Any]], int]:
-        effective_limit = int(limit)
-        while True:
-            params = {
-                "symbol": symbol.upper(),
-                "startTime": int(start_time_ms),
-                "endTime": int(end_time_ms),
-                "limit": int(effective_limit),
-            }
-            try:
-                payload = self._request(params, signed=False)
-                if not isinstance(payload, list):
-                    raise RuntimeError("Unexpected Binance force-order payload.")
-                return payload, effective_limit
-            except BinanceApiError as exc:
-                message = exc.message.lower()
-                if exc.status_code in {401, 403} and self.api_key and self.api_secret:
-                    LOG.warning(
-                        "event=force_orders_rest_auth_retry mode=signed status=%s symbol=%s",
-                        exc.status_code,
-                        symbol.upper(),
-                    )
-                    payload = self._request(params, signed=True)
-                    if not isinstance(payload, list):
-                        raise RuntimeError("Unexpected Binance force-order payload.")
-                    return payload, effective_limit
-                if effective_limit > 100 and exc.status_code == 400 and "limit" in message:
-                    effective_limit = 100
-                    LOG.warning(
-                        "event=force_orders_rest_limit_downgrade requested_limit=%s effective_limit=%s reason=%s",
-                        limit,
-                        effective_limit,
-                        exc.message.replace(" ", "_"),
-                    )
-                    continue
-                raise
+        if not self.api_key or not self.api_secret:
+            raise RuntimeError("Binance force-orders endpoint requires API credentials.")
+
+        requested_limit = int(limit)
+        effective_limit = max(1, min(requested_limit, MAX_FORCE_ORDER_LIMIT))
+        if effective_limit != requested_limit:
+            LOG.warning(
+                "event=force_orders_rest_limit_clamped requested_limit=%s effective_limit=%s symbol=%s",
+                requested_limit,
+                effective_limit,
+                symbol.upper(),
+            )
+
+        params = {
+            "symbol": symbol.upper(),
+            "startTime": int(start_time_ms),
+            "endTime": int(end_time_ms),
+            "limit": int(effective_limit),
+        }
+        payload = self._request(params, signed=True)
+        if not isinstance(payload, list):
+            raise RuntimeError("Unexpected Binance force-order payload.")
+        return payload, effective_limit
 
     def _request(self, params: dict[str, Any], *, signed: bool) -> Any:
         headers: dict[str, str] = {}
