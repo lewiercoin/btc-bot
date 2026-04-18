@@ -98,6 +98,54 @@ def get_bot_state(conn: sqlite3.Connection) -> dict | None:
     return dict(row)
 
 
+_RUNTIME_METRICS_FIELDS = (
+    "last_decision_cycle_started_at",
+    "last_decision_cycle_finished_at",
+    "last_decision_outcome",
+    "decision_cycle_status",
+    "last_snapshot_built_at",
+    "last_snapshot_symbol",
+    "last_15m_candle_open_at",
+    "last_1h_candle_open_at",
+    "last_4h_candle_open_at",
+    "last_ws_message_at",
+    "last_health_check_at",
+    "last_runtime_warning",
+    "config_hash",
+)
+
+
+def upsert_runtime_metrics(conn: sqlite3.Connection, **fields: Any) -> None:
+    unknown_fields = set(fields) - set(_RUNTIME_METRICS_FIELDS)
+    if unknown_fields:
+        raise ValueError(f"Unsupported runtime_metrics fields: {sorted(unknown_fields)}")
+
+    if not fields:
+        return
+
+    field_names = ["updated_at", *fields.keys()]
+    placeholders = ", ".join("?" for _ in field_names)
+    updates = ", ".join(f"{field} = excluded.{field}" for field in field_names)
+    values = [_normalize_runtime_metric_value(datetime.now(timezone.utc)), *(_normalize_runtime_metric_value(value) for value in fields.values())]
+
+    conn.execute(
+        f"""
+        INSERT INTO runtime_metrics (id, {", ".join(field_names)})
+        VALUES (1, {placeholders})
+        ON CONFLICT(id) DO UPDATE SET
+            {updates}
+        """,
+        tuple(values),
+    )
+
+
+def get_runtime_metrics(conn: sqlite3.Connection) -> dict | None:
+    row = conn.execute("SELECT * FROM runtime_metrics WHERE id = 1").fetchone()
+    if not row:
+        return None
+    return dict(row)
+
+
 def get_open_positions_count(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         "SELECT COUNT(*) AS cnt FROM positions WHERE status IN ('OPEN', 'PARTIAL')"
@@ -492,3 +540,11 @@ def get_last_closed_loss_at(conn: sqlite3.Connection) -> datetime | None:
     if not row or not row["closed_at"]:
         return None
     return datetime.fromisoformat(row["closed_at"])
+
+
+def _normalize_runtime_metric_value(value: Any) -> Any:
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            return value.replace(tzinfo=timezone.utc).isoformat()
+        return value.astimezone(timezone.utc).isoformat()
+    return value

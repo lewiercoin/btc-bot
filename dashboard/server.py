@@ -146,6 +146,22 @@ async def get_positions(request: Request) -> dict:
     return request.app.state.reader.read_positions()
 
 
+@app.get("/api/runtime-freshness")
+async def get_runtime_freshness(request: Request) -> dict:
+    payload = request.app.state.reader.read_runtime_freshness(
+        heartbeat_seconds=request.app.state.settings.execution.ws_heartbeat_seconds
+    )
+    process_status = request.app.state.process_manager.status()
+    payload["process"] = {
+        "running": process_status["running"],
+        "pid": process_status["pid"],
+        "mode": process_status["mode"],
+        "exit_code": process_status["exit_code"],
+        "uptime_seconds": process_status["uptime_seconds"],
+    }
+    return payload
+
+
 @app.get("/api/trades")
 async def get_trades(request: Request, limit: int = Query(default=50, ge=1, le=200)) -> dict:
     runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)

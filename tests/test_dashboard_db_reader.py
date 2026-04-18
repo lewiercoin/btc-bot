@@ -9,6 +9,7 @@ from dashboard.db_reader import (
     read_alerts_from_conn,
     read_daily_metrics_from_conn,
     read_positions_from_conn,
+    read_runtime_freshness_from_conn,
     read_signals_from_conn,
     read_status_from_conn,
     read_trades_from_conn,
@@ -666,3 +667,114 @@ def test_read_signals_honors_explicit_config_hash_override() -> None:
     assert len(payload["signals"]) == 1
     assert payload["signals"][0]["signal_id"] == "sig-current"
     assert payload["signals"][0]["config_hash"] == "current"
+
+
+def test_read_runtime_freshness_from_conn_returns_unavailable_when_table_missing() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    try:
+        conn.execute("DROP TABLE runtime_metrics")
+        conn.commit()
+        payload = read_runtime_freshness_from_conn(conn)
+    finally:
+        conn.close()
+
+    assert payload["runtime_available"] is False
+    assert payload["decision_cycle"]["status"] == "unavailable"
+    assert payload["rest_snapshot"]["built_at"] is None
+    assert payload["websocket"]["healthy"] is None
+
+
+def test_read_runtime_freshness_from_conn_returns_expected_schema() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    now = datetime(2026, 4, 18, 10, 15, 30, tzinfo=timezone.utc)
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO runtime_metrics (
+                id, updated_at, last_decision_cycle_started_at, last_decision_cycle_finished_at,
+                last_decision_outcome, decision_cycle_status, last_snapshot_built_at, last_snapshot_symbol,
+                last_15m_candle_open_at, last_1h_candle_open_at, last_4h_candle_open_at,
+                last_ws_message_at, last_health_check_at, last_runtime_warning, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                now.isoformat(),
+                datetime(2026, 4, 18, 10, 15, 0, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 10, 15, 1, tzinfo=timezone.utc).isoformat(),
+                "no_signal",
+                "idle",
+                datetime(2026, 4, 18, 10, 15, 0, tzinfo=timezone.utc).isoformat(),
+                "BTCUSDT",
+                datetime(2026, 4, 18, 10, 15, 0, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 10, 0, 0, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 8, 0, 0, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 10, 15, 25, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 10, 15, 5, tzinfo=timezone.utc).isoformat(),
+                None,
+                "cfg-123",
+            ),
+        )
+        conn.commit()
+        payload = read_runtime_freshness_from_conn(conn, heartbeat_seconds=30, now=now)
+    finally:
+        conn.close()
+
+    assert payload["runtime_available"] is True
+    assert payload["config_hash"] == "cfg-123"
+    assert payload["decision_cycle"]["status"] == "idle"
+    assert payload["decision_cycle"]["last_outcome"] == "no_signal"
+    assert payload["decision_cycle"]["last_snapshot_age_seconds"] == 30.0
+    assert payload["rest_snapshot"]["symbol"] == "BTCUSDT"
+    assert payload["rest_snapshot"]["timeframes"]["15m"]["age_seconds"] == 30.0
+    assert payload["rest_snapshot"]["timeframes"]["1h"]["age_seconds"] == 930.0
+    assert payload["rest_snapshot"]["timeframes"]["4h"]["age_seconds"] == 8130.0
+    assert payload["websocket"]["message_age_seconds"] == 5.0
+    assert payload["websocket"]["healthy"] is True
+    assert payload["collector"] is None
+
+
+def test_read_runtime_freshness_ignores_stale_db_candles() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    now = datetime(2026, 4, 18, 10, 15, 30, tzinfo=timezone.utc)
+    stale_open = datetime(2026, 4, 17, 19, 15, 0, tzinfo=timezone.utc)
+
+    try:
+        conn.execute(
+            """
+            INSERT INTO candles (symbol, timeframe, open_time, open, high, low, close, volume)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            ("BTCUSDT", "15m", stale_open.isoformat(), 1.0, 1.0, 1.0, 1.0, 1.0),
+        )
+        conn.execute(
+            """
+            INSERT INTO runtime_metrics (
+                id, updated_at, last_snapshot_built_at, last_snapshot_symbol, last_15m_candle_open_at,
+                last_ws_message_at, decision_cycle_status, last_decision_outcome, config_hash
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                1,
+                now.isoformat(),
+                datetime(2026, 4, 18, 10, 15, 0, tzinfo=timezone.utc).isoformat(),
+                "BTCUSDT",
+                datetime(2026, 4, 18, 10, 15, 0, tzinfo=timezone.utc).isoformat(),
+                datetime(2026, 4, 18, 10, 15, 20, tzinfo=timezone.utc).isoformat(),
+                "idle",
+                "no_signal",
+                "cfg-123",
+            ),
+        )
+        conn.commit()
+        payload = read_runtime_freshness_from_conn(conn, heartbeat_seconds=30, now=now)
+    finally:
+        conn.close()
+
+    assert payload["runtime_available"] is True
+    assert payload["rest_snapshot"]["timeframes"]["15m"]["last_candle_open_at"] == "2026-04-18T10:15:00+00:00"
+    assert payload["rest_snapshot"]["timeframes"]["15m"]["age_seconds"] == 30.0

@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from storage.db import connect_readonly
-from storage.repositories import fetch_open_positions, get_bot_state
+from storage.repositories import fetch_open_positions, get_bot_state, get_runtime_metrics
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -54,6 +54,53 @@ def _parse_json_list(value: Any) -> list:
         return result if isinstance(result, list) else []
     except (json.JSONDecodeError, TypeError):
         return []
+
+
+def _age_seconds(value: Any, *, now: datetime) -> float | None:
+    parsed = _parse_datetime(value)
+    if parsed is None:
+        return None
+    return max((now - parsed).total_seconds(), 0.0)
+
+
+def _table_exists(conn: sqlite3.Connection, table_name: str) -> bool:
+    row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?",
+        (table_name,),
+    ).fetchone()
+    return bool(row)
+
+
+def _runtime_freshness_unavailable() -> dict[str, Any]:
+    return {
+        "runtime_available": False,
+        "updated_at": None,
+        "config_hash": None,
+        "last_health_check_at": None,
+        "last_runtime_warning": None,
+        "decision_cycle": {
+            "status": "unavailable",
+            "last_started_at": None,
+            "last_finished_at": None,
+            "last_outcome": None,
+            "last_snapshot_age_seconds": None,
+        },
+        "rest_snapshot": {
+            "built_at": None,
+            "symbol": None,
+            "timeframes": {
+                "15m": {"last_candle_open_at": None, "age_seconds": None},
+                "1h": {"last_candle_open_at": None, "age_seconds": None},
+                "4h": {"last_candle_open_at": None, "age_seconds": None},
+            },
+        },
+        "websocket": {
+            "last_message_at": None,
+            "message_age_seconds": None,
+            "healthy": None,
+        },
+        "collector": None,
+    }
 
 
 def _get_current_config_hash(conn: sqlite3.Connection) -> str | None:
@@ -278,6 +325,64 @@ def read_alerts_from_conn(conn: sqlite3.Connection, *, limit: int = 20) -> dict[
     }
 
 
+def read_runtime_freshness_from_conn(
+    conn: sqlite3.Connection,
+    *,
+    heartbeat_seconds: int = 30,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    if not _table_exists(conn, "runtime_metrics"):
+        return _runtime_freshness_unavailable()
+
+    row = get_runtime_metrics(conn)
+    if row is None:
+        return _runtime_freshness_unavailable()
+
+    reference_now = _to_utc(now or datetime.now(timezone.utc))
+    ws_age_seconds = _age_seconds(row.get("last_ws_message_at"), now=reference_now)
+    max_delay = max(int(heartbeat_seconds) * 3, 5)
+    websocket_healthy = None if ws_age_seconds is None else ws_age_seconds <= max_delay
+
+    return {
+        "runtime_available": True,
+        "updated_at": _to_iso(row.get("updated_at")),
+        "config_hash": row.get("config_hash"),
+        "last_health_check_at": _to_iso(row.get("last_health_check_at")),
+        "last_runtime_warning": row.get("last_runtime_warning"),
+        "decision_cycle": {
+            "status": row.get("decision_cycle_status") or "idle",
+            "last_started_at": _to_iso(row.get("last_decision_cycle_started_at")),
+            "last_finished_at": _to_iso(row.get("last_decision_cycle_finished_at")),
+            "last_outcome": row.get("last_decision_outcome"),
+            "last_snapshot_age_seconds": _age_seconds(row.get("last_snapshot_built_at"), now=reference_now),
+        },
+        "rest_snapshot": {
+            "built_at": _to_iso(row.get("last_snapshot_built_at")),
+            "symbol": row.get("last_snapshot_symbol"),
+            "timeframes": {
+                "15m": {
+                    "last_candle_open_at": _to_iso(row.get("last_15m_candle_open_at")),
+                    "age_seconds": _age_seconds(row.get("last_15m_candle_open_at"), now=reference_now),
+                },
+                "1h": {
+                    "last_candle_open_at": _to_iso(row.get("last_1h_candle_open_at")),
+                    "age_seconds": _age_seconds(row.get("last_1h_candle_open_at"), now=reference_now),
+                },
+                "4h": {
+                    "last_candle_open_at": _to_iso(row.get("last_4h_candle_open_at")),
+                    "age_seconds": _age_seconds(row.get("last_4h_candle_open_at"), now=reference_now),
+                },
+            },
+        },
+        "websocket": {
+            "last_message_at": _to_iso(row.get("last_ws_message_at")),
+            "message_age_seconds": ws_age_seconds,
+            "healthy": websocket_healthy,
+        },
+        "collector": None,
+    }
+
+
 class DashboardReader:
     def __init__(
         self,
@@ -374,5 +479,17 @@ class DashboardReader:
             raise
         try:
             return read_alerts_from_conn(conn, limit=limit)
+        finally:
+            conn.close()
+
+    def read_runtime_freshness(self, *, heartbeat_seconds: int = 30) -> dict[str, Any]:
+        try:
+            conn = self._connect_fn(self.db_path)
+        except sqlite3.OperationalError as exc:
+            if _is_missing_db_error(exc):
+                return _runtime_freshness_unavailable()
+            raise
+        try:
+            return read_runtime_freshness_from_conn(conn, heartbeat_seconds=heartbeat_seconds)
         finally:
             conn.close()

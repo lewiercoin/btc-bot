@@ -24,7 +24,7 @@ from execution.order_manager import OrderManager
 from execution.paper_execution_engine import PaperExecutionEngine
 from execution.recovery import BinanceRecoverySyncSource, NoOpRecoverySyncSource, RecoveryCoordinator
 from monitoring.audit_logger import AuditLogger
-from monitoring.health import HealthMonitor
+from monitoring.health import HealthMonitor, HealthStatus
 from monitoring.metrics import (
     CYCLE_DURATION_MS,
     ERRORS_TOTAL,
@@ -326,11 +326,23 @@ class BotOrchestrator:
         cycle_started = time.perf_counter()
         timestamp = (now or self._now()).astimezone(timezone.utc)
         cycle_outcome = "unknown"
+        self._update_runtime_metrics(
+            last_decision_cycle_started_at=timestamp,
+            decision_cycle_status="running",
+        )
         LOG.info("Decision cycle started | timestamp=%s", timestamp.isoformat())
         try:
             self.state_store.refresh_runtime_state(timestamp)
             try:
                 snapshot = self._build_snapshot(timestamp)
+                self._update_runtime_metrics(
+                    last_snapshot_built_at=timestamp,
+                    last_snapshot_symbol=snapshot.symbol,
+                    last_15m_candle_open_at=self._latest_candle_open_at(snapshot.candles_15m),
+                    last_1h_candle_open_at=self._latest_candle_open_at(snapshot.candles_1h),
+                    last_4h_candle_open_at=self._latest_candle_open_at(snapshot.candles_4h),
+                    last_ws_message_at=self._last_ws_message_at(),
+                )
             except Exception as exc:
                 cycle_outcome = "snapshot_failed"
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
@@ -463,6 +475,12 @@ class BotOrchestrator:
         finally:
             duration_ms = (time.perf_counter() - cycle_started) * 1000.0
             self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
+            self._update_runtime_metrics(
+                last_decision_cycle_finished_at=timestamp,
+                last_decision_outcome=cycle_outcome,
+                decision_cycle_status="blocked" if cycle_outcome == "safe_mode_skip" else "idle",
+                last_ws_message_at=self._last_ws_message_at(),
+            )
             LOG.info(
                 "Decision cycle finished | timestamp=%s | outcome=%s | duration_ms=%.1f",
                 timestamp.isoformat(),
@@ -528,6 +546,11 @@ class BotOrchestrator:
 
     def _run_health_check(self, now: datetime) -> None:
         status = self.health_monitor.check()
+        self._update_runtime_metrics(
+            last_health_check_at=now,
+            last_ws_message_at=self._last_ws_message_at(),
+            last_runtime_warning=None if status.healthy else self._format_health_warning(status),
+        )
         if status.healthy:
             self._consecutive_health_failures = 0
             return
@@ -604,6 +627,14 @@ class BotOrchestrator:
             symbol=self.settings.strategy.symbol,
             timestamp=timestamp,
         )
+
+    def _update_runtime_metrics(self, **fields: object) -> None:
+        if "config_hash" not in fields:
+            fields["config_hash"] = self.settings.config_hash
+        try:
+            self.state_store.update_runtime_metrics(**fields)
+        except Exception as exc:
+            LOG.warning("Runtime metrics update failed: %s", exc)
 
     def _log_no_signal_diagnostics(self, timestamp: datetime, diagnostics: SignalDiagnostics) -> None:
         LOG.info(
@@ -698,6 +729,44 @@ class BotOrchestrator:
             else:
                 result.append(candle)
         return result
+
+    @staticmethod
+    def _latest_candle_open_at(candles: list[dict]) -> datetime | None:
+        if not candles:
+            return None
+        raw_value = candles[-1].get("open_time")
+        if raw_value is None:
+            return None
+        if isinstance(raw_value, datetime):
+            if raw_value.tzinfo is None:
+                return raw_value.replace(tzinfo=timezone.utc)
+            return raw_value.astimezone(timezone.utc)
+        parsed = datetime.fromisoformat(str(raw_value))
+        if parsed.tzinfo is None:
+            return parsed.replace(tzinfo=timezone.utc)
+        return parsed.astimezone(timezone.utc)
+
+    def _last_ws_message_at(self) -> datetime | None:
+        websocket_client = self.bundle.market_data.websocket_client
+        if websocket_client is None:
+            return None
+        last_message_at = websocket_client.last_message_at
+        if last_message_at is None:
+            return None
+        if last_message_at.tzinfo is None:
+            return last_message_at.replace(tzinfo=timezone.utc)
+        return last_message_at.astimezone(timezone.utc)
+
+    @staticmethod
+    def _format_health_warning(status: HealthStatus) -> str:
+        failures: list[str] = []
+        if not status.websocket_alive:
+            failures.append("websocket_alive=false")
+        if not status.db_writable:
+            failures.append("db_writable=false")
+        if not status.exchange_reachable:
+            failures.append("exchange_reachable=false")
+        return ", ".join(failures) if failures else "health_check_failed"
 
     def _start_data_feeds(self) -> None:
         websocket_client = self.bundle.market_data.websocket_client

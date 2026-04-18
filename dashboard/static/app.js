@@ -39,6 +39,26 @@ const serverMemory = document.getElementById("server-memory");
 const serverLoad = document.getElementById("server-load");
 const serverDisk = document.getElementById("server-disk");
 
+const runtimeFields = {
+  meta: document.getElementById("runtime-meta"),
+  process: document.getElementById("runtime-process"),
+  cycleStatus: document.getElementById("runtime-cycle-status"),
+  lastOutcome: document.getElementById("runtime-last-outcome"),
+  cycleStarted: document.getElementById("runtime-cycle-started"),
+  cycleFinished: document.getElementById("runtime-cycle-finished"),
+  snapshotBuilt: document.getElementById("runtime-snapshot-built"),
+  snapshotAge: document.getElementById("runtime-snapshot-age"),
+  snapshotSymbol: document.getElementById("runtime-snapshot-symbol"),
+  tf15mAge: document.getElementById("runtime-15m-age"),
+  tf1hAge: document.getElementById("runtime-1h-age"),
+  tf4hAge: document.getElementById("runtime-4h-age"),
+  websocketHealth: document.getElementById("runtime-websocket-health"),
+  wsAge: document.getElementById("runtime-ws-age"),
+  wsLastMessage: document.getElementById("runtime-ws-last-message"),
+  healthCheck: document.getElementById("runtime-health-check"),
+  warning: document.getElementById("runtime-warning"),
+};
+
 const egressFields = {
   enabled: document.getElementById("egress-enabled"),
   type: document.getElementById("egress-type"),
@@ -114,6 +134,20 @@ function formatUptime(seconds) {
     return `${minutes}m ${remainingSeconds}s`;
   }
   return `${remainingSeconds}s`;
+}
+
+function formatAgeSeconds(value) {
+  if (value === null || value === undefined) {
+    return "-";
+  }
+  const seconds = Math.max(Number(value), 0);
+  if (seconds < 60) {
+    return `${Math.round(seconds)}s`;
+  }
+  if (seconds < 3600) {
+    return `${Math.round(seconds / 60)}m`;
+  }
+  return `${(seconds / 3600).toFixed(1)}h`;
 }
 
 function setControlEnabled(processRunning) {
@@ -352,6 +386,48 @@ function renderStatus(payload) {
   statusFields.processPid.textContent = process.pid === null ? "-" : String(process.pid);
   statusFields.processExitCode.textContent = process.exit_code === null ? "-" : String(process.exit_code);
   statusFields.uptime.textContent = formatUptime(payload.uptime_seconds);
+}
+
+function renderRuntimeFreshness(payload) {
+  const process = payload.process || { running: false, pid: null, mode: null, uptime_seconds: null };
+  const decision = payload.decision_cycle || {};
+  const snapshot = payload.rest_snapshot || {};
+  const timeframes = snapshot.timeframes || {};
+  const websocket = payload.websocket || {};
+
+  runtimeFields.meta.textContent = payload.runtime_available
+    ? `Updated ${formatDate(payload.updated_at)}`
+    : "Runtime metrics unavailable";
+
+  runtimeFields.process.textContent = process.running
+    ? `Running PID ${process.pid} (${process.mode || "-"})`
+    : "Stopped";
+  runtimeFields.cycleStatus.textContent = decision.status || "-";
+  runtimeFields.lastOutcome.textContent = decision.last_outcome || "-";
+  runtimeFields.cycleStarted.textContent = formatDate(decision.last_started_at);
+  runtimeFields.cycleFinished.textContent = formatDate(decision.last_finished_at);
+  runtimeFields.snapshotBuilt.textContent = formatDate(snapshot.built_at);
+  runtimeFields.snapshotAge.textContent = formatAgeSeconds(decision.last_snapshot_age_seconds);
+  runtimeFields.snapshotSymbol.textContent = snapshot.symbol || "-";
+  runtimeFields.tf15mAge.textContent = formatAgeSeconds(timeframes["15m"]?.age_seconds);
+  runtimeFields.tf1hAge.textContent = formatAgeSeconds(timeframes["1h"]?.age_seconds);
+  runtimeFields.tf4hAge.textContent = formatAgeSeconds(timeframes["4h"]?.age_seconds);
+
+  if (websocket.healthy === true) {
+    runtimeFields.websocketHealth.textContent = "Healthy";
+    runtimeFields.websocketHealth.className = "badge badge--ok";
+  } else if (websocket.healthy === false) {
+    runtimeFields.websocketHealth.textContent = "Stale";
+    runtimeFields.websocketHealth.className = "badge badge--warn";
+  } else {
+    runtimeFields.websocketHealth.textContent = "-";
+    runtimeFields.websocketHealth.className = "";
+  }
+
+  runtimeFields.wsAge.textContent = formatAgeSeconds(websocket.message_age_seconds);
+  runtimeFields.wsLastMessage.textContent = formatDate(websocket.last_message_at);
+  runtimeFields.healthCheck.textContent = formatDate(payload.last_health_check_at);
+  runtimeFields.warning.textContent = payload.last_runtime_warning || "-";
 }
 
 function appendCells(row, values) {
@@ -618,6 +694,14 @@ async function refreshRisk() {
   }
 }
 
+async function refreshRuntimeFreshness() {
+  try {
+    renderRuntimeFreshness(await loadJson("/api/runtime-freshness"));
+  } catch (error) {
+    runtimeFields.meta.textContent = "Runtime metrics unavailable";
+  }
+}
+
 function renderServerResources(payload) {
   const cpuPct = payload.cpu_percent || 0;
   const memPct = payload.memory_percent || 0;
@@ -740,6 +824,7 @@ refreshMetrics();
 refreshAlerts();
 refreshEgress();
 refreshRisk();
+refreshRuntimeFreshness();
 refreshServerResources();
 connectLogs();
 
@@ -751,4 +836,5 @@ window.setInterval(refreshMetrics, 120000);
 window.setInterval(refreshAlerts, 60000);
 window.setInterval(refreshEgress, 10000);
 window.setInterval(refreshRisk, 10000);
+window.setInterval(refreshRuntimeFreshness, 10000);
 window.setInterval(refreshServerResources, 10000);

@@ -16,6 +16,7 @@ from monitoring.health import HealthStatus
 from orchestrator import BotOrchestrator, EngineBundle
 from settings import load_settings
 from storage.db import init_db
+from storage.repositories import get_runtime_metrics
 
 
 def make_conn(schema_path: Path) -> sqlite3.Connection:
@@ -81,8 +82,24 @@ class FakeMarketData:
                     "close": 100.0,
                 }
             ],
-            candles_1h=[],
-            candles_4h=[],
+            candles_1h=[
+                {
+                    "open_time": timestamp.replace(minute=0, second=0, microsecond=0),
+                    "open": 98.0,
+                    "high": 101.0,
+                    "low": 97.0,
+                    "close": 100.0,
+                }
+            ],
+            candles_4h=[
+                {
+                    "open_time": timestamp.replace(hour=(timestamp.hour // 4) * 4, minute=0, second=0, microsecond=0),
+                    "open": 96.0,
+                    "high": 102.0,
+                    "low": 95.0,
+                    "close": 100.0,
+                }
+            ],
             funding_history=[],
             open_interest=0.0,
             aggtrades_bucket_60s={},
@@ -158,6 +175,11 @@ class UnusedExecutionEngine:
 class FakeHealthMonitor:
     def check(self) -> HealthStatus:
         return HealthStatus(websocket_alive=True, db_writable=True, exchange_reachable=True)
+
+
+class DegradedHealthMonitor:
+    def check(self) -> HealthStatus:
+        return HealthStatus(websocket_alive=False, db_writable=True, exchange_reachable=True)
 
 
 class DummyTelegramNotifier:
@@ -267,3 +289,71 @@ def test_decision_cycle_logs_no_signal_outcome(caplog: pytest.LogCaptureFixture,
         "Decision cycle finished | timestamp=2026-04-15T12:15:00+00:00 | outcome=no_signal" in message
         for message in messages
     )
+
+
+def test_decision_cycle_persists_runtime_metrics(paper_settings) -> None:
+    assert paper_settings.storage is not None
+    conn = make_conn(paper_settings.storage.schema_path)
+    clock = FakeClock(datetime(2026, 4, 15, 12, 14, 59, tzinfo=timezone.utc))
+    bundle = make_bundle(conn, clock)
+
+    holder: dict[str, BotOrchestrator] = {}
+    stop_at = datetime(2026, 4, 15, 12, 15, 2, tzinfo=timezone.utc)
+
+    def sleep_fn(seconds: float) -> None:
+        clock.sleep(seconds)
+        if clock.now() >= stop_at:
+            holder["orchestrator"].stop("test_stop")
+
+    orchestrator = BotOrchestrator(
+        settings=paper_settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=FakeHealthMonitor(),  # type: ignore[arg-type]
+        telegram_notifier=DummyTelegramNotifier(),  # type: ignore[arg-type]
+        now_provider=clock.now,
+        sleep_fn=sleep_fn,
+    )
+    holder["orchestrator"] = orchestrator
+
+    orchestrator.start()
+
+    runtime_metrics = get_runtime_metrics(conn)
+    assert runtime_metrics is not None
+    assert runtime_metrics["decision_cycle_status"] == "idle"
+    assert runtime_metrics["last_decision_outcome"] == "no_signal"
+    assert runtime_metrics["last_snapshot_symbol"] == "BTCUSDT"
+    assert runtime_metrics["last_decision_cycle_started_at"] == "2026-04-15T12:15:00+00:00"
+    assert runtime_metrics["last_decision_cycle_finished_at"] == "2026-04-15T12:15:00+00:00"
+    assert runtime_metrics["last_snapshot_built_at"] == "2026-04-15T12:15:00+00:00"
+    assert runtime_metrics["last_15m_candle_open_at"] == "2026-04-15T12:00:00+00:00"
+    assert runtime_metrics["last_1h_candle_open_at"] == "2026-04-15T12:00:00+00:00"
+    assert runtime_metrics["last_4h_candle_open_at"] == "2026-04-15T12:00:00+00:00"
+    assert runtime_metrics["last_ws_message_at"] == "2026-04-15T12:14:59+00:00"
+    assert runtime_metrics["last_health_check_at"] == "2026-04-15T12:14:59+00:00"
+    assert runtime_metrics["last_runtime_warning"] is None
+    assert runtime_metrics["config_hash"] == paper_settings.config_hash
+
+
+def test_health_check_persists_runtime_warning(paper_settings) -> None:
+    assert paper_settings.storage is not None
+    conn = make_conn(paper_settings.storage.schema_path)
+    clock = FakeClock(datetime(2026, 4, 15, 12, 0, 0, tzinfo=timezone.utc))
+    bundle = make_bundle(conn, clock)
+    orchestrator = BotOrchestrator(
+        settings=paper_settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=DegradedHealthMonitor(),  # type: ignore[arg-type]
+        telegram_notifier=DummyTelegramNotifier(),  # type: ignore[arg-type]
+        now_provider=clock.now,
+        sleep_fn=clock.sleep,
+    )
+    orchestrator.state_store.ensure_initialized()
+
+    orchestrator._run_health_check(clock.now())
+
+    runtime_metrics = get_runtime_metrics(conn)
+    assert runtime_metrics is not None
+    assert runtime_metrics["last_health_check_at"] == "2026-04-15T12:00:00+00:00"
+    assert runtime_metrics["last_runtime_warning"] == "websocket_alive=false"
