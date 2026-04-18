@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 from typing import Any
 
 from backtest.backtest_runner import BacktestConfig, BacktestResult, BacktestRunner
 from core.models import Features, RegimeState, SignalCandidate
 from core.signal_engine import SignalEngine
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -64,6 +67,7 @@ class ResearchBacktestRunner(BacktestRunner):
         replay_loader = self._custom_replay_loader or self._build_default_replay_loader(config)
         fill_model = self._custom_fill_model or self._build_default_fill_model(config)
         feature_engine, regime_engine, signal_engine, governance, risk_engine = self._build_engines()
+        self._log_uptrend_continuation_config()
 
         open_positions: list[Any] = []
         closed_records: list[Any] = []
@@ -113,23 +117,18 @@ class ResearchBacktestRunner(BacktestRunner):
                 config_hash=self.settings.config_hash,
             )
             regime = regime_engine.classify(features)
-            candidate = signal_engine.generate(features, regime)
-            if candidate is None:
-                candidate = self._generate_uptrend_continuation_candidate(
-                    snapshot=snapshot,
-                    features=features,
-                    regime=regime,
-                    signal_engine=signal_engine,
-                )
-                if candidate is None and self._is_regime_blocked(features, regime, signal_engine):
-                    self.signals_generated += 1
-                    self.signals_regime_blocked += 1
-            else:
+            base_candidate, uptrend_candidate, candidate = self._resolve_signal_candidates(
+                snapshot=snapshot,
+                features=features,
+                regime=regime,
+                signal_engine=signal_engine,
+            )
+            self.signals_generated += int(base_candidate is not None) + int(uptrend_candidate is not None)
+            if candidate is None and self._is_regime_blocked(features, regime, signal_engine):
                 self.signals_generated += 1
+                self.signals_regime_blocked += 1
 
             if candidate is not None:
-                if candidate.setup_type == "uptrend_continuation_long":
-                    self.signals_generated += 1
                 self._signal_counter += 1
                 candidate.signal_id = self._make_signal_id(now, self._signal_counter)
                 governance_decision = governance.evaluate(candidate)
@@ -233,6 +232,55 @@ class ResearchBacktestRunner(BacktestRunner):
         if direction is None:
             return False
         return not signal_engine._is_direction_allowed_for_regime(direction=direction, regime=regime)
+
+    def _log_uptrend_continuation_config(self) -> None:
+        cfg = self.uptrend_continuation
+        if not cfg.allow_uptrend_continuation:
+            return
+        logger.info(
+            "Research uptrend continuation overlay active | "
+            "selection_policy=higher_confluence_base_tie_break | "
+            "allow_uptrend_continuation=%s | "
+            "uptrend_continuation_reclaim_strength_min=%.4f | "
+            "uptrend_continuation_participation_min=%.4f | "
+            "uptrend_continuation_confluence_multiplier=%.4f",
+            cfg.allow_uptrend_continuation,
+            float(cfg.uptrend_continuation_reclaim_strength_min),
+            float(cfg.uptrend_continuation_participation_min),
+            float(cfg.uptrend_continuation_confluence_multiplier),
+        )
+
+    def _resolve_signal_candidates(
+        self,
+        *,
+        snapshot: Any,
+        features: Features,
+        regime: RegimeState,
+        signal_engine: SignalEngine,
+    ) -> tuple[SignalCandidate | None, SignalCandidate | None, SignalCandidate | None]:
+        base_candidate = signal_engine.generate(features, regime)
+        uptrend_candidate = self._generate_uptrend_continuation_candidate(
+            snapshot=snapshot,
+            features=features,
+            regime=regime,
+            signal_engine=signal_engine,
+        )
+        selected_candidate = self._select_signal_candidate(base_candidate, uptrend_candidate)
+        return base_candidate, uptrend_candidate, selected_candidate
+
+    @staticmethod
+    def _select_signal_candidate(
+        base_candidate: SignalCandidate | None,
+        uptrend_candidate: SignalCandidate | None,
+    ) -> SignalCandidate | None:
+        """Prefer the stronger overlay candidate while preserving base behavior on ties."""
+        if base_candidate is None:
+            return uptrend_candidate
+        if uptrend_candidate is None:
+            return base_candidate
+        if float(uptrend_candidate.confluence_score) > float(base_candidate.confluence_score):
+            return uptrend_candidate
+        return base_candidate
 
     def _generate_uptrend_continuation_candidate(
         self,
