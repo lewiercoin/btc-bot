@@ -13,7 +13,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.models import ExecutableSignal, MarketSnapshot, RegimeState, SettlementMetrics, SignalCandidate
+from core.models import ExecutableSignal, MarketSnapshot, RegimeState, SettlementMetrics, SignalCandidate, SignalDiagnostics
 from core.risk_engine import ExitDecision, RiskDecision
 from execution.execution_engine import ExecutionEngine
 from monitoring.audit_logger import AuditLogger
@@ -133,10 +133,31 @@ class FakeRegimeEngine:
 class FakeSignalEngine:
     def __init__(self, *, emit_signals: bool = True) -> None:
         self.emit_signals = emit_signals
+        self.diagnose_calls = 0
         self.generate_calls = 0
 
-    def generate(self, features, regime):  # type: ignore[no-untyped-def]
+    def diagnose(self, features, regime):  # type: ignore[no-untyped-def]
+        self.diagnose_calls += 1
+        return SignalDiagnostics(
+            timestamp=features["timestamp"],
+            config_hash="smoke",
+            regime=regime,
+            blocked_by=None if self.emit_signals else "smoke_blocked",
+            sweep_detected=True,
+            reclaim_detected=True,
+            sweep_side="LOW",
+            sweep_level=100.0,
+            sweep_depth_pct=0.01,
+            direction_inferred="LONG" if self.emit_signals else None,
+            direction_allowed=True if self.emit_signals else None,
+            confluence_preview=4.0 if self.emit_signals else None,
+            candidate_reasons_preview=["smoke"] if self.emit_signals else [],
+        )
+
+    def generate(self, features, regime, diagnostics=None):  # type: ignore[no-untyped-def]
         self.generate_calls += 1
+        if diagnostics is not None and diagnostics.blocked_by is not None:
+            return None
         if not self.emit_signals:
             return None
         ts = features["timestamp"]

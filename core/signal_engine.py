@@ -22,6 +22,7 @@ def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
 class SignalConfig:
     confluence_min: float = 3.0
     min_sweep_depth_pct: float = 0.0001
+    ema_trend_gap_pct: float = 0.0063
     entry_offset_atr: float = 0.05
     invalidation_offset_atr: float = 0.75
     min_stop_distance_pct: float = 0.0015
@@ -54,17 +55,24 @@ class SignalEngine:
 
         if not features.sweep_detected:
             blocked_by = "no_sweep"
-        elif not features.reclaim_detected:
-            blocked_by = "no_reclaim"
         elif features.sweep_level is None:
             blocked_by = "missing_sweep_level"
         elif features.sweep_depth_pct is not None and features.sweep_depth_pct < self.config.min_sweep_depth_pct:
             blocked_by = "sweep_too_shallow"
         else:
-            direction = self._infer_direction(features)
+            continuation_blocked_by: str | None = None
+            if regime is RegimeState.UPTREND and not features.reclaim_detected:
+                direction, continuation_blocked_by = self._infer_uptrend_continuation_direction(features)
+
             if direction is None:
-                blocked_by = "direction_unresolved"
-            else:
+                if not features.reclaim_detected:
+                    blocked_by = continuation_blocked_by or "no_reclaim"
+                else:
+                    direction = self._infer_direction(features)
+                    if direction is None:
+                        blocked_by = "direction_unresolved"
+
+            if direction is not None:
                 direction_allowed = self._is_direction_allowed_for_regime(direction=direction, regime=regime)
                 if not direction_allowed:
                     blocked_by = "regime_direction_whitelist"
@@ -88,6 +96,18 @@ class SignalEngine:
             confluence_preview=confluence_preview,
             candidate_reasons_preview=candidate_reasons_preview,
         )
+
+    def _infer_uptrend_continuation_direction(self, features: Features) -> tuple[str | None, str | None]:
+        if features.sweep_side != "HIGH":
+            return None, "uptrend_continuation_weak"
+
+        ema_gap_pct = self._ema_gap_pct(features)
+        ema_gap_ok = ema_gap_pct > self.config.ema_trend_gap_pct
+        tfi_bullish = features.tfi_60s > self.config.direction_tfi_threshold
+
+        if ema_gap_ok and tfi_bullish:
+            return "LONG", None
+        return None, "uptrend_continuation_weak"
 
     def generate(
         self,
@@ -147,6 +167,11 @@ class SignalEngine:
         if inferred_direction == "SHORT" and features.sweep_side != "HIGH":
             return None
         return inferred_direction
+
+    def _ema_gap_pct(self, features: Features) -> float:
+        if features.ema200_4h == 0:
+            return 0.0
+        return (features.ema50_4h - features.ema200_4h) / features.ema200_4h
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
         score = 0.0

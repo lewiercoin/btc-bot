@@ -158,6 +158,7 @@ def build_default_bundle(
             SignalConfig(
                 confluence_min=settings.strategy.confluence_min,
                 min_sweep_depth_pct=settings.strategy.min_sweep_depth_pct,
+                ema_trend_gap_pct=settings.strategy.ema_trend_gap_pct,
                 entry_offset_atr=settings.strategy.entry_offset_atr,
                 invalidation_offset_atr=settings.strategy.invalidation_offset_atr,
                 min_stop_distance_pct=settings.strategy.min_stop_distance_pct,

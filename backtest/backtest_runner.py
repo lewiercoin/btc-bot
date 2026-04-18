@@ -276,6 +276,7 @@ class BacktestRunner:
             SignalConfig(
                 confluence_min=strategy.confluence_min,
                 min_sweep_depth_pct=strategy.min_sweep_depth_pct,
+                ema_trend_gap_pct=strategy.ema_trend_gap_pct,
                 entry_offset_atr=strategy.entry_offset_atr,
                 invalidation_offset_atr=strategy.invalidation_offset_atr,
                 min_stop_distance_pct=strategy.min_stop_distance_pct,
