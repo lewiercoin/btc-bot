@@ -43,7 +43,7 @@ def test_config_hash_is_stable_for_same_configuration(monkeypatch: pytest.Monkey
 
 
 def test_build_signal_regime_direction_whitelist_preserves_defaults_when_flag_disabled() -> None:
-    strategy = StrategyConfig()
+    strategy = StrategyConfig(allow_long_in_uptrend=False)
 
     assert build_signal_regime_direction_whitelist(strategy) == strategy.regime_direction_whitelist
 

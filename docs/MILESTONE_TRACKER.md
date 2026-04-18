@@ -6,13 +6,16 @@ Last updated: 2026-04-18
 
 ## Current Active Milestone
 
-**Milestone:** None (awaiting user decision)
-**Status:** IDLE
-**Active builder:** N/A
+**Milestone:** UPTREND-UNLOCK
+**Status:** ACTIVE
+**Active builder:** Codex
+**Started:** 2026-04-18
+
+**Scope:** Enable LONG signals in UPTREND regime with conservative gating (confluence_min increase)
 
 **Recent milestone:** RUN14-OVERLAY-FIX (DONE, 2026-04-18)
 
-**Next action:** User to choose next focus after RUN14 overlay fix deployment.
+**Next action:** Codex implements config changes → push → Claude Code audit.
 
 ---
 
