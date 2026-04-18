@@ -61,7 +61,7 @@ class StrategyConfig:
 
     funding_window_days: int = 82
     oi_z_window_days: int = 62
-    confluence_min: float = 3.6
+    confluence_min: float = 4.5
     ema_trend_gap_pct: float = 0.0063
     compression_atr_norm_max: float = 0.0023
     crowded_funding_extreme_pct: float = 85.0
@@ -85,7 +85,7 @@ class StrategyConfig:
     direction_tfi_threshold: float = 0.08
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.13
-    allow_long_in_uptrend: bool = False
+    allow_long_in_uptrend: bool = True
     regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
@@ -276,7 +276,7 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
     live_strategy = dataclasses.replace(
         settings.strategy,
         min_sweep_depth_pct=0.0001,
-        confluence_min=3.0,
+        confluence_min=4.5,
     )
     return dataclasses.replace(settings, strategy=live_strategy)
 

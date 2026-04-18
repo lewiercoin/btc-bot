@@ -429,7 +429,7 @@ def test_enqueue_warm_start_trials_falls_back_to_history_when_protocol_hash_chan
     )
 
     assert study.enqueued_params[0] == historical_trial.params
-    assert study.enqueued_params[1]["allow_long_in_uptrend"] is False
+    assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
 
 
 def test_enqueue_warm_start_fallback_skips_incompatible_and_overfit_history(
@@ -537,7 +537,7 @@ def test_enqueue_warm_start_fallback_skips_incompatible_and_overfit_history(
     )
 
     assert study.enqueued_params[0] == compatible_trial.params
-    assert study.enqueued_params[1]["allow_long_in_uptrend"] is False
+    assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
 
 
 def test_constraints_rejects_invalid_vectors() -> None:

@@ -15,7 +15,8 @@ def test_load_settings_research_profile_uses_dataclass_defaults(
     settings = load_settings(project_root=tmp_path, profile="research")
 
     assert settings.strategy.min_sweep_depth_pct == 0.00286
-    assert settings.strategy.confluence_min == 3.6
+    assert settings.strategy.confluence_min == 4.5
+    assert settings.strategy.allow_long_in_uptrend is True
 
 
 def test_load_settings_live_profile_applies_overrides(
@@ -26,7 +27,8 @@ def test_load_settings_live_profile_applies_overrides(
     settings = load_settings(project_root=tmp_path, profile="live")
 
     assert settings.strategy.min_sweep_depth_pct == 0.0001
-    assert settings.strategy.confluence_min == 3.0
+    assert settings.strategy.confluence_min == 4.5
+    assert settings.strategy.allow_long_in_uptrend is True
 
 
 def test_load_settings_default_profile_is_research(
@@ -37,7 +39,8 @@ def test_load_settings_default_profile_is_research(
     settings = load_settings(project_root=tmp_path)
 
     assert settings.strategy.min_sweep_depth_pct == 0.00286
-    assert settings.strategy.confluence_min == 3.6
+    assert settings.strategy.confluence_min == 4.5
+    assert settings.strategy.allow_long_in_uptrend is True
 
 
 def test_load_settings_invalid_profile_raises(
