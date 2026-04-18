@@ -7,15 +7,24 @@ Last updated: 2026-04-18
 ## Current Active Milestone
 
 **Milestone:** RECLAIM-DIAGNOSTICS
-**Status:** ACTIVE
+**Status:** READY_FOR_DATA_COLLECTION
 **Active builder:** Codex
+**Deployed:** 2026-04-18 22:41:26 UTC (commit 16fa1cb)
 **Started:** 2026-04-19
+**Data collection period:** 24-48 hours (until 2026-04-19/20 ~22:45 UTC)
 
 **Scope:** Add observability for reclaim detection bottlenecks (close vs buffer, wick vs min, sweep depth)
 
-**Recent milestone:** UPTREND-CONTINUATION (DONE, 2026-04-18/19, commit 224a769) - deployed, working, awaiting HIGH sweep
+**Implementation:** 3 signed ATR-margin diagnostics added to Features → SignalDiagnostics → runtime logs
+- `close_vs_reclaim_buffer_atr` - Close distance from reclaim threshold
+- `wick_vs_min_atr` - Wick size margin over minimum
+- `sweep_vs_buffer_atr` - Sweep penetration depth beyond buffer
 
-**Next action:** Codex implements diagnostic fields → deploy → 24h data collection → data-driven buffer tuning decision.
+**First diagnostic sample (22:45 UTC):** `close_vs_buf_atr=-3.019 | wick_vs_min_atr=-0.150 | sweep_vs_buf_atr=3.114`
+
+**Recent milestone:** UPTREND-CONTINUATION (DONE, 2026-04-18/19, commit 224a769) - deployed, working
+
+**Next action:** After 24-48h, run Perplexity's analysis script → decide buffer tuning strategy based on data distribution.
 
 ---
 
