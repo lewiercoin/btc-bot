@@ -1,12 +1,71 @@
 # Milestone Tracker
 
-Last updated: 2026-04-17
+Last updated: 2026-04-18
 
 ---
 
 ## Current Active Milestone
 
-**Milestone:** STRATEGY-ASSESSMENT-2026-04-17
+**Milestone:** None (awaiting user decision)
+**Status:** IDLE
+**Active builder:** N/A
+
+**Recent milestone:** RUN14-OVERLAY-FIX (DONE, 2026-04-18)
+
+**Next action:** User to choose next focus after RUN14 overlay fix deployment.
+
+---
+
+## Completed Milestone: RUN14-OVERLAY-FIX
+**Status:** DONE (commit f22c2d7, 2026-04-18)
+**Active builder:** Codex
+**Commits:** `f22c2d7` fix: make RUN14 uptrend continuation an overlay candidate
+
+**What:** Refactored ResearchBacktestRunner to always evaluate uptrend continuation alongside the base signal engine, select the stronger candidate with a deterministic base tie-break, and log overlay config values for trial validation.
+
+**Why:** RUN14 trials (25/80 completed) were all producing identical results because uptrend continuation parameters only ran as a fallback after generate() returned None, so overlay parameters could not influence bars where the base engine already produced a candidate.
+
+**Implementation:**
+- Changed from fallback pattern to overlay pattern in research_backtest_runner.py (line 120)
+- Added `_resolve_signal_candidates()` method: evaluates both base and uptrend independently
+- Added `_select_signal_candidate()` static method: prefers higher confluence, base on tie (deterministic)
+- Added `_log_uptrend_continuation_config()` helper: logs overlay parameters once per run for trial validation
+- Updated signals_generated counter to count both candidates independently
+
+**Tests:** 7 tests covering all selection paths + integration test proving overlay always runs
+- `test_select_signal_candidate_prefers_higher_confluence_overlay`
+- `test_select_signal_candidate_prefers_base_on_equal_confluence`
+- `test_select_signal_candidate_returns_overlay_when_base_missing`
+- `test_select_signal_candidate_returns_base_when_overlay_missing`
+- `test_select_signal_candidate_returns_none_when_both_candidates_missing`
+- `test_run_evaluates_overlay_even_when_base_candidate_exists` (integration test)
+- `test_run_logs_overlay_config_for_trial_validation`
+
+**Audit:** `docs/audits/AUDIT_RUN14_OVERLAY_FIX_2026-04-18.md`
+**Verdict:** DONE (all audit axes PASS)
+
+**Acceptance criteria met:**
+- ✅ Overlay pattern correctly implemented (both candidates always evaluated)
+- ✅ Selection logic deterministic (higher confluence, base on tie)
+- ✅ Config logging for trial validation (once per run)
+- ✅ Tests validate overlay behavior (7 passed)
+- ✅ Layer separation preserved (research_lab only)
+- ✅ Determinism preserved (no randomness)
+- ✅ Tech debt low (clean implementation)
+- ✅ AGENTS.md compliance (WHAT/WHY/STATUS commit message)
+
+**Next steps:**
+1. Re-run RUN14 campaign (trials 26-80) with overlay fix
+2. Verify trials produce varied results (not all identical)
+3. Compare trial outcomes to confirm overlay parameters affect confluence selection
+4. If results vary: RUN14 bug confirmed fixed
+
+**In-scope:** research_lab/research_backtest_runner.py, tests/test_research_backtest_runner.py
+**Out-of-scope:** Core pipeline, live bot, dashboard
+
+---
+
+## Recent Milestone: STRATEGY-ASSESSMENT-2026-04-17
 **Status:** READY FOR AUDIT (2026-04-17)
 **Active builder:** Codex
 
