@@ -16,6 +16,9 @@ def _features(
     funding_8h: float = 0.0,
     ema50_4h: float = 100.0,
     ema200_4h: float = 100.0,
+    close_vs_reclaim_buffer_atr: float | None = None,
+    wick_vs_min_atr: float | None = None,
+    sweep_vs_buffer_atr: float | None = None,
 ) -> Features:
     return Features(
         schema_version="v1.0",
@@ -31,6 +34,9 @@ def _features(
         sweep_level=100.0,
         sweep_depth_pct=0.001,
         sweep_side=sweep_side,
+        close_vs_reclaim_buffer_atr=close_vs_reclaim_buffer_atr,
+        wick_vs_min_atr=wick_vs_min_atr,
+        sweep_vs_buffer_atr=sweep_vs_buffer_atr,
         funding_8h=funding_8h,
         funding_sma3=0.0,
         funding_sma9=0.0,
@@ -231,6 +237,27 @@ def test_diagnose_non_uptrend_preserves_gate_order_and_stops_at_no_reclaim() -> 
     assert diagnostics.direction_inferred is None
     assert diagnostics.direction_allowed is None
     assert diagnostics.confluence_preview is None
+
+
+def test_diagnose_propagates_reclaim_diagnostic_fields() -> None:
+    engine = SignalEngine()
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.2,
+            close_vs_reclaim_buffer_atr=-0.25,
+            wick_vs_min_atr=0.5,
+            sweep_vs_buffer_atr=0.75,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.NORMAL)
+
+    assert diagnostics.close_vs_reclaim_buffer_atr == -0.25
+    assert diagnostics.wick_vs_min_atr == 0.5
+    assert diagnostics.sweep_vs_buffer_atr == 0.75
 
 
 def test_generate_accepts_precomputed_diagnostics_without_changing_candidate() -> None:

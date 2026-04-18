@@ -638,10 +638,12 @@ class BotOrchestrator:
             LOG.warning("Runtime metrics update failed: %s", exc)
 
     def _log_no_signal_diagnostics(self, timestamp: datetime, diagnostics: SignalDiagnostics) -> None:
-        LOG.info(
+        message = (
             "Decision diagnostics | timestamp=%s | outcome=no_signal | blocked_by=%s | "
             "sweep_detected=%s | reclaim_detected=%s | sweep_side=%s | sweep_depth_pct=%s | "
-            "direction_inferred=%s | regime=%s | direction_allowed=%s | confluence_preview=%s",
+            "direction_inferred=%s | regime=%s | direction_allowed=%s | confluence_preview=%s"
+        )
+        values: list[object] = [
             timestamp.isoformat(),
             self._log_optional_value(diagnostics.blocked_by),
             self._log_bool(diagnostics.sweep_detected),
@@ -652,7 +654,17 @@ class BotOrchestrator:
             diagnostics.regime.value,
             self._log_bool(diagnostics.direction_allowed),
             self._log_optional_float(diagnostics.confluence_preview),
-        )
+        ]
+        if diagnostics.blocked_by in {"no_reclaim", "uptrend_continuation_weak"}:
+            message += " | close_vs_buf_atr=%s | wick_vs_min_atr=%s | sweep_vs_buf_atr=%s"
+            values.extend(
+                [
+                    self._log_optional_float_short(diagnostics.close_vs_reclaim_buffer_atr),
+                    self._log_optional_float_short(diagnostics.wick_vs_min_atr),
+                    self._log_optional_float_short(diagnostics.sweep_vs_buffer_atr),
+                ]
+            )
+        LOG.info(message, *values)
 
     @staticmethod
     def _signal_diagnostics_payload(diagnostics: SignalDiagnostics) -> dict[str, object]:
@@ -869,6 +881,12 @@ class BotOrchestrator:
         if value is None:
             return "none"
         return f"{value:.6f}"
+
+    @staticmethod
+    def _log_optional_float_short(value: float | None) -> str:
+        if value is None:
+            return "none"
+        return f"{value:.3f}"
 
     @staticmethod
     def _log_optional_value(value: object | None) -> str:

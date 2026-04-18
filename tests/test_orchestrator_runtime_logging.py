@@ -138,6 +138,9 @@ class FakeSignalEngine:
             direction_inferred="SHORT",
             direction_allowed=True,
             confluence_preview=None,
+            close_vs_reclaim_buffer_atr=-0.25,
+            wick_vs_min_atr=0.5,
+            sweep_vs_buffer_atr=0.75,
             candidate_reasons_preview=[],
         )
 
@@ -283,6 +286,10 @@ def test_decision_cycle_logs_no_signal_outcome(caplog: pytest.LogCaptureFixture,
     assert any(
         "Decision diagnostics | timestamp=2026-04-15T12:15:00+00:00 | outcome=no_signal | blocked_by=no_reclaim"
         in message
+        for message in messages
+    )
+    assert any(
+        "close_vs_buf_atr=-0.250 | wick_vs_min_atr=0.500 | sweep_vs_buf_atr=0.750" in message
         for message in messages
     )
     assert any(

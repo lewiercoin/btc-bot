@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from core.feature_engine import FeatureEngine, FeatureEngineConfig
+import pytest
+
+from core.feature_engine import FeatureEngine, FeatureEngineConfig, detect_sweep_reclaim
 from core.models import MarketSnapshot
 
 
@@ -150,6 +152,9 @@ def test_compute_features_marks_low_sweep_side() -> None:
 
     assert features.sweep_detected is True
     assert features.sweep_side == "LOW"
+    assert features.close_vs_reclaim_buffer_atr is not None
+    assert features.wick_vs_min_atr is not None
+    assert features.sweep_vs_buffer_atr is not None
 
 
 def test_compute_features_marks_high_sweep_side() -> None:
@@ -168,6 +173,51 @@ def test_compute_features_marks_high_sweep_side() -> None:
 
     assert features.sweep_detected is True
     assert features.sweep_side == "HIGH"
+    assert features.close_vs_reclaim_buffer_atr is not None
+    assert features.wick_vs_min_atr is not None
+    assert features.sweep_vs_buffer_atr is not None
+
+
+def test_detect_sweep_reclaim_reports_low_sweep_diagnostic_margins() -> None:
+    ts = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+    candles = [
+        _candle(ts - timedelta(minutes=15), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts, 101.0, 102.0, 98.0, 101.0),
+    ]
+
+    detected = detect_sweep_reclaim(
+        candles,
+        equal_lows=[100.0],
+        equal_highs=[],
+        atr_15m=10.0,
+        config=FeatureEngineConfig(),
+    )
+
+    assert detected[0:5] == (True, False, 100.0, 0.02, "LOW")
+    assert detected[5] == pytest.approx(0.05)
+    assert detected[6] == pytest.approx(-0.1)
+    assert detected[7] == pytest.approx(0.05)
+
+
+def test_detect_sweep_reclaim_reports_high_sweep_diagnostic_margins() -> None:
+    ts = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+    candles = [
+        _candle(ts - timedelta(minutes=15), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts, 99.0, 102.0, 98.0, 99.0),
+    ]
+
+    detected = detect_sweep_reclaim(
+        candles,
+        equal_lows=[],
+        equal_highs=[100.0],
+        atr_15m=10.0,
+        config=FeatureEngineConfig(),
+    )
+
+    assert detected[0:5] == (True, False, 100.0, 0.02, "HIGH")
+    assert detected[5] == pytest.approx(0.05)
+    assert detected[6] == pytest.approx(-0.1)
+    assert detected[7] == pytest.approx(0.05)
 
 
 def test_cvd_divergence_uses_windowed_swing_reference_not_last_bar_only() -> None:

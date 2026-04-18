@@ -94,6 +94,9 @@ class SignalEngine:
             direction_inferred=direction,
             direction_allowed=direction_allowed,
             confluence_preview=confluence_preview,
+            close_vs_reclaim_buffer_atr=features.close_vs_reclaim_buffer_atr,
+            wick_vs_min_atr=features.wick_vs_min_atr,
+            sweep_vs_buffer_atr=features.sweep_vs_buffer_atr,
             candidate_reasons_preview=candidate_reasons_preview,
         )
 
