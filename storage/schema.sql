@@ -148,6 +148,24 @@ CREATE TABLE IF NOT EXISTS bot_state (
     safe_mode_entry_at TEXT
 );
 
+CREATE TABLE IF NOT EXISTS runtime_metrics (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    updated_at TEXT NOT NULL,
+    last_decision_cycle_started_at TEXT,
+    last_decision_cycle_finished_at TEXT,
+    last_decision_outcome TEXT,
+    decision_cycle_status TEXT,
+    last_snapshot_built_at TEXT,
+    last_snapshot_symbol TEXT,
+    last_15m_candle_open_at TEXT,
+    last_1h_candle_open_at TEXT,
+    last_4h_candle_open_at TEXT,
+    last_ws_message_at TEXT,
+    last_health_check_at TEXT,
+    last_runtime_warning TEXT,
+    config_hash TEXT
+);
+
 CREATE TABLE IF NOT EXISTS safe_mode_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type TEXT NOT NULL,

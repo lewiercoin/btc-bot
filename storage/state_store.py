@@ -20,11 +20,13 @@ from storage.repositories import (
     get_latest_position_for_signal,
     get_open_trade_log_for_position,
     get_open_positions_count,
+    get_runtime_metrics,
     insert_trade_log_open,
     sum_closed_pnl_abs_before,
     update_trade_log_close,
     upsert_bot_state,
     upsert_daily_metrics,
+    upsert_runtime_metrics,
 )
 
 LOG = logging.getLogger(__name__)
@@ -68,6 +70,27 @@ class StateStore:
                 probe_failures INTEGER DEFAULT 0,
                 remaining_triggers TEXT,
                 timestamp TEXT NOT NULL
+            )
+        """)
+        self.connection.commit()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS runtime_metrics (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                updated_at TEXT NOT NULL,
+                last_decision_cycle_started_at TEXT,
+                last_decision_cycle_finished_at TEXT,
+                last_decision_outcome TEXT,
+                decision_cycle_status TEXT,
+                last_snapshot_built_at TEXT,
+                last_snapshot_symbol TEXT,
+                last_15m_candle_open_at TEXT,
+                last_1h_candle_open_at TEXT,
+                last_4h_candle_open_at TEXT,
+                last_ws_message_at TEXT,
+                last_health_check_at TEXT,
+                last_runtime_warning TEXT,
+                config_hash TEXT
             )
         """)
         self.connection.commit()
@@ -339,6 +362,12 @@ class StateStore:
         state = self.refresh_runtime_state()
         assert state is not None
         self.save(replace(state, healthy=True, last_error=None, open_positions_count=self.get_open_positions()))
+
+    def update_runtime_metrics(self, **fields: object) -> dict | None:
+        self._apply_migrations()
+        upsert_runtime_metrics(self.connection, **fields)
+        self.connection.commit()
+        return get_runtime_metrics(self.connection)
 
     def refresh_runtime_state(self, now: datetime | None = None) -> BotState:
         ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
