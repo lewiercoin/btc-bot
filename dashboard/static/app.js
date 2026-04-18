@@ -150,10 +150,24 @@ function formatAgeSeconds(value) {
   return `${(seconds / 3600).toFixed(1)}h`;
 }
 
-function setControlEnabled(processRunning) {
-  startButton.disabled = controlBusy || processRunning;
-  stopButton.disabled = controlBusy || !processRunning;
-  botModeSelect.disabled = controlBusy || processRunning;
+function formatProcessLabel(process) {
+  if (!process || !process.running) {
+    return "Stopped";
+  }
+  const pid = process.pid === null || process.pid === undefined ? "-" : process.pid;
+  const mode = process.mode || "-";
+  if (process.managed === false) {
+    return `Running PID ${pid} (${mode}, external)`;
+  }
+  return `Running PID ${pid} (${mode})`;
+}
+
+function setControlEnabled(process) {
+  const running = Boolean(process && process.running);
+  const managed = Boolean(process && process.managed);
+  startButton.disabled = controlBusy || running;
+  stopButton.disabled = controlBusy || !running || !managed;
+  botModeSelect.disabled = controlBusy || running;
 }
 
 function setControlBusy(action) {
@@ -348,13 +362,11 @@ function renderEgress(payload) {
 function renderStatus(payload) {
   dashboardVersion.textContent = payload.dashboard_version || "m4";
   const state = payload.bot_state;
-  const process = payload.process || { running: false, pid: null, mode: null, exit_code: null };
+  const process = payload.process || { running: false, pid: null, mode: null, exit_code: null, managed: false };
   setBadge(state);
   updateSafeModeAlert(state);
-  processStatus.textContent = process.running
-    ? `Running PID ${process.pid} (${process.mode})`
-    : "Stopped";
-  setControlEnabled(process.running);
+  processStatus.textContent = formatProcessLabel(process);
+  setControlEnabled(process);
 
   if (!state) {
     statusFields.mode.textContent = "-";
@@ -389,7 +401,13 @@ function renderStatus(payload) {
 }
 
 function renderRuntimeFreshness(payload) {
-  const process = payload.process || { running: false, pid: null, mode: null, uptime_seconds: null };
+  const process = payload.process || {
+    running: false,
+    pid: null,
+    mode: null,
+    uptime_seconds: null,
+    managed: false,
+  };
   const decision = payload.decision_cycle || {};
   const snapshot = payload.rest_snapshot || {};
   const timeframes = snapshot.timeframes || {};
@@ -399,9 +417,7 @@ function renderRuntimeFreshness(payload) {
     ? `Updated ${formatDate(payload.updated_at)}`
     : "Runtime metrics unavailable";
 
-  runtimeFields.process.textContent = process.running
-    ? `Running PID ${process.pid} (${process.mode || "-"})`
-    : "Stopped";
+  runtimeFields.process.textContent = formatProcessLabel(process);
   runtimeFields.cycleStatus.textContent = decision.status || "-";
   runtimeFields.lastOutcome.textContent = decision.last_outcome || "-";
   runtimeFields.cycleStarted.textContent = formatDate(decision.last_started_at);
@@ -762,7 +778,7 @@ async function handleStart() {
   }
 
   setControlBusy("start");
-  setControlEnabled(false);
+  setControlEnabled({ running: false, managed: false });
   try {
     const result = await postJson("/api/bot/start", { mode });
     if (result.started) {

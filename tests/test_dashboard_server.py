@@ -48,6 +48,7 @@ class DummyProcessManager:
             "pid": 4321,
             "mode": "PAPER",
             "exit_code": None,
+            "managed": True,
         }
 
     def start(self, *, mode: str) -> dict[str, object]:
@@ -194,3 +195,4 @@ def test_runtime_freshness_endpoint_returns_expected_schema(
     assert payload["websocket"]["healthy"] is True
     assert payload["process"]["running"] is True
     assert payload["process"]["pid"] == 4321
+    assert payload["process"]["managed"] is True
