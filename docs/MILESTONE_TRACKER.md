@@ -6,16 +6,13 @@ Last updated: 2026-04-18
 
 ## Current Active Milestone
 
-**Milestone:** UPTREND-CONTINUATION
-**Status:** ACTIVE
-**Active builder:** Codex (default, user may redirect to Cascade)
-**Started:** 2026-04-18
+**Milestone:** None (runtime verification in progress)
+**Status:** IDLE
+**Active builder:** N/A
 
-**Scope:** Enable direction inference for UPTREND continuation without reclaim requirement
+**Recent milestone:** UPTREND-CONTINUATION (DEPLOYED, 2026-04-18/19, commit 224a769) - awaiting first UPTREND + HIGH sweep cycle for confirmation
 
-**Recent milestone:** UPTREND-UNLOCK (PARTIAL, 2026-04-18, commit 980034d) - unlocked whitelist but direction inference still blocked
-
-**Next action:** Builder implements continuation logic → push → Claude Code audit.
+**Next action:** Monitor runtime for direction_inferred=long in UPTREND continuation scenario → finalize audit.
 
 ---
 
