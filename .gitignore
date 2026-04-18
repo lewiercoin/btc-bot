@@ -166,6 +166,8 @@ _tmp_*
 # Deploy artifacts (SSH keys + git bundle)
 btc-bot-deploy
 btc-bot-deploy.pub
+btc-bot-deploy-v2
+btc-bot-deploy-v2.pub
 *.bundle
 
 # Spyder project settings
