@@ -6,13 +6,16 @@ Last updated: 2026-04-18
 
 ## Current Active Milestone
 
-**Milestone:** None (awaiting user decision - paper test validation)
-**Status:** IDLE
-**Active builder:** N/A
+**Milestone:** UPTREND-CONTINUATION
+**Status:** ACTIVE
+**Active builder:** Codex (default, user may redirect to Cascade)
+**Started:** 2026-04-18
 
-**Recent milestone:** UPTREND-UNLOCK (DONE, 2026-04-18, commit 980034d)
+**Scope:** Enable direction inference for UPTREND continuation without reclaim requirement
 
-**Next action:** User runs 7-day paper test, monitors signal quality → decision: promote to live OR tune confluence_min.
+**Recent milestone:** UPTREND-UNLOCK (PARTIAL, 2026-04-18, commit 980034d) - unlocked whitelist but direction inference still blocked
+
+**Next action:** Builder implements continuation logic → push → Claude Code audit.
 
 ---
 
