@@ -93,6 +93,7 @@ def _assert_live_bundle_config_injection() -> None:
         assert regime_cfg.post_liq_tfi_abs_min == settings.strategy.post_liq_tfi_abs_min
 
         assert signal_cfg.min_sweep_depth_pct == settings.strategy.min_sweep_depth_pct
+        assert signal_cfg.ema_trend_gap_pct == settings.strategy.ema_trend_gap_pct
         assert signal_cfg.entry_offset_atr == settings.strategy.entry_offset_atr
         assert signal_cfg.invalidation_offset_atr == settings.strategy.invalidation_offset_atr
         assert signal_cfg.min_stop_distance_pct == settings.strategy.min_stop_distance_pct
@@ -140,6 +141,7 @@ def _assert_backtest_config_injection() -> None:
         assert regime_engine.config.crowded_oi_zscore_min == settings.strategy.crowded_oi_zscore_min
         assert regime_engine.config.post_liq_tfi_abs_min == settings.strategy.post_liq_tfi_abs_min
 
+        assert signal_engine.config.ema_trend_gap_pct == settings.strategy.ema_trend_gap_pct
         assert signal_engine.config.entry_offset_atr == settings.strategy.entry_offset_atr
         assert signal_engine.config.weight_cvd_divergence == settings.strategy.weight_cvd_divergence
         assert signal_engine.config.direction_tfi_threshold == settings.strategy.direction_tfi_threshold

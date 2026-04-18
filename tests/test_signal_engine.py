@@ -134,14 +134,98 @@ def test_diagnose_reports_regime_whitelist_block_for_long_uptrend() -> None:
     assert diagnostics.reclaim_detected is True
 
 
-def test_diagnose_preserves_gate_order_and_stops_at_no_reclaim() -> None:
+def test_uptrend_continuation_infers_long_without_reclaim() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            confluence_min=0.0,
+            ema_trend_gap_pct=0.02,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(sweep_side="HIGH", bullish_divergence=True, tfi_60s=0.2, ema50_4h=105.0, ema200_4h=100.0),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by is None
+    assert diagnostics.direction_inferred == "LONG"
+    assert diagnostics.direction_allowed is True
+    assert diagnostics.reclaim_detected is False
+
+
+def test_uptrend_continuation_blocked_on_low_sweep() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            ema_trend_gap_pct=0.02,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2, ema50_4h=105.0, ema200_4h=100.0),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_continuation_weak"
+    assert diagnostics.direction_inferred is None
+    assert diagnostics.direction_allowed is None
+
+
+def test_uptrend_continuation_blocked_weak_trend() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            ema_trend_gap_pct=0.01,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(sweep_side="HIGH", bullish_divergence=True, tfi_60s=0.2, ema50_4h=100.4, ema200_4h=100.0),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_continuation_weak"
+    assert diagnostics.direction_inferred is None
+    assert diagnostics.direction_allowed is None
+
+
+def test_uptrend_continuation_fallback_to_reclaim() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            confluence_min=0.0,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("SHORT",),
+            },
+        )
+    )
+    features = _features(sweep_side="HIGH", bearish_divergence=True, tfi_60s=-0.2, ema50_4h=105.0, ema200_4h=100.0)
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by is None
+    assert diagnostics.direction_inferred == "SHORT"
+    assert diagnostics.direction_allowed is True
+    assert diagnostics.reclaim_detected is True
+
+
+def test_diagnose_non_uptrend_preserves_gate_order_and_stops_at_no_reclaim() -> None:
     engine = SignalEngine()
     features = replace(
         _features(sweep_side="LOW", bullish_divergence=True, tfi_60s=0.2),
         reclaim_detected=False,
     )
 
-    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+    diagnostics = engine.diagnose(features, RegimeState.NORMAL)
 
     assert diagnostics.blocked_by == "no_reclaim"
     assert diagnostics.direction_inferred is None
