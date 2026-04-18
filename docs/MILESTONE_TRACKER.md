@@ -6,13 +6,16 @@ Last updated: 2026-04-18
 
 ## Current Active Milestone
 
-**Milestone:** None (runtime verification in progress)
-**Status:** IDLE
-**Active builder:** N/A
+**Milestone:** RECLAIM-DIAGNOSTICS
+**Status:** ACTIVE
+**Active builder:** Codex
+**Started:** 2026-04-19
 
-**Recent milestone:** UPTREND-CONTINUATION (DEPLOYED, 2026-04-18/19, commit 224a769) - awaiting first UPTREND + HIGH sweep cycle for confirmation
+**Scope:** Add observability for reclaim detection bottlenecks (close vs buffer, wick vs min, sweep depth)
 
-**Next action:** Monitor runtime for direction_inferred=long in UPTREND continuation scenario → finalize audit.
+**Recent milestone:** UPTREND-CONTINUATION (DONE, 2026-04-18/19, commit 224a769) - deployed, working, awaiting HIGH sweep
+
+**Next action:** Codex implements diagnostic fields → deploy → 24h data collection → data-driven buffer tuning decision.
 
 ---
 

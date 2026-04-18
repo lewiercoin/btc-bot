@@ -111,9 +111,9 @@ def detect_sweep_reclaim(
     equal_highs: list[float],
     atr_15m: float,
     config: FeatureEngineConfig,
-) -> tuple[bool, bool, float | None, float | None, str | None]:
+) -> tuple[bool, bool, float | None, float | None, str | None, float | None, float | None, float | None]:
     if len(candles_15m) < 2 or atr_15m <= 0:
-        return False, False, None, None, None
+        return False, False, None, None, None, None, None, None
 
     latest = candles_15m[-1]
     open_price = float(latest["open"])
@@ -131,19 +131,43 @@ def detect_sweep_reclaim(
         swept = low_price < (level - sweep_buffer)
         reclaimed = close_price > (level + reclaim_buffer)
         wick_ok = (body_low - low_price) >= wick_min
+        close_vs_reclaim_buffer_atr = (close_price - (level + reclaim_buffer)) / atr_15m
+        wick_vs_min_atr = ((body_low - low_price) - wick_min) / atr_15m
+        sweep_vs_buffer_atr = ((level - sweep_buffer) - low_price) / atr_15m
         if swept:
             depth_pct = abs(level - low_price) / level if level else 0.0
-            return True, bool(reclaimed and wick_ok), float(level), depth_pct, "LOW"
+            return (
+                True,
+                bool(reclaimed and wick_ok),
+                float(level),
+                depth_pct,
+                "LOW",
+                close_vs_reclaim_buffer_atr,
+                wick_vs_min_atr,
+                sweep_vs_buffer_atr,
+            )
 
     for level in equal_highs:
         swept = high_price > (level + sweep_buffer)
         reclaimed = close_price < (level - reclaim_buffer)
         wick_ok = (high_price - body_high) >= wick_min
+        close_vs_reclaim_buffer_atr = ((level - reclaim_buffer) - close_price) / atr_15m
+        wick_vs_min_atr = ((high_price - body_high) - wick_min) / atr_15m
+        sweep_vs_buffer_atr = (high_price - (level + sweep_buffer)) / atr_15m
         if swept:
             depth_pct = abs(high_price - level) / level if level else 0.0
-            return True, bool(reclaimed and wick_ok), float(level), depth_pct, "HIGH"
+            return (
+                True,
+                bool(reclaimed and wick_ok),
+                float(level),
+                depth_pct,
+                "HIGH",
+                close_vs_reclaim_buffer_atr,
+                wick_vs_min_atr,
+                sweep_vs_buffer_atr,
+            )
 
-    return False, False, None, None, None
+    return False, False, None, None, None, None, None, None
 
 
 class FeatureEngine:
@@ -181,9 +205,16 @@ class FeatureEngine:
         equal_lows = detect_equal_levels(lows, tolerance=level_tolerance, min_hits=3)
         equal_highs = detect_equal_levels(highs, tolerance=level_tolerance, min_hits=3)
 
-        sweep_detected, reclaim_detected, sweep_level, sweep_depth_pct, sweep_side = detect_sweep_reclaim(
-            snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config
-        )
+        (
+            sweep_detected,
+            reclaim_detected,
+            sweep_level,
+            sweep_depth_pct,
+            sweep_side,
+            close_vs_reclaim_buffer_atr,
+            wick_vs_min_atr,
+            sweep_vs_buffer_atr,
+        ) = detect_sweep_reclaim(snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config)
 
         funding_rates = self._funding_window_rates(snapshot.funding_history, timestamp)
         funding_8h = funding_rates[-1] if funding_rates else 0.0
@@ -219,6 +250,9 @@ class FeatureEngine:
             sweep_level=sweep_level,
             sweep_depth_pct=sweep_depth_pct,
             sweep_side=sweep_side,
+            close_vs_reclaim_buffer_atr=close_vs_reclaim_buffer_atr,
+            wick_vs_min_atr=wick_vs_min_atr,
+            sweep_vs_buffer_atr=sweep_vs_buffer_atr,
             funding_8h=funding_8h,
             funding_sma3=funding_sma3,
             funding_sma9=funding_sma9,

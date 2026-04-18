@@ -55,6 +55,9 @@ class Features:
     sweep_level: float | None = None
     sweep_depth_pct: float | None = None
     sweep_side: str | None = None
+    close_vs_reclaim_buffer_atr: float | None = None
+    wick_vs_min_atr: float | None = None
+    sweep_vs_buffer_atr: float | None = None
     funding_8h: float = 0.0
     funding_sma3: float = 0.0
     funding_sma9: float = 0.0
@@ -102,6 +105,9 @@ class SignalDiagnostics:
     direction_inferred: Direction | None
     direction_allowed: bool | None
     confluence_preview: float | None
+    close_vs_reclaim_buffer_atr: float | None = None
+    wick_vs_min_atr: float | None = None
+    sweep_vs_buffer_atr: float | None = None
     candidate_reasons_preview: list[str] = field(default_factory=list)
 
 
