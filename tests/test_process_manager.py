@@ -4,6 +4,7 @@ import json
 import signal
 import subprocess
 from pathlib import Path
+from types import SimpleNamespace
 
 import pytest
 
@@ -44,6 +45,8 @@ def test_start_launches_process_and_logs_event(monkeypatch: pytest.MonkeyPatch, 
     process = FakeProcess(pid=2222)
     popen_calls: list[tuple] = []
 
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
+
     def fake_popen(args, cwd, creationflags):
         popen_calls.append((args, cwd, creationflags))
         return process
@@ -72,6 +75,7 @@ def test_start_launches_process_and_logs_event(monkeypatch: pytest.MonkeyPatch, 
 
 def test_start_returns_already_running_when_process_alive(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     process = FakeProcess(pid=3333, poll_values=[None, None])
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
     monkeypatch.setattr("dashboard.process_manager.subprocess.Popen", lambda *args, **kwargs: process)
 
     manager = ProcessManager(
@@ -89,6 +93,7 @@ def test_stop_graceful_path_signals_process_and_logs(monkeypatch: pytest.MonkeyP
     process = FakeProcess(pid=4444)
     signals: list[tuple[int, int]] = []
 
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
     monkeypatch.setattr("dashboard.process_manager.subprocess.Popen", lambda *args, **kwargs: process)
     monkeypatch.setattr("dashboard.process_manager.os.kill", lambda pid, sig: signals.append((pid, sig)))
 
@@ -112,6 +117,7 @@ def test_stop_hard_fallback_terminates_process_and_logs(monkeypatch: pytest.Monk
     process = FakeProcess(pid=5555, wait_side_effect=subprocess.TimeoutExpired(cmd="main.py", timeout=10))
     signals: list[tuple[int, int]] = []
 
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
     monkeypatch.setattr("dashboard.process_manager.subprocess.Popen", lambda *args, **kwargs: process)
     monkeypatch.setattr("dashboard.process_manager.os.kill", lambda pid, sig: signals.append((pid, sig)))
 
@@ -132,7 +138,8 @@ def test_stop_hard_fallback_terminates_process_and_logs(monkeypatch: pytest.Monk
     assert events[-1]["graceful"] is False
 
 
-def test_stop_returns_not_running_when_idle(tmp_path: Path) -> None:
+def test_stop_returns_not_running_when_idle(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
     manager = ProcessManager(
         project_root=tmp_path,
         operator_log_path=tmp_path / "operator.jsonl",
@@ -146,6 +153,7 @@ def test_status_reports_uptime_and_clears_exited_process(monkeypatch: pytest.Mon
     exited_process = FakeProcess(pid=7777, poll_values=[0])
     popen_results = [live_process, exited_process]
 
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [])
     monkeypatch.setattr("dashboard.process_manager.subprocess.Popen", lambda *args, **kwargs: popen_results.pop(0))
     monkeypatch.setattr("dashboard.process_manager.os.kill", lambda pid, sig: None)
 
@@ -161,6 +169,7 @@ def test_status_reports_uptime_and_clears_exited_process(monkeypatch: pytest.Mon
     assert running_status["mode"] == "PAPER"
     assert running_status["uptime_seconds"] is not None
     assert running_status["uptime_seconds"] >= 0.0
+    assert running_status["managed"] is True
 
     manager.stop()
     manager.start(mode="LIVE")
@@ -173,6 +182,7 @@ def test_status_reports_uptime_and_clears_exited_process(monkeypatch: pytest.Mon
         "pid": None,
         "mode": None,
         "exit_code": 0,
+        "managed": False,
     }
     assert idle_status == {
         "running": False,
@@ -180,6 +190,7 @@ def test_status_reports_uptime_and_clears_exited_process(monkeypatch: pytest.Mon
         "pid": None,
         "mode": None,
         "exit_code": None,
+        "managed": False,
     }
 
 
@@ -191,3 +202,71 @@ def test_start_rejects_invalid_mode(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError):
         manager.start(mode="SANDBOX")
+
+
+def test_status_detects_external_bot_process(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    external = SimpleNamespace(
+        info={
+            "pid": 8888,
+            "cmdline": ["python", "main.py", "--mode", "PAPER"],
+            "create_time": 1_712_000_000.0,
+            "cwd": str(tmp_path),
+        }
+    )
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [external])
+
+    manager = ProcessManager(
+        project_root=tmp_path,
+        operator_log_path=tmp_path / "operator.jsonl",
+    )
+    status = manager.status()
+
+    assert status["running"] is True
+    assert status["pid"] == 8888
+    assert status["mode"] == "PAPER"
+    assert status["managed"] is False
+    assert status["uptime_seconds"] is not None
+
+
+def test_start_refuses_duplicate_when_external_process_is_running(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = SimpleNamespace(
+        info={
+            "pid": 9999,
+            "cmdline": ["python", "main.py", "--mode", "LIVE"],
+            "create_time": 1_712_000_000.0,
+            "cwd": str(tmp_path),
+        }
+    )
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [external])
+
+    manager = ProcessManager(
+        project_root=tmp_path,
+        operator_log_path=tmp_path / "operator.jsonl",
+    )
+
+    assert manager.start(mode="PAPER") == {"started": False, "reason": "already_running", "pid": 9999}
+
+
+def test_stop_rejects_external_process_that_is_not_dashboard_managed(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    external = SimpleNamespace(
+        info={
+            "pid": 10001,
+            "cmdline": ["python", "main.py", "--mode", "PAPER"],
+            "create_time": 1_712_000_000.0,
+            "cwd": str(tmp_path),
+        }
+    )
+    monkeypatch.setattr("dashboard.process_manager.psutil.process_iter", lambda attrs=None: [external])
+
+    manager = ProcessManager(
+        project_root=tmp_path,
+        operator_log_path=tmp_path / "operator.jsonl",
+    )
+
+    assert manager.stop() == {"stopped": False, "reason": "not_managed", "pid": 10001}

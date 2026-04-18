@@ -136,6 +136,7 @@ async def get_status(request: Request) -> dict:
         "pid": process_status["pid"],
         "mode": process_status["mode"],
         "exit_code": process_status["exit_code"],
+        "managed": process_status["managed"],
     }
     payload["dashboard_version"] = "m3"
     return payload
@@ -158,6 +159,7 @@ async def get_runtime_freshness(request: Request) -> dict:
         "mode": process_status["mode"],
         "exit_code": process_status["exit_code"],
         "uptime_seconds": process_status["uptime_seconds"],
+        "managed": process_status["managed"],
     }
     return payload
 
