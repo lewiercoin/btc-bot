@@ -1,30 +1,57 @@
 # Milestone Tracker
 
-Last updated: 2026-04-18
+Last updated: 2026-04-19
 
 ---
 
 ## Current Active Milestone
 
-**Milestone:** RECLAIM-DIAGNOSTICS
-**Status:** READY_FOR_DATA_COLLECTION
+**None** — awaiting user decision on next milestone
+
+**Proposed next:** UPTREND-PULLBACK-EVAL-V1 (evaluation harness for pullback candidates)
+
+**Previous milestone:** UPTREND-PULLBACK-RESEARCH-V1 (DONE, 2026-04-19, commit c240f1d)
+
+---
+
+## Completed Milestone: UPTREND-PULLBACK-RESEARCH-V1
+**Status:** DONE (commit c240f1d, 2026-04-19)
 **Active builder:** Codex
-**Deployed:** 2026-04-18 22:41:26 UTC (commit 16fa1cb)
-**Started:** 2026-04-19
-**Data collection period:** 24-48 hours (until 2026-04-19/20 ~22:45 UTC)
+**Audit verdict:** DONE (implementation complete, research-only, NOT approved for live)
 
-**Scope:** Add observability for reclaim detection bottlenecks (close vs buffer, wick vs min, sweep depth)
+**Context:** Post-incident analysis of 21-day trading halt (Mar 29 - Apr 19). Root cause: bot has 0% historical uptrend signal coverage, strategy structurally incomplete.
 
-**Implementation:** 3 signed ATR-margin diagnostics added to Features → SignalDiagnostics → runtime logs
-- `close_vs_reclaim_buffer_atr` - Close distance from reclaim threshold
-- `wick_vs_min_atr` - Wick size margin over minimum
-- `sweep_vs_buffer_atr` - Sweep penetration depth beyond buffer
+**What:** Add feature-flagged uptrend pullback continuation logic + observability infrastructure
 
-**First diagnostic sample (22:45 UTC):** `close_vs_buf_atr=-3.019 | wick_vs_min_atr=-0.150 | sweep_vs_buf_atr=3.114`
+**Deliverables completed:**
+- ✅ D1: Uptrend pullback signal path (regime=UPTREND + sweep_side=LOW → LONG)
+- ✅ D2: Decision outcome histogram (`decision_outcomes` table + `/api/decision-funnel` endpoint)
+- ✅ D3: Config snapshot persistence (`config_snapshots` table + `/api/config/{hash}` endpoint)
+- ✅ D4: Feature flag `allow_uptrend_pullback=False` (default OFF, research ENV override, live hard-locked)
+- ✅ D5: Tests (92 passed, 2 skipped, all milestone tests pass)
+- ✅ D6: Backtest comparison March 2026 (OFF vs ON, info only)
 
-**Recent milestone:** RESEARCH-LAB-HARDENING-2PHASE (DONE, 2026-04-19, commit 1da4664) - 2-phase workflow formalized
+**Files changed (18):**
+- `settings.py`, `core/signal_engine.py`, `orchestrator.py`, `backtest/backtest_runner.py`
+- `storage/schema.sql`, `storage/repositories.py`, `storage/state_store.py`
+- `dashboard/db_reader.py`, `dashboard/server.py`
+- `research_lab/param_registry.py`, `scripts/run_backtest.py`
+- 7 test files
 
-**Next action:** After 24-48h, run Perplexity's analysis script → decide buffer tuning strategy based on data distribution.
+**Comparison results (March 2026):**
+- OFF: 44 signals, 7 trades, PnL $1,394, expectancy 2.66R
+- ON: 102 signals (+58 uptrend), 9 trades, PnL $859 (-$535), expectancy 1.33R (-1.33R)
+- 86 governance vetoes, 7 risk blocks in ON run
+- **Verdict:** Coverage ↑, quality ↓ — hypothesis does NOT demonstrate edge yet
+
+**Audit notes:**
+- Architecture discipline excellent (isolated path, feature flag safety, frozen params)
+- Config snapshots + decision funnel are valuable observability investments
+- Governance/risk correctly filtering low-quality candidates
+- **DO NOT enable in live** — research hypothesis only
+
+**Next recommended milestone:** UPTREND-PULLBACK-EVAL-V1  
+**Scope:** Breakdown rejection reasons, candidate quality segmentation, identify viable vs junk subgroups
 
 ---
 
