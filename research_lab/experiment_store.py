@@ -32,6 +32,29 @@ def _ensure_protocol_hash_columns(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE {table_name} ADD COLUMN protocol_hash TEXT NULL")
 
 
+def _ensure_trial_lineage_columns(conn: sqlite3.Connection) -> None:
+    trial_columns = _table_columns(conn, "trials")
+    if "search_space_signature" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN search_space_signature TEXT NOT NULL DEFAULT ''")
+    if "regime_signature" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN regime_signature TEXT NULL")
+    if "trial_context_signature" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN trial_context_signature TEXT NOT NULL DEFAULT ''")
+    if "baseline_version" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN baseline_version TEXT NOT NULL DEFAULT ''")
+
+
+def _ensure_indexes(conn: sqlite3.Connection) -> None:
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_trials_warm_start_context "
+        "ON trials(protocol_hash, search_space_signature, regime_signature)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_trials_context_signature "
+        "ON trials(trial_context_signature)"
+    )
+
+
 def init_store(store_path: Path) -> None:
     with _connect(store_path) as conn:
         conn.execute(
@@ -43,7 +66,11 @@ def init_store(store_path: Path) -> None:
                 funnel_json TEXT NOT NULL,
                 rejected_reason TEXT NULL,
                 created_at_utc TEXT NOT NULL,
-                protocol_hash TEXT NULL
+                protocol_hash TEXT NULL,
+                search_space_signature TEXT NOT NULL DEFAULT '',
+                regime_signature TEXT NULL,
+                trial_context_signature TEXT NOT NULL DEFAULT '',
+                baseline_version TEXT NOT NULL DEFAULT ''
             )
             """
         )
@@ -68,6 +95,8 @@ def init_store(store_path: Path) -> None:
             """
         )
         _ensure_protocol_hash_columns(conn)
+        _ensure_trial_lineage_columns(conn)
+        _ensure_indexes(conn)
         conn.commit()
 
 
@@ -77,8 +106,9 @@ def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
         conn.execute(
             """
             INSERT OR REPLACE INTO trials (
-                trial_id, params_json, metrics_json, funnel_json, rejected_reason, created_at_utc, protocol_hash
-            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+                trial_id, params_json, metrics_json, funnel_json, rejected_reason, created_at_utc, protocol_hash,
+                search_space_signature, regime_signature, trial_context_signature, baseline_version
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evaluation.trial_id,
@@ -108,6 +138,10 @@ def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
                 evaluation.rejected_reason,
                 _utc_now_iso(),
                 evaluation.protocol_hash,
+                evaluation.search_space_signature,
+                evaluation.regime_signature,
+                evaluation.trial_context_signature,
+                evaluation.baseline_version,
             ),
         )
         conn.commit()
@@ -185,6 +219,10 @@ def _parse_trial_row(row: sqlite3.Row) -> TrialEvaluation:
         ),
         rejected_reason=str(row["rejected_reason"]) if row["rejected_reason"] is not None else None,
         protocol_hash=str(row["protocol_hash"]) if row["protocol_hash"] is not None else None,
+        search_space_signature=str(row["search_space_signature"]),
+        regime_signature=str(row["regime_signature"]) if row["regime_signature"] is not None else None,
+        trial_context_signature=str(row["trial_context_signature"]),
+        baseline_version=str(row["baseline_version"]),
     )
 
 
@@ -208,11 +246,37 @@ def load_trials(store_path: Path) -> list[TrialEvaluation]:
     with _connect(store_path) as conn:
         rows = conn.execute(
             """
-            SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash
+            SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash,
+                   search_space_signature, regime_signature, trial_context_signature, baseline_version
             FROM trials
             ORDER BY created_at_utc ASC, trial_id ASC
             """
         ).fetchall()
+    return [_parse_trial_row(row) for row in rows]
+
+
+def load_trials_filtered(
+    store_path: Path,
+    protocol_hash: str,
+    search_space_signature: str,
+    regime_signature: str | None = None,
+) -> list[TrialEvaluation]:
+    if not store_path.exists():
+        return []
+    init_store(store_path)
+    query = (
+        "SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash, "
+        "search_space_signature, regime_signature, trial_context_signature, baseline_version "
+        "FROM trials "
+        "WHERE protocol_hash = ? AND search_space_signature = ?"
+    )
+    params: list[Any] = [protocol_hash, search_space_signature]
+    if regime_signature is not None:
+        query += " AND COALESCE(regime_signature, '') = ?"
+        params.append(regime_signature)
+    query += " ORDER BY created_at_utc ASC, trial_id ASC"
+    with _connect(store_path) as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
     return [_parse_trial_row(row) for row in rows]
 
 

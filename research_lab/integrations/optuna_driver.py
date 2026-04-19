@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import logging
 import time
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
@@ -11,8 +12,12 @@ from settings import AppSettings
 from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.constraints import validate_param_vector
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
-from research_lab.experiment_store import init_store, load_trials, save_trial
-from research_lab.objective import evaluate_candidate
+from research_lab.experiment_store import init_store, load_trials, load_trials_filtered, save_trial
+from research_lab.objective import (
+    build_search_space_signature,
+    build_trial_context_signature,
+    evaluate_candidate,
+)
 from research_lab.param_registry import get_active_params
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 from research_lab.settings_adapter import build_candidate_settings
@@ -23,6 +28,7 @@ if TYPE_CHECKING:
 
 
 _HARD_MIN_TRADES_FLOOR = 80
+logger = logging.getLogger(__name__)
 
 
 def _require_optuna():
@@ -191,49 +197,57 @@ def _enqueue_warm_start_trials(
     protocol_hash: str | None,
     warm_start_top_n: int,
     active_param_names: tuple[str, ...] | None = None,
+    warm_start_ignore_protocol: bool = False,
+    regime_signature: str | None = None,
 ) -> None:
     """Enqueue baseline config + top-N Pareto winners from store as warm-start trials."""
-    active_names = set(_filter_active_specs(active_param_names).keys())
+    active_names = tuple(_filter_active_specs(active_param_names).keys())
+    active_name_set = set(active_names)
+    search_space_signature = build_search_space_signature(active_names)
     if store_path.exists():
         existing = load_trials(store_path)
-        if protocol_hash is not None:
-            candidates = [
-                t
-                for t in existing
-                if t.protocol_hash == protocol_hash
-                and t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(
-                    t.params,
-                    credible_history=False,
-                    active_param_names=active_param_names,
-                )
-            ]
+        if warm_start_ignore_protocol:
+            logger.warning(
+                "Unsafe warm-start enabled: ignoring protocol/search-space filters for historical trials."
+            )
+            context_trials = existing
         else:
-            candidates = [
-                t
-                for t in existing
-                if t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(
-                    t.params,
-                    credible_history=False,
-                    active_param_names=active_param_names,
+            if protocol_hash is None:
+                context_trials = [
+                    trial for trial in existing if trial.search_space_signature == search_space_signature
+                ]
+            else:
+                context_trials = load_trials_filtered(
+                    store_path,
+                    protocol_hash,
+                    search_space_signature,
+                    regime_signature=regime_signature,
                 )
-            ]
-        if not candidates and protocol_hash is not None:
-            candidates = [
-                t
-                for t in existing
-                if t.rejected_reason is None
-                and _is_warm_start_candidate_compatible(
-                    t.params,
-                    credible_history=True,
-                    active_param_names=active_param_names,
+            filtered_out = len(existing) - len(context_trials)
+            if filtered_out > 0:
+                logger.warning(
+                    "Warm-start skipped %s historical trial(s) due to protocol/search-space mismatch.",
+                    filtered_out,
                 )
-                and _is_credible_history_trial(t)
-            ]
+                if len(existing) > 0 and (filtered_out / len(existing)) > 0.5:
+                    logger.warning(
+                        "Warm-start filtered out more than 50%% of store history (%s/%s trials).",
+                        filtered_out,
+                        len(existing),
+                    )
+        candidates = [
+            t
+            for t in context_trials
+            if t.rejected_reason is None
+            and _is_warm_start_candidate_compatible(
+                t.params,
+                credible_history=False,
+                active_param_names=active_param_names,
+            )
+        ]
         pareto = rank_pareto_candidates(compute_pareto_frontier(candidates))
         for winner in pareto[:warm_start_top_n]:
-            warm_params = {k: v for k, v in winner.params.items() if k in active_names}
+            warm_params = {k: v for k, v in winner.params.items() if k in active_name_set}
             if warm_params:
                 study.enqueue_trial(warm_params)
 
@@ -272,10 +286,21 @@ def run_optuna_study(
     warm_start_from_store: bool = False,
     warm_start_top_n: int = 3,
     active_param_names: tuple[str, ...] | None = None,
+    warm_start_ignore_protocol: bool = False,
+    regime_signature: str | None = None,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
     init_store(store_path)
     evaluations: list[TrialEvaluation] = []
+    active_search_space_names = tuple(_filter_active_specs(active_param_names).keys())
+    search_space_signature = build_search_space_signature(active_search_space_names)
+    trial_context_signature = build_trial_context_signature(
+        protocol_hash=protocol_hash,
+        search_space_signature=search_space_signature,
+        start_date=backtest_config.start_date,
+        end_date=backtest_config.end_date,
+        baseline_version=base_settings.config_hash,
+    )
 
     if optuna_storage_path is not None:
         optuna_storage_path.parent.mkdir(parents=True, exist_ok=True)
@@ -311,6 +336,8 @@ def run_optuna_study(
             protocol_hash=protocol_hash,
             warm_start_top_n=warm_start_top_n,
             active_param_names=active_param_names,
+            warm_start_ignore_protocol=warm_start_ignore_protocol,
+            regime_signature=regime_signature,
         )
 
     def objective(trial: optuna.Trial) -> tuple[float, float, float]:
@@ -330,6 +357,10 @@ def run_optuna_study(
             evaluation = dataclasses.replace(
                 _rejected_trial(trial_id, sampled_params, rejection_reason),
                 protocol_hash=protocol_hash,
+                search_space_signature=search_space_signature,
+                regime_signature=regime_signature,
+                trial_context_signature=trial_context_signature,
+                baseline_version=base_settings.config_hash,
             )
             evaluations.append(evaluation)
             save_trial(evaluation, store_path)
@@ -349,6 +380,10 @@ def run_optuna_study(
                 backtest_config=backtest_config,
                 min_trades=int(min_trades),
                 max_trades=int(max_trades),
+                protocol_hash=protocol_hash,
+                search_space_param_names=active_search_space_names,
+                regime_signature=regime_signature,
+                baseline_version=base_settings.config_hash,
             )
         finally:
             conn.close()
@@ -359,6 +394,10 @@ def run_optuna_study(
             trial_id=trial_id,
             params=sampled_params,
             protocol_hash=protocol_hash,
+            search_space_signature=search_space_signature,
+            regime_signature=regime_signature,
+            trial_context_signature=trial_context_signature,
+            baseline_version=base_settings.config_hash,
         )
         evaluations.append(evaluation)
         save_trial(evaluation, store_path)

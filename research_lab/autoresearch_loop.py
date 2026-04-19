@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import dataclasses
 import json
+import logging
 import random
 import sqlite3
 import uuid
@@ -25,7 +26,7 @@ from research_lab.experiment_store import (
     save_trial,
     save_walkforward,
 )
-from research_lab.objective import evaluate_candidate
+from research_lab.objective import build_search_space_signature, build_trial_context_signature, evaluate_candidate
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.protocol import hash_protocol, load_protocol
 from research_lab.settings_adapter import build_candidate_settings
@@ -41,6 +42,7 @@ from research_lab.walkforward import build_windows, run_walkforward
 
 _STORE_ERROR_TYPES = (OSError, sqlite3.Error)
 _MAX_CANDIDATES_HARD_LIMIT = 50
+logger = logging.getLogger(__name__)
 
 
 def _to_range_value(value: datetime | date | str) -> str:
@@ -290,7 +292,8 @@ def _generate_candidate_vectors(
     max_candidates: int,
     trials: list[TrialEvaluation],
     recommendations: list[RecommendationDraft],
-) -> list[dict[str, Any]]:
+    priority_seed_vectors: list[dict[str, Any]] | None = None,
+) -> list[tuple[dict[str, Any], str]]:
     build_param_registry()
     active_params = get_active_params()
     base_vector = _base_active_vector(base_settings, active_params)
@@ -300,26 +303,36 @@ def _generate_candidate_vectors(
     ordered_history = sorted(accepted_trials, key=lambda trial: _history_trial_sort_key(trial, recommendation_priority))
 
     historical_vectors: list[dict[str, Any]] = []
+    historical_entries: list[tuple[dict[str, Any], str]] = []
     historical_keys: set[str] = set()
+    for index, seed_vector in enumerate(priority_seed_vectors or (), start=1):
+        vector = _normalize_active_vector(seed_vector, base_vector=base_vector, active_params=active_params)
+        key = _canonical_vector(vector)
+        if key in historical_keys:
+            continue
+        historical_vectors.append(vector)
+        historical_entries.append((vector, f"seeded from Pareto candidate {index}"))
+        historical_keys.add(key)
     for trial in ordered_history:
         vector = _normalize_active_vector(trial.params, base_vector=base_vector, active_params=active_params)
         key = _canonical_vector(vector)
         if key in historical_keys:
             continue
         historical_vectors.append(vector)
+        historical_entries.append((vector, ""))
         historical_keys.add(key)
 
     history_value_counts = _history_value_counts(historical_vectors)
     rng = random.Random(seed)
-    generated: list[dict[str, Any]] = []
+    generated: list[tuple[dict[str, Any], str]] = []
     generated_keys: set[str] = set()
     attempts = 0
     max_attempts = max(max_candidates * 25, 100)
 
     while len(generated) < max_candidates and attempts < max_attempts:
         attempts += 1
-        if historical_vectors:
-            seed_vector = historical_vectors[(attempts - 1) % len(historical_vectors)]
+        if historical_entries:
+            seed_vector, rationale = historical_entries[(attempts - 1) % len(historical_entries)]
             candidate = _mutate_vector(
                 seed_vector=seed_vector,
                 active_params=active_params,
@@ -327,6 +340,7 @@ def _generate_candidate_vectors(
                 rng=rng,
             )
         else:
+            rationale = ""
             candidate = _generate_random_vector(
                 active_params=active_params,
                 history_value_counts=history_value_counts,
@@ -336,7 +350,7 @@ def _generate_candidate_vectors(
         key = _canonical_vector(candidate)
         if key in historical_keys or key in generated_keys:
             continue
-        generated.append(candidate)
+        generated.append((candidate, rationale))
         generated_keys.add(key)
 
     while len(generated) < max_candidates and attempts < max_attempts * 2:
@@ -349,7 +363,7 @@ def _generate_candidate_vectors(
         key = _canonical_vector(candidate)
         if key in historical_keys or key in generated_keys:
             continue
-        generated.append(candidate)
+        generated.append((candidate, ""))
         generated_keys.add(key)
 
     return generated
@@ -358,9 +372,11 @@ def _generate_candidate_vectors(
 def _apply_llm_advisory(
     vectors: list[dict[str, Any]],
     llm_advisory_fn: Callable[[list[dict]], list[str]] | None,
+    base_rationales: list[str] | None = None,
 ) -> tuple[list[dict[str, Any]], list[str]]:
+    default_rationales = list(base_rationales or ["" for _ in vectors])
     if llm_advisory_fn is None or not vectors:
-        return [dict(vector) for vector in vectors], [""] * len(vectors)
+        return [dict(vector) for vector in vectors], default_rationales
 
     advisory_vectors = [dict(vector) for vector in vectors]
     expected = sorted(_canonical_vector(vector) for vector in advisory_vectors)
@@ -370,7 +386,15 @@ def _apply_llm_advisory(
         raise ValueError("llm_advisory_fn may reorder vectors only; adding, removing, or mutating candidates is not allowed.")
     if len(rationales) != len(advisory_vectors):
         raise ValueError("llm_advisory_fn must return one rationale string per candidate.")
-    return advisory_vectors, [str(rationale) for rationale in rationales]
+    merged_rationales: list[str] = []
+    for base_rationale, advisory_rationale in zip(default_rationales, rationales):
+        base_token = str(base_rationale)
+        advisory_token = str(advisory_rationale)
+        if base_token and advisory_token:
+            merged_rationales.append(f"{base_token} | {advisory_token}")
+            continue
+        merged_rationales.append(base_token or advisory_token)
+    return advisory_vectors, merged_rationales
 
 
 def _blocking_risks(report) -> tuple[str, ...]:
@@ -389,8 +413,8 @@ def _rank_key(result: AutoresearchCandidateResult) -> tuple[Any, ...]:
         not result.walkforward_report.passed,
         result.walkforward_report.fragile,
         -metrics.expectancy_r,
-        -metrics.profit_factor,
         metrics.max_drawdown_pct,
+        -metrics.profit_factor,
         -metrics.trades_count,
         result.candidate_id,
     )
@@ -452,6 +476,7 @@ def run_autoresearch_loop(
     seed: int = 42,
     max_candidates: int = 10,
     llm_advisory_fn: Callable[[list[dict]], list[str]] | None = None,
+    priority_seed_vectors: list[dict[str, Any]] | None = None,
 ) -> AutoresearchLoopReport:
     if max_candidates <= 0:
         raise ValueError("max_candidates must be >= 1")
@@ -468,6 +493,16 @@ def run_autoresearch_loop(
     run_id = uuid.uuid4().hex
     date_range_start = _to_range_value(backtest_config.start_date)
     date_range_end = _to_range_value(backtest_config.end_date)
+    build_param_registry()
+    active_param_names = tuple(get_active_params().keys())
+    search_space_signature = build_search_space_signature(active_param_names)
+    trial_context_signature = build_trial_context_signature(
+        protocol_hash=protocol_hash,
+        search_space_signature=search_space_signature,
+        start_date=backtest_config.start_date,
+        end_date=backtest_config.end_date,
+        baseline_version=base_settings.config_hash,
+    )
 
     try:
         init_store(store_path)
@@ -511,14 +546,23 @@ def run_autoresearch_loop(
         _write_loop_report(report=report, output_dir=output_dir)
         return report
 
-    generated_vectors = _generate_candidate_vectors(
+    generated_entries = _generate_candidate_vectors(
         base_settings=base_settings,
         seed=int(seed),
         max_candidates=int(max_candidates),
         trials=historical_trials,
         recommendations=historical_recommendations,
+        priority_seed_vectors=priority_seed_vectors,
     )
-    generated_vectors, rationales = _apply_llm_advisory(generated_vectors, llm_advisory_fn)
+    generated_vectors = [dict(vector) for vector, _ in generated_entries]
+    generated_rationales = [rationale for _, rationale in generated_entries]
+    if priority_seed_vectors:
+        logger.info("Autoresearch seeded from %s Pareto candidate(s).", len(priority_seed_vectors))
+    generated_vectors, rationales = _apply_llm_advisory(
+        generated_vectors,
+        llm_advisory_fn,
+        base_rationales=generated_rationales,
+    )
 
     filtered_vectors: list[tuple[dict[str, Any], str]] = []
     for vector, rationale in zip(generated_vectors, rationales):
@@ -550,6 +594,9 @@ def run_autoresearch_loop(
                 candidate_params=vector,
                 backtest_config=backtest_config,
                 min_trades=min_trades_full_candidate,
+                protocol_hash=protocol_hash,
+                search_space_param_names=active_param_names,
+                baseline_version=base_settings.config_hash,
             )
         finally:
             conn.close()
@@ -558,6 +605,9 @@ def run_autoresearch_loop(
             evaluation_raw,
             params=dict(vector),
             protocol_hash=protocol_hash,
+            search_space_signature=search_space_signature,
+            trial_context_signature=trial_context_signature,
+            baseline_version=base_settings.config_hash,
         )
         try:
             save_trial(evaluation, store_path)

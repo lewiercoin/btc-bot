@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import sqlite3
 from datetime import date, datetime
 from pathlib import Path
@@ -11,7 +12,7 @@ from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from settings import AppSettings
 
 from research_lab.approval import build_recommendation
-from research_lab.baseline_gate import check_baseline
+from research_lab.baseline_gate import check_baseline_hard, check_baseline_soft
 from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.experiment_store import save_recommendation, save_walkforward
 from research_lab.integrations.optuna_driver import run_optuna_study
@@ -19,6 +20,9 @@ from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 from research_lab.protocol import hash_protocol, load_protocol
 from research_lab.settings_adapter import build_candidate_settings
 from research_lab.walkforward import build_windows, run_nested_walkforward, run_walkforward
+
+
+logger = logging.getLogger(__name__)
 
 
 class SignalHealthError(ValueError):
@@ -120,6 +124,7 @@ def run_optimize_loop(
     optuna_storage_path: Path | None = None,
     multivariate_tpe: bool = False,
     warm_start_from_store: bool = False,
+    warm_start_ignore_protocol: bool = False,
 ) -> dict[str, Any]:
     protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
     protocol = load_protocol(protocol_file)
@@ -129,11 +134,22 @@ def run_optimize_loop(
     max_trades_full_candidate = int(protocol.get("max_trades_full_candidate", MAX_TRADES_DEFAULT))
     active_param_names = tuple(protocol.get("active_params_whitelist", ())) or None
 
-    check_baseline(
+    check_baseline_hard(
         source_db_path=source_db_path,
         backtest_config=backtest_config,
         base_settings=base_settings,
     )
+    baseline_summary = check_baseline_soft(
+        source_db_path=source_db_path,
+        backtest_config=backtest_config,
+        base_settings=base_settings,
+    )
+    if baseline_summary["warning"] is not None:
+        logger.warning(
+            "Baseline soft warning: %s | metrics=%s",
+            baseline_summary["warning"],
+            baseline_summary["metrics"],
+        )
     check_signal_health(
         source_db_path=source_db_path,
         backtest_config=backtest_config,
@@ -184,6 +200,8 @@ def run_optimize_loop(
             "walkforward_windows": len(windows),
             "recommendations_saved": recommendations_count,
             "selected_candidate_id": selected_candidate_id,
+            "baseline_warning": baseline_summary["warning"],
+            "baseline_metrics": baseline_summary["metrics"],
         }
 
     if walkforward_mode != "post_hoc":
@@ -205,6 +223,7 @@ def run_optimize_loop(
         multivariate_tpe=multivariate_tpe,
         warm_start_from_store=warm_start_from_store,
         active_param_names=active_param_names,
+        warm_start_ignore_protocol=warm_start_ignore_protocol,
     )
     frontier = rank_pareto_candidates(compute_pareto_frontier(trials))
 
@@ -237,4 +256,18 @@ def run_optimize_loop(
         "pareto_candidates": len(frontier),
         "walkforward_windows": len(windows),
         "recommendations_saved": recommendations_count,
+        "baseline_warning": baseline_summary["warning"],
+        "baseline_metrics": baseline_summary["metrics"],
+        "pareto_ranked": [
+            {
+                "candidate_id": trial.trial_id,
+                "trial_id": trial.trial_id,
+                "params": trial.params,
+                "expectancy_r": trial.metrics.expectancy_r,
+                "profit_factor": trial.metrics.profit_factor,
+                "max_drawdown_pct": trial.metrics.max_drawdown_pct,
+                "trades_count": trial.metrics.trades_count,
+            }
+            for trial in frontier
+        ],
     }

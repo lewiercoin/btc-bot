@@ -48,6 +48,10 @@ class TrialEvaluation:
     funnel: SignalFunnel
     rejected_reason: str | None
     protocol_hash: str | None = None
+    search_space_signature: str = ""
+    regime_signature: str | None = None
+    trial_context_signature: str = ""
+    baseline_version: str = ""
 
 
 @dataclass(frozen=True)
