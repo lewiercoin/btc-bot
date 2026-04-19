@@ -285,6 +285,11 @@ def _parse_args() -> argparse.Namespace:
         action="store_true",
         help="Run the same backtest twice with allow_uptrend_pullback OFF then ON and print the delta.",
     )
+    parser.add_argument(
+        "--evaluate-uptrend-pullback",
+        action="store_true",
+        help="Run the research-only UPTREND pullback evaluation harness and emit a funnel/segmentation report.",
+    )
     parser.add_argument("--output-json", type=Path, default=None)
     return parser.parse_args()
 
@@ -371,6 +376,21 @@ def main() -> None:
     settings = load_settings()
     assert settings.storage is not None
     symbol = settings.strategy.symbol.upper()
+
+    if args.evaluate_uptrend_pullback:
+        if args.compare_uptrend_pullback:
+            raise SystemExit("Use either --evaluate-uptrend-pullback or --compare-uptrend-pullback, not both.")
+        from research_lab.diagnostics.uptrend_pullback_eval_v1 import run_uptrend_pullback_evaluation
+
+        output_path = args.output_json or Path("research_lab/runs/uptrend_pullback_eval_v1.json")
+        run_uptrend_pullback_evaluation(
+            source_db_path=settings.storage.db_path,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            output_path=output_path,
+            initial_equity=float(args.initial_equity),
+        )
+        return
 
     conn = connect(settings.storage.db_path)
     init_db(conn, settings.storage.schema_path)
