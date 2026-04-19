@@ -6,9 +6,33 @@ Last updated: 2026-04-19
 
 ## Current Active Milestone
 
-**None** — awaiting user decision on next milestone
+**Milestone:** UPTREND-PULLBACK-EVAL-V1
+**Status:** AWAITING_IMPLEMENTATION
+**Active builder:** Codex
+**Decision date:** 2026-04-19
 
-**Proposed next:** UPTREND-PULLBACK-EVAL-V1 (evaluation harness for pullback candidates)
+**Scope:** Build evaluation harness for uptrend pullback candidates - segmentation, quality analysis, viable vs junk identification
+
+**Context:** 
+Previous milestone (UPTREND-PULLBACK-RESEARCH-V1) delivered pullback logic but March 2026 comparison showed coverage ↑ but quality ↓ (PnL -$535, expectancy -1.33R). 86 governance vetoes, 7 risk blocks in ON run. Need evidence-based segmentation before parameter tuning.
+
+**Goal:** Answer which candidate subgroups have edge, which are junk, and what features distinguish viable from junk.
+
+**Deliverables:**
+- D1: Candidate funnel breakdown (detected → generated → governance veto → risk block → trade → PnL)
+- D2: Feature segmentation (confluence, TFI, sweep depth, EMA gap buckets/histograms)
+- D3: Viable vs junk comparison (identify distinguishing features)
+- D4: Research report artifact (repeatable, comparable format)
+- D5: Script/command ergonomics (easy to run)
+- D6: Tests
+
+**Critical constraints:**
+- No live deployment
+- No default threshold changes
+- Evidence-first, no blind parameter tuning
+- Research/analysis milestone, not implementation
+
+**Next action:** Codex implements → pushes → Claude Code audits
 
 **Previous milestone:** UPTREND-PULLBACK-RESEARCH-V1 (DONE, 2026-04-19, commit c240f1d)
 
