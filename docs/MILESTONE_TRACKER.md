@@ -6,35 +6,62 @@ Last updated: 2026-04-19
 
 ## Current Active Milestone
 
-**Milestone:** UPTREND-PULLBACK-EVAL-V1
-**Status:** AWAITING_IMPLEMENTATION
+**None** — awaiting user strategic decision
+
+**Context:** UPTREND-PULLBACK-EVAL-V1 (DONE, commit 5668ccd) delivered conclusive evidence: current pullback path has no edge. Structural issues in geometry + uniqueness, not threshold tuning problem.
+
+**Strategic decision required:** Abandon / Redesign / Pivot to alternative uptrend hypothesis
+
+**Previous milestone:** UPTREND-PULLBACK-EVAL-V1 (DONE, 2026-04-19, commit 5668ccd)
+
+---
+
+## Completed Milestone: UPTREND-PULLBACK-EVAL-V1
+**Status:** DONE (commit 5668ccd, 2026-04-19)
 **Active builder:** Codex
-**Decision date:** 2026-04-19
+**Audit verdict:** DONE (findings conclusive, recommendation: redesign or abandon, NOT tuning)
 
-**Scope:** Build evaluation harness for uptrend pullback candidates - segmentation, quality analysis, viable vs junk identification
+**What:** Evaluation harness for uptrend pullback candidates - funnel breakdown, feature segmentation, viable vs junk analysis
 
-**Context:** 
-Previous milestone (UPTREND-PULLBACK-RESEARCH-V1) delivered pullback logic but March 2026 comparison showed coverage ↑ but quality ↓ (PnL -$535, expectancy -1.33R). 86 governance vetoes, 7 risk blocks in ON run. Need evidence-based segmentation before parameter tuning.
+**Files changed (3):**
+- `research_lab/diagnostics/uptrend_pullback_eval_v1.py` - replay harness, JSON artifact
+- `scripts/run_backtest.py` - added `--evaluate-uptrend-pullback` flag
+- `tests/test_uptrend_pullback_eval_v1.py` - 29 tests (funnel, segmentation, cohort)
 
-**Goal:** Answer which candidate subgroups have edge, which are junk, and what features distinguish viable from junk.
+**Evaluation results (March 2026):**
 
-**Deliverables:**
-- D1: Candidate funnel breakdown (detected → generated → governance veto → risk block → trade → PnL)
-- D2: Feature segmentation (confluence, TFI, sweep depth, EMA gap buckets/histograms)
-- D3: Viable vs junk comparison (identify distinguishing features)
-- D4: Research report artifact (repeatable, comparable format)
-- D5: Script/command ergonomics (easy to run)
-- D6: Tests
+**Funnel breakdown:**
+- 286 detected → 58 candidates (79.7% died as `uptrend_pullback_weak`)
+- 58 candidates → 50 governance veto (86.2%, of which 45 were `duplicate_level`)
+- 58 candidates → 5 risk block
+- 3 trades opened → 3 closed (all losses)
 
-**Critical constraints:**
-- No live deployment
-- No default threshold changes
-- Evidence-first, no blind parameter tuning
-- Research/analysis milestone, not implementation
+**Performance:**
+- PnL: -$319.52
+- Expectancy: -1.33R
+- Profit factor: 0.0
+- Win rate: 0% (3/3 losses, all `loss_1R_to_2R` bucket)
 
-**Next action:** Codex implements → pushes → Claude Code audits
+**3 Critical Findings:**
+1. **79.7% detection failure** - most pullbacks fail before candidate generation (`uptrend_pullback_weak`)
+2. **Governance duplicate_level dominance** - 45/50 vetoes are duplicate_level (geometry problem, not threshold)
+3. **No viable cohort** - 0% win rate, higher confluence (12.95) setups rejected by risk (`rr_below_min`)
 
-**Previous milestone:** UPTREND-PULLBACK-RESEARCH-V1 (DONE, 2026-04-19, commit c240f1d)
+**Codex recommendation:** ✅ **Redesign path, NOT tune thresholds**  
+**Claude Code assessment:** ✅ **Fully agree**
+
+**Why tuning won't work:**
+- Duplicate_level = geometry issue (pullbacks cluster at same levels in uptrend)
+- 0% win rate = entry/stop/TP logic incompatible with uptrend pullbacks
+- RR targets that work in downtrend (2.1+) may be unrealistic for uptrend pullbacks
+
+**Strategic options:**
+- **A:** Abandon uptrend pullback path (accept bot doesn't trade uptrend)
+- **B:** Redesign from scratch (different entry logic, RR targets, uniqueness criteria)
+- **C:** Pivot to HIGH sweep uptrend (breakout continuation, if market provides setups)
+- **D:** Research alternative uptrend strategies (momentum, breakout+retest)
+
+**User decision required:** Which strategic option to pursue?
 
 ---
 
