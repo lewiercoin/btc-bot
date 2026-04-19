@@ -22,9 +22,73 @@ Last updated: 2026-04-18
 
 **First diagnostic sample (22:45 UTC):** `close_vs_buf_atr=-3.019 | wick_vs_min_atr=-0.150 | sweep_vs_buf_atr=3.114`
 
-**Recent milestone:** UPTREND-CONTINUATION (DONE, 2026-04-18/19, commit 224a769) - deployed, working
+**Recent milestone:** RESEARCH-LAB-HARDENING-2PHASE (DONE, 2026-04-19, commit 1da4664) - 2-phase workflow formalized
 
 **Next action:** After 24-48h, run Perplexity's analysis script → decide buffer tuning strategy based on data distribution.
+
+---
+
+## Completed Milestone: RESEARCH-LAB-HARDENING-2PHASE
+**Status:** DONE (commit 1da4664, 2026-04-19)
+**Active builders:** Cascade (started), Codex (finished)
+**Commits:** `1da4664` feat(research-lab): harden 2-phase workflow and warm-start hygiene
+
+**What:** Formalize research lab as staged 2-phase system (Optuna discovery → Autoresearch refinement) with metodologiczna higiena
+
+**Why:** Address metodologiczne słabości identified by Perplexity architectural review:
+- Warm-start contamination from mixed contexts (different protocols, date ranges, search spaces)
+- Baseline gate too restrictive (blocked weak-but-valid baselines, prevented improvement)
+- No trial context reproducibility (couldn't match exact optimization conditions)
+- Autoresearch treated as equal alternative to Optuna (should be refinement phase, not discovery)
+- Ranking prioritized misleading profit_factor over operationally painful drawdown
+
+**Implementation:**
+- **P1 - Critical:**
+  - Enforce protocol/context filtering for warm-start (protocol_hash + search_space_signature)
+  - Split baseline gate: `check_baseline_hard()` blocks broken setup, `check_baseline_soft()` warns on weak baseline
+  - Add trial lineage tracking: search_space_signature, regime_signature, trial_context_signature, baseline_version
+  - Schema migrations + indexes for performance
+- **P2 - High Priority:**
+  - Create `docs/RESEARCH_LAB_WORKFLOW.md` formalizing Optuna→Autoresearch 2-phase workflow
+  - Add CLI flags: `--warm-start-ignore-protocol` (bypass filter), `--seed-from-pareto` (handoff)
+- **P3 - Medium Priority:**
+  - Rank drawdown ahead of profit_factor in autoresearch candidate ordering
+
+**Tests:** 7 new tests, 31/33 pass (2 expected skips)
+- `test_warm_start_filters_mismatched_protocol`
+- `test_enqueue_warm_start_ignore_protocol_bypasses_filters`
+- `test_check_baseline_hard_raises_on_broken_pipeline`
+- `test_check_baseline_soft_warns_on_weak_but_evaluable_baseline`
+- `test_rank_key_prefers_low_dd_over_high_pf`
+- `test_optimize_cli_passes_warm_start_ignore_protocol`
+- `test_autoresearch_cli_loads_seed_vectors_from_pareto_json`
+
+**Audit:** Claude Code + Perplexity consultation
+**Verdict:** MVP_DONE (all P1-P3 deliverables complete, zero tech debt)
+
+**Architecture:**
+- Phase 1 = Optuna (global discovery, 80-150 trials)
+- Phase 2 = Autoresearch (local refinement, 10 candidates, seed from Pareto)
+- Warm-start hygiene = context matching required by default
+- Baseline gate = hard block for broken pipeline, soft warning for weak strategy
+
+**Acceptance criteria met:**
+- ✅ Protocol/context filtering implemented + tested
+- ✅ Baseline gate split implemented + tested
+- ✅ Trial context tracking implemented + tested
+- ✅ Workflow documentation created
+- ✅ CLI handoff support added + tested
+- ✅ Ranking priority fixed + tested
+- ✅ All tests pass
+- ✅ Zero tech debt introduced
+
+**Future work (deferred to next milestones):**
+- P4: Adaptive autoresearch (mutation rate, exploration scoring, lineage)
+- P5: Observability (convergence charts, parameter importance, dashboard endpoint)
+- Regime-aware filtering (full implementation)
+
+**In-scope:** `research_lab/` (all offline optimization system)
+**Out-of-scope:** Live bot, dashboard, core trading logic
 
 ---
 
