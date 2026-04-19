@@ -146,6 +146,108 @@ def get_runtime_metrics(conn: sqlite3.Connection) -> dict | None:
     return dict(row)
 
 
+def insert_decision_outcome(
+    conn: sqlite3.Connection,
+    *,
+    cycle_timestamp: datetime,
+    outcome_group: str,
+    outcome_reason: str,
+    config_hash: str,
+    regime: str | None = None,
+    signal_id: str | None = None,
+    details: dict[str, Any] | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO decision_outcomes (
+            cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id, details_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            _normalize_runtime_metric_value(cycle_timestamp),
+            outcome_group,
+            outcome_reason,
+            regime,
+            config_hash,
+            signal_id,
+            json.dumps(details or {}, sort_keys=True),
+        ),
+    )
+
+
+def fetch_decision_outcome_counts(
+    conn: sqlite3.Connection,
+    *,
+    since_ts: datetime,
+    config_hash: str | None = None,
+) -> dict[str, dict[str, int]]:
+    where_clause = "WHERE cycle_timestamp >= ?"
+    params: list[Any] = [_normalize_runtime_metric_value(since_ts)]
+    if config_hash:
+        where_clause += " AND config_hash = ?"
+        params.append(config_hash)
+
+    grouped = conn.execute(
+        f"""
+        SELECT outcome_group, outcome_reason, COUNT(*) AS count
+        FROM decision_outcomes
+        {where_clause}
+        GROUP BY outcome_group, outcome_reason
+        """,
+        tuple(params),
+    ).fetchall()
+
+    by_outcome: dict[str, int] = {}
+    by_reason: dict[str, int] = {}
+    for row in grouped:
+        outcome_group = str(row["outcome_group"])
+        outcome_reason = str(row["outcome_reason"])
+        count = int(row["count"])
+        by_outcome[outcome_group] = by_outcome.get(outcome_group, 0) + count
+        by_reason[outcome_reason] = by_reason.get(outcome_reason, 0) + count
+
+    return {
+        "by_outcome": by_outcome,
+        "by_reason": by_reason,
+    }
+
+
+def upsert_config_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    config_hash: str,
+    captured_at: datetime,
+    strategy_snapshot: dict[str, Any],
+) -> None:
+    conn.execute(
+        """
+        INSERT INTO config_snapshots (config_hash, captured_at, strategy_json)
+        VALUES (?, ?, ?)
+        ON CONFLICT(config_hash) DO UPDATE SET
+            strategy_json = excluded.strategy_json
+        """,
+        (
+            config_hash,
+            _normalize_runtime_metric_value(captured_at),
+            json.dumps(strategy_snapshot, sort_keys=True),
+        ),
+    )
+
+
+def get_config_snapshot(conn: sqlite3.Connection, config_hash: str) -> dict | None:
+    row = conn.execute(
+        """
+        SELECT config_hash, captured_at, strategy_json
+        FROM config_snapshots
+        WHERE config_hash = ?
+        """,
+        (config_hash,),
+    ).fetchone()
+    if not row:
+        return None
+    return dict(row)
+
+
 def get_open_positions_count(conn: sqlite3.Connection) -> int:
     row = conn.execute(
         "SELECT COUNT(*) AS cnt FROM positions WHERE status IN ('OPEN', 'PARTIAL')"

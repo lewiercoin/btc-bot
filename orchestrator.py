@@ -4,7 +4,7 @@ import logging
 import sqlite3
 import threading
 import time
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
@@ -175,6 +175,10 @@ def build_default_bundle(
                 direction_tfi_threshold=settings.strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=settings.strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=settings.strategy.tfi_impulse_threshold,
+                allow_uptrend_pullback=settings.strategy.allow_uptrend_pullback,
+                uptrend_pullback_tfi_threshold=settings.strategy.uptrend_pullback_tfi_threshold,
+                uptrend_pullback_min_sweep_depth_pct=settings.strategy.uptrend_pullback_min_sweep_depth_pct,
+                uptrend_pullback_confluence_min=settings.strategy.uptrend_pullback_confluence_min,
                 regime_direction_whitelist=signal_whitelist,
             )
         ),
@@ -286,7 +290,13 @@ class BotOrchestrator:
         self._stop_event.clear()
         LOG.info("Bot started in %s mode", self.settings.mode.value)
         self.state_store.ensure_initialized()
-        self.state_store.refresh_runtime_state(self._now())
+        startup_ts = self._now()
+        self.state_store.persist_config_snapshot(
+            config_hash=self.settings.config_hash,
+            strategy_snapshot=asdict(self.settings.strategy),
+            captured_at=startup_ts,
+        )
+        self.state_store.refresh_runtime_state(startup_ts)
 
         recovery_report = self.recovery.run_startup_sync()
         if recovery_report.safe_mode:
@@ -346,6 +356,12 @@ class BotOrchestrator:
                 )
             except Exception as exc:
                 cycle_outcome = "snapshot_failed"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    details={"error": str(exc)},
+                )
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
                 self.state_store.mark_error(f"snapshot_build_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
@@ -364,6 +380,12 @@ class BotOrchestrator:
                     self._notify_closed_trades(closed_events)
             except Exception as exc:
                 cycle_outcome = "lifecycle_failed"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    details={"error": str(exc)},
+                )
                 self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
                 self.state_store.mark_error(f"lifecycle_failed:{exc}")
                 self.metrics.inc(ERRORS_TOTAL)
@@ -373,6 +395,11 @@ class BotOrchestrator:
             state = self.state_store.load()
             if state and state.safe_mode:
                 cycle_outcome = "safe_mode_skip"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                )
                 self.bundle.audit_logger.log_decision(
                     "orchestrator",
                     "Safe mode active. New trade decisions skipped.",
@@ -391,6 +418,13 @@ class BotOrchestrator:
             if candidate is None:
                 cycle_outcome = "no_signal"
                 self._log_no_signal_diagnostics(timestamp, diagnostics)
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=diagnostics.blocked_by or cycle_outcome,
+                    regime=regime.value,
+                    details=self._signal_diagnostics_payload(diagnostics),
+                )
                 self.bundle.audit_logger.log_decision(
                     "decision",
                     "No signal candidate.",
@@ -416,6 +450,14 @@ class BotOrchestrator:
             governance_decision = self.bundle.governance.evaluate(candidate)
             if not governance_decision.approved:
                 cycle_outcome = "governance_veto"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    regime=candidate.regime.value,
+                    signal_id=candidate.signal_id,
+                    details={"notes": governance_decision.notes},
+                )
                 self.bundle.audit_logger.log_decision(
                     "governance",
                     "Candidate rejected by governance.",
@@ -436,6 +478,14 @@ class BotOrchestrator:
             )
             if not risk_decision.allowed:
                 cycle_outcome = "risk_block"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    regime=candidate.regime.value,
+                    signal_id=candidate.signal_id,
+                    details={"reason": risk_decision.reason},
+                )
                 self.bundle.audit_logger.log_decision(
                     "risk",
                     f"Trade blocked: {risk_decision.reason}",
@@ -463,11 +513,27 @@ class BotOrchestrator:
                     "size": risk_decision.size,
                     "leverage": risk_decision.leverage,
                 }
-                cycle_outcome = "trade_opened"
+                cycle_outcome = "signal_generated"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    regime=candidate.regime.value,
+                    signal_id=candidate.signal_id,
+                    details=trade_payload,
+                )
                 self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
                 self._send_telegram_alert(TelegramNotifier.ALERT_ENTRY, trade_payload)
             except Exception as exc:
                 cycle_outcome = "execution_failed"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    regime=candidate.regime.value,
+                    signal_id=candidate.signal_id,
+                    details={"error": str(exc)},
+                )
                 self._critical_execution_errors += 1
                 self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
                 self.state_store.mark_error(f"execution_failed:{exc}")
@@ -637,6 +703,29 @@ class BotOrchestrator:
         except Exception as exc:
             LOG.warning("Runtime metrics update failed: %s", exc)
 
+    def _record_decision_outcome(
+        self,
+        *,
+        timestamp: datetime,
+        outcome_group: str,
+        outcome_reason: str,
+        regime: str | None = None,
+        signal_id: str | None = None,
+        details: dict[str, object] | None = None,
+    ) -> None:
+        try:
+            self.state_store.record_decision_outcome(
+                cycle_timestamp=timestamp,
+                outcome_group=outcome_group,
+                outcome_reason=outcome_reason,
+                config_hash=self.settings.config_hash,
+                regime=regime,
+                signal_id=signal_id,
+                details=details,
+            )
+        except Exception as exc:
+            LOG.warning("Decision outcome persistence failed: %s", exc)
+
     def _log_no_signal_diagnostics(self, timestamp: datetime, diagnostics: SignalDiagnostics) -> None:
         message = (
             "Decision diagnostics | timestamp=%s | outcome=no_signal | blocked_by=%s | "
@@ -655,7 +744,7 @@ class BotOrchestrator:
             self._log_bool(diagnostics.direction_allowed),
             self._log_optional_float(diagnostics.confluence_preview),
         ]
-        if diagnostics.blocked_by in {"no_reclaim", "uptrend_continuation_weak"}:
+        if diagnostics.blocked_by in {"no_reclaim", "uptrend_continuation_weak", "uptrend_pullback_weak"}:
             message += " | close_vs_buf_atr=%s | wick_vs_min_atr=%s | sweep_vs_buf_atr=%s"
             values.extend(
                 [

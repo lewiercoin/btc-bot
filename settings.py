@@ -41,6 +41,13 @@ def build_signal_regime_direction_whitelist(strategy: "StrategyConfig") -> dict[
     return whitelist
 
 
+def _env_flag(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
 @dataclass(frozen=True)
 class StrategyConfig:
     symbol: str = "BTCUSDT"
@@ -86,6 +93,10 @@ class StrategyConfig:
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.13
     allow_long_in_uptrend: bool = True
+    allow_uptrend_pullback: bool = False
+    uptrend_pullback_tfi_threshold: float = 0.13
+    uptrend_pullback_min_sweep_depth_pct: float = 0.0030
+    uptrend_pullback_confluence_min: float = 8.0
     regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
@@ -270,13 +281,18 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         mode=mode,
         storage=storage,
     )
+    research_strategy = dataclasses.replace(
+        settings.strategy,
+        allow_uptrend_pullback=_env_flag("ALLOW_UPTREND_PULLBACK", settings.strategy.allow_uptrend_pullback),
+    )
     if profile == "research":
-        return settings
+        return dataclasses.replace(settings, strategy=research_strategy)
 
     live_strategy = dataclasses.replace(
-        settings.strategy,
+        research_strategy,
         min_sweep_depth_pct=0.0001,
         confluence_min=4.5,
+        allow_uptrend_pullback=False,
     )
     return dataclasses.replace(settings, strategy=live_strategy)
 

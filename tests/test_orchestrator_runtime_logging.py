@@ -11,6 +11,7 @@ from typing import Any
 import pytest
 
 from core.models import MarketSnapshot, RegimeState, SignalDiagnostics
+from dashboard.db_reader import read_config_snapshot_from_conn, read_decision_funnel_from_conn
 from monitoring.audit_logger import AuditLogger
 from monitoring.health import HealthStatus
 from orchestrator import BotOrchestrator, EngineBundle
@@ -364,3 +365,76 @@ def test_health_check_persists_runtime_warning(paper_settings) -> None:
     assert runtime_metrics is not None
     assert runtime_metrics["last_health_check_at"] == "2026-04-15T12:00:00+00:00"
     assert runtime_metrics["last_runtime_warning"] == "websocket_alive=false"
+
+
+def test_start_persists_config_snapshot(paper_settings) -> None:
+    assert paper_settings.storage is not None
+    conn = make_conn(paper_settings.storage.schema_path)
+    clock = FakeClock(datetime(2026, 4, 15, 12, 33, 5, tzinfo=timezone.utc))
+    bundle = make_bundle(conn, clock)
+
+    holder: dict[str, BotOrchestrator] = {}
+    stop_at = clock.now() + timedelta(seconds=1)
+
+    def sleep_fn(seconds: float) -> None:
+        clock.sleep(seconds)
+        if clock.now() >= stop_at:
+            holder["orchestrator"].stop("test_stop")
+
+    orchestrator = BotOrchestrator(
+        settings=paper_settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=FakeHealthMonitor(),  # type: ignore[arg-type]
+        telegram_notifier=DummyTelegramNotifier(),  # type: ignore[arg-type]
+        now_provider=clock.now,
+        sleep_fn=sleep_fn,
+    )
+    holder["orchestrator"] = orchestrator
+
+    orchestrator.start()
+
+    payload = read_config_snapshot_from_conn(conn, config_hash=paper_settings.config_hash)
+
+    assert payload["config_hash"] == paper_settings.config_hash
+    assert payload["captured_at"] == "2026-04-15T12:33:05+00:00"
+    assert payload["strategy"] is not None
+    assert payload["strategy"]["allow_uptrend_pullback"] is False
+
+
+def test_decision_cycle_records_decision_outcome_counts(paper_settings) -> None:
+    assert paper_settings.storage is not None
+    conn = make_conn(paper_settings.storage.schema_path)
+    clock = FakeClock(datetime(2026, 4, 15, 12, 14, 59, tzinfo=timezone.utc))
+    bundle = make_bundle(conn, clock)
+
+    holder: dict[str, BotOrchestrator] = {}
+    stop_at = datetime(2026, 4, 15, 12, 15, 2, tzinfo=timezone.utc)
+
+    def sleep_fn(seconds: float) -> None:
+        clock.sleep(seconds)
+        if clock.now() >= stop_at:
+            holder["orchestrator"].stop("test_stop")
+
+    orchestrator = BotOrchestrator(
+        settings=paper_settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=FakeHealthMonitor(),  # type: ignore[arg-type]
+        telegram_notifier=DummyTelegramNotifier(),  # type: ignore[arg-type]
+        now_provider=clock.now,
+        sleep_fn=sleep_fn,
+    )
+    holder["orchestrator"] = orchestrator
+
+    orchestrator.start()
+
+    payload = read_decision_funnel_from_conn(
+        conn,
+        config_hash=paper_settings.config_hash,
+        now=stop_at,
+    )
+
+    assert payload["windows"]["24h"]["total"] == 1
+    assert payload["windows"]["24h"]["by_outcome"] == {"no_signal": 1}
+    assert payload["windows"]["24h"]["by_reason"] == {"no_reclaim": 1}

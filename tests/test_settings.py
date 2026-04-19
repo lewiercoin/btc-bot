@@ -42,6 +42,17 @@ def test_config_hash_is_stable_for_same_configuration(monkeypatch: pytest.Monkey
     assert first.config_hash == second.config_hash
 
 
+def test_config_hash_changes_when_uptrend_pullback_flag_changes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    monkeypatch.delenv("ALLOW_UPTREND_PULLBACK", raising=False)
+    baseline = load_settings(project_root=tmp_path)
+    monkeypatch.setenv("ALLOW_UPTREND_PULLBACK", "true")
+    enabled = load_settings(project_root=tmp_path)
+
+    assert baseline.strategy.allow_uptrend_pullback is False
+    assert enabled.strategy.allow_uptrend_pullback is True
+    assert baseline.config_hash != enabled.config_hash
+
+
 def test_build_signal_regime_direction_whitelist_preserves_defaults_when_flag_disabled() -> None:
     strategy = StrategyConfig(allow_long_in_uptrend=False)
 

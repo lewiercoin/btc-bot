@@ -7,7 +7,13 @@ from pathlib import Path
 from typing import Any, Callable
 
 from storage.db import connect_readonly
-from storage.repositories import fetch_open_positions, get_bot_state, get_runtime_metrics
+from storage.repositories import (
+    fetch_decision_outcome_counts,
+    fetch_open_positions,
+    get_bot_state,
+    get_config_snapshot,
+    get_runtime_metrics,
+)
 
 
 def _to_utc(value: datetime) -> datetime:
@@ -383,6 +389,86 @@ def read_runtime_freshness_from_conn(
     }
 
 
+def _empty_decision_window(start_at: datetime) -> dict[str, Any]:
+    return {
+        "start_at": start_at.isoformat(),
+        "total": 0,
+        "by_outcome": {},
+        "by_reason": {},
+    }
+
+
+def read_decision_funnel_from_conn(
+    conn: sqlite3.Connection,
+    *,
+    config_hash: str | None = None,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    reference_now = _to_utc(now or datetime.now(timezone.utc))
+    windows = {
+        "24h": reference_now - timedelta(hours=24),
+        "7d": reference_now - timedelta(days=7),
+    }
+    payload = {
+        "config_hash": config_hash,
+        "windows": {
+            key: _empty_decision_window(start_at)
+            for key, start_at in windows.items()
+        },
+    }
+
+    if not _table_exists(conn, "decision_outcomes"):
+        return payload
+
+    for key, start_at in windows.items():
+        counts = fetch_decision_outcome_counts(
+            conn,
+            since_ts=start_at,
+            config_hash=config_hash,
+        )
+        by_reason = counts["by_reason"]
+        payload["windows"][key] = {
+            "start_at": start_at.isoformat(),
+            "total": sum(by_reason.values()),
+            "by_outcome": counts["by_outcome"],
+            "by_reason": by_reason,
+        }
+
+    return payload
+
+
+def read_config_snapshot_from_conn(conn: sqlite3.Connection, *, config_hash: str) -> dict[str, Any]:
+    if not _table_exists(conn, "config_snapshots"):
+        return {
+            "config_hash": config_hash,
+            "captured_at": None,
+            "strategy": None,
+        }
+
+    row = get_config_snapshot(conn, config_hash)
+    if row is None:
+        return {
+            "config_hash": config_hash,
+            "captured_at": None,
+            "strategy": None,
+        }
+
+    strategy: dict[str, Any] | None = None
+    raw_strategy = row.get("strategy_json")
+    if isinstance(raw_strategy, str):
+        try:
+            parsed = json.loads(raw_strategy)
+            strategy = parsed if isinstance(parsed, dict) else None
+        except json.JSONDecodeError:
+            strategy = None
+
+    return {
+        "config_hash": str(row["config_hash"]),
+        "captured_at": _to_iso(row["captured_at"]),
+        "strategy": strategy,
+    }
+
+
 class DashboardReader:
     def __init__(
         self,
@@ -491,5 +577,44 @@ class DashboardReader:
             raise
         try:
             return read_runtime_freshness_from_conn(conn, heartbeat_seconds=heartbeat_seconds)
+        finally:
+            conn.close()
+
+    def read_decision_funnel(
+        self,
+        *,
+        config_hash: str | None = None,
+    ) -> dict[str, Any]:
+        try:
+            conn = self._connect_fn(self.db_path)
+        except sqlite3.OperationalError as exc:
+            if _is_missing_db_error(exc):
+                reference_now = _to_utc(datetime.now(timezone.utc))
+                return {
+                    "config_hash": config_hash,
+                    "windows": {
+                        "24h": _empty_decision_window(reference_now - timedelta(hours=24)),
+                        "7d": _empty_decision_window(reference_now - timedelta(days=7)),
+                    },
+                }
+            raise
+        try:
+            return read_decision_funnel_from_conn(conn, config_hash=config_hash)
+        finally:
+            conn.close()
+
+    def read_config_snapshot(self, *, config_hash: str) -> dict[str, Any]:
+        try:
+            conn = self._connect_fn(self.db_path)
+        except sqlite3.OperationalError as exc:
+            if _is_missing_db_error(exc):
+                return {
+                    "config_hash": config_hash,
+                    "captured_at": None,
+                    "strategy": None,
+                }
+            raise
+        try:
+            return read_config_snapshot_from_conn(conn, config_hash=config_hash)
         finally:
             conn.close()

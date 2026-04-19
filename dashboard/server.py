@@ -214,6 +214,17 @@ async def get_alerts(request: Request, limit: int = Query(default=20, ge=1, le=1
     return request.app.state.reader.read_alerts(limit=limit)
 
 
+@app.get("/api/decision-funnel")
+async def get_decision_funnel(request: Request) -> dict:
+    runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
+    return request.app.state.reader.read_decision_funnel(config_hash=runtime_config_hash)
+
+
+@app.get("/api/config/{config_hash}")
+async def get_config_snapshot(request: Request, config_hash: str) -> dict:
+    return request.app.state.reader.read_config_snapshot(config_hash=config_hash)
+
+
 @app.get("/api/trades/export")
 async def export_trades(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
     runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)

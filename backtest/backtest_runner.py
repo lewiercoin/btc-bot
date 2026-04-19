@@ -293,6 +293,10 @@ class BacktestRunner:
                 direction_tfi_threshold=strategy.direction_tfi_threshold,
                 direction_tfi_threshold_inverse=strategy.direction_tfi_threshold_inverse,
                 tfi_impulse_threshold=strategy.tfi_impulse_threshold,
+                allow_uptrend_pullback=strategy.allow_uptrend_pullback,
+                uptrend_pullback_tfi_threshold=strategy.uptrend_pullback_tfi_threshold,
+                uptrend_pullback_min_sweep_depth_pct=strategy.uptrend_pullback_min_sweep_depth_pct,
+                uptrend_pullback_confluence_min=strategy.uptrend_pullback_confluence_min,
                 regime_direction_whitelist=signal_whitelist,
             )
         )

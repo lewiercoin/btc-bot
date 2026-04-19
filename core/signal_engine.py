@@ -39,6 +39,10 @@ class SignalConfig:
     direction_tfi_threshold: float = 0.05
     direction_tfi_threshold_inverse: float = -0.05
     tfi_impulse_threshold: float = 0.10
+    allow_uptrend_pullback: bool = False
+    uptrend_pullback_tfi_threshold: float = 0.13
+    uptrend_pullback_min_sweep_depth_pct: float = 0.003
+    uptrend_pullback_confluence_min: float = 8.0
     regime_direction_whitelist: dict[str, tuple[str, ...]] = field(default_factory=_default_regime_direction_whitelist)
 
 
@@ -57,6 +61,17 @@ class SignalEngine:
             blocked_by = "no_sweep"
         elif features.sweep_level is None:
             blocked_by = "missing_sweep_level"
+        elif self._is_uptrend_pullback_context(features, regime):
+            direction, blocked_by = self._infer_uptrend_pullback_direction(features)
+            if direction is not None:
+                direction_allowed = self._is_direction_allowed_for_regime(direction=direction, regime=regime)
+                if not direction_allowed:
+                    blocked_by = "regime_direction_whitelist"
+                else:
+                    confluence_preview, candidate_reasons_preview = self._confluence_score(features, regime, direction)
+                    candidate_reasons_preview = ["uptrend_pullback_entry", *candidate_reasons_preview]
+                    if confluence_preview < self.config.uptrend_pullback_confluence_min:
+                        blocked_by = "uptrend_pullback_weak"
         elif features.sweep_depth_pct is not None and features.sweep_depth_pct < self.config.min_sweep_depth_pct:
             blocked_by = "sweep_too_shallow"
         else:
@@ -111,6 +126,16 @@ class SignalEngine:
         if ema_gap_ok and tfi_bullish:
             return "LONG", None
         return None, "uptrend_continuation_weak"
+
+    def _infer_uptrend_pullback_direction(self, features: Features) -> tuple[str | None, str | None]:
+        sweep_depth_pct = features.sweep_depth_pct or 0.0
+        tfi_bullish = features.tfi_60s > self.config.uptrend_pullback_tfi_threshold
+        ema_aligned = features.ema50_4h > features.ema200_4h
+        depth_ok = sweep_depth_pct > self.config.uptrend_pullback_min_sweep_depth_pct
+
+        if features.sweep_side == "LOW" and tfi_bullish and ema_aligned and depth_ok:
+            return "LONG", None
+        return None, "uptrend_pullback_weak"
 
     def generate(
         self,
@@ -175,6 +200,14 @@ class SignalEngine:
         if features.ema200_4h == 0:
             return 0.0
         return (features.ema50_4h - features.ema200_4h) / features.ema200_4h
+
+    def _is_uptrend_pullback_context(self, features: Features, regime: RegimeState) -> bool:
+        return (
+            self.config.allow_uptrend_pullback
+            and regime is RegimeState.UPTREND
+            and not features.reclaim_detected
+            and features.sweep_side == "LOW"
+        )
 
     def _confluence_score(self, features: Features, regime: RegimeState, direction: str) -> tuple[float, list[str]]:
         score = 0.0
