@@ -16,6 +16,7 @@ def _features(
     funding_8h: float = 0.0,
     ema50_4h: float = 100.0,
     ema200_4h: float = 100.0,
+    sweep_depth_pct: float = 0.001,
     close_vs_reclaim_buffer_atr: float | None = None,
     wick_vs_min_atr: float | None = None,
     sweep_vs_buffer_atr: float | None = None,
@@ -32,7 +33,7 @@ def _features(
         sweep_detected=True,
         reclaim_detected=True,
         sweep_level=100.0,
-        sweep_depth_pct=0.001,
+        sweep_depth_pct=sweep_depth_pct,
         sweep_side=sweep_side,
         close_vs_reclaim_buffer_atr=close_vs_reclaim_buffer_atr,
         wick_vs_min_atr=wick_vs_min_atr,
@@ -222,6 +223,157 @@ def test_uptrend_continuation_fallback_to_reclaim() -> None:
     assert diagnostics.direction_inferred == "SHORT"
     assert diagnostics.direction_allowed is True
     assert diagnostics.reclaim_detected is True
+
+
+def test_uptrend_pullback_generates_long_when_flagged_and_conditions_met() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            allow_uptrend_pullback=True,
+            uptrend_pullback_tfi_threshold=0.15,
+            uptrend_pullback_min_sweep_depth_pct=0.003,
+            uptrend_pullback_confluence_min=0.0,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.2,
+            funding_8h=-0.0001,
+            ema50_4h=105.0,
+            ema200_4h=100.0,
+            sweep_depth_pct=0.004,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+    candidate = engine.generate(features, RegimeState.UPTREND, diagnostics=diagnostics)
+
+    assert diagnostics.blocked_by is None
+    assert diagnostics.direction_inferred == "LONG"
+    assert candidate is not None
+    assert candidate.direction == "LONG"
+    assert "uptrend_pullback_entry" in candidate.reasons
+
+
+def test_uptrend_pullback_blocks_when_tfi_confirmation_fails() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            allow_uptrend_pullback=True,
+            uptrend_pullback_tfi_threshold=0.15,
+            uptrend_pullback_min_sweep_depth_pct=0.003,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.14,
+            ema50_4h=105.0,
+            ema200_4h=100.0,
+            sweep_depth_pct=0.004,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_pullback_weak"
+    assert diagnostics.direction_inferred is None
+
+
+def test_uptrend_pullback_blocks_when_ema_alignment_fails() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            allow_uptrend_pullback=True,
+            uptrend_pullback_tfi_threshold=0.15,
+            uptrend_pullback_min_sweep_depth_pct=0.003,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.2,
+            ema50_4h=99.0,
+            ema200_4h=100.0,
+            sweep_depth_pct=0.004,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_pullback_weak"
+    assert diagnostics.direction_inferred is None
+
+
+def test_uptrend_pullback_blocks_when_sweep_depth_is_too_shallow() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            allow_uptrend_pullback=True,
+            min_sweep_depth_pct=0.0005,
+            uptrend_pullback_tfi_threshold=0.15,
+            uptrend_pullback_min_sweep_depth_pct=0.003,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.2,
+            ema50_4h=105.0,
+            ema200_4h=100.0,
+            sweep_depth_pct=0.002,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_pullback_weak"
+    assert diagnostics.direction_inferred is None
+
+
+def test_uptrend_pullback_respects_feature_flag_off() -> None:
+    engine = SignalEngine(
+        SignalConfig(
+            allow_uptrend_pullback=False,
+            ema_trend_gap_pct=0.02,
+            regime_direction_whitelist={
+                RegimeState.UPTREND.value: ("LONG",),
+            },
+        )
+    )
+    features = replace(
+        _features(
+            sweep_side="LOW",
+            bullish_divergence=True,
+            tfi_60s=0.2,
+            ema50_4h=105.0,
+            ema200_4h=100.0,
+            sweep_depth_pct=0.004,
+        ),
+        reclaim_detected=False,
+    )
+
+    diagnostics = engine.diagnose(features, RegimeState.UPTREND)
+
+    assert diagnostics.blocked_by == "uptrend_continuation_weak"
+    assert diagnostics.direction_inferred is None
 
 
 def test_diagnose_non_uptrend_preserves_gate_order_and_stops_at_no_reclaim() -> None:

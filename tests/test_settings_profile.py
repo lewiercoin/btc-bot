@@ -17,6 +17,7 @@ def test_load_settings_research_profile_uses_dataclass_defaults(
     assert settings.strategy.min_sweep_depth_pct == 0.00286
     assert settings.strategy.confluence_min == 4.5
     assert settings.strategy.allow_long_in_uptrend is True
+    assert settings.strategy.allow_uptrend_pullback is False
 
 
 def test_load_settings_live_profile_applies_overrides(
@@ -29,6 +30,7 @@ def test_load_settings_live_profile_applies_overrides(
     assert settings.strategy.min_sweep_depth_pct == 0.0001
     assert settings.strategy.confluence_min == 4.5
     assert settings.strategy.allow_long_in_uptrend is True
+    assert settings.strategy.allow_uptrend_pullback is False
 
 
 def test_load_settings_default_profile_is_research(
@@ -41,6 +43,29 @@ def test_load_settings_default_profile_is_research(
     assert settings.strategy.min_sweep_depth_pct == 0.00286
     assert settings.strategy.confluence_min == 4.5
     assert settings.strategy.allow_long_in_uptrend is True
+    assert settings.strategy.allow_uptrend_pullback is False
+
+
+def test_load_settings_research_profile_allows_env_toggle_for_uptrend_pullback(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("ALLOW_UPTREND_PULLBACK", "true")
+
+    settings = load_settings(project_root=tmp_path, profile="research")
+
+    assert settings.strategy.allow_uptrend_pullback is True
+
+
+def test_load_settings_live_profile_forces_uptrend_pullback_off_even_when_env_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("ALLOW_UPTREND_PULLBACK", "true")
+
+    settings = load_settings(project_root=tmp_path, profile="live")
+
+    assert settings.strategy.allow_uptrend_pullback is False
 
 
 def test_load_settings_invalid_profile_raises(

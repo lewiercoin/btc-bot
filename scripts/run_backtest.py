@@ -5,7 +5,7 @@ import json
 import math
 import sqlite3
 import sys
-from dataclasses import asdict
+from dataclasses import asdict, replace
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -57,6 +57,7 @@ class _SignalCountingProxy:
         candidate = self._wrapped.generate(features, regime)
         if candidate is not None:
             self._runner.signals_generated += 1
+            self._runner.signal_regime_counts[regime.value] = self._runner.signal_regime_counts.get(regime.value, 0) + 1
         return candidate
 
     def __getattr__(self, item: str) -> Any:
@@ -100,6 +101,7 @@ class InstrumentedBacktestRunner(BacktestRunner):
         self.signals_regime_blocked = 0
         self.signals_governance_rejected = 0
         self.signals_risk_rejected = 0
+        self.signal_regime_counts: dict[str, int] = {}
 
     def _build_engines(self):  # type: ignore[override]
         feature_engine, regime_engine, signal_engine, governance, risk_engine = super()._build_engines()
@@ -278,8 +280,85 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--start-date", required=True, help="Inclusive start datetime (ISO-8601, UTC).")
     parser.add_argument("--end-date", required=True, help="Exclusive end datetime (ISO-8601, UTC). Date-only values are treated as next-day exclusive.")
     parser.add_argument("--initial-equity", type=float, default=10_000.0)
+    parser.add_argument(
+        "--compare-uptrend-pullback",
+        action="store_true",
+        help="Run the same backtest twice with allow_uptrend_pullback OFF then ON and print the delta.",
+    )
     parser.add_argument("--output-json", type=Path, default=None)
     return parser.parse_args()
+
+
+def _run_backtest_summary(
+    conn: sqlite3.Connection,
+    *,
+    settings,
+    run_config: BacktestConfig,
+    symbol: str,
+) -> dict[str, Any]:
+    bars_processed = _count_bars(conn, symbol=symbol, config=run_config)
+    runner = InstrumentedBacktestRunner(conn, settings=settings)
+    result = runner.run(run_config)
+
+    trades_opened = len(result.trades)
+    trades_closed = len(result.trades)
+    wins = sum(1 for trade in result.trades if float(trade.pnl_abs) > 0)
+    losses = sum(1 for trade in result.trades if float(trade.pnl_abs) < 0)
+    breakeven = trades_closed - wins - losses
+
+    return {
+        "bars_processed": bars_processed,
+        "runner": runner,
+        "result": result,
+        "trades_opened": trades_opened,
+        "trades_closed": trades_closed,
+        "wins": wins,
+        "losses": losses,
+        "breakeven": breakeven,
+    }
+
+
+def _print_summary(
+    conn: sqlite3.Connection,
+    *,
+    label: str,
+    settings,
+    run_config: BacktestConfig,
+    symbol: str,
+    start_ts: datetime,
+    end_ts: datetime,
+    summary: dict[str, Any],
+) -> None:
+    runner = summary["runner"]
+    perf = summary["result"].performance
+
+    print(f"{label} summary")
+    print(f"symbol: {symbol}")
+    print(f"range_utc: {start_ts.isoformat()} -> {end_ts.isoformat()}")
+    print(f"bars_processed: {summary['bars_processed']}")
+    print(f"signals_generated: {runner.signals_generated}")
+    print(
+        "signal_funnel: "
+        f"generated={runner.signals_generated} "
+        f"regime_blocked={runner.signals_regime_blocked} "
+        f"governance_rejected={runner.signals_governance_rejected} "
+        f"risk_rejected={runner.signals_risk_rejected} "
+        f"-> trades_opened={summary['trades_opened']}"
+    )
+    print(f"signal_regime_distribution: {json.dumps(runner.signal_regime_counts, sort_keys=True)}")
+    print(f"trades_opened: {summary['trades_opened']}")
+    print(f"trades_closed: {summary['trades_closed']}")
+    print(f"wins/losses/breakeven: {summary['wins']}/{summary['losses']}/{summary['breakeven']}")
+    print(f"pnl_abs: {perf.pnl_abs:.6f}")
+    print(f"pnl_r_sum: {perf.pnl_r_sum:.6f}")
+    print(f"profit_factor: {perf.profit_factor}")
+    print(f"expectancy_r: {perf.expectancy_r:.6f}")
+    print(f"max_consecutive_losses: {perf.max_consecutive_losses}")
+
+    if summary["trades_closed"] == 0:
+        print("diagnostic: no trades generated")
+        for line in _zero_trade_diagnostics(conn, settings=settings, backtest_config=run_config, symbol=symbol):
+            print(f"- {line}")
 
 
 def main() -> None:
@@ -302,46 +381,102 @@ def main() -> None:
             initial_equity=float(args.initial_equity),
             symbol=symbol,
         )
-        bars_processed = _count_bars(conn, symbol=symbol, config=run_config)
+        if args.compare_uptrend_pullback:
+            base_settings = replace(settings, strategy=replace(settings.strategy, allow_uptrend_pullback=False))
+            pullback_settings = replace(settings, strategy=replace(settings.strategy, allow_uptrend_pullback=True))
 
-        runner = InstrumentedBacktestRunner(conn, settings=settings)
-        result = runner.run(run_config)
+            off_summary = _run_backtest_summary(conn, settings=base_settings, run_config=run_config, symbol=symbol)
+            on_summary = _run_backtest_summary(conn, settings=pullback_settings, run_config=run_config, symbol=symbol)
 
-        trades_opened = len(result.trades)
-        trades_closed = len(result.trades)
-        wins = sum(1 for trade in result.trades if float(trade.pnl_abs) > 0)
-        losses = sum(1 for trade in result.trades if float(trade.pnl_abs) < 0)
-        breakeven = trades_closed - wins - losses
+            _print_summary(
+                conn,
+                label="UPTREND_PULLBACK_OFF",
+                settings=base_settings,
+                run_config=run_config,
+                symbol=symbol,
+                start_ts=start_ts,
+                end_ts=end_ts,
+                summary=off_summary,
+            )
+            print("")
+            _print_summary(
+                conn,
+                label="UPTREND_PULLBACK_ON",
+                settings=pullback_settings,
+                run_config=run_config,
+                symbol=symbol,
+                start_ts=start_ts,
+                end_ts=end_ts,
+                summary=on_summary,
+            )
 
-        perf = result.performance
-        print("Backtest summary")
-        print(f"symbol: {symbol}")
-        print(f"range_utc: {start_ts.isoformat()} -> {end_ts.isoformat()}")
-        print(f"bars_processed: {bars_processed}")
-        print(f"signals_generated: {runner.signals_generated}")
-        print(
-            "signal_funnel: "
-            f"generated={runner.signals_generated} "
-            f"regime_blocked={runner.signals_regime_blocked} "
-            f"governance_rejected={runner.signals_governance_rejected} "
-            f"risk_rejected={runner.signals_risk_rejected} "
-            f"-> trades_opened={trades_opened}"
+            off_perf = off_summary["result"].performance
+            on_perf = on_summary["result"].performance
+            print("")
+            print("UPTREND_PULLBACK delta")
+            print(f"signals_generated_delta: {on_summary['runner'].signals_generated - off_summary['runner'].signals_generated}")
+            print(
+                "uptrend_signal_delta: "
+                f"{on_summary['runner'].signal_regime_counts.get('uptrend', 0) - off_summary['runner'].signal_regime_counts.get('uptrend', 0)}"
+            )
+            print(f"trades_opened_delta: {on_summary['trades_opened'] - off_summary['trades_opened']}")
+            print(f"pnl_abs_delta: {on_perf.pnl_abs - off_perf.pnl_abs:.6f}")
+            print(f"expectancy_r_delta: {on_perf.expectancy_r - off_perf.expectancy_r:.6f}")
+
+            if args.output_json is not None:
+                payload = {
+                    "symbol": symbol,
+                    "start_ts_utc": start_ts.isoformat(),
+                    "end_ts_utc": end_ts.isoformat(),
+                    "off": {
+                        "allow_uptrend_pullback": False,
+                        "bars_processed": off_summary["bars_processed"],
+                        "signals_generated": off_summary["runner"].signals_generated,
+                        "signal_regime_distribution": off_summary["runner"].signal_regime_counts,
+                        "trades_opened": off_summary["trades_opened"],
+                        "trades_closed": off_summary["trades_closed"],
+                        "performance": asdict(off_perf),
+                    },
+                    "on": {
+                        "allow_uptrend_pullback": True,
+                        "bars_processed": on_summary["bars_processed"],
+                        "signals_generated": on_summary["runner"].signals_generated,
+                        "signal_regime_distribution": on_summary["runner"].signal_regime_counts,
+                        "trades_opened": on_summary["trades_opened"],
+                        "trades_closed": on_summary["trades_closed"],
+                        "performance": asdict(on_perf),
+                    },
+                    "delta": {
+                        "signals_generated": on_summary["runner"].signals_generated - off_summary["runner"].signals_generated,
+                        "uptrend_signals": on_summary["runner"].signal_regime_counts.get("uptrend", 0) - off_summary["runner"].signal_regime_counts.get("uptrend", 0),
+                        "trades_opened": on_summary["trades_opened"] - off_summary["trades_opened"],
+                        "pnl_abs": on_perf.pnl_abs - off_perf.pnl_abs,
+                        "expectancy_r": on_perf.expectancy_r - off_perf.expectancy_r,
+                    },
+                }
+                args.output_json.parent.mkdir(parents=True, exist_ok=True)
+                args.output_json.write_text(
+                    json.dumps(_sanitize_json(payload), indent=2, sort_keys=True),
+                    encoding="utf-8",
+                )
+                print(f"analysis_report_json: {args.output_json}")
+            return
+
+        summary = _run_backtest_summary(conn, settings=settings, run_config=run_config, symbol=symbol)
+        _print_summary(
+            conn,
+            label="Backtest",
+            settings=settings,
+            run_config=run_config,
+            symbol=symbol,
+            start_ts=start_ts,
+            end_ts=end_ts,
+            summary=summary,
         )
-        print(f"trades_opened: {trades_opened}")
-        print(f"trades_closed: {trades_closed}")
-        print(f"wins/losses/breakeven: {wins}/{losses}/{breakeven}")
-        print(f"pnl_abs: {perf.pnl_abs:.6f}")
-        print(f"pnl_r_sum: {perf.pnl_r_sum:.6f}")
-        print(f"profit_factor: {perf.profit_factor}")
-        print(f"expectancy_r: {perf.expectancy_r:.6f}")
-        print(f"max_consecutive_losses: {perf.max_consecutive_losses}")
-
-        if trades_closed == 0:
-            print("diagnostic: no trades generated")
-            for line in _zero_trade_diagnostics(conn, settings=settings, backtest_config=run_config, symbol=symbol):
-                print(f"- {line}")
 
         if args.output_json is not None:
+            result = summary["result"]
+            runner = summary["runner"]
             run_trade_ids = tuple(trade.trade_id for trade in result.trades)
             analysis = analyze_closed_trades(
                 conn,
@@ -356,17 +491,18 @@ def main() -> None:
                 "symbol": symbol,
                 "start_ts_utc": start_ts.isoformat(),
                 "end_ts_utc": end_ts.isoformat(),
-                "bars_processed": bars_processed,
+                "bars_processed": summary["bars_processed"],
                 "signals_generated": runner.signals_generated,
+                "signal_regime_distribution": runner.signal_regime_counts,
                 "signals_regime_blocked": runner.signals_regime_blocked,
                 "signals_governance_rejected": runner.signals_governance_rejected,
                 "signals_risk_rejected": runner.signals_risk_rejected,
-                "trades_opened": trades_opened,
-                "trades_closed": trades_closed,
-                "wins": wins,
-                "losses": losses,
-                "breakeven": breakeven,
-                "performance": asdict(perf),
+                "trades_opened": summary["trades_opened"],
+                "trades_closed": summary["trades_closed"],
+                "wins": summary["wins"],
+                "losses": summary["losses"],
+                "breakeven": summary["breakeven"],
+                "performance": asdict(result.performance),
                 "analysis": analysis.to_dict(),
             }
             args.output_json.parent.mkdir(parents=True, exist_ok=True)

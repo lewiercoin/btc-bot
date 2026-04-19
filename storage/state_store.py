@@ -9,11 +9,13 @@ from uuid import uuid4
 from core.models import BotState, ExecutableSignal, GovernanceRuntimeState, Position, RiskRuntimeState, SettlementMetrics, SignalCandidate
 from storage.repositories import (
     close_position,
+    fetch_decision_outcome_counts,
     fetch_closed_trade_pnl_series_between,
     fetch_open_positions,
     fetch_open_trade_positions,
     fetch_recent_closed_trade_outcomes,
     fetch_trade_log_rows_for_day,
+    get_config_snapshot,
     get_bot_state,
     get_daily_metrics,
     get_last_closed_loss_at,
@@ -22,9 +24,11 @@ from storage.repositories import (
     get_open_positions_count,
     get_runtime_metrics,
     insert_trade_log_open,
+    insert_decision_outcome,
     sum_closed_pnl_abs_before,
     update_trade_log_close,
     upsert_bot_state,
+    upsert_config_snapshot,
     upsert_daily_metrics,
     upsert_runtime_metrics,
 )
@@ -91,6 +95,29 @@ class StateStore:
                 last_health_check_at TEXT,
                 last_runtime_warning TEXT,
                 config_hash TEXT
+            )
+        """)
+        self.connection.commit()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS decision_outcomes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                cycle_timestamp TEXT NOT NULL,
+                outcome_group TEXT NOT NULL,
+                outcome_reason TEXT NOT NULL,
+                regime TEXT,
+                config_hash TEXT NOT NULL,
+                signal_id TEXT,
+                details_json TEXT
+            )
+        """)
+        self.connection.commit()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS config_snapshots (
+                config_hash TEXT PRIMARY KEY,
+                captured_at TEXT NOT NULL,
+                strategy_json TEXT NOT NULL
             )
         """)
         self.connection.commit()
@@ -368,6 +395,63 @@ class StateStore:
         upsert_runtime_metrics(self.connection, **fields)
         self.connection.commit()
         return get_runtime_metrics(self.connection)
+
+    def record_decision_outcome(
+        self,
+        *,
+        cycle_timestamp: datetime,
+        outcome_group: str,
+        outcome_reason: str,
+        config_hash: str,
+        regime: str | None = None,
+        signal_id: str | None = None,
+        details: dict | None = None,
+    ) -> None:
+        self._apply_migrations()
+        insert_decision_outcome(
+            self.connection,
+            cycle_timestamp=cycle_timestamp,
+            outcome_group=outcome_group,
+            outcome_reason=outcome_reason,
+            config_hash=config_hash,
+            regime=regime,
+            signal_id=signal_id,
+            details=details,
+        )
+        self.connection.commit()
+
+    def get_decision_outcome_counts(
+        self,
+        *,
+        since_ts: datetime,
+        config_hash: str | None = None,
+    ) -> dict[str, dict[str, int]]:
+        self._apply_migrations()
+        return fetch_decision_outcome_counts(
+            self.connection,
+            since_ts=since_ts,
+            config_hash=config_hash,
+        )
+
+    def persist_config_snapshot(
+        self,
+        *,
+        config_hash: str,
+        strategy_snapshot: dict,
+        captured_at: datetime,
+    ) -> None:
+        self._apply_migrations()
+        upsert_config_snapshot(
+            self.connection,
+            config_hash=config_hash,
+            captured_at=captured_at,
+            strategy_snapshot=strategy_snapshot,
+        )
+        self.connection.commit()
+
+    def get_config_snapshot(self, config_hash: str) -> dict | None:
+        self._apply_migrations()
+        return get_config_snapshot(self.connection, config_hash)
 
     def refresh_runtime_state(self, now: datetime | None = None) -> BotState:
         ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)

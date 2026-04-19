@@ -187,6 +187,10 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["session_end_hour_utc"].status == PARAM_STATUS_FROZEN
     assert registry["allow_long_in_uptrend"].status == PARAM_STATUS_ACTIVE
     assert registry["allow_long_in_uptrend"].domain_type == "bool"
+    assert registry["allow_uptrend_pullback"].status == PARAM_STATUS_FROZEN
+    assert registry["uptrend_pullback_tfi_threshold"].status == PARAM_STATUS_FROZEN
+    assert registry["uptrend_pullback_min_sweep_depth_pct"].status == PARAM_STATUS_FROZEN
+    assert registry["uptrend_pullback_confluence_min"].status == PARAM_STATUS_FROZEN
     assert registry["weight_ema_trend_alignment"].status == PARAM_STATUS_ACTIVE
     assert registry["weight_ema_trend_alignment"].low == 0.0
     assert registry["weight_ema_trend_alignment"].high == 5.0
@@ -196,6 +200,7 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["crowded_oi_zscore_min"].default_value == 1.5
     assert registry["force_order_history_points"].status == PARAM_STATUS_UNSUPPORTED
     assert "allow_long_in_uptrend" in get_active_params()
+    assert "allow_uptrend_pullback" not in get_active_params()
     assert "ema_trend_gap_pct" in get_active_params()
     assert "compression_atr_norm_max" in get_active_params()
     assert "weight_ema_trend_alignment" in get_active_params()

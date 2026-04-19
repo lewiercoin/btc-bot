@@ -7,6 +7,8 @@ from types import SimpleNamespace
 
 from dashboard.db_reader import (
     read_alerts_from_conn,
+    read_config_snapshot_from_conn,
+    read_decision_funnel_from_conn,
     read_daily_metrics_from_conn,
     read_positions_from_conn,
     read_runtime_freshness_from_conn,
@@ -319,6 +321,77 @@ def test_read_alerts_from_conn_with_rows() -> None:
     assert alert["severity"] == "ERROR"
     assert alert["component"] == "orchestrator"
     assert alert["message"] == "Bot entered safe mode"
+
+
+def test_read_decision_funnel_from_conn_aggregates_windows_and_reasons() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    now = datetime(2026, 4, 19, 12, 0, tzinfo=timezone.utc)
+    try:
+        conn.executemany(
+            """
+            INSERT INTO decision_outcomes (
+                cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id, details_json
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            [
+                ((now - timedelta(hours=2)).isoformat(), "no_signal", "no_reclaim", "normal", "cfg-1", None, "{}"),
+                ((now - timedelta(hours=3)).isoformat(), "no_signal", "uptrend_pullback_weak", "uptrend", "cfg-1", None, "{}"),
+                ((now - timedelta(hours=4)).isoformat(), "signal_generated", "signal_generated", "uptrend", "cfg-1", "sig-1", "{}"),
+                ((now - timedelta(days=3)).isoformat(), "risk_block", "risk_block", "downtrend", "cfg-1", "sig-2", "{}"),
+                ((now - timedelta(days=8)).isoformat(), "no_signal", "no_reclaim", "normal", "cfg-1", None, "{}"),
+                ((now - timedelta(hours=1)).isoformat(), "no_signal", "no_reclaim", "normal", "cfg-2", None, "{}"),
+            ],
+        )
+        conn.commit()
+
+        payload = read_decision_funnel_from_conn(conn, config_hash="cfg-1", now=now)
+    finally:
+        conn.close()
+
+    assert payload["config_hash"] == "cfg-1"
+    assert payload["windows"]["24h"]["total"] == 3
+    assert payload["windows"]["24h"]["by_outcome"] == {
+        "no_signal": 2,
+        "signal_generated": 1,
+    }
+    assert payload["windows"]["24h"]["by_reason"] == {
+        "no_reclaim": 1,
+        "signal_generated": 1,
+        "uptrend_pullback_weak": 1,
+    }
+    assert payload["windows"]["7d"]["total"] == 4
+    assert payload["windows"]["7d"]["by_outcome"]["risk_block"] == 1
+
+
+def test_read_config_snapshot_from_conn_returns_strategy_snapshot() -> None:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = _make_conn(schema_path)
+    captured_at = datetime(2026, 4, 19, 10, 0, tzinfo=timezone.utc)
+    try:
+        conn.execute(
+            """
+            INSERT INTO config_snapshots (config_hash, captured_at, strategy_json)
+            VALUES (?, ?, ?)
+            """,
+            (
+                "cfg-123",
+                captured_at.isoformat(),
+                '{"allow_uptrend_pullback": true, "uptrend_pullback_confluence_min": 8.0}',
+            ),
+        )
+        conn.commit()
+
+        payload = read_config_snapshot_from_conn(conn, config_hash="cfg-123")
+    finally:
+        conn.close()
+
+    assert payload["config_hash"] == "cfg-123"
+    assert payload["captured_at"] == captured_at.isoformat()
+    assert payload["strategy"] == {
+        "allow_uptrend_pullback": True,
+        "uptrend_pullback_confluence_min": 8.0,
+    }
 
 
 def test_read_trades_filters_by_config_hash() -> None:

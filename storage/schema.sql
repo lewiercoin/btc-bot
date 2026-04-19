@@ -166,6 +166,23 @@ CREATE TABLE IF NOT EXISTS runtime_metrics (
     config_hash TEXT
 );
 
+CREATE TABLE IF NOT EXISTS decision_outcomes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    cycle_timestamp TEXT NOT NULL,
+    outcome_group TEXT NOT NULL,
+    outcome_reason TEXT NOT NULL,
+    regime TEXT,
+    config_hash TEXT NOT NULL,
+    signal_id TEXT,
+    details_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS config_snapshots (
+    config_hash TEXT PRIMARY KEY,
+    captured_at TEXT NOT NULL,
+    strategy_json TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS safe_mode_events (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     event_type TEXT NOT NULL,
@@ -225,5 +242,9 @@ CREATE INDEX IF NOT EXISTS idx_executions_position_executed
     ON executions(position_id, executed_at);
 CREATE INDEX IF NOT EXISTS idx_trade_log_closed_at
     ON trade_log(closed_at);
+CREATE INDEX IF NOT EXISTS idx_decision_outcomes_ts_group
+    ON decision_outcomes(cycle_timestamp, outcome_group);
+CREATE INDEX IF NOT EXISTS idx_decision_outcomes_reason
+    ON decision_outcomes(outcome_reason, cycle_timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_errors_ts_severity
     ON alerts_errors(timestamp, severity);
