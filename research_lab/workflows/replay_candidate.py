@@ -49,6 +49,7 @@ def replay_candidate(
         raise ValueError("replay_candidate supports only walkforward_mode='post_hoc'.")
     protocol_hash = hash_protocol(protocol)
     min_trades_full_candidate = int(protocol.get("min_trades_full_candidate", MIN_TRADES_DEFAULT))
+    active_param_names = tuple(protocol.get("active_params_whitelist", ())) or None
 
     candidate_settings = build_candidate_settings(base_settings, selected.params)
     snapshot_path = create_trial_snapshot(source_db_path, snapshots_dir, f"replay-{candidate_id}")
@@ -61,6 +62,9 @@ def replay_candidate(
             candidate_params=selected.params,
             backtest_config=backtest_config,
             min_trades=min_trades_full_candidate,
+            protocol_hash=protocol_hash,
+            search_space_param_names=active_param_names,
+            baseline_version=base_settings.config_hash,
         )
     finally:
         conn.close()

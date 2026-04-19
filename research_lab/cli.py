@@ -76,6 +76,26 @@ def _load_recommendation(store_path: Path, candidate_id: str) -> RecommendationD
     )
 
 
+def _load_pareto_seed_vectors(seed_path: Path) -> list[dict[str, Any]]:
+    payload = json.loads(seed_path.read_text(encoding="utf-8"))
+    if isinstance(payload, dict):
+        candidates = payload.get("pareto_ranked", [])
+    elif isinstance(payload, list):
+        candidates = payload
+    else:
+        raise ValueError(f"Unsupported Pareto seed format in {seed_path}")
+
+    seed_vectors: list[dict[str, Any]] = []
+    for index, candidate in enumerate(candidates, start=1):
+        if not isinstance(candidate, dict):
+            raise ValueError(f"Invalid Pareto candidate at index {index} in {seed_path}")
+        params = candidate.get("params")
+        if not isinstance(params, dict):
+            raise ValueError(f"Pareto candidate at index {index} is missing params in {seed_path}")
+        seed_vectors.append(dict(params))
+    return seed_vectors
+
+
 def _get_blocking_promotion_risks(risks: tuple[str, ...]) -> tuple[str, ...]:
     return tuple(dict.fromkeys(risk for risk in risks if risk in PROMOTION_BLOCKING_RISKS))
 
@@ -97,6 +117,7 @@ def _build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--max-sweep-rate", type=float, default=0.5)
     optimize.add_argument("--optuna-storage-path", type=Path, default=None)
     optimize.add_argument("--warm-start-from-store", action="store_true", default=False)
+    optimize.add_argument("--warm-start-ignore-protocol", action="store_true", default=False)
     optimize.add_argument("--multivariate-tpe", action="store_true", default=False)
 
     replay = sub.add_parser("replay-candidate", help="Replay one candidate and rebuild walk-forward artifacts.")
@@ -118,6 +139,7 @@ def _build_parser() -> argparse.ArgumentParser:
     autoresearch.add_argument("--protocol-path", type=Path, default=None)
     autoresearch.add_argument("--seed", type=int, default=42)
     autoresearch.add_argument("--max-candidates", type=int, default=10)
+    autoresearch.add_argument("--seed-from-pareto", type=Path, default=None)
 
     report = sub.add_parser("build-report", help="Build experiment report from store.")
     report.add_argument("--store-path", type=Path, default=None)
@@ -169,6 +191,7 @@ def main(argv: list[str] | None = None) -> None:
             max_sweep_rate=float(args.max_sweep_rate),
             optuna_storage_path=args.optuna_storage_path,
             warm_start_from_store=bool(args.warm_start_from_store),
+            warm_start_ignore_protocol=bool(args.warm_start_ignore_protocol),
             multivariate_tpe=bool(args.multivariate_tpe),
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
@@ -200,6 +223,9 @@ def main(argv: list[str] | None = None) -> None:
         end_ts = _parse_iso_datetime(args.end_date, is_end=True)
         if end_ts <= start_ts:
             raise ValueError("--end-date must be later than --start-date.")
+        priority_seed_vectors = None
+        if args.seed_from_pareto is not None:
+            priority_seed_vectors = _load_pareto_seed_vectors(args.seed_from_pareto)
         report = run_autoresearch_loop(
             source_db_path=source_db_path,
             store_path=store_path,
@@ -214,6 +240,7 @@ def main(argv: list[str] | None = None) -> None:
             protocol_path=args.protocol_path,
             seed=int(args.seed),
             max_candidates=int(args.max_candidates),
+            priority_seed_vectors=priority_seed_vectors,
         )
         summary = {
             "run_id": report.run_id,

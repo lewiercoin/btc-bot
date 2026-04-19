@@ -9,18 +9,20 @@ import pytest
 
 from backtest.backtest_runner import BacktestConfig
 from research_lab.autoresearch_loop import run_autoresearch_loop
-from research_lab.baseline_gate import BaselineGateError, check_baseline
+from research_lab.baseline_gate import BaselineGateError, check_baseline, check_baseline_hard, check_baseline_soft
 from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
 from research_lab.constants import PARAM_STATUS_ACTIVE, PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
-from research_lab.experiment_store import init_store, save_recommendation, save_trial, save_walkforward
+from research_lab.experiment_store import init_store, load_trials, load_trials_filtered, save_recommendation, save_trial, save_walkforward
+from research_lab.objective import build_search_space_signature, build_trial_context_signature
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
 from research_lab.protocol import hash_protocol
 from research_lab.reporter import build_experiment_report
 from research_lab.settings_adapter import build_candidate_settings, diff_settings
 from research_lab.types import (
+    AutoresearchCandidateResult,
     NestedWalkForwardCandidateSummary,
     NestedWalkForwardReport,
     ObjectiveMetrics,
@@ -30,7 +32,9 @@ from research_lab.types import (
     WalkForwardReport,
     WalkForwardWindow,
 )
+from research_lab import baseline_gate as baseline_gate_module
 from research_lab import autoresearch_loop as autoresearch_loop_module
+from research_lab import cli as cli_module
 from research_lab.integrations import optuna_driver as optuna_driver_module
 from research_lab import walkforward as walkforward_module
 from research_lab.workflows import optimize_loop as optimize_loop_module
@@ -382,19 +386,145 @@ def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
     assert saved_trials[0].metrics.trades_count == 85
 
 
-def test_enqueue_warm_start_trials_falls_back_to_history_when_protocol_hash_changes(
+def test_warm_start_filters_mismatched_protocol(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
 ) -> None:
     settings = load_settings(project_root=tmp_path)
     study = _FakeOptunaStudy()
     store_path = tmp_path / "research_lab.db"
-    store_path.write_text("", encoding="utf-8")
-    historical_trial = TrialEvaluation(
-        trial_id="historical-winner",
+    build_param_registry()
+    active_param_names = tuple(get_active_params().keys())
+    search_space_signature = build_search_space_signature(active_param_names)
+    mismatched_search_space_signature = build_search_space_signature(("tp1_atr_mult", "tp2_atr_mult"))
+    matching_trial = TrialEvaluation(
+        trial_id="historical-match",
         params={
             "allow_long_in_uptrend": True,
             "tp1_atr_mult": 2.5,
+            "tp2_atr_mult": 4.0,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.6363,
+            profit_factor=1.6165,
+            max_drawdown_pct=0.4049,
+            trades_count=339,
+            sharpe_ratio=3.33,
+            pnl_abs=118433.35,
+            win_rate=0.277,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="run13-protocol-hash",
+        search_space_signature=search_space_signature,
+    )
+    mismatched_protocol_trial = TrialEvaluation(
+        trial_id="historical-old-protocol",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.8,
+            "tp2_atr_mult": 4.2,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.5,
+            profit_factor=1.5,
+            max_drawdown_pct=0.35,
+            trades_count=250,
+            sharpe_ratio=2.0,
+            pnl_abs=5000.0,
+            win_rate=0.4,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="run12-protocol-hash",
+        search_space_signature=search_space_signature,
+    )
+    mismatched_search_trial = TrialEvaluation(
+        trial_id="historical-old-search-space",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.9,
+            "tp2_atr_mult": 4.4,
+        },
+        metrics=ObjectiveMetrics(
+            expectancy_r=0.55,
+            profit_factor=1.55,
+            max_drawdown_pct=0.33,
+            trades_count=260,
+            sharpe_ratio=2.1,
+            pnl_abs=5200.0,
+            win_rate=0.41,
+        ),
+        funnel=SignalFunnel(
+            signals_generated=10,
+            signals_regime_blocked=1,
+            signals_governance_rejected=1,
+            signals_risk_rejected=1,
+            signals_executed=7,
+        ),
+        rejected_reason=None,
+        protocol_hash="run13-protocol-hash",
+        search_space_signature=mismatched_search_space_signature,
+    )
+
+    save_trial(matching_trial, store_path)
+    save_trial(mismatched_protocol_trial, store_path)
+    save_trial(mismatched_search_trial, store_path)
+
+    filtered_trials = load_trials_filtered(
+        store_path,
+        "run13-protocol-hash",
+        search_space_signature,
+    )
+
+    monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
+    monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
+
+    with caplog.at_level("WARNING"):
+        optuna_driver_module._enqueue_warm_start_trials(
+            study,
+            base_settings=settings,
+            store_path=store_path,
+            protocol_hash="run13-protocol-hash",
+            warm_start_top_n=1,
+        )
+
+    assert [trial.trial_id for trial in filtered_trials] == [matching_trial.trial_id]
+    assert study.enqueued_params[0] == matching_trial.params
+    assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
+    assert "Warm-start skipped 2 historical trial(s) due to protocol/search-space mismatch." in caplog.text
+
+
+def test_enqueue_warm_start_ignore_protocol_bypasses_filters(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    study = _FakeOptunaStudy()
+    store_path = tmp_path / "research_lab.db"
+    build_param_registry()
+    active_param_names = tuple(get_active_params().keys())
+    search_space_signature = build_search_space_signature(active_param_names)
+    historical_trial = TrialEvaluation(
+        trial_id="historical-bypass",
+        params={
+            "allow_long_in_uptrend": True,
+            "tp1_atr_mult": 2.5,
+            "tp2_atr_mult": 4.0,
         },
         metrics=ObjectiveMetrics(
             expectancy_r=0.6363,
@@ -414,130 +544,27 @@ def test_enqueue_warm_start_trials_falls_back_to_history_when_protocol_hash_chan
         ),
         rejected_reason=None,
         protocol_hash="run12-protocol-hash",
+        search_space_signature=search_space_signature,
     )
 
-    monkeypatch.setattr(optuna_driver_module, "load_trials", lambda store_path: [historical_trial])
+    save_trial(historical_trial, store_path)
+
     monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
     monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
 
-    optuna_driver_module._enqueue_warm_start_trials(
-        study,
-        base_settings=settings,
-        store_path=store_path,
-        protocol_hash="run13-protocol-hash",
-        warm_start_top_n=1,
-    )
+    with caplog.at_level("WARNING"):
+        optuna_driver_module._enqueue_warm_start_trials(
+            study,
+            base_settings=settings,
+            store_path=store_path,
+            protocol_hash="run13-protocol-hash",
+            warm_start_top_n=1,
+            warm_start_ignore_protocol=True,
+        )
 
     assert study.enqueued_params[0] == historical_trial.params
     assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
-
-
-def test_enqueue_warm_start_fallback_skips_incompatible_and_overfit_history(
-    tmp_path: Path,
-    monkeypatch: pytest.MonkeyPatch,
-) -> None:
-    settings = load_settings(project_root=tmp_path)
-    study = _FakeOptunaStudy()
-    store_path = tmp_path / "research_lab.db"
-    store_path.write_text("", encoding="utf-8")
-    incompatible_trial = TrialEvaluation(
-        trial_id="historical-incompatible",
-        params={
-            "allow_long_in_uptrend": True,
-            "tp1_atr_mult": 9.9,
-            "max_open_positions": 4,
-        },
-        metrics=ObjectiveMetrics(
-            expectancy_r=0.9,
-            profit_factor=1.8,
-            max_drawdown_pct=0.3,
-            trades_count=250,
-            sharpe_ratio=2.0,
-            pnl_abs=1000.0,
-            win_rate=0.5,
-        ),
-        funnel=SignalFunnel(
-            signals_generated=10,
-            signals_regime_blocked=1,
-            signals_governance_rejected=1,
-            signals_risk_rejected=1,
-            signals_executed=7,
-        ),
-        rejected_reason=None,
-        protocol_hash="old-hash",
-    )
-    overfit_trial = TrialEvaluation(
-        trial_id="historical-overfit",
-        params={
-            "allow_long_in_uptrend": True,
-            "tp1_atr_mult": 2.5,
-            "tp2_atr_mult": 4.0,
-        },
-        metrics=ObjectiveMetrics(
-            expectancy_r=1.5,
-            profit_factor=999999.0,
-            max_drawdown_pct=0.2,
-            trades_count=120,
-            sharpe_ratio=4.0,
-            pnl_abs=10000.0,
-            win_rate=0.9,
-        ),
-        funnel=SignalFunnel(
-            signals_generated=10,
-            signals_regime_blocked=1,
-            signals_governance_rejected=1,
-            signals_risk_rejected=1,
-            signals_executed=7,
-        ),
-        rejected_reason=None,
-        protocol_hash="old-hash",
-    )
-    compatible_trial = TrialEvaluation(
-        trial_id="historical-run12-26",
-        params={
-            "allow_long_in_uptrend": True,
-            "tp1_atr_mult": 2.5,
-            "tp2_atr_mult": 4.0,
-            "weight_ema_trend_alignment": 0.25,
-        },
-        metrics=ObjectiveMetrics(
-            expectancy_r=0.6363,
-            profit_factor=1.6165,
-            max_drawdown_pct=0.4049,
-            trades_count=339,
-            sharpe_ratio=3.33,
-            pnl_abs=118433.35,
-            win_rate=0.277,
-        ),
-        funnel=SignalFunnel(
-            signals_generated=10,
-            signals_regime_blocked=1,
-            signals_governance_rejected=1,
-            signals_risk_rejected=1,
-            signals_executed=7,
-        ),
-        rejected_reason=None,
-        protocol_hash="run12-protocol-hash",
-    )
-
-    monkeypatch.setattr(
-        optuna_driver_module,
-        "load_trials",
-        lambda store_path: [incompatible_trial, overfit_trial, compatible_trial],
-    )
-    monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
-    monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
-
-    optuna_driver_module._enqueue_warm_start_trials(
-        study,
-        base_settings=settings,
-        store_path=store_path,
-        protocol_hash="run13-protocol-hash",
-        warm_start_top_n=3,
-    )
-
-    assert study.enqueued_params[0] == compatible_trial.params
-    assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
+    assert "Unsafe warm-start enabled: ignoring protocol/search-space filters for historical trials." in caplog.text
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
@@ -687,6 +714,103 @@ def test_build_approval_bundle_cli_writes_files_for_clean_recommendation(tmp_pat
     assert (output_dir / "candidate_settings.json").exists()
 
 
+def test_optimize_cli_passes_warm_start_ignore_protocol(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    captured_kwargs: dict[str, object] = {}
+
+    monkeypatch.setattr(cli_module, "load_settings", lambda project_root=None, *, profile="research": settings)
+    monkeypatch.setattr(
+        cli_module,
+        "_default_paths",
+        lambda: (tmp_path / "source.db", tmp_path / "research_lab.db", tmp_path / "snapshots"),
+    )
+
+    def fake_run_optimize_loop(**kwargs):
+        captured_kwargs.update(kwargs)
+        return {"status": "ok"}
+
+    monkeypatch.setattr(cli_module, "run_optimize_loop", fake_run_optimize_loop)
+
+    research_lab_main(
+        [
+            "optimize",
+            "--start-date",
+            "2025-01-01",
+            "--end-date",
+            "2025-03-31",
+            "--warm-start-from-store",
+            "--warm-start-ignore-protocol",
+        ]
+    )
+
+    assert captured_kwargs["warm_start_from_store"] is True
+    assert captured_kwargs["warm_start_ignore_protocol"] is True
+
+
+def test_autoresearch_cli_loads_seed_vectors_from_pareto_json(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    output_dir = tmp_path / "autoresearch_output"
+    pareto_path = tmp_path / "pareto.json"
+    pareto_path.write_text(
+        json.dumps(
+            {
+                "pareto_ranked": [
+                    {"params": {"tp1_atr_mult": 2.5, "tp2_atr_mult": 4.0}},
+                    {"params": {"tp1_atr_mult": 2.8, "tp2_atr_mult": 4.4}},
+                ]
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+    captured_kwargs: dict[str, object] = {}
+
+    monkeypatch.setattr(cli_module, "load_settings", lambda project_root=None, *, profile="research": settings)
+    monkeypatch.setattr(
+        cli_module,
+        "_default_paths",
+        lambda: (tmp_path / "source.db", tmp_path / "research_lab.db", tmp_path / "snapshots"),
+    )
+
+    def fake_run_autoresearch_loop(**kwargs):
+        captured_kwargs.update(kwargs)
+        return SimpleNamespace(
+            run_id="loop-001",
+            candidates_evaluated=0,
+            candidates_blocked=0,
+            stop_reason="completed",
+            approval_bundle_written=False,
+            approval_bundle_candidate_id=None,
+        )
+
+    monkeypatch.setattr(cli_module, "run_autoresearch_loop", fake_run_autoresearch_loop)
+
+    research_lab_main(
+        [
+            "autoresearch",
+            "--start-date",
+            "2025-01-01",
+            "--end-date",
+            "2025-03-31",
+            "--output-dir",
+            str(output_dir),
+            "--seed-from-pareto",
+            str(pareto_path),
+        ]
+    )
+
+    assert captured_kwargs["priority_seed_vectors"] == [
+        {"tp1_atr_mult": 2.5, "tp2_atr_mult": 4.0},
+        {"tp1_atr_mult": 2.8, "tp2_atr_mult": 4.4},
+    ]
+
+
 def test_baseline_gate_raises_on_empty_db(tmp_path: Path) -> None:
     schema_sql = (Path(__file__).resolve().parents[1] / "storage" / "schema.sql").read_text(encoding="utf-8")
     memory_conn = sqlite3.connect(":memory:")
@@ -720,6 +844,68 @@ def test_baseline_gate_raises_on_empty_db(tmp_path: Path) -> None:
     assert "2025-01-01" in message
     assert "2025-03-31" in message
     assert "aggtrade_buckets" in message
+
+
+def test_check_baseline_hard_raises_on_broken_pipeline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+    )
+    settings = load_settings(project_root=tmp_path)
+
+    def fail_baseline(**kwargs):
+        raise RuntimeError("runner exploded")
+
+    monkeypatch.setattr(baseline_gate_module, "_run_baseline_backtest", fail_baseline)
+
+    with pytest.raises(BaselineGateError) as exc_info:
+        check_baseline_hard(
+            source_db_path=tmp_path / "source.db",
+            backtest_config=config,
+            base_settings=settings,
+        )
+
+    assert "Broken baseline pipeline" in str(exc_info.value)
+
+
+def test_check_baseline_soft_warns_on_weak_but_evaluable_baseline(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    config = BacktestConfig(
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        initial_equity=10_000.0,
+    )
+    settings = load_settings(project_root=tmp_path)
+    expected_metrics = {
+        "trades_count": 42,
+        "expectancy_r": -0.05,
+        "profit_factor": 0.95,
+        "max_drawdown_pct": 12.5,
+        "sharpe_ratio": 0.1,
+        "pnl_abs": -50.0,
+        "win_rate": 0.48,
+    }
+
+    monkeypatch.setattr(
+        baseline_gate_module,
+        "_run_baseline_backtest",
+        lambda **kwargs: dict(expected_metrics),
+    )
+
+    summary = check_baseline_soft(
+        source_db_path=tmp_path / "source.db",
+        backtest_config=config,
+        base_settings=settings,
+    )
+
+    assert summary["warning"] == "weak_baseline"
+    assert summary["metrics"] == expected_metrics
 
 
 @pytest.mark.skip(reason="level_min_age_bars and min_hits don't exist in StrategyConfig at commit 8f2c6f2")
@@ -808,7 +994,8 @@ def test_run_optimize_loop_uses_protocol_min_trades_full_candidate(tmp_path: Pat
             )
         ]
 
-    monkeypatch.setattr(optimize_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "check_baseline_hard", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "check_baseline_soft", lambda **_: {"warning": None, "metrics": {}})
     monkeypatch.setattr(optimize_loop_module, "run_optuna_study", fake_run_optuna_study)
     monkeypatch.setattr(optimize_loop_module, "compute_pareto_frontier", lambda trials: [t for t in trials if t.rejected_reason is None])
     monkeypatch.setattr(optimize_loop_module, "rank_pareto_candidates", lambda frontier: frontier)
@@ -852,9 +1039,13 @@ def test_run_optimize_loop_uses_protocol_min_trades_full_candidate(tmp_path: Pat
     assert low_summary["trials_total"] == 1
     assert low_summary["pareto_candidates"] == 1
     assert low_summary["recommendations_saved"] == 1
+    assert "baseline_warning" in low_summary
+    assert "baseline_metrics" in low_summary
     assert high_summary["trials_total"] == 1
     assert high_summary["pareto_candidates"] == 0
     assert high_summary["recommendations_saved"] == 0
+    assert "baseline_warning" in high_summary
+    assert "baseline_metrics" in high_summary
 
 
 def test_replay_candidate_uses_protocol_min_trades_full_candidate(
@@ -914,7 +1105,7 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
         def close(self) -> None:
             return None
 
-    def fake_evaluate_candidate(connection, *, settings, backtest_config, min_trades, candidate_params=None):
+    def fake_evaluate_candidate(connection, *, settings, backtest_config, min_trades, candidate_params=None, **kwargs):
         captured_min_trades.append(int(min_trades))
         return TrialEvaluation(
             trial_id="candidate-001",
@@ -1175,7 +1366,8 @@ def test_run_optimize_loop_uses_nested_mode_when_requested(
     captured_save_walkforward: list[str] = []
     captured_nested_args: list[dict[str, object]] = []
 
-    monkeypatch.setattr(optimize_loop_module, "check_baseline", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "check_baseline_hard", lambda **_: None)
+    monkeypatch.setattr(optimize_loop_module, "check_baseline_soft", lambda **_: {"warning": None, "metrics": {}})
 
     def fake_run_nested_walkforward(**kwargs):
         captured_nested_args.append(kwargs)
@@ -1392,6 +1584,15 @@ def test_protocol_hash_persists_through_store_and_report(tmp_path: Path) -> None
         ),
         rejected_reason=None,
         protocol_hash=protocol_hash,
+        search_space_signature="space-001",
+        trial_context_signature=build_trial_context_signature(
+            protocol_hash=protocol_hash,
+            search_space_signature="space-001",
+            start_date="2025-01-01",
+            end_date="2025-03-31",
+            baseline_version="baseline-001",
+        ),
+        baseline_version="baseline-001",
     )
     report = WalkForwardReport(
         passed=True,
@@ -1424,6 +1625,17 @@ def test_protocol_hash_persists_through_store_and_report(tmp_path: Path) -> None
     assert stored_trials["recommendations"][0]["protocol_hash"] == protocol_hash
     assert stored_trials["recommendations"][0]["recommendation_json"]["protocol_hash"] == protocol_hash
 
+    stored_trial = load_trials(store_path)[0]
+    assert stored_trial.search_space_signature == "space-001"
+    assert stored_trial.trial_context_signature == build_trial_context_signature(
+        protocol_hash=protocol_hash,
+        search_space_signature="space-001",
+        start_date="2025-01-01",
+        end_date="2025-03-31",
+        baseline_version="baseline-001",
+    )
+    assert stored_trial.baseline_version == "baseline-001"
+
 
 def test_init_store_creates_protocol_hash_columns_in_fresh_schema(tmp_path: Path) -> None:
     store_path = tmp_path / "fresh_research_lab.db"
@@ -1448,6 +1660,10 @@ def test_init_store_creates_protocol_hash_columns_in_fresh_schema(tmp_path: Path
         conn.close()
 
     assert trials_columns["protocol_hash"] == "TEXT"
+    assert trials_columns["search_space_signature"] == "TEXT"
+    assert trials_columns["regime_signature"] == "TEXT"
+    assert trials_columns["trial_context_signature"] == "TEXT"
+    assert trials_columns["baseline_version"] == "TEXT"
     assert walkforward_columns["protocol_hash"] == "TEXT"
     assert recommendations_columns["protocol_hash"] == "TEXT"
 
@@ -1469,13 +1685,13 @@ def test_autoresearch_loop_single_pass_produces_ranked_loop_report(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "_generate_candidate_vectors",
-        lambda **_: [dict(vector) for vector in generated_vectors],
+        lambda **_: [(dict(vector), "") for vector in generated_vectors],
     )
     _patch_autoresearch_snapshot_io(tmp_path, monkeypatch)
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None, **kwargs: _trial_with_params(
             trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult),
@@ -1537,13 +1753,13 @@ def test_autoresearch_loop_all_candidates_blocked_writes_no_bundle(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "_generate_candidate_vectors",
-        lambda **_: [dict(vector) for vector in generated_vectors],
+        lambda **_: [(dict(vector), "") for vector in generated_vectors],
     )
     _patch_autoresearch_snapshot_io(tmp_path, monkeypatch)
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None, **kwargs: _trial_with_params(
             trial_id=f"candidate-{settings.strategy.tp1_atr_mult:.2f}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult),
@@ -1583,6 +1799,53 @@ def test_autoresearch_loop_all_candidates_blocked_writes_no_bundle(
     assert (output_dir / "loop_report.json").exists()
     assert report.approval_bundle_written is False
     assert (output_dir / "approval_bundle").exists() is False
+
+
+def test_rank_key_prefers_low_dd_over_high_pf() -> None:
+    walkforward_report = WalkForwardReport(
+        passed=True,
+        windows_total=2,
+        windows_passed=2,
+        is_degradation_pct=0.0,
+        fragile=False,
+        reasons=(),
+    )
+    low_dd = AutoresearchCandidateResult(
+        candidate_id="low-dd",
+        params={"tp1_atr_mult": 2.0},
+        hypothesis_rationale="",
+        evaluation=_trial_with_params(
+            trial_id="low-dd",
+            params={"tp1_atr_mult": 2.0},
+            expectancy_r=0.5,
+            profit_factor=1.2,
+            max_drawdown_pct=5.0,
+            trades_count=50,
+        ),
+        walkforward_report=walkforward_report,
+        blocking_risks=(),
+        rank=0,
+    )
+    high_pf = AutoresearchCandidateResult(
+        candidate_id="high-pf",
+        params={"tp1_atr_mult": 2.1},
+        hypothesis_rationale="",
+        evaluation=_trial_with_params(
+            trial_id="high-pf",
+            params={"tp1_atr_mult": 2.1},
+            expectancy_r=0.5,
+            profit_factor=2.0,
+            max_drawdown_pct=10.0,
+            trades_count=50,
+        ),
+        walkforward_report=walkforward_report,
+        blocking_risks=(),
+        rank=0,
+    )
+
+    ranked = sorted([high_pf, low_dd], key=autoresearch_loop_module._rank_key)
+
+    assert [result.candidate_id for result in ranked] == ["low-dd", "high-pf"]
 
 
 def test_autoresearch_loop_baseline_gate_failure_writes_empty_report(
@@ -1655,7 +1918,7 @@ def test_autoresearch_loop_ranking_is_deterministic(
     monkeypatch.setattr(
         autoresearch_loop_module,
         "evaluate_candidate",
-        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None: _trial_with_params(
+        lambda connection, *, settings, backtest_config, min_trades, candidate_params=None, **kwargs: _trial_with_params(
             trial_id=f"candidate-{settings.config_hash[:12]}",
             params={},
             expectancy_r=float(settings.strategy.tp1_atr_mult) + float(settings.strategy.tp2_atr_mult) / 10.0,
