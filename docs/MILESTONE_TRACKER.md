@@ -1,18 +1,55 @@
 # Milestone Tracker
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ---
 
 ## Current Active Milestone
 
-**None** — awaiting user strategic decision
+**EXPERIMENT-V1-THROUGHPUT** — DEPLOYED & COLLECTING DATA (branch: `experiment-v1-unblock-filters`)
 
-**Context:** UPTREND-PULLBACK-EVAL-V1 (DONE, commit 5668ccd) delivered conclusive evidence: current pullback path has no edge. Structural issues in geometry + uniqueness, not threshold tuning problem.
+**Note:** Full Experiment V1 details are tracked in the experiment branch. Main branch tracks post-experiment planning.
 
-**Strategic decision required:** Abandon / Redesign / Pivot to alternative uptrend hypothesis
+**Next planned milestone:** DATA-INTEGRITY-V1 (after Experiment v1 Day 14: 2026-05-04)  
+**Handoff prepared:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md`  
+**Builder assigned:** Codex  
+**Auditor:** Claude Code
 
-**Previous milestone:** UPTREND-PULLBACK-EVAL-V1 (DONE, 2026-04-19, commit 5668ccd)
+---
+
+## Next Milestone: DATA-INTEGRITY-V1 (Post-Experiment V1)
+
+**Status:** PLANNING — ready for implementation after Experiment v1 checkpoint
+
+**Start date:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
+
+**Goal:** Make decision-path data **restart-safe, coverage-aware, and quality-explicit**.
+
+**Architecture:** Persistence + bootstrap > restart-from-zero warmup
+
+**Scope:** Data reliability infrastructure only (OI persistence, CVD persistence, flow completeness, funding integrity, quality visibility)
+
+**Out of scope:** Session modeling, execution realism, parameter tuning, new data sources
+
+**Documentation:**
+- **Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready for Codex)
+- **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
+
+**Implementation branch:** `data-integrity-v1` (will be created from main)
+
+**Merge gate:** Claude Code audit verdict = DONE (after Task 7)
+
+**Post-milestone validation:** Experiment v2 (same config as Experiment v1, but with clean data contracts)
+
+---
+
+## Previous Milestone: UPTREND-PULLBACK-EVAL-V1
+
+**Status:** DONE (2026-04-19, commit 5668ccd)
+
+**Context:** Delivered conclusive evidence that current pullback path has no edge. Structural issues in geometry + uniqueness, not threshold tuning problem.
+
+**Strategic decision:** Uptrend path deferred. Focus shifted to data integrity + modeling improvements.
 
 ---
 
