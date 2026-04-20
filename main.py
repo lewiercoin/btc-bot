@@ -7,15 +7,29 @@ import signal
 from logging.handlers import RotatingFileHandler
 
 from orchestrator import BotOrchestrator
-from settings import load_settings
+from settings import BotMode, load_settings
 from storage.db import connect, init_db
 
 LOG = logging.getLogger(__name__)
 
 
+def _parse_settings_profile(raw: str) -> str:
+    profile = raw.strip().lower()
+    if profile not in {"live", "experiment"}:
+        raise ValueError(f"Invalid BOT_SETTINGS_PROFILE={raw!r}. Use 'live' or 'experiment'.")
+    return profile
+
+
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
+    default_profile = _parse_settings_profile(os.getenv("BOT_SETTINGS_PROFILE", "live"))
     parser = argparse.ArgumentParser(description="BTC bot entrypoint")
     parser.add_argument("--mode", choices=["PAPER", "LIVE"], help="override BOT_MODE env")
+    parser.add_argument(
+        "--settings-profile",
+        choices=["live", "experiment"],
+        default=default_profile,
+        help="runtime settings profile (default: BOT_SETTINGS_PROFILE or live)",
+    )
     parser.add_argument("--log-level", default="INFO", help="logging level (e.g. INFO, DEBUG)")
     return parser.parse_args(argv)
 
@@ -62,16 +76,31 @@ def main(argv: list[str] | None = None) -> None:
     args = parse_args(argv)
     if args.mode:
         os.environ["BOT_MODE"] = args.mode.upper()
+    os.environ["BOT_SETTINGS_PROFILE"] = args.settings_profile
 
-    settings = load_settings(profile="live")
+    settings = load_settings(profile=args.settings_profile)
+    if args.settings_profile == "experiment" and settings.mode == BotMode.LIVE:
+        raise ValueError("The 'experiment' settings profile is PAPER-only. Use mode PAPER.")
     assert settings.storage is not None
 
     configure_logging(logs_dir=settings.storage.logs_dir, level=args.log_level)
     LOG.info(
-        "Starting bot | mode=%s | symbol=%s | config_hash=%s",
+        "Starting bot | mode=%s | profile=%s | symbol=%s | config_hash=%s",
         settings.mode.value,
+        args.settings_profile,
         settings.strategy.symbol,
         settings.config_hash,
+    )
+    LOG.info(
+        "Runtime settings | settings_profile=%s | mode=%s | confluence_min=%.2f | min_rr=%.2f | "
+        "max_trades_per_day=%d | max_open_positions=%d | regime_whitelist[crowded_leverage]=%s",
+        args.settings_profile,
+        settings.mode.value,
+        settings.strategy.confluence_min,
+        settings.risk.min_rr,
+        settings.risk.max_trades_per_day,
+        settings.risk.max_open_positions,
+        ",".join(settings.strategy.regime_direction_whitelist.get("crowded_leverage", ())),
     )
 
     conn = connect(settings.storage.db_path)

@@ -1,16 +1,41 @@
 # Milestone Tracker
 
-Last updated: 2026-04-19
+Last updated: 2026-04-20
 
 ---
 
 ## Current Active Milestone
 
-**None** — awaiting user strategic decision
+**EXPERIMENT-V1-THROUGHPUT** — ACTIVE (branch: `experiment-v1`)
 
-**Context:** UPTREND-PULLBACK-EVAL-V1 (DONE, commit 5668ccd) delivered conclusive evidence: current pullback path has no edge. Structural issues in geometry + uniqueness, not threshold tuning problem.
+**Active builder:** Codex
 
-**Strategic decision required:** Abandon / Redesign / Pivot to alternative uptrend hypothesis
+**Context:** Live paper observations indicate the current runtime is healthy and capable of detecting opportunity structure, but the signal-to-trade bridge is too restrictive to collect a usable sample. The immediate goal is to test whether opportunity loss comes primarily from direction resolution, regime whitelist policy, and late governance/risk gates.
+
+**What:** Add an explicit PAPER-only `experiment` settings profile that relaxes runtime thresholds without mutating the research baseline.
+
+**Why:** The next decision should be based on a larger live-paper sample. At the moment, throughput is too low to separate setup quality from gating logic with confidence.
+
+**Acceptance criteria:**
+- explicit `experiment` runtime profile exists in `settings.py`
+- `main.py` and paper runner can launch the experiment profile directly
+- `research` profile remains unchanged
+- tracker + analysis doc define experiment scope, hypotheses, metrics, and stop conditions
+- focused settings tests pass
+
+**In-scope:**
+- runtime-only profile wiring
+- signal/governance/risk threshold relaxation for paper throughput validation
+- operator-facing documentation for Experiment V1
+
+**Out-of-scope:**
+- research-lab promotion
+- time-of-day logic
+- uptrend-pullback redesign
+- execution-engine redesign
+- claiming edge validation before enough live-paper trades exist
+
+**Report:** `docs/analysis/EXPERIMENT_V1_2026-04-20.md`
 
 **Previous milestone:** UPTREND-PULLBACK-EVAL-V1 (DONE, 2026-04-19, commit 5668ccd)
 
@@ -1156,29 +1181,29 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 | 2026-04-12 | SIGNAL-REVERT-V1: restore 8f2c6f2 + min_hits=3 | ACTIVE — Crash Test confirmed safe |
 | 2026-04-12 | SOFT-PENALTY-V1: replace zero-vector cliff | ACTIVE — TPE death spiral broken |
 | 2026-04-12 | Anti-overfitting guard: cap PF>5.0 | ACTIVE — deployed at trial #88 |
-| 2026-04-17 | Live vs Research Settings Split | ACTIVE — live overrides for relaxed signal thresholds |
+| 2026-04-17 | Live vs Research Settings Split | ACTIVE — live runtime diverges from research baseline |
+| 2026-04-20 | Experiment V1 runtime profile | ACTIVE — paper-only throughput profile added for signal-to-trade validation |
 
 ## Live vs Research Settings Split (2026-04-17)
 
- **Decision:** Live bot and research lab use different signal thresholds.
+ **Decision:** Research, live, and experiment runtime profiles are intentionally separated.
 
  **Why:**
- - Trial #63 params (`min_sweep_depth_pct=0.00286`, `confluence_min=3.6`) passed walk-forward on 2022-2026 backtest data.
- - The same params produce zero signals in the live April 2026 market.
  - Research reproducibility requires stable dataclass defaults.
- - Live incident recovery needs immediate threshold relaxation.
+ - Runtime paper/live operation needs explicit, auditable profile selection.
+ - Experiment V1 needs a higher-throughput PAPER profile without silently rewriting the research baseline.
 
  **Implementation:**
- - `settings.py`: `StrategyConfig` dataclass defaults remain Trial #63 values as the research baseline.
- - `load_settings(profile="live")`: applies live runtime overrides `min_sweep_depth_pct=0.0001` and `confluence_min=3.0`.
- - `load_settings(profile="research")`: uses the unmodified dataclass defaults.
- - `main.py`: calls `load_settings(profile="live")`.
- - `research_lab/cli.py`: calls `load_settings(profile="research")`.
+ - `load_settings(profile="research")`: uses the baseline dataclass defaults.
+ - `load_settings(profile="live")`: applies the current runtime overrides used by the bot.
+ - `load_settings(profile="experiment")`: applies PAPER-only throughput overrides for Experiment V1.
+ - `main.py`: supports explicit runtime selection via `--settings-profile`.
+ - `research_lab/cli.py`: remains pinned to `profile="research"`.
 
  **Important:**
  - `settings.py` is not a candidate promotion channel.
- - Live overrides are runtime-only and do not affect the research param registry or warm-start baseline.
- - Future research campaigns continue using the Trial #63 baseline unless the dataclass defaults are changed explicitly.
+ - Runtime profiles do not affect the research param registry or warm-start baseline.
+ - Experiment V1 is for PAPER throughput validation, not parameter promotion.
 
 ---
 
