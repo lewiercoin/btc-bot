@@ -188,7 +188,9 @@ Last updated: 2026-04-20
 - Document session-specific patterns observed
 - Refine DATA-INTEGRITY-V1 scope based on operational findings
 
-**Handoff Generation:** After Day 14 evaluation, generate detailed handoff for builder (Codex or Cascade)
+**Handoff Status:** ✅ **READY** — `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (on main branch)  
+**Builder assigned:** Codex  
+**Auditor:** Claude Code
 
 **No Action Required Until:** 2026-05-04 (Experiment v1 Day 14 evaluation)
 
