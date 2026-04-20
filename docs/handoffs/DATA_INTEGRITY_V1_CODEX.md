@@ -9,15 +9,19 @@
 
 ## Critical timing and merge discipline
 
-**Start date:** after Experiment v1 checkpoint/end (target date previously discussed: 2026-05-05)
+**Full implementation start:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
 
-Before that date:
-- You MAY create branch `data-integrity-v1`
-- You MAY start Task 1 design work (`FeatureQuality` model)
-- You MUST NOT merge anything to `main` before Experiment v1 checkpoint/end
-- You MUST NOT touch files in `experiment-v1-unblock-filters`
+**Pre-Day14 preparation (ALLOWED NOW):**
+- ✅ You MAY create branch `data-integrity-v1` from main NOW
+- ✅ You MAY start Task 1 design work (FeatureQuality model) NOW
+- ✅ You MAY draft schema migrations (OI samples, CVD history tables) NOW
+- ✅ You MAY scaffold tests NOW
+- ❌ You MUST NOT merge anything to `main` before Day 14 checkpoint (2026-05-04)
+- ❌ You MUST NOT deploy anything to production
+- ❌ You MUST NOT touch files in `experiment-v1-unblock-filters` branch
+- ❌ You MUST NOT contaminate Experiment v1 runtime in ANY way
 
-Why: Experiment v1 is collecting baseline data. Any change to `main` risks contaminating interpretation of the experiment.
+**Why:** Experiment v1 is collecting baseline data. Branch-only preparation is allowed, but any change to `main` or production risks contaminating the experiment.
 
 ---
 
