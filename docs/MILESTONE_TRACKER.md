@@ -192,7 +192,16 @@ Last updated: 2026-04-20
 **Builder assigned:** Codex  
 **Auditor:** Claude Code
 
-**No Action Required Until:** 2026-05-04 (Experiment v1 Day 14 evaluation)
+**Pre-Day14 Preparation (ALLOWED NOW):**
+- ✅ Create branch `data-integrity-v1` from main
+- ✅ Start Task 1 design work (FeatureQuality model)
+- ✅ Draft schema migrations (OI samples, CVD history tables)
+- ✅ Test scaffolding
+- ❌ **ZERO merge to main** before Day 14 checkpoint
+- ❌ **ZERO deploy** to production
+- ❌ **ZERO contamination** of Experiment v1 runtime
+
+**Full Implementation Start:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
 
 ---
 
