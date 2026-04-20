@@ -104,6 +104,18 @@ User does NOT need to understand technical trade-offs to approve. One sentence s
 5. Smoke tests + audits - validation
 6. `CLAUDE.md` - this file (Claude Code operating model)
 
+## Runtime Data Source
+
+**When querying bot status, trades, signals, or performance metrics:**
+
+- **MUST** query production server: `ssh root@204.168.146.253 /home/btc-bot/btc-bot/storage/btc_bot.db`
+- **MUST NOT** query local files: `c:\development\btc-bot\storage\btc_bot.db` (stale, not synchronized)
+- Use `scripts/query_bot_status.py` on server for standard queries
+- Text logs (`btc_bot.log`) don't contain trade details - use SQLite database
+- Dashboard reads from server database - you must too
+
+**Full guidance:** `docs/DATA_SOURCES.md`
+
 ## Audit Standard
 
 ### What to check (in order)

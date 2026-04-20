@@ -235,11 +235,18 @@ This project uses a structured generator-evaluator workflow:
   - deployed process/service
   - deployed commit
   - deployed config / environment
-  - active database
+  - active database (**on production server, not local files**)
   - current logs / audit trail
+  - **See `docs/DATA_SOURCES.md` for how to query runtime data**
 
 If documents conflict on workflow, role assignment, or authority chain, `AGENTS.md` wins.
 If documents conflict on live runtime state, runtime artifacts win over markdown files.
+
+**CRITICAL for runtime queries:**
+- Bot status/trades/signals MUST query production server: `ssh root@204.168.146.253`
+- Local `storage/btc_bot.db` is NOT synchronized (stale data)
+- Use `scripts/query_bot_status.py` on server
+- Full guidance: `docs/DATA_SOURCES.md`
 
 ---
 
