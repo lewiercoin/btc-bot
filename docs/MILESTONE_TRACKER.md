@@ -6,9 +6,12 @@ Last updated: 2026-04-20
 
 ## Current Active Milestone
 
-**EXPERIMENT-V1-THROUGHPUT** — ACTIVE (branch: `experiment-v1`)
+**EXPERIMENT-V1-THROUGHPUT** — DEPLOYED & COLLECTING DATA (branch: `experiment-v1-unblock-filters`)
 
-**Active builder:** Codex
+**Active builder:** Codex  
+**Deployment:** 2026-04-20 09:57 UTC (production server)  
+**Commit:** 1128284  
+**Status:** Day 0 - Bot running on `settings_profile=experiment`, all verification checks passed
 
 **Context:** Live paper observations indicate the current runtime is healthy and capable of detecting opportunity structure, but the signal-to-trade bridge is too restrictive to collect a usable sample. The immediate goal is to test whether opportunity loss comes primarily from direction resolution, regime whitelist policy, and late governance/risk gates.
 
@@ -16,12 +19,27 @@ Last updated: 2026-04-20
 
 **Why:** The next decision should be based on a larger live-paper sample. At the moment, throughput is too low to separate setup quality from gating logic with confidence.
 
+**Evaluation Window:** 14 days (2026-04-20 → 2026-05-04)
+
+**Target Metrics (Day 14):**
+- Trade frequency: >0.5/day (baseline: 0.21/day)
+- Reclaim execution rate: >20% (baseline: 0%)
+- Total trades: >10 (baseline: 1 in 5 days)
+
+**Checkpoints:**
+- Day 1 (2026-04-21): Stability check, first trades
+- Day 3 (2026-04-23): Throughput trend verification
+- Day 7 (2026-04-27): Mid-point evaluation
+- Day 14 (2026-05-04): Final evaluation vs success criteria
+
 **Acceptance criteria:**
-- explicit `experiment` runtime profile exists in `settings.py`
-- `main.py` and paper runner can launch the experiment profile directly
-- `research` profile remains unchanged
-- tracker + analysis doc define experiment scope, hypotheses, metrics, and stop conditions
-- focused settings tests pass
+- ✅ explicit `experiment` runtime profile exists in `settings.py`
+- ✅ `main.py` and paper runner can launch the experiment profile directly
+- ✅ `research` profile remains unchanged
+- ✅ tracker + analysis doc define experiment scope, hypotheses, metrics, and stop conditions
+- ✅ focused settings tests pass (173/197 passed)
+- ✅ deployed to production with verification
+- ⏳ 14-day data collection (in progress)
 
 **In-scope:**
 - runtime-only profile wiring
@@ -35,9 +53,144 @@ Last updated: 2026-04-20
 - execution-engine redesign
 - claiming edge validation before enough live-paper trades exist
 
-**Report:** `docs/analysis/EXPERIMENT_V1_2026-04-20.md`
+**Report:** `docs/analysis/EXPERIMENT_V1_2026-04-20.md`  
+**Edge Data Audit:** `BOT_COMPREHENSIVE_REPORT_2026-04-20.md` (external)
 
 **Previous milestone:** UPTREND-PULLBACK-EVAL-V1 (DONE, 2026-04-19, commit 5668ccd)
+
+---
+
+## Post-Experiment V1 Roadmap (Draft v0.1)
+
+**Status:** Planning - pending Experiment v1 results (Day 14: 2026-05-04)
+
+**Context:** Dual independent audits (Claude Code + Cascade) confirmed bot has core edge data but identified critical data reliability issues that must be fixed before edge can be fully validated.
+
+**Key Findings from Code-Level Audit:**
+1. ✅ **Core edge exists:** Sweep + reclaim detection works, basic confluence functional
+2. ❌ **Data persistence gaps:** OI baseline, CVD divergence, order flow - restart-dependent
+3. ❌ **Time-of-day not modeled:** Documented 2x effect (EU vs Asian/US) ignored in decisions
+4. ❌ **PAPER fill unrealistic:** No slippage/spread modeling limits LIVE transition confidence
+
+**Strategic Principle:**
+> "Fix data reliability → Improve modeling → Add execution realism → Tune parameters"
+
+**Proposed Milestone Sequence:**
+
+### 1. DATA-INTEGRITY-V1 (Next after Exp v1)
+**Goal:** Stabilize core edge inputs - ensure data survives restarts and WS failures
+
+**Must Have:**
+- OI baseline persistence (no reset on restart)
+- Order flow fallback quality check (when aggTrades incomplete)
+- CVD memory persistence or warm-up rules
+- Funding window correctness verification
+- Feature maturity flags (`oi_baseline_mature`, `flow_window_complete`, etc.)
+
+**Should Have:**
+- Regime warm-up rules (7-14 day bootstrap period)
+- Quality degradation logging
+
+**Out of Scope:**
+- Session weighting (deferred to MODELING-V1)
+- New data sources (Long/Short ratio, etc.)
+- Execution costs (deferred to EXECUTION-REALISM-V1)
+
+**Success Criteria:**
+- Bot restart doesn't break OI zscore or CVD divergence
+- Flow fallback detects and logs incomplete data
+- Regime detection has explicit warm-up grace period
+
+### 2. MODELING-V1 (After data fixed)
+**Goal:** Improve context interpretation - session awareness, volatility adaptation
+
+**Must Have:**
+- Time-of-day / session-aware logic (EU / Asian / US distinct treatment)
+- Session-specific thresholds (reclaim buffers, confluence, direction per session)
+- Explicit session state visibility in logs
+
+**Should Have:**
+- Volatility-aware adaptation (ATR regime shifts)
+- Cleaner regime interpretation on existing inputs
+
+**Out of Scope:**
+- Data persistence fixes (done in DATA-INTEGRITY-V1)
+- Execution costs (deferred to EXECUTION-REALISM-V1)
+- New data sources requiring architecture changes
+
+**Success Criteria:**
+- Session-specific behavior measurably different
+- EU hours show different entry characteristics than Asian/US
+- Logs clearly show which session rules applied
+
+### 3. EXECUTION-REALISM-V1 (After model improved)
+**Goal:** Reduce PAPER mode optimism - model execution costs without going LIVE
+
+**Must Have:**
+- Spread cost model
+- Slippage assumptions (side-dependent)
+- Fill realism baseline (not always at reference price)
+
+**Should Have:**
+- Partial fill / timeout assumptions
+
+**Out of Scope:**
+- Full exchange simulator
+- Order book depth engine
+- LIVE infrastructure (remains PAPER but more realistic)
+
+**Success Criteria:**
+- PAPER P&L closer to realistic expectations
+- Execution costs explicitly modeled and logged
+
+### 4. OPTUNA-RECALIBRATION-V1 (Last - tune parameters)
+**Goal:** Optimize parameters after foundation is stable
+
+**Prerequisites:**
+- DATA-INTEGRITY-V1 complete
+- MODELING-V1 complete
+- EXECUTION-REALISM-V1 at least baseline complete
+- Sufficient sample of quality trades
+
+**Out of Scope:**
+- Architecture changes
+- New edge design
+- Data reliability fixes
+
+**Success Criteria:**
+- Parameter ranges validated on stable data
+- Backtests and forward tests show consistent improvement
+
+**Rationale for Sequence:**
+- Can't model on unreliable data → DATA-INTEGRITY first
+- Can't tune broken model → MODELING before OPTUNA
+- Can't trust PAPER P&L without costs → EXECUTION-REALISM before final validation
+- Optuna is for tuning working systems, not fixing broken foundations
+
+---
+
+## Next Milestone (Pending Experiment v1 Evaluation)
+
+**Target Start:** 2026-05-05 (Day after Experiment v1 completes)
+
+**Decision Point:** Based on Experiment v1 results (Day 14: 2026-05-04)
+
+**Likely Next:** DATA-INTEGRITY-V1
+
+**Conditions:**
+- If Exp v1 shows increased throughput → proceed with DATA-INTEGRITY-V1 as planned
+- If Exp v1 shows no change → deeper diagnosis required before committing to roadmap
+- If Exp v1 reveals new critical issues → roadmap may be revised
+
+**Pre-work (During Exp v1):**
+- Monitor which data quality issues manifest in practice
+- Track OI/CVD/flow degradation incidents
+- Document session-specific patterns observed
+- Refine DATA-INTEGRITY-V1 scope based on operational findings
+
+**Handoff Generation:** After Day 14 evaluation, generate detailed handoff for builder (Codex or Cascade)
+
+**No Action Required Until:** 2026-05-04 (Experiment v1 Day 14 evaluation)
 
 ---
 
