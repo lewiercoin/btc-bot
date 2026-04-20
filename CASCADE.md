@@ -106,6 +106,70 @@ Builder (Codex or Cascade) never decides what to build next. Builder receives a 
 5. Smoke tests + audits — validation
 6. `CASCADE.md` — this file (Cascade operating model)
 
+## Runtime Bot Data Source (CRITICAL)
+
+**ALWAYS query production server for bot status, trades, signals — NEVER use local files.**
+
+### The Rule
+
+When user asks about:
+- Current bot status
+- Recent trades
+- Trading performance
+- Open positions
+- Signals generated
+- Bot health
+
+**You MUST:**
+```bash
+# Query production server database
+ssh -i "c:\development\btc-bot\btc-bot-deploy-v2" root@204.168.146.253 \
+  "cd /home/btc-bot/btc-bot && python3 scripts/query_bot_status.py --summary"
+```
+
+**You MUST NOT:**
+```bash
+# ❌ WRONG - Local files are stale
+python3 -c "import sqlite3; conn = sqlite3.connect('storage/btc_bot.db'); ..."
+cat logs/btc_bot.log
+```
+
+### Why This Matters
+
+- **Local repository** = development workspace, stale data (days/weeks old)
+- **Production server** = live bot, current trades, real-time status
+- **Dashboard reads from server** = user sees server data, you must too
+
+Local `storage/btc_bot.db` is NOT synchronized with production. Querying it will give you outdated data (wrong trades, wrong status, wrong statistics).
+
+### Data Source Map
+
+| Data Type | Source | How to Query |
+|-----------|--------|--------------|
+| **Bot status** | Server: `/home/btc-bot/btc-bot/storage/btc_bot.db` | SSH + `scripts/query_bot_status.py --summary` |
+| **Recent trades** | Server: `trade_log` table | SSH + `scripts/query_bot_status.py --trades 10` |
+| **Signals** | Server: `signal_candidates` table | SSH + `scripts/query_bot_status.py --signals 10` |
+| **Code/Architecture** | Local: `c:\development\btc-bot\` | Direct file read |
+| **Blueprints** | Local: `docs/BLUEPRINT_*.md` | Direct file read |
+
+### Example: Correct Data Query
+
+```bash
+# Get current bot status
+ssh -i "c:\development\btc-bot\btc-bot-deploy-v2" root@204.168.146.253 \
+  "cd /home/btc-bot/btc-bot && python3 -c \"
+import sqlite3, json
+conn = sqlite3.connect('storage/btc_bot.db')
+cursor = conn.cursor()
+cursor.execute('SELECT * FROM trade_log WHERE date(opened_at) = date(\"now\") ORDER BY opened_at DESC LIMIT 5')
+cols = [d[0] for d in cursor.description]
+for row in cursor.fetchall():
+    print(json.dumps(dict(zip(cols, row)), indent=2, default=str))
+\""
+```
+
+**Incident:** 2026-04-20 - Cascade reported bot as "not running" and "last trade 2026-03-29" when bot was actually running (PID 300113) with fresh trade at 2026-04-20 11:15 UTC (+134.56 USD WIN). Root cause: queried local stale database instead of production server.
+
 ## Implementation Checklist
 
 Before coding, Cascade must verify:
