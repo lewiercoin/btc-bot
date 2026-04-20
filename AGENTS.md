@@ -248,6 +248,12 @@ If documents conflict on live runtime state, runtime artifacts win over markdown
 - Use `scripts/query_bot_status.py` on server
 - Full guidance: `docs/DATA_SOURCES.md`
 
+**Backup & disaster recovery:**
+- Production database: automated daily backups (2 AM UTC), 30-day retention
+- Before risky operations (migrations, major changes): run manual backup
+- Recovery procedures: `docs/DISASTER_RECOVERY.md`
+- Scripts: `scripts/backup_production_db.sh`, `scripts/restore_production_db.sh`
+
 ---
 
 ### Current Project Status

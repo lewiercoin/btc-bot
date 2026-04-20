@@ -116,6 +116,23 @@ User does NOT need to understand technical trade-offs to approve. One sentence s
 
 **Full guidance:** `docs/DATA_SOURCES.md`
 
+## Backup & Disaster Recovery Context
+
+Production database is protected by automated daily backups. When auditing or planning risky operations, consider:
+
+- **Backup status:** Daily automated (2 AM UTC), 30-day retention, 136MB compressed
+- **Location:** `/home/btc-bot/backups/database/` (server) + `c:\development\btc-bot\backups\` (local)
+- **Recovery capability:** RTO < 2h, RPO < 24h
+- **Manual backup before risky ops:** Use `scripts/backup_production_db.sh`
+
+**Audit considerations:**
+- Database schema migrations → manual backup required before
+- Major parameter changes → backup recommended
+- Experiment deployments → backup existing state
+- State integrity issues → verify backup available for rollback
+
+**Full DR plan:** `docs/DISASTER_RECOVERY.md`
+
 ## Audit Standard
 
 ### What to check (in order)
