@@ -62,7 +62,7 @@ Approval bundle is the end of the automated path. Human review and manual applic
 | `research_lab/approval.py` | Recommendation drafting and approval bundle generation without auto-promotion |
 | `research_lab/experiment_store.py` | SQLite persistence for trials, walk-forward reports, and recommendations |
 | `research_lab/db_snapshot.py` | Per-trial source DB snapshot creation and required-table verification |
-| `research_lab/baseline_gate.py` | Hard baseline contract: block optimization if the base settings do not generate enough trades |
+| `research_lab/baseline_gate.py` | Hard and soft baseline contracts: block broken baselines, warn on weak but evaluable baselines |
 | `research_lab/reporter.py` | Offline experiment report generation from the experiment store |
 | `research_lab/settings_adapter.py` | Immutable `AppSettings` candidate construction from flat parameter overrides |
 | `research_lab/sensitivity.py` | Local perturbation analysis for selected candidate parameters |
@@ -73,17 +73,25 @@ Primary optimization flow:
 
 1. `python -m research_lab optimize ...`
 2. CLI loads baseline `AppSettings`, resolves source DB, store path, snapshots directory, and protocol configuration.
-3. `baseline_gate` runs a read-only baseline backtest and blocks the workflow if the baseline contract fails.
-4. Optuna samples ACTIVE parameters from `param_registry`.
-5. Each trial is validated by `constraints.py`.
-6. Each accepted trial runs against its own copied SQLite snapshot.
-7. Trial metrics and signal funnel counts are stored in the experiment store.
-8. Pareto frontier is computed across accepted trials.
-9. Each Pareto candidate runs through walk-forward validation.
-10. Walk-forward report is persisted.
-11. `approval.build_recommendation()` converts evaluation plus walk-forward output into a recommendation draft.
-12. Recommendation draft is stored in the experiment store.
-13. `build-approval-bundle` may write human-review artifacts only if blocking promotion risks are absent.
+3. `baseline_gate` runs a read-only baseline backtest.
+4. Hard baseline checks block the workflow if the baseline is broken or nonsensical.
+5. Soft baseline checks keep the workflow running for weak but still evaluable baselines and persist warning-ready metrics in the summary.
+6. Optuna samples ACTIVE parameters from `param_registry`.
+7. Each trial is validated by `constraints.py`.
+8. Each accepted trial runs against its own copied SQLite snapshot.
+9. Trial metrics, signal funnel counts, and trial lineage are stored in the experiment store.
+10. Pareto frontier is computed across accepted trials.
+11. Each Pareto candidate runs through walk-forward validation.
+12. Walk-forward report is persisted.
+13. `approval.build_recommendation()` converts evaluation plus walk-forward output into a recommendation draft.
+14. Recommendation draft is stored in the experiment store.
+15. `build-approval-bundle` may write human-review artifacts only if blocking promotion risks are absent.
+
+Two-phase staged workflow:
+
+1. Phase 1 discovery: `optimize` is the canonical broad search stage. Warm-start history is filtered by `protocol_hash` plus `search_space_signature` by default, with an explicit unsafe bypass for operators.
+2. Phase 2 refinement: `autoresearch` is the canonical refinement stage. It is not a peer alternative to Optuna discovery. It consumes prior store history and may be explicitly seeded from Phase 1 Pareto exports through `--seed-from-pareto`.
+3. Promotion artifacts remain human-reviewed outputs only. Phase 2 may refine candidates; it may not bypass approval policy.
 
 Replay flow:
 
@@ -143,6 +151,7 @@ Current methodology supports two explicit modes:
 - In `nested` mode, each walk-forward window runs its own train-only Optuna search, the train champion is evaluated on that window's validation slice, and final candidate selection is based on aggregated out-of-sample validation results.
 - In both modes, walk-forward window pass/fail requires `min_trades_per_window` and enforces per-window protocol thresholds for `expectancy_r`, `profit_factor`, `max_drawdown_pct`, and `sharpe_ratio`.
 - Fragility still uses expectancy degradation between train and validation segments.
+- Methodology is staged, not forked: Optuna discovery is Phase 1, autoresearch refinement is Phase 2, and Pareto handoff is the supported bridge between them.
 
 The remaining methodology limitation is narrower: `post_hoc` mode is intentionally not nested, and nested mode still requires honest language about its exact aggregation and selection contract.
 
@@ -166,6 +175,9 @@ Full reproducibility requires the following fields:
 - `seed`
 - `study_name`
 - `protocol_hash`
+- `search_space_signature`
+- `trial_context_signature`
+- `baseline_version`
 - `config_hash`
 - source DB path
 - commit SHA
@@ -176,6 +188,7 @@ Current state:
 - `seed` and `study_name` are first-class CLI inputs
 - source DB path and date range are provided to workflow entrypoints
 - `protocol_hash` is derived from canonical protocol JSON and persisted with trials, walk-forward reports, recommendations, and experiment reports
+- `search_space_signature`, optional `regime_signature`, `trial_context_signature`, and `baseline_version` are persisted with trials for context-safe warm-start and replay lineage
 - commit SHA is not yet persisted in the experiment store
 
 Protocol lineage is now explicit for the current blueprint version, but full reproducibility is still incomplete until commit SHA is persisted.
@@ -285,8 +298,8 @@ The agent must not touch:
    - walkforward_passed desc
    - walkforward_fragile asc
    - expectancy_r desc
-   - profit_factor desc
    - max_drawdown_pct asc
+   - profit_factor desc
    - trades_count desc
    - candidate_id asc (deterministic tiebreak)
 
