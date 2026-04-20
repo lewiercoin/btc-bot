@@ -435,17 +435,33 @@ rm /tmp/btc_bot_test.db
 
 ---
 
-## Immediate Action Items
+## Setup Status
 
-### Setup Checklist (DO NOW for Experiment v1)
+### Completed Actions (2026-04-20)
 
-- [ ] Deploy backup script to server
-- [ ] Enable daily cron backup (2 AM UTC)
-- [ ] Create manual backup NOW (before any changes)
-- [ ] Test restore on staging/local
-- [ ] Pull first backup to local machine
-- [ ] Setup weekly local pull reminder
-- [ ] Document this in milestone tracker
+- [x] Deploy backup script to server ✅
+- [x] Enable daily cron backup (2 AM UTC) ✅
+- [x] Create manual backup NOW (before any changes) ✅
+- [x] Test backup integrity verification ✅
+- [x] Pull first backup to local machine ✅
+- [x] Document in milestone tracker ✅
+
+**Automation Status:** FULLY OPERATIONAL
+
+**Cron Schedule:**
+```
+0 2 * * * /home/btc-bot/btc-bot/scripts/backup_production_db.sh >> /var/log/btc-bot-backup.log 2>&1
+```
+
+**First Backup:** 2026-04-20 14:23 UTC (136MB compressed)  
+**Local Copy:** c:\development\btc-bot\backups\btc_bot_20260420.db.gz (136MB)  
+**Next Automated:** 2026-04-21 02:00 UTC
+
+### Weekly Maintenance
+
+- [ ] Pull backup to local (every Sunday) - use `scripts/pull_production_backup.bat`
+- [ ] Verify backup count retention (should be ~30 files)
+- [ ] Check disk space on server (should have > 10GB free)
 
 ### Commands to Run
 

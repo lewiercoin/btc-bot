@@ -170,6 +170,35 @@ for row in cursor.fetchall():
 
 **Incident:** 2026-04-20 - Cascade reported bot as "not running" and "last trade 2026-03-29" when bot was actually running (PID 300113) with fresh trade at 2026-04-20 11:15 UTC (+134.56 USD WIN). Root cause: queried local stale database instead of production server.
 
+## Backup & Disaster Recovery
+
+**Production database is protected by automated daily backups.**
+
+- **Backup schedule:** Daily 2 AM UTC (automated via cron)
+- **Location:** `/home/btc-bot/backups/database/` on production server
+- **Retention:** 30 days
+- **Compression:** ~136MB per backup (from 667MB database)
+- **Off-server copy:** `c:\development\btc-bot\backups\` (pull weekly)
+
+**When to consider backups:**
+- Before database schema migrations
+- Before risky parameter changes
+- During major milestone deployments
+- If disaster recovery needed
+
+**Recovery procedures:** See `docs/DISASTER_RECOVERY.md` for full DR plan including:
+- Server crash recovery
+- Database corruption recovery
+- Accidental data deletion recovery
+- Experiment data loss scenarios
+
+**Scripts available:**
+- `scripts/backup_production_db.sh` - Manual backup
+- `scripts/restore_production_db.sh` - Safe restore with verification
+- `scripts/pull_production_backup.bat` - Pull to local machine
+
+**RTO:** < 2 hours | **RPO:** < 24 hours
+
 ## Implementation Checklist
 
 Before coding, Cascade must verify:
