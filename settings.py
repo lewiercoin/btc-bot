@@ -48,6 +48,14 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _validate_profile(profile: str, *, allowed: tuple[str, ...]) -> str:
+    normalized = profile.strip().lower()
+    if normalized not in allowed:
+        allowed_str = "', '".join(allowed)
+        raise ValueError(f"Invalid settings profile {profile!r}. Use '{allowed_str}'.")
+    return normalized
+
+
 @dataclass(frozen=True)
 class StrategyConfig:
     symbol: str = "BTCUSDT"
@@ -268,8 +276,7 @@ def _serialize_settings(settings: AppSettings) -> dict[str, Any]:
 def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:
     root = project_root or Path(__file__).resolve().parent
     mode = _parse_mode(os.getenv("BOT_MODE", "PAPER"))
-    if profile not in {"research", "live"}:
-        raise ValueError(f"Invalid settings profile {profile!r}. Use 'research' or 'live'.")
+    profile = _validate_profile(profile, allowed=("research", "live", "experiment"))
     storage = StorageConfig(
         project_root=root,
         db_path=root / "storage" / "btc_bot.db",
@@ -294,7 +301,32 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         confluence_min=4.5,
         allow_uptrend_pullback=False,
     )
-    return dataclasses.replace(settings, strategy=live_strategy)
+    if profile == "live":
+        return dataclasses.replace(settings, strategy=live_strategy)
+
+    experiment_whitelist = {
+        regime: tuple(allowed_directions)
+        for regime, allowed_directions in live_strategy.regime_direction_whitelist.items()
+    }
+    experiment_whitelist["crowded_leverage"] = ("LONG", "SHORT")
+    experiment_strategy = dataclasses.replace(
+        live_strategy,
+        confluence_min=3.6,
+        direction_tfi_threshold=0.05,
+        direction_tfi_threshold_inverse=-0.03,
+        tfi_impulse_threshold=0.10,
+        regime_direction_whitelist=experiment_whitelist,
+    )
+    experiment_risk = dataclasses.replace(
+        settings.risk,
+        min_rr=1.6,
+        max_open_positions=2,
+        max_trades_per_day=6,
+        cooldown_minutes_after_loss=30,
+        duplicate_level_tolerance_pct=0.0004,
+        duplicate_level_window_hours=24,
+    )
+    return dataclasses.replace(settings, strategy=experiment_strategy, risk=experiment_risk)
 
 
 SETTINGS = load_settings()
