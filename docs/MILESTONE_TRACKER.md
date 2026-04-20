@@ -21,7 +21,16 @@ Last updated: 2026-04-20
 
 **Status:** PLANNING — ready for implementation after Experiment v1 checkpoint
 
-**Start date:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
+**Full implementation start:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
+
+**Pre-Day14 preparation (ALLOWED NOW):**
+- ✅ Create branch `data-integrity-v1` from main
+- ✅ Task 1 design work (FeatureQuality model)
+- ✅ Draft schema migrations (OI samples, CVD history tables)
+- ✅ Test scaffolding
+- ❌ **ZERO merge to main** before Day 14
+- ❌ **ZERO deploy** to production
+- ❌ **ZERO contamination** of Experiment v1
 
 **Goal:** Make decision-path data **restart-safe, coverage-aware, and quality-explicit**.
 
@@ -35,7 +44,7 @@ Last updated: 2026-04-20
 - **Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready for Codex)
 - **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
 
-**Implementation branch:** `data-integrity-v1` (will be created from main)
+**Implementation branch:** `data-integrity-v1` (create from main)
 
 **Merge gate:** Claude Code audit verdict = DONE (after Task 7)
 
