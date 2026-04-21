@@ -44,7 +44,8 @@ Last updated: 2026-04-20
 - **Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready for Codex)
 - **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
 
-**Implementation branch:** `data-integrity-v1` (create from main)
+**Implementation branch:** `data-integrity-v1` ✅ **PUSHED to origin** (backup/visibility only)  
+**Branch status:** Pre-Day14 scaffolding approved, **BLOCKED from merge until 2026-05-04**
 
 **Merge gate:** Claude Code audit verdict = DONE (after Task 7)
 
