@@ -102,3 +102,27 @@ Stop and reassess if:
 - rejection mix simply moves from signal gates to a new single dominant veto reason
 
 That outcome would mean the next problem is no longer throughput. It would be setup quality or edge quality.
+
+---
+
+## Conclusion (2026-04-21)
+
+**Status:** EXPERIMENT VALIDATED — Hypothesis confirmed
+
+**Decision:** Proceed with roadmap implementation (DATA-INTEGRITY-V1 → MODELING-V1)
+
+**Key findings:**
+- Filter relaxation demonstrated measurable throughput improvement
+- Hypothesis validated: opportunity loss was primarily gating-related, not edge-related
+- Data quality was not perfect during experiment, but sufficient to prove the core hypothesis
+
+**Important notes:**
+- Experiment was conducted on imperfect data (acknowledged limitation)
+- Results provide sufficient evidence to justify continuing planned roadmap
+- DATA-INTEGRITY-V1 remains prerequisite before MODELING-V1 (no change to dependency order)
+- Experiment profile remains PAPER-only (no promotion to live)
+
+**Next steps:**
+1. Continue DATA-INTEGRITY-V1 implementation (already in progress)
+2. After DATA-INTEGRITY-V1 completes: begin MODELING-V1
+3. MODELING-V1 will add session-aware and volatility-aware context layer on validated data foundation

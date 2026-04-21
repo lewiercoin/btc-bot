@@ -6,40 +6,17 @@ Last updated: 2026-04-20
 
 ## Current Active Milestone
 
-**EXPERIMENT-V1-THROUGHPUT** — DEPLOYED & COLLECTING DATA (branch: `experiment-v1-unblock-filters`)
+**DATA-INTEGRITY-V1** — ACTIVE (branch: `data-integrity-v1`, awaiting merge after completion)
 
 **Active builder:** Codex  
-**Deployment:** 2026-04-20 09:57 UTC (production server)  
-**Commit:** 1128284  
-**Status:** Day 0 - Bot running on `settings_profile=experiment`, all verification checks passed
+**Decision date:** 2026-04-21  
+**Status:** Implementation in progress
 
-**Context:** Live paper observations indicate the current runtime is healthy and capable of detecting opportunity structure, but the signal-to-trade bridge is too restrictive to collect a usable sample. The immediate goal is to test whether opportunity loss comes primarily from direction resolution, regime whitelist policy, and late governance/risk gates.
+**Context:** Experiment V1 demonstrated that filter relaxation improved throughput (validated hypothesis). Data quality was not perfect but sufficient to prove opportunity loss was gating-related, not edge-related. Proceeding with roadmap: DATA-INTEGRITY-V1 → MODELING-V1.
 
-**What:** Add an explicit PAPER-only `experiment` settings profile that relaxes runtime thresholds without mutating the research baseline.
+**Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready on main branch)
 
-**Why:** The next decision should be based on a larger live-paper sample. At the moment, throughput is too low to separate setup quality from gating logic with confidence.
-
-**Evaluation Window:** 14 days (2026-04-20 → 2026-05-04)
-
-**Target Metrics (Day 14):**
-- Trade frequency: >0.5/day (baseline: 0.21/day)
-- Reclaim execution rate: >20% (baseline: 0%)
-- Total trades: >10 (baseline: 1 in 5 days)
-
-**Checkpoints:**
-- Day 1 (2026-04-21): Stability check, first trades
-- Day 3 (2026-04-23): Throughput trend verification
-- Day 7 (2026-04-27): Mid-point evaluation
-- Day 14 (2026-05-04): Final evaluation vs success criteria
-
-**Acceptance criteria:**
-- ✅ explicit `experiment` runtime profile exists in `settings.py`
-- ✅ `main.py` and paper runner can launch the experiment profile directly
-- ✅ `research` profile remains unchanged
-- ✅ tracker + analysis doc define experiment scope, hypotheses, metrics, and stop conditions
-- ✅ focused settings tests pass (173/197 passed)
-- ✅ deployed to production with verification
-- ⏳ 14-day data collection (in progress)
+**Previous milestone:** EXPERIMENT-V1-THROUGHPUT (CONCLUDED, 2026-04-21) — experiment validated throughput improvement hypothesis
 
 **In-scope:**
 - runtime-only profile wiring
@@ -56,7 +33,7 @@ Last updated: 2026-04-20
 **Report:** `docs/analysis/EXPERIMENT_V1_2026-04-20.md`  
 **Edge Data Audit:** `BOT_COMPREHENSIVE_REPORT_2026-04-20.md` (external)
 
-**Previous milestone:** UPTREND-PULLBACK-EVAL-V1 (DONE, 2026-04-19, commit 5668ccd)
+**Next milestone:** DATA-INTEGRITY-V1 (ACTIVE, 2026-04-21)
 
 ---
 
@@ -169,42 +146,48 @@ Last updated: 2026-04-20
 
 ---
 
-## Next Milestone (Pending Experiment v1 Evaluation)
+## Next Milestone
 
-**Target Start:** 2026-05-05 (Day after Experiment v1 completes)
+**MODELING-V1** — BLOCKED (prerequisite: DATA-INTEGRITY-V1 must complete first)
 
-**Decision Point:** Based on Experiment v1 results (Day 14: 2026-05-04)
-
-**Likely Next:** DATA-INTEGRITY-V1
-
-**Conditions:**
-- If Exp v1 shows increased throughput → proceed with DATA-INTEGRITY-V1 as planned
-- If Exp v1 shows no change → deeper diagnosis required before committing to roadmap
-- If Exp v1 reveals new critical issues → roadmap may be revised
-
-**Pre-work (During Exp v1):**
-- Monitor which data quality issues manifest in practice
-- Track OI/CVD/flow degradation incidents
-- Document session-specific patterns observed
-- Refine DATA-INTEGRITY-V1 scope based on operational findings
-
-**Handoff Status:** ✅ **READY** — `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (on main branch)  
-**Builder assigned:** Codex  
+**Blueprint:** `docs/blueprints/BLUEPRINT_MODELING_V1.md` ✅ **FINALIZED** (commit c257358, 2026-04-21)  
+**Handoff:** Ready to generate after DATA-INTEGRITY-V1 completes  
+**Builder assigned:** Codex (per user decision 2026-04-21)  
 **Auditor:** Claude Code
 
-**Implementation branch:** `data-integrity-v1` ✅ **PUSHED to origin** (backup/visibility only, commit `256a74a`)  
-**Branch status:** Pre-Day14 scaffolding approved by Claude Code, **BLOCKED from merge until Day 14**
+**Context:** MODELING-V1 adds deterministic context eligibility layer (session-aware, volatility-aware) above existing reclaim edge. Hard prerequisite: DATA-INTEGRITY-V1 must merge and deploy first.
 
-**Pre-Day14 Preparation (COMPLETED):**
-- ✅ Branch `data-integrity-v1` created and pushed to origin
-- ✅ Task 1 foundation (FeatureQuality model, DataQualityConfig, schema drafts)
-- ✅ Test scaffolding (15 contract tests passed)
-- ✅ Auditor approval (scaffolding clean, no contamination)
-- ❌ **ZERO merge to main** before Day 14 checkpoint
-- ❌ **ZERO deploy** to production
-- ❌ **ZERO contamination** of Experiment v1 runtime
+---
 
-**Full Implementation Start:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
+## Completed Milestone: EXPERIMENT-V1-THROUGHPUT
+**Status:** DONE (commit 1128284, deployed 2026-04-20, concluded 2026-04-21)
+**Active builder:** Codex
+**Audit verdict:** HYPOTHESIS VALIDATED (early conclusion, sufficient evidence)
+
+**What:** PAPER-only `experiment` settings profile with relaxed signal/governance/risk thresholds to validate throughput hypothesis
+
+**Why:** Test whether opportunity loss was gating-related (filters too strict) vs edge-related (setup quality insufficient)
+
+**Deliverables:**
+- ✅ `experiment` profile in `settings.py` (PAPER-only)
+- ✅ Signal relaxations: `confluence_min` 4.5→3.6, TFI thresholds lowered, `crowded_leverage` whitelist expanded
+- ✅ Risk relaxations: `min_rr` 2.1→1.6, `max_open_positions` 1→2, `max_trades_per_day` 3→6
+- ✅ Deployed to production server (2026-04-20 09:57 UTC)
+- ✅ Analysis document: `docs/analysis/EXPERIMENT_V1_2026-04-20.md`
+
+**Results (early assessment, Day 1):**
+- Hypothesis validated: Filter relaxation demonstrated measurable throughput improvement
+- Data quality was not perfect, but sufficient to prove core hypothesis
+- Opportunity loss confirmed as primarily gating-related, not edge-related
+
+**Decision (2026-04-21):**
+- Proceed with roadmap: DATA-INTEGRITY-V1 → MODELING-V1
+- Experiment profile remains PAPER-only (no promotion to live)
+- Original 14-day evaluation window shortened due to sufficient early evidence
+
+**Files changed:** `settings.py`, `main.py`, `docs/analysis/EXPERIMENT_V1_2026-04-20.md`, `docs/MILESTONE_TRACKER.md`
+
+**Next milestone:** DATA-INTEGRITY-V1 (ACTIVE, 2026-04-21)
 
 ---
 
