@@ -142,6 +142,16 @@ class ExecutionConfig:
 
 
 @dataclass(frozen=True)
+class DataQualityConfig:
+    oi_baseline_days: int = 60
+    cvd_divergence_bars: int = 30
+    flow_coverage_ready: float = 0.90
+    flow_coverage_degraded: float = 0.70
+    funding_coverage_ready: float = 0.90
+    funding_coverage_degraded: float = 0.70
+
+
+@dataclass(frozen=True)
 class ProxyConfig:
     enabled: bool = False
     proxy_enabled_env: str = "PROXY_ENABLED"
@@ -228,6 +238,7 @@ class AppSettings:
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
+    data_quality: DataQualityConfig = field(default_factory=DataQualityConfig)
     exchange: ExchangeConfig = field(default_factory=ExchangeConfig)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     storage: StorageConfig | None = None
@@ -241,6 +252,7 @@ class AppSettings:
             "strategy": asdict(self.strategy),
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
+            "data_quality": asdict(self.data_quality),
         }
         data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(data).hexdigest()

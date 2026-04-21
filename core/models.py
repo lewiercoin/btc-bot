@@ -8,6 +8,7 @@ from typing import Any, Literal
 Direction = Literal["LONG", "SHORT"]
 PositionStatus = Literal["OPEN", "PARTIAL", "CLOSED"]
 BotMode = Literal["PAPER", "LIVE"]
+FeatureQualityStatus = Literal["ready", "degraded", "unavailable"]
 
 
 class RegimeState(str, Enum):
@@ -17,6 +18,59 @@ class RegimeState(str, Enum):
     COMPRESSION = "compression"
     CROWDED_LEVERAGE = "crowded_leverage"
     POST_LIQUIDATION = "post_liquidation"
+
+
+@dataclass(slots=True, frozen=True)
+class FeatureQuality:
+    status: FeatureQualityStatus
+    reason: str
+    metadata: dict[str, Any] = field(default_factory=dict)
+    provenance: str = "unknown"
+
+    @classmethod
+    def ready(
+        cls,
+        *,
+        reason: str = "ready",
+        metadata: dict[str, Any] | None = None,
+        provenance: str = "unknown",
+    ) -> "FeatureQuality":
+        return cls(
+            status="ready",
+            reason=reason,
+            metadata=dict(metadata or {}),
+            provenance=provenance,
+        )
+
+    @classmethod
+    def degraded(
+        cls,
+        *,
+        reason: str,
+        metadata: dict[str, Any] | None = None,
+        provenance: str = "unknown",
+    ) -> "FeatureQuality":
+        return cls(
+            status="degraded",
+            reason=reason,
+            metadata=dict(metadata or {}),
+            provenance=provenance,
+        )
+
+    @classmethod
+    def unavailable(
+        cls,
+        *,
+        reason: str,
+        metadata: dict[str, Any] | None = None,
+        provenance: str = "unknown",
+    ) -> "FeatureQuality":
+        return cls(
+            status="unavailable",
+            reason=reason,
+            metadata=dict(metadata or {}),
+            provenance=provenance,
+        )
 
 
 @dataclass(slots=True)
@@ -36,6 +90,7 @@ class MarketSnapshot:
     force_order_events_60s: list[dict[str, Any]] = field(default_factory=list)
     etf_bias_daily: float | None = None
     dxy_daily: float | None = None
+    quality: dict[str, FeatureQuality] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -73,6 +128,7 @@ class Features:
     force_order_spike: bool = False
     force_order_decreasing: bool = False
     passive_etf_bias_5d: float | None = None
+    quality: dict[str, FeatureQuality] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

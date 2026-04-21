@@ -29,6 +29,16 @@ CREATE TABLE IF NOT EXISTS open_interest (
     UNIQUE(symbol, timestamp)
 );
 
+CREATE TABLE IF NOT EXISTS oi_samples (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    timestamp TEXT NOT NULL,
+    oi_value REAL NOT NULL,
+    source TEXT NOT NULL DEFAULT 'unknown',
+    captured_at TEXT NOT NULL,
+    UNIQUE(symbol, timestamp)
+);
+
 CREATE TABLE IF NOT EXISTS aggtrade_buckets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     symbol TEXT NOT NULL,
@@ -39,6 +49,19 @@ CREATE TABLE IF NOT EXISTS aggtrade_buckets (
     tfi REAL NOT NULL,
     cvd REAL NOT NULL,
     UNIQUE(symbol, timeframe, bucket_time)
+);
+
+CREATE TABLE IF NOT EXISTS cvd_price_history (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    bar_time TEXT NOT NULL,
+    price_close REAL NOT NULL,
+    cvd REAL NOT NULL,
+    tfi REAL,
+    source TEXT NOT NULL DEFAULT 'unknown',
+    captured_at TEXT NOT NULL,
+    UNIQUE(symbol, timeframe, bar_time)
 );
 
 CREATE TABLE IF NOT EXISTS force_orders (
@@ -228,8 +251,12 @@ CREATE INDEX IF NOT EXISTS idx_funding_symbol_time
     ON funding(symbol, funding_time);
 CREATE INDEX IF NOT EXISTS idx_open_interest_symbol_time
     ON open_interest(symbol, timestamp);
+CREATE INDEX IF NOT EXISTS idx_oi_samples_symbol_time
+    ON oi_samples(symbol, timestamp);
 CREATE INDEX IF NOT EXISTS idx_aggtrade_symbol_tf_time
     ON aggtrade_buckets(symbol, timeframe, bucket_time);
+CREATE INDEX IF NOT EXISTS idx_cvd_price_history_symbol_tf_time
+    ON cvd_price_history(symbol, timeframe, bar_time);
 CREATE INDEX IF NOT EXISTS idx_force_orders_symbol_time
     ON force_orders(symbol, event_time);
 CREATE INDEX IF NOT EXISTS idx_signal_candidates_timestamp
