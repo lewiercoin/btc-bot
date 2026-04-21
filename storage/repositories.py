@@ -259,22 +259,27 @@ def fetch_open_positions(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """
         SELECT
-            position_id,
-            signal_id,
-            symbol,
-            direction,
-            status,
-            entry_price,
-            size,
-            leverage,
-            stop_loss,
-            take_profit_1,
-            take_profit_2,
-            opened_at,
-            updated_at
-        FROM positions
-        WHERE status IN ('OPEN', 'PARTIAL')
-        ORDER BY opened_at ASC
+            p.position_id,
+            p.signal_id,
+            p.symbol,
+            p.direction,
+            p.status,
+            p.entry_price,
+            p.size,
+            p.leverage,
+            p.stop_loss,
+            p.take_profit_1,
+            p.take_profit_2,
+            p.opened_at,
+            p.updated_at,
+            es.entry_price AS signal_entry_reference,
+            EXISTS (
+                SELECT 1 FROM executions e WHERE e.position_id = p.position_id
+            ) AS has_execution_record
+        FROM positions p
+        LEFT JOIN executable_signals es ON es.signal_id = p.signal_id
+        WHERE p.status IN ('OPEN', 'PARTIAL')
+        ORDER BY p.opened_at ASC
         """
     ).fetchall()
     return [dict(row) for row in rows]

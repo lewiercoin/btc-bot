@@ -94,6 +94,15 @@ const statusFields = {
 const logEntries = [];
 let controlBusy = false;
 
+function relabelEntryColumns() {
+  const positionEntry = document.querySelector("#positions-body")?.closest("table")?.querySelector("thead th:nth-child(2)");
+  const tradeEntry = document.querySelector("#trades-body")?.closest("table")?.querySelector("thead th:nth-child(2)");
+  const signalEntry = document.querySelector("#signals-body")?.closest("table")?.querySelector("thead th:nth-child(8)");
+  if (positionEntry) positionEntry.textContent = "Fill Entry";
+  if (tradeEntry) tradeEntry.textContent = "Fill Entry";
+  if (signalEntry) signalEntry.textContent = "Signal Reference";
+}
+
 function formatDate(value) {
   if (!value) {
     return "-";
@@ -117,6 +126,10 @@ function formatPercent(value) {
     return "-";
   }
   return `${(Number(value) * 100).toFixed(2)}%`;
+}
+
+function formatExecutionStatusLabel(record) {
+  return record.has_execution_record === false ? "No execution" : "Recorded";
 }
 
 function formatUptime(seconds) {
@@ -281,7 +294,7 @@ function renderRisk(payload) {
         <div class="stat-row"><dt>Regime</dt><dd>${sig.regime ? sig.regime.toUpperCase() : "-"}</dd></div>
         <div class="stat-row"><dt>Confluence</dt><dd>${sig.confluence_score !== null && sig.confluence_score !== undefined ? formatNumber(sig.confluence_score, 2) : "-"} <small>(min ${formatNumber(limits.confluence_min, 1)})</small></dd></div>
         <div class="stat-row"><dt>RR ratio</dt><dd>${sig.rr_ratio !== null && sig.rr_ratio !== undefined ? formatNumber(sig.rr_ratio, 2) : "-"} <small>(min ${formatNumber(limits.min_rr, 1)})</small></dd></div>
-        <div class="stat-row"><dt>Entry</dt><dd>${sig.entry_price !== null && sig.entry_price !== undefined ? formatNumber(sig.entry_price) : "-"}</dd></div>
+        <div class="stat-row"><dt>Signal Reference</dt><dd>${sig.signal_entry_reference !== null && sig.signal_entry_reference !== undefined ? formatNumber(sig.signal_entry_reference) : "-"}</dd></div>
         <div class="stat-row"><dt>Time</dt><dd>${formatDate(sig.timestamp)}</dd></div>
       </dl>
       <div class="sig-reasons"><strong>Reasons:</strong><ul>${reasonsHtml}</ul></div>
@@ -484,7 +497,7 @@ function renderPositions(payload) {
       formatNumber(position.size, 4),
       position.stop_loss === null ? "-" : formatNumber(position.stop_loss),
       position.take_profit_1 === null ? "-" : formatNumber(position.take_profit_1),
-      position.status,
+      `${position.status} / ${formatExecutionStatusLabel(position)}`,
       formatDate(position.opened_at),
     ]);
     positionsBody.appendChild(row);
@@ -511,7 +524,7 @@ function renderTrades(payload) {
       trade.regime || "-",
       trade.confluence_score === null ? "-" : formatNumber(trade.confluence_score, 2),
       trade.exit_reason || "-",
-      trade.outcome || "-",
+      `${trade.outcome || "-"} / ${formatExecutionStatusLabel(trade)}`,
       formatDate(trade.closed_at),
     ]);
     tradesBody.appendChild(row);
@@ -537,7 +550,7 @@ function renderSignals(payload) {
       reasonsText || "-",
       sig.promoted ? "✓" : "✗",
       sig.rr_ratio === null ? "-" : formatNumber(sig.rr_ratio, 2),
-      sig.entry_price === null ? "-" : formatNumber(sig.entry_price),
+      sig.signal_entry_reference === null ? "-" : formatNumber(sig.signal_entry_reference),
     ]);
     signalsBody.appendChild(row);
   }
@@ -840,6 +853,7 @@ refreshMetrics();
 refreshAlerts();
 refreshEgress();
 refreshRisk();
+relabelEntryColumns();
 refreshRuntimeFreshness();
 refreshServerResources();
 connectLogs();
