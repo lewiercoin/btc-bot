@@ -67,6 +67,48 @@ Last updated: 2026-04-21
 
 ---
 
+## 🎯 DATA QUALITY FOUNDATION (2026-04-21)
+
+**Historical Significance:** First time bot has complete, correct, restart-safe data contracts.
+
+This is a **critical milestone** that combines two fundamental fixes establishing the data foundation for all future work:
+
+### Fix 1: DATA-INTEGRITY-V1 (Commit 7ebf2d2 → main)
+- ✅ Restart-safe OI/CVD persistence (`oi_samples`, `cvd_price_history` tables)
+- ✅ Feature quality contracts (ready/degraded/unavailable)
+- ✅ Bootstrap from DB on startup (no more cold-start penalty)
+- ✅ Observable quality state (logs + dashboard `/api/feature-quality`)
+
+### Fix 2: Paper Execution Realism (Commit df30615 → main)
+- ✅ Fills at `snapshot.price` (not `signal.entry_price` reference)
+- ✅ Execution audit trail (`executions` table populated)
+- ✅ Correct PnL metrics (no more corrupted paper results)
+- ✅ Dashboard visibility (Signal Reference vs Fill Entry)
+
+### Integration: EXPERIMENT-V2 (Commit 0607b3e)
+Both fixes integrated with experiment profile (relaxed filters) for validation.
+
+**Before/After comparison:**
+
+| Aspect | Before (v1) | After (v2) |
+|--------|-------------|------------|
+| OI/CVD data | Lost on restart | Persistent, restart-safe |
+| Feature quality | Invisible | Explicit (ready/degraded/unavailable) |
+| Paper fills | Reference levels (wrong) | Snapshot prices (correct) |
+| Execution trail | Missing | Complete audit records |
+| PnL metrics | Corrupted | Realistic |
+
+**Analysis:** `docs/analysis/DATA_QUALITY_MILESTONE_2026-04-21.md`
+
+**Validation:** EXPERIMENT-V2 deployment will compare v1 (corrupted data) vs v2 (clean data) under identical throughput config.
+
+**Impact on future milestones:**
+- MODELING-V1: Builds on clean data (session/volatility filters require mature data)
+- EXECUTION-REALISM-V1: Builds on correct fills (spread/slippage on top of realistic base)
+- OPTUNA-RECALIBRATION-V1: Tunes on clean data (no hidden quality gaps)
+
+---
+
 ## Completed Milestone: DATA-INTEGRITY-V1
 **Status:** DONE (merged to main commit 7ebf2d2, 2026-04-21)
 **Active builder:** Codex
