@@ -255,11 +255,22 @@ class FakeExecutionEngine(ExecutionEngine):
         self.should_fail = should_fail
         self.execute_calls = 0
 
-    def execute_signal(self, signal: ExecutableSignal, size: float, leverage: int) -> None:
+    def execute_signal(
+        self,
+        signal: ExecutableSignal,
+        size: float,
+        leverage: int,
+        *,
+        snapshot_price: float | None = None,
+    ) -> None:
         self.execute_calls += 1
         if self.should_fail:
             raise RuntimeError("forced_execution_failure")
+        if snapshot_price is None:
+            raise RuntimeError("snapshot_price_required")
         now = self.clock.now().isoformat()
+        position_id = f"pos-{uuid4().hex[:12]}"
+        filled_price = float(snapshot_price)
         self.conn.execute(
             """
             INSERT INTO positions (
@@ -268,18 +279,39 @@ class FakeExecutionEngine(ExecutionEngine):
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
-                f"pos-{uuid4().hex[:12]}",
+                position_id,
                 signal.signal_id,
                 "BTCUSDT",
                 signal.direction,
                 "OPEN",
-                signal.entry_price,
+                filled_price,
                 size,
                 leverage,
                 signal.stop_loss,
                 signal.take_profit_1,
                 signal.take_profit_2,
                 now,
+                now,
+            ),
+        )
+        slippage_bps = abs(filled_price - signal.entry_price) / max(abs(signal.entry_price), 1e-8) * 10_000.0
+        self.conn.execute(
+            """
+            INSERT INTO executions (
+                execution_id, position_id, order_type, side, requested_price, filled_price,
+                qty, fees, slippage_bps, executed_at
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                f"exe-{uuid4().hex[:12]}",
+                position_id,
+                "MARKET",
+                "BUY" if signal.direction == "LONG" else "SELL",
+                signal.entry_price,
+                filled_price,
+                size,
+                0.0,
+                slippage_bps,
                 now,
             ),
         )
@@ -612,7 +644,8 @@ def run_kill_switch_smoke(conn: sqlite3.Connection, settings) -> None:  # type: 
     health = FakeHealthMonitor()
     telegram = FakeTelegramNotifier()
 
-    seed_closed_loss_trade(conn, settings, closed_at=clock.now(), loss_abs=-500.0)
+    loss_abs = -(BotOrchestrator.REFERENCE_EQUITY * settings.risk.daily_dd_limit + 100.0)
+    seed_closed_loss_trade(conn, settings, closed_at=clock.now(), loss_abs=loss_abs)
 
     holder: dict[str, BotOrchestrator] = {}
     stop_at = datetime(2026, 3, 26, 2, 0, 5, tzinfo=timezone.utc)
