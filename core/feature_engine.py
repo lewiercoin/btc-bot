@@ -21,8 +21,14 @@ class FeatureEngineConfig:
     wick_min_atr: float = 0.40
     funding_window_days: int = 60
     oi_z_window_days: int = 60
+    oi_baseline_days: int = 60
     force_order_history_points: int = 180
     cvd_divergence_window_bars: int = 10
+    cvd_divergence_bars: int = 30
+    flow_coverage_ready: float = 0.90
+    flow_coverage_degraded: float = 0.70
+    funding_coverage_ready: float = 0.90
+    funding_coverage_degraded: float = 0.70
 
 
 def _mean(values: Iterable[float]) -> float:
