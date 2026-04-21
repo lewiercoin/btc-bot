@@ -353,12 +353,16 @@ class StateStore:
         executable: ExecutableSignal,
         schema_version: str,
         config_hash: str,
+        filled_entry_price: float | None = None,
     ) -> None:
         position = get_latest_position_for_signal(self.connection, executable.signal_id)
         if not position:
             raise RuntimeError(f"No position found for signal_id={executable.signal_id}")
 
         opened_at = datetime.fromisoformat(position["opened_at"])
+        entry_price = float(position["entry_price"] if filled_entry_price is None else filled_entry_price)
+        if entry_price <= 0:
+            raise RuntimeError(f"Invalid filled entry price for signal_id={executable.signal_id}: {entry_price}")
         insert_trade_log_open(
             self.connection,
             trade_id=f"trd-{uuid4().hex}",
@@ -368,7 +372,7 @@ class StateStore:
             direction=executable.direction,
             regime=candidate.regime.value,
             confluence_score=candidate.confluence_score,
-            entry_price=float(position["entry_price"]),
+            entry_price=entry_price,
             size=float(position["size"]),
             features_at_entry_json=candidate.features_json,
             schema_version=schema_version,

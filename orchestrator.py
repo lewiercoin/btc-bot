@@ -522,20 +522,29 @@ class BotOrchestrator:
                 return
 
             try:
-                self.bundle.execution_engine.execute_signal(executable, size=risk_decision.size, leverage=risk_decision.leverage)
+                paper_fill_price = float(snapshot.price) if self.settings.mode == BotMode.PAPER else None
+                self.bundle.execution_engine.execute_signal(
+                    executable,
+                    size=risk_decision.size,
+                    leverage=risk_decision.leverage,
+                    snapshot_price=paper_fill_price,
+                )
                 self.state_store.record_trade_open(
                     candidate=candidate,
                     executable=executable,
                     schema_version=self.settings.schema_version,
                     config_hash=self.settings.config_hash,
+                    filled_entry_price=paper_fill_price,
                 )
                 self.state_store.mark_healthy()
                 self.metrics.inc(TRADES_OPENED)
+                filled_entry_price = paper_fill_price if paper_fill_price is not None else executable.entry_price
                 trade_payload = {
                     "symbol": self.settings.strategy.symbol,
                     "signal_id": executable.signal_id,
                     "direction": executable.direction,
-                    "entry_price": executable.entry_price,
+                    "entry_price": filled_entry_price,
+                    "signal_entry_reference": executable.entry_price,
                     "size": risk_decision.size,
                     "leverage": risk_decision.leverage,
                 }
