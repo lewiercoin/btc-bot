@@ -9,6 +9,9 @@ GOVERNANCE_VETOES = "governance_vetoes"
 RISK_BLOCKS = "risk_blocks"
 ERRORS_TOTAL = "errors_total"
 CYCLE_DURATION_MS = "cycle_duration_ms"
+FEATURE_QUALITY_READY = "feature_quality_ready"
+FEATURE_QUALITY_DEGRADED = "feature_quality_degraded"
+FEATURE_QUALITY_UNAVAILABLE = "feature_quality_unavailable"
 
 
 @dataclass(slots=True)

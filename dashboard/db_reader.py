@@ -62,6 +62,16 @@ def _parse_json_list(value: Any) -> list:
         return []
 
 
+def _parse_json_dict(value: Any) -> dict[str, Any]:
+    if value is None:
+        return {}
+    try:
+        result = json.loads(value)
+        return result if isinstance(result, dict) else {}
+    except (json.JSONDecodeError, TypeError):
+        return {}
+
+
 def _age_seconds(value: Any, *, now: datetime) -> float | None:
     parsed = _parse_datetime(value)
     if parsed is None:
@@ -469,6 +479,29 @@ def read_config_snapshot_from_conn(conn: sqlite3.Connection, *, config_hash: str
     }
 
 
+def read_feature_quality_from_conn(conn: sqlite3.Connection) -> dict[str, Any]:
+    if not _table_exists(conn, "runtime_metrics"):
+        return {
+            "updated_at": None,
+            "config_hash": None,
+            "quality": {},
+        }
+
+    row = get_runtime_metrics(conn)
+    if row is None:
+        return {
+            "updated_at": None,
+            "config_hash": None,
+            "quality": {},
+        }
+
+    return {
+        "updated_at": _to_iso(row.get("updated_at")),
+        "config_hash": row.get("config_hash"),
+        "quality": _parse_json_dict(row.get("feature_quality_json")),
+    }
+
+
 class DashboardReader:
     def __init__(
         self,
@@ -616,5 +649,21 @@ class DashboardReader:
             raise
         try:
             return read_config_snapshot_from_conn(conn, config_hash=config_hash)
+        finally:
+            conn.close()
+
+    def read_feature_quality(self) -> dict[str, Any]:
+        try:
+            conn = self._connect_fn(self.db_path)
+        except sqlite3.OperationalError as exc:
+            if _is_missing_db_error(exc):
+                return {
+                    "updated_at": None,
+                    "config_hash": None,
+                    "quality": {},
+                }
+            raise
+        try:
+            return read_feature_quality_from_conn(conn)
         finally:
             conn.close()

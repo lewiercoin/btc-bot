@@ -225,6 +225,11 @@ async def get_config_snapshot(request: Request, config_hash: str) -> dict:
     return request.app.state.reader.read_config_snapshot(config_hash=config_hash)
 
 
+@app.get("/api/feature-quality")
+async def get_feature_quality(request: Request) -> dict:
+    return request.app.state.reader.read_feature_quality()
+
+
 @app.get("/api/trades/export")
 async def export_trades(request: Request, limit: int = Query(default=200, ge=1, le=1000)) -> StreamingResponse:
     runtime_config_hash = extract_runtime_config_hash(request.app.state.log_path)
