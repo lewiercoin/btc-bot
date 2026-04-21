@@ -38,7 +38,15 @@ class LiveExecutionEngine(ExecutionEngine):
         self.entry_timeout_seconds = max(int(entry_timeout_seconds), 1)
         self.poll_interval_seconds = max(float(poll_interval_seconds), 0.0)
 
-    def execute_signal(self, signal: ExecutableSignal, size: float, leverage: int) -> None:
+    def execute_signal(
+        self,
+        signal: ExecutableSignal,
+        size: float,
+        leverage: int,
+        *,
+        snapshot_price: float | None = None,
+    ) -> None:
+        _ = snapshot_price
         try:
             self._set_leverage(leverage)
             entry_side = "BUY" if signal.direction == "LONG" else "SELL"
