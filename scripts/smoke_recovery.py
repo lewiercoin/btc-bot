@@ -39,6 +39,8 @@ def reset_runtime_tables(conn) -> None:
         "daily_metrics",
         "bot_state",
         "alerts_errors",
+        "oi_samples",
+        "cvd_price_history",
     ):
         conn.execute(f"DELETE FROM {table}")
     conn.commit()

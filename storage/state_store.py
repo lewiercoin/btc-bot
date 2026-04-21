@@ -94,8 +94,53 @@ class StateStore:
                 last_ws_message_at TEXT,
                 last_health_check_at TEXT,
                 last_runtime_warning TEXT,
+                feature_quality_json TEXT,
                 config_hash TEXT
             )
+        """)
+        self.connection.commit()
+
+        cursor.execute("PRAGMA table_info(runtime_metrics)")
+        runtime_columns = {row[1] for row in cursor.fetchall()}
+        if "feature_quality_json" not in runtime_columns:
+            cursor.execute("ALTER TABLE runtime_metrics ADD COLUMN feature_quality_json TEXT DEFAULT NULL")
+            self.connection.commit()
+            LOG.info("Migration applied: added feature_quality_json column to runtime_metrics")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS oi_samples (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                timestamp TEXT NOT NULL,
+                oi_value REAL NOT NULL,
+                source TEXT NOT NULL DEFAULT 'unknown',
+                captured_at TEXT NOT NULL,
+                UNIQUE(symbol, timestamp)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_oi_samples_symbol_time
+                ON oi_samples(symbol, timestamp)
+        """)
+        self.connection.commit()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS cvd_price_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                bar_time TEXT NOT NULL,
+                price_close REAL NOT NULL,
+                cvd REAL NOT NULL,
+                tfi REAL,
+                source TEXT NOT NULL DEFAULT 'unknown',
+                captured_at TEXT NOT NULL,
+                UNIQUE(symbol, timeframe, bar_time)
+            )
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_cvd_price_history_symbol_tf_time
+                ON cvd_price_history(symbol, timeframe, bar_time)
         """)
         self.connection.commit()
 

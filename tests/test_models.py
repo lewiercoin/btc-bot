@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 
-from core.models import MarketSnapshot, RegimeState, SignalCandidate
+from core.models import FeatureQuality, MarketSnapshot, RegimeState, SignalCandidate
 
 
 def test_market_snapshot_defaults_are_independent() -> None:
@@ -14,6 +14,37 @@ def test_market_snapshot_defaults_are_independent() -> None:
 
     assert len(a.candles_15m) == 1
     assert b.candles_15m == []
+    assert a.quality == {}
+    assert b.quality == {}
+
+
+def test_feature_quality_factories_copy_metadata() -> None:
+    metadata = {"samples_loaded": 3}
+    quality = FeatureQuality.degraded(
+        reason="insufficient_history",
+        metadata=metadata,
+        provenance="bootstrapped-from-db",
+    )
+    metadata["samples_loaded"] = 0
+
+    assert quality.status == "degraded"
+    assert quality.reason == "insufficient_history"
+    assert quality.metadata == {"samples_loaded": 3}
+    assert quality.provenance == "bootstrapped-from-db"
+
+
+def test_feature_quality_is_available_on_market_snapshot() -> None:
+    now = datetime(2026, 1, 1, tzinfo=timezone.utc)
+    snapshot = MarketSnapshot(
+        symbol="BTCUSDT",
+        timestamp=now,
+        price=100.0,
+        bid=99.5,
+        ask=100.5,
+        quality={"flow_15m": FeatureQuality.ready(provenance="ws")},
+    )
+
+    assert snapshot.quality["flow_15m"].status == "ready"
 
 
 def test_signal_candidate_defaults_for_optional_fields() -> None:
