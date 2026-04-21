@@ -6,28 +6,31 @@ Last updated: 2026-04-21
 
 ## Current Active Milestone
 
-**DATA-INTEGRITY-V1** — READY FOR AUDIT (branch: `data-integrity-v1`)
+**EXPERIMENT-V2** — READY FOR DEPLOYMENT (branch: `experiment-v2`)
 
-**Previous milestone:** EXPERIMENT-V1-THROUGHPUT — completed successfully per operator update (2026-04-21)
-**Handoff prepared:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md`  
-**Builder assigned:** Codex  
-**Auditor:** Claude Code
+**Previous milestone:** DATA-INTEGRITY-V1 — DONE (merged to `main`, commit `7ebf2d2`, 2026-04-21)
 
-**Implementation checkpoint:** `075f529` (`feat(data-integrity): implement restart-safe feature quality`)
+**What:** Validate DATA-INTEGRITY-V1 with same experiment profile as v1 (relaxed filters)
 
-**Validation:**
-- `python -m pytest` → 193 passed, 24 skipped
-- `python -m compileall core data dashboard monitoring settings.py storage scripts tests` → passed
-- `python scripts/smoke_feature_engine.py` → passed
-- `python scripts/smoke_recovery.py` → passed
+**Why:** Compare restart-safe persistence (v2) vs baseline (v1) for feature quality impact
 
-**Status note:** Builder implementation is pushed for Claude Code audit. Do not merge to `main` or deploy until audit closure.
+**Composition:**
+- `main` with DATA-INTEGRITY-V1 merged ✅
+- Experiment profile from v1 (cherry-picked) ✅
+
+**Deployment target:** Production server (same as experiment-v1-unblock-filters)
+
+**Success criteria:**
+- Bootstrap summary appears in logs at startup
+- Feature quality propagates through `MarketSnapshot` → `Features`
+- OI/CVD persistence survives restart
+- Throughput comparable to v1 (baseline for comparison)
 
 ---
 
-## Next Milestone: DATA-INTEGRITY-V1 (Post-Experiment V1)
+## Next Milestone
 
-**Status:** READY FOR AUDIT — implementation pushed on `data-integrity-v1`
+**MODELING-V1** — BLOCKED (prerequisite: EXPERIMENT-V2 must validate DATA-INTEGRITY first)
 
 **Implementation commits:**
 - `256a74a` — scaffold feature quality contracts
@@ -61,6 +64,34 @@ Last updated: 2026-04-21
 **Context:** Delivered conclusive evidence that current pullback path has no edge. Structural issues in geometry + uniqueness, not threshold tuning problem.
 
 **Strategic decision:** Uptrend path deferred. Focus shifted to data integrity + modeling improvements.
+
+---
+
+## Completed Milestone: DATA-INTEGRITY-V1
+**Status:** DONE (merged to main commit 7ebf2d2, 2026-04-21)
+**Active builder:** Codex
+**Audit verdict:** DONE (all 7 tasks implemented, restart safety verified)
+
+**What:** Make decision-path data restart-safe, coverage-aware, and quality-explicit
+
+**Deliverables:**
+- ✅ Task 1: `FeatureQuality` model integrated into `MarketSnapshot` and `Features`
+- ✅ Task 2: OI sample persistence + bootstrap (table: `oi_samples`)
+- ✅ Task 3: Flow window completeness validation (config-driven thresholds)
+- ✅ Task 4: CVD/price history persistence + bootstrap (table: `cvd_price_history`)
+- ✅ Task 5: Funding window integrity validation
+- ✅ Task 6: Operational visibility (bootstrap logs, `/api/feature-quality` endpoint)
+- ✅ Task 7: Integration + regression tests (20 tests pass)
+
+**Architecture:** Persistence + bootstrap > restart-from-zero warmup
+
+**Files changed:** 28 files, +1709 insertions, -89 deletions
+
+**Tests:** 183 passed, 24 skipped (intentional)
+
+**Audit report:** `docs/audits/AUDIT_DATA_INTEGRITY_V1_2026-04-21.md`
+
+**Next milestone:** EXPERIMENT-V2 (validate DATA-INTEGRITY in production), then MODELING-V1
 
 ---
 
