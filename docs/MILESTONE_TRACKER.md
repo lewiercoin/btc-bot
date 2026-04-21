@@ -192,11 +192,14 @@ Last updated: 2026-04-20
 **Builder assigned:** Codex  
 **Auditor:** Claude Code
 
-**Pre-Day14 Preparation (ALLOWED NOW):**
-- ✅ Create branch `data-integrity-v1` from main
-- ✅ Start Task 1 design work (FeatureQuality model)
-- ✅ Draft schema migrations (OI samples, CVD history tables)
-- ✅ Test scaffolding
+**Implementation branch:** `data-integrity-v1` ✅ **PUSHED to origin** (backup/visibility only, commit `256a74a`)  
+**Branch status:** Pre-Day14 scaffolding approved by Claude Code, **BLOCKED from merge until Day 14**
+
+**Pre-Day14 Preparation (COMPLETED):**
+- ✅ Branch `data-integrity-v1` created and pushed to origin
+- ✅ Task 1 foundation (FeatureQuality model, DataQualityConfig, schema drafts)
+- ✅ Test scaffolding (15 contract tests passed)
+- ✅ Auditor approval (scaffolding clean, no contamination)
 - ❌ **ZERO merge to main** before Day 14 checkpoint
 - ❌ **ZERO deploy** to production
 - ❌ **ZERO contamination** of Experiment v1 runtime
