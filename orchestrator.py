@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import logging
 import sqlite3
 import threading
@@ -10,11 +11,11 @@ from typing import Callable
 
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
-from core.models import GovernanceRuntimeState, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
+from core.models import Features, GovernanceRuntimeState, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
-from data.market_data import MarketDataAssembler
+from data.market_data import MarketDataAssembler, MarketDataConfig
 from data.proxy_transport import ProxyTransport
 from data.rest_client import BinanceFuturesRestClient, RestClientConfig
 from data.websocket_client import BinanceFuturesWebsocketClient, WebsocketClientConfig
@@ -28,6 +29,9 @@ from monitoring.health import HealthMonitor, HealthStatus
 from monitoring.metrics import (
     CYCLE_DURATION_MS,
     ERRORS_TOTAL,
+    FEATURE_QUALITY_DEGRADED,
+    FEATURE_QUALITY_READY,
+    FEATURE_QUALITY_UNAVAILABLE,
     GOVERNANCE_VETOES,
     RISK_BLOCKS,
     SIGNALS_GENERATED,
@@ -38,7 +42,13 @@ from monitoring.metrics import (
 from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
 from settings import AppSettings, BotMode, build_signal_regime_direction_whitelist
 from storage.position_persister import SqlitePositionPersister
-from storage.repositories import get_daily_metrics, save_executable_signal, save_signal_candidate
+from storage.repositories import (
+    fetch_cvd_price_history,
+    fetch_oi_samples,
+    get_daily_metrics,
+    save_executable_signal,
+    save_signal_candidate,
+)
 from storage.state_store import StateStore
 
 LOG = logging.getLogger(__name__)
@@ -129,6 +139,13 @@ def build_default_bundle(
         market_data=MarketDataAssembler(
             rest_client=rest_client,
             websocket_client=websocket_client,
+            config=MarketDataConfig(
+                candles_limit=300,
+                funding_limit=max(settings.strategy.funding_window_days * 3 + 3, 200),
+                agg_trades_limit=1000,
+                flow_coverage_ready=settings.data_quality.flow_coverage_ready,
+                flow_coverage_degraded=settings.data_quality.flow_coverage_degraded,
+            ),
             db_connection=conn,
         ),
         feature_engine=FeatureEngine(
@@ -143,6 +160,12 @@ def build_default_bundle(
                 wick_min_atr=settings.strategy.wick_min_atr,
                 funding_window_days=settings.strategy.funding_window_days,
                 oi_z_window_days=settings.strategy.oi_z_window_days,
+                oi_baseline_days=settings.data_quality.oi_baseline_days,
+                cvd_divergence_bars=settings.data_quality.cvd_divergence_bars,
+                flow_coverage_ready=settings.data_quality.flow_coverage_ready,
+                flow_coverage_degraded=settings.data_quality.flow_coverage_degraded,
+                funding_coverage_ready=settings.data_quality.funding_coverage_ready,
+                funding_coverage_degraded=settings.data_quality.funding_coverage_degraded,
             )
         ),
         regime_engine=RegimeEngine(
@@ -296,6 +319,8 @@ class BotOrchestrator:
             strategy_snapshot=asdict(self.settings.strategy),
             captured_at=startup_ts,
         )
+        bootstrap_summary = self._bootstrap_feature_engine_history(startup_ts)
+        self._record_bootstrap_summary(bootstrap_summary)
         self.state_store.refresh_runtime_state(startup_ts)
 
         recovery_report = self.recovery.run_startup_sync()
@@ -412,6 +437,7 @@ class BotOrchestrator:
                 schema_version=self.settings.schema_version,
                 config_hash=self.settings.config_hash,
             )
+            self._record_feature_quality(features)
             regime = self.bundle.regime_engine.classify(features)
             diagnostics = self.bundle.signal_engine.diagnose(features, regime)
             candidate = self.bundle.signal_engine.generate(features, regime, diagnostics=diagnostics)
@@ -725,6 +751,84 @@ class BotOrchestrator:
             )
         except Exception as exc:
             LOG.warning("Decision outcome persistence failed: %s", exc)
+
+    def _bootstrap_feature_engine_history(self, now: datetime) -> dict[str, object]:
+        symbol = self.settings.strategy.symbol
+        oi_since = now.astimezone(timezone.utc) - timedelta(days=self.settings.data_quality.oi_baseline_days)
+        oi_rows = fetch_oi_samples(
+            self.conn,
+            symbol=symbol,
+            since_ts=oi_since,
+        )
+        feature_config = getattr(self.bundle.feature_engine, "config", None)
+        cvd_window_bars = int(
+            getattr(
+                feature_config,
+                "cvd_divergence_window_bars",
+                self.settings.data_quality.cvd_divergence_bars,
+            )
+        )
+        cvd_rows = fetch_cvd_price_history(
+            self.conn,
+            symbol=symbol,
+            timeframe="15m",
+            limit=max(self.settings.data_quality.cvd_divergence_bars, cvd_window_bars) + 1,
+        )
+        if hasattr(self.bundle.feature_engine, "bootstrap_oi_history"):
+            oi_summary = self.bundle.feature_engine.bootstrap_oi_history(oi_rows)
+        else:
+            oi_summary = {"loaded_samples": len(oi_rows), "skipped": "feature_engine_has_no_bootstrap"}
+        if hasattr(self.bundle.feature_engine, "bootstrap_cvd_price_history"):
+            cvd_summary = self.bundle.feature_engine.bootstrap_cvd_price_history(cvd_rows)
+        else:
+            cvd_summary = {"loaded_bars": len(cvd_rows), "skipped": "feature_engine_has_no_bootstrap"}
+        return {
+            "oi": oi_summary,
+            "cvd": cvd_summary,
+        }
+
+    def _record_bootstrap_summary(self, summary: dict[str, object]) -> None:
+        LOG.info("Feature bootstrap summary | %s", json.dumps(summary, sort_keys=True))
+        self.bundle.audit_logger.log_info(
+            "feature_quality",
+            "Feature bootstrap summary.",
+            payload=summary,
+        )
+
+    def _record_feature_quality(self, features: object) -> None:
+        payload = self._feature_quality_payload(features)
+        counts = {"ready": 0, "degraded": 0, "unavailable": 0}
+        for item in payload.values():
+            status = str(item.get("status", "unavailable"))
+            if status in counts:
+                counts[status] += 1
+        self.metrics.set_gauge(FEATURE_QUALITY_READY, float(counts["ready"]))
+        self.metrics.set_gauge(FEATURE_QUALITY_DEGRADED, float(counts["degraded"]))
+        self.metrics.set_gauge(FEATURE_QUALITY_UNAVAILABLE, float(counts["unavailable"]))
+        LOG.info(
+            "Feature quality summary | ready=%s | degraded=%s | unavailable=%s | keys=%s",
+            counts["ready"],
+            counts["degraded"],
+            counts["unavailable"],
+            ",".join(sorted(payload)),
+        )
+        self._update_runtime_metrics(feature_quality_json=json.dumps(payload, sort_keys=True))
+
+    @staticmethod
+    def _feature_quality_payload(features: object) -> dict[str, dict[str, object]]:
+        quality_map = getattr(features, "quality", {})
+        if not isinstance(quality_map, dict):
+            return {}
+        return {
+            name: {
+                "status": quality.status,
+                "reason": quality.reason,
+                "metadata": quality.metadata,
+                "provenance": quality.provenance,
+            }
+            for name, quality in sorted(quality_map.items())
+            if hasattr(quality, "status")
+        }
 
     def _log_no_signal_diagnostics(self, timestamp: datetime, diagnostics: SignalDiagnostics) -> None:
         message = (

@@ -388,6 +388,21 @@ class BinanceFuturesRestClient:
         payload = self._request("/fapi/v1/aggTrades", params)
         return [normalize_agg_trade(item, symbol=symbol) for item in payload]
 
+    def fetch_agg_trades_window(
+        self,
+        *,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        limit: int = 1000,
+    ) -> list[dict[str, Any]]:
+        return self.fetch_agg_trades(
+            symbol=symbol,
+            limit=limit,
+            start_time_ms=int(start_time.astimezone(timezone.utc).timestamp() * 1000),
+            end_time_ms=int(end_time.astimezone(timezone.utc).timestamp() * 1000),
+        )
+
     def fetch_position_risk(self, symbol: str) -> list[dict[str, Any]]:
         payload = self.signed_request("/fapi/v2/positionRisk", {"symbol": symbol.upper()})
         if not isinstance(payload, list):

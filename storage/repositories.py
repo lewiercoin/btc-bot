@@ -111,6 +111,7 @@ _RUNTIME_METRICS_FIELDS = (
     "last_ws_message_at",
     "last_health_check_at",
     "last_runtime_warning",
+    "feature_quality_json",
     "config_hash",
 )
 
@@ -144,6 +145,111 @@ def get_runtime_metrics(conn: sqlite3.Connection) -> dict | None:
     if not row:
         return None
     return dict(row)
+
+
+def save_oi_sample(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    timestamp: datetime,
+    oi_value: float,
+    source: str,
+    captured_at: datetime | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT OR IGNORE INTO oi_samples (symbol, timestamp, oi_value, source, captured_at)
+        VALUES (?, ?, ?, ?, ?)
+        """,
+        (
+            symbol.upper(),
+            _normalize_runtime_metric_value(timestamp),
+            float(oi_value),
+            source,
+            _normalize_runtime_metric_value(captured_at or datetime.now(timezone.utc)),
+        ),
+    )
+
+
+def fetch_oi_samples(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    since_ts: datetime | None = None,
+    limit: int | None = None,
+) -> list[dict[str, Any]]:
+    params: list[Any] = [symbol.upper()]
+    where_clause = "WHERE symbol = ?"
+    if since_ts is not None:
+        where_clause += " AND timestamp >= ?"
+        params.append(_normalize_runtime_metric_value(since_ts))
+    limit_clause = ""
+    if limit is not None:
+        limit_clause = " LIMIT ?"
+        params.append(max(int(limit), 1))
+
+    rows = conn.execute(
+        f"""
+        SELECT symbol, timestamp, oi_value, source, captured_at
+        FROM oi_samples
+        {where_clause}
+        ORDER BY timestamp ASC
+        {limit_clause}
+        """,
+        tuple(params),
+    ).fetchall()
+    return [dict(row) for row in rows]
+
+
+def save_cvd_price_bar(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    timeframe: str,
+    bar_time: datetime,
+    price_close: float,
+    cvd: float,
+    tfi: float | None,
+    source: str,
+    captured_at: datetime | None = None,
+) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO cvd_price_history (
+            symbol, timeframe, bar_time, price_close, cvd, tfi, source, captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            symbol.upper(),
+            timeframe,
+            _normalize_runtime_metric_value(bar_time),
+            float(price_close),
+            float(cvd),
+            None if tfi is None else float(tfi),
+            source,
+            _normalize_runtime_metric_value(captured_at or datetime.now(timezone.utc)),
+        ),
+    )
+
+
+def fetch_cvd_price_history(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    timeframe: str,
+    limit: int,
+) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT symbol, timeframe, bar_time, price_close, cvd, tfi, source, captured_at
+        FROM cvd_price_history
+        WHERE symbol = ? AND timeframe = ?
+        ORDER BY bar_time DESC
+        LIMIT ?
+        """,
+        (symbol.upper(), timeframe, max(int(limit), 1)),
+    ).fetchall()
+    return [dict(row) for row in reversed(rows)]
 
 
 def insert_decision_outcome(

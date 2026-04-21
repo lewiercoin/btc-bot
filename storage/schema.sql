@@ -186,6 +186,7 @@ CREATE TABLE IF NOT EXISTS runtime_metrics (
     last_ws_message_at TEXT,
     last_health_check_at TEXT,
     last_runtime_warning TEXT,
+    feature_quality_json TEXT,
     config_hash TEXT
 );
 
