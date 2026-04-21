@@ -1,36 +1,37 @@
 # Milestone Tracker
 
-Last updated: 2026-04-20
+Last updated: 2026-04-21
 
 ---
 
 ## Current Active Milestone
 
-**EXPERIMENT-V1-THROUGHPUT** — DEPLOYED & COLLECTING DATA (branch: `experiment-v1-unblock-filters`)
+**DATA-INTEGRITY-V1** — READY FOR AUDIT (branch: `data-integrity-v1`)
 
-**Note:** Full Experiment V1 details are tracked in the experiment branch. Main branch tracks post-experiment planning.
-
-**Next planned milestone:** DATA-INTEGRITY-V1 (after Experiment v1 Day 14: 2026-05-04)  
+**Previous milestone:** EXPERIMENT-V1-THROUGHPUT — completed successfully per operator update (2026-04-21)
 **Handoff prepared:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md`  
 **Builder assigned:** Codex  
 **Auditor:** Claude Code
+
+**Implementation checkpoint:** `075f529` (`feat(data-integrity): implement restart-safe feature quality`)
+
+**Validation:**
+- `python -m pytest` → 193 passed, 24 skipped
+- `python -m compileall core data dashboard monitoring settings.py storage scripts tests` → passed
+- `python scripts/smoke_feature_engine.py` → passed
+- `python scripts/smoke_recovery.py` → passed
+
+**Status note:** Builder implementation is pushed for Claude Code audit. Do not merge to `main` or deploy until audit closure.
 
 ---
 
 ## Next Milestone: DATA-INTEGRITY-V1 (Post-Experiment V1)
 
-**Status:** PLANNING — ready for implementation after Experiment v1 checkpoint
+**Status:** READY FOR AUDIT — implementation pushed on `data-integrity-v1`
 
-**Full implementation start:** 2026-05-05 (after Experiment v1 Day 14 evaluation)
-
-**Pre-Day14 preparation (ALLOWED NOW):**
-- ✅ Create branch `data-integrity-v1` from main
-- ✅ Task 1 design work (FeatureQuality model)
-- ✅ Draft schema migrations (OI samples, CVD history tables)
-- ✅ Test scaffolding
-- ❌ **ZERO merge to main** before Day 14
-- ❌ **ZERO deploy** to production
-- ❌ **ZERO contamination** of Experiment v1
+**Implementation commits:**
+- `256a74a` — scaffold feature quality contracts
+- `075f529` — implement restart-safe feature quality
 
 **Goal:** Make decision-path data **restart-safe, coverage-aware, and quality-explicit**.
 
