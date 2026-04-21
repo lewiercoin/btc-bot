@@ -269,13 +269,14 @@ def test_read_daily_metrics_from_conn_empty() -> None:
 def test_read_daily_metrics_from_conn_with_rows() -> None:
     schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
     conn = _make_conn(schema_path)
+    metrics_day = (datetime.now(timezone.utc) - timedelta(days=1)).date().isoformat()
     try:
         conn.execute(
             """
             INSERT INTO daily_metrics (date, trades_count, wins, losses, pnl_abs, pnl_r_sum, daily_dd_pct, expectancy_r)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("2026-04-13", 3, 2, 1, 120.0, 0.6, 0.005, 0.2),
+            (metrics_day, 3, 2, 1, 120.0, 0.6, 0.005, 0.2),
         )
         conn.commit()
         payload = read_daily_metrics_from_conn(conn, days=7)
@@ -283,7 +284,7 @@ def test_read_daily_metrics_from_conn_with_rows() -> None:
         conn.close()
     assert len(payload["metrics"]) == 1
     row = payload["metrics"][0]
-    assert row["date"] == "2026-04-13"
+    assert row["date"] == metrics_day
     assert row["trades_count"] == 3
     assert row["wins"] == 2
     assert row["losses"] == 1

@@ -216,8 +216,9 @@ def test_decision_funnel_and_config_snapshot_endpoints_return_expected_payloads(
     logs_dir = tmp_path / "logs"
     logs_dir.mkdir(parents=True, exist_ok=True)
     log_path = logs_dir / "btc_bot.log"
+    now = datetime.now(timezone.utc).replace(microsecond=0)
     log_path.write_text(
-        f"2026-04-19 11:00:00 | INFO | __main__ | Starting bot | mode=PAPER | symbol=BTCUSDT | config_hash={config_hash}",
+        f"{now.strftime('%Y-%m-%d %H:%M:%S')} | INFO | __main__ | Starting bot | mode=PAPER | symbol=BTCUSDT | config_hash={config_hash}",
         encoding="utf-8",
     )
 
@@ -232,14 +233,14 @@ def test_decision_funnel_and_config_snapshot_endpoints_return_expected_payloads(
                 cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id, details_json
             ) VALUES (?, ?, ?, ?, ?, ?, ?)
             """,
-            ("2026-04-19T10:30:00+00:00", "no_signal", "uptrend_pullback_weak", "uptrend", config_hash, None, "{}"),
+            ((now - timedelta(minutes=30)).isoformat(), "no_signal", "uptrend_pullback_weak", "uptrend", config_hash, None, "{}"),
         )
         conn.execute(
             """
             INSERT INTO config_snapshots (config_hash, captured_at, strategy_json)
             VALUES (?, ?, ?)
             """,
-            (config_hash, "2026-04-19T10:00:00+00:00", '{"allow_uptrend_pullback": true}'),
+            (config_hash, (now - timedelta(hours=1)).isoformat(), '{"allow_uptrend_pullback": true}'),
         )
         conn.commit()
     finally:

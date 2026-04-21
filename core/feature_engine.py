@@ -4,9 +4,9 @@ from collections import deque
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from math import sqrt
-from typing import Iterable
+from typing import Any, Iterable
 
-from core.models import Features, MarketSnapshot
+from core.models import FeatureQuality, Features, MarketSnapshot
 
 
 @dataclass(slots=True)
@@ -45,6 +45,21 @@ def _std(values: Iterable[float]) -> float:
     avg = _mean(vals)
     variance = sum((v - avg) ** 2 for v in vals) / len(vals)
     return sqrt(variance)
+
+
+def _to_utc_datetime(value: Any) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        parsed = value
+    else:
+        try:
+            parsed = datetime.fromisoformat(str(value))
+        except ValueError:
+            return None
+    if parsed.tzinfo is None:
+        return parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def percentile_rank(values: list[float], value: float) -> float:
@@ -194,6 +209,43 @@ class FeatureEngine:
         self._force_order_rate_history.clear()
         self._cvd_price_history.clear()
 
+    def bootstrap_oi_history(self, samples: Iterable[dict[str, Any]]) -> dict[str, Any]:
+        self._oi_history.clear()
+        loaded = 0
+        for sample in sorted(samples, key=lambda item: str(item.get("timestamp", ""))):
+            timestamp = _to_utc_datetime(sample.get("timestamp"))
+            if timestamp is None:
+                continue
+            self._oi_history.append((timestamp, float(sample.get("oi_value", 0.0))))
+            loaded += 1
+        return {
+            "loaded_samples": loaded,
+            "oldest_timestamp": self._oi_history[0][0].isoformat() if self._oi_history else None,
+            "newest_timestamp": self._oi_history[-1][0].isoformat() if self._oi_history else None,
+        }
+
+    def bootstrap_cvd_price_history(self, rows: Iterable[dict[str, Any]]) -> dict[str, Any]:
+        self._cvd_price_history.clear()
+        loaded = 0
+        for row in sorted(rows, key=lambda item: str(item.get("bar_time", ""))):
+            bar_time = _to_utc_datetime(row.get("bar_time"))
+            if bar_time is None:
+                continue
+            self._cvd_price_history.append(
+                (
+                    bar_time,
+                    float(row.get("price_close", 0.0)),
+                    float(row.get("cvd", 0.0)),
+                )
+            )
+            loaded += 1
+        return {
+            "loaded_bars": loaded,
+            "required_bars": max(int(self.config.cvd_divergence_bars), 1),
+            "oldest_timestamp": self._cvd_price_history[0][0].isoformat() if self._cvd_price_history else None,
+            "newest_timestamp": self._cvd_price_history[-1][0].isoformat() if self._cvd_price_history else None,
+        }
+
     def compute(self, snapshot: MarketSnapshot, schema_version: str, config_hash: str) -> Features:
         timestamp = snapshot.timestamp.astimezone(timezone.utc)
         atr_15m = compute_atr(snapshot.candles_15m, self.config.atr_period)
@@ -222,17 +274,38 @@ class FeatureEngine:
             sweep_vs_buffer_atr,
         ) = detect_sweep_reclaim(snapshot.candles_15m, equal_lows, equal_highs, atr_15m, self.config)
 
-        funding_rates = self._funding_window_rates(snapshot.funding_history, timestamp)
+        quality = dict(snapshot.quality)
+        quality.setdefault(
+            "flow_60s",
+            FeatureQuality.ready(reason="legacy_snapshot_no_quality", provenance="snapshot"),
+        )
+        quality.setdefault(
+            "flow_15m",
+            FeatureQuality.ready(reason="legacy_snapshot_no_quality", provenance="snapshot"),
+        )
+
+        funding_rates, funding_quality = self._funding_window_rates(snapshot.funding_history, timestamp)
+        quality["funding_window"] = funding_quality
         funding_8h = funding_rates[-1] if funding_rates else 0.0
         funding_sma3 = _mean(funding_rates[-3:]) if funding_rates else 0.0
         funding_sma9 = _mean(funding_rates[-9:]) if funding_rates else 0.0
         funding_pct_60d = percentile_rank(funding_rates, funding_8h) if funding_rates else 50.0
 
-        oi_value, oi_zscore_60d, oi_delta_pct = self._compute_oi_stats(snapshot.open_interest, timestamp)
+        oi_value, oi_zscore_60d, oi_delta_pct, oi_quality = self._compute_oi_stats(snapshot.open_interest, timestamp)
+        quality["oi_baseline"] = oi_quality
 
         cvd_15m = float(snapshot.aggtrades_bucket_15m.get("cvd", 0.0))
-        self._cvd_price_history.append((timestamp, float(snapshot.price), cvd_15m))
-        cvd_bullish_divergence, cvd_bearish_divergence = self._compute_cvd_divergence()
+        cvd_bar = (timestamp, float(snapshot.price), cvd_15m)
+        if self._cvd_price_history and self._cvd_price_history[-1][0] == timestamp:
+            self._cvd_price_history[-1] = cvd_bar
+        else:
+            self._cvd_price_history.append(cvd_bar)
+        cvd_quality = self._cvd_quality()
+        quality["cvd_divergence"] = cvd_quality
+        if cvd_quality.status == "ready":
+            cvd_bullish_divergence, cvd_bearish_divergence = self._compute_cvd_divergence()
+        else:
+            cvd_bullish_divergence, cvd_bearish_divergence = False, False
 
         tfi_60s = float(snapshot.aggtrades_bucket_60s.get("tfi", 0.0))
         force_order_rate_60s = len(snapshot.force_order_events_60s) / 60.0
@@ -274,23 +347,57 @@ class FeatureEngine:
             force_order_spike=force_order_spike,
             force_order_decreasing=force_order_decreasing,
             passive_etf_bias_5d=snapshot.etf_bias_daily,
+            quality=quality,
         )
 
-    def _funding_window_rates(self, funding_history: list[dict], now: datetime) -> list[float]:
+    def _funding_window_rates(self, funding_history: list[dict], now: datetime) -> tuple[list[float], FeatureQuality]:
         window_start = now - timedelta(days=self.config.funding_window_days)
-        values: list[float] = []
+        rows_in_window: list[tuple[datetime, float]] = []
         for row in funding_history:
-            ts = row.get("funding_time")
-            if isinstance(ts, datetime):
-                ts_utc = ts.astimezone(timezone.utc)
-                if ts_utc >= window_start:
-                    values.append(float(row.get("funding_rate", 0.0)))
-        if not values:
-            values = [float(row.get("funding_rate", 0.0)) for row in funding_history]
-        return values
+            ts_utc = _to_utc_datetime(row.get("funding_time"))
+            if ts_utc is not None and ts_utc >= window_start:
+                rows_in_window.append((ts_utc, float(row.get("funding_rate", 0.0))))
+        rows_in_window.sort(key=lambda item: item[0])
 
-    def _compute_oi_stats(self, oi_value: float, now: datetime) -> tuple[float, float, float]:
-        self._oi_history.append((now, float(oi_value)))
+        values = [rate for _, rate in rows_in_window]
+        required_samples = max(int(self.config.funding_window_days * 3), 1)
+        loaded_samples = len(values)
+        coverage_ratio = min(loaded_samples / required_samples, 1.0)
+        metadata = {
+            "loaded_samples": loaded_samples,
+            "required_samples": required_samples,
+            "coverage_ratio": coverage_ratio,
+            "window_start": window_start.isoformat(),
+            "window_end": now.isoformat(),
+            "oldest_timestamp": rows_in_window[0][0].isoformat() if rows_in_window else None,
+            "newest_timestamp": rows_in_window[-1][0].isoformat() if rows_in_window else None,
+        }
+        if coverage_ratio >= self.config.funding_coverage_ready:
+            quality = FeatureQuality.ready(
+                reason="funding_window_complete",
+                metadata=metadata,
+                provenance="rest",
+            )
+        elif coverage_ratio >= self.config.funding_coverage_degraded and loaded_samples > 0:
+            quality = FeatureQuality.degraded(
+                reason="funding_window_partial",
+                metadata=metadata,
+                provenance="rest",
+            )
+        else:
+            quality = FeatureQuality.unavailable(
+                reason="funding_window_insufficient",
+                metadata=metadata,
+                provenance="rest",
+            )
+        return values, quality
+
+    def _compute_oi_stats(self, oi_value: float, now: datetime) -> tuple[float, float, float, FeatureQuality]:
+        oi_sample = (now, float(oi_value))
+        if self._oi_history and self._oi_history[-1][0] == now:
+            self._oi_history[-1] = oi_sample
+        else:
+            self._oi_history.append(oi_sample)
         threshold = now - timedelta(days=self.config.oi_z_window_days)
         while self._oi_history and self._oi_history[0][0] < threshold:
             self._oi_history.popleft()
@@ -298,7 +405,70 @@ class FeatureEngine:
         values = [value for _, value in self._oi_history]
         prev = values[-2] if len(values) >= 2 else oi_value
         delta_pct = 0.0 if prev == 0 else (oi_value - prev) / prev
-        return float(oi_value), zscore(values, float(oi_value)), delta_pct
+        quality = self._oi_quality(now)
+        return float(oi_value), zscore(values, float(oi_value)), delta_pct, quality
+
+    def _oi_quality(self, now: datetime) -> FeatureQuality:
+        loaded_samples = len(self._oi_history)
+        oldest = self._oi_history[0][0] if self._oi_history else None
+        newest = self._oi_history[-1][0] if self._oi_history else None
+        days_covered = 0.0
+        if oldest is not None and newest is not None:
+            days_covered = max((newest - oldest).total_seconds() / 86_400.0, 0.0)
+        required_days = max(float(self.config.oi_baseline_days), 0.0)
+        metadata = {
+            "loaded_samples": loaded_samples,
+            "required_days": required_days,
+            "days_covered": days_covered,
+            "oldest_timestamp": oldest.isoformat() if oldest else None,
+            "newest_timestamp": newest.isoformat() if newest else None,
+        }
+        if loaded_samples >= 2 and days_covered >= required_days:
+            return FeatureQuality.ready(
+                reason="oi_baseline_mature",
+                metadata=metadata,
+                provenance="bootstrapped-from-db",
+            )
+        if loaded_samples >= 2:
+            return FeatureQuality.degraded(
+                reason="oi_baseline_partial",
+                metadata=metadata,
+                provenance="bootstrapped-from-db",
+            )
+        return FeatureQuality.unavailable(
+            reason="oi_baseline_insufficient",
+            metadata=metadata,
+            provenance="bootstrapped-from-db",
+        )
+
+    def _cvd_quality(self) -> FeatureQuality:
+        loaded_bars = len(self._cvd_price_history)
+        required_bars = max(int(self.config.cvd_divergence_bars), 1)
+        oldest = self._cvd_price_history[0][0] if self._cvd_price_history else None
+        newest = self._cvd_price_history[-1][0] if self._cvd_price_history else None
+        metadata = {
+            "loaded_bars": loaded_bars,
+            "required_bars": required_bars,
+            "oldest_timestamp": oldest.isoformat() if oldest else None,
+            "newest_timestamp": newest.isoformat() if newest else None,
+        }
+        if loaded_bars >= required_bars:
+            return FeatureQuality.ready(
+                reason="cvd_history_mature",
+                metadata=metadata,
+                provenance="bootstrapped-from-db",
+            )
+        if loaded_bars > 1:
+            return FeatureQuality.degraded(
+                reason="cvd_history_partial",
+                metadata=metadata,
+                provenance="bootstrapped-from-db",
+            )
+        return FeatureQuality.unavailable(
+            reason="cvd_history_insufficient",
+            metadata=metadata,
+            provenance="bootstrapped-from-db",
+        )
 
     def _compute_cvd_divergence(self) -> tuple[bool, bool]:
         window = max(int(self.config.cvd_divergence_window_bars), 3)
