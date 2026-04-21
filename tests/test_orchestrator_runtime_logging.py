@@ -172,7 +172,15 @@ class UnusedRiskEngine:
 
 
 class UnusedExecutionEngine:
-    def execute_signal(self, signal: Any, size: float, leverage: int) -> None:
+    def execute_signal(
+        self,
+        signal: Any,
+        size: float,
+        leverage: int,
+        *,
+        snapshot_price: float | None = None,
+    ) -> None:
+        _ = snapshot_price
         raise AssertionError("execution should not be called when no signal is generated")
 
 

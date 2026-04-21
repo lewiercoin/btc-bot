@@ -45,5 +45,12 @@ class ExecutionEngine(ABC):
     """Execution layer only. No strategic filtering and no risk gating here."""
 
     @abstractmethod
-    def execute_signal(self, signal: ExecutableSignal, size: float, leverage: int) -> None:
+    def execute_signal(
+        self,
+        signal: ExecutableSignal,
+        size: float,
+        leverage: int,
+        *,
+        snapshot_price: float | None = None,
+    ) -> None:
         raise NotImplementedError

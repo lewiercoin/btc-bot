@@ -164,6 +164,10 @@ def read_positions_from_conn(conn: sqlite3.Connection, *, now: datetime | None =
             "take_profit_1": None if row["take_profit_1"] is None else float(row["take_profit_1"]),
             "status": str(row["status"]),
             "opened_at": _to_iso(row["opened_at"]),
+            "signal_entry_reference": (
+                None if row.get("signal_entry_reference") is None else float(row["signal_entry_reference"])
+            ),
+            "has_execution_record": bool(row.get("has_execution_record", 0)),
         }
         for row in rows
     ]
@@ -183,16 +187,34 @@ def read_positions_from_conn(conn: sqlite3.Connection, *, now: datetime | None =
 def read_trades_from_conn(conn: sqlite3.Connection, *, limit: int = 50, config_hash: str | None = None) -> dict[str, Any]:
     current_config = config_hash or _get_current_config_hash(conn)
     query = """
-        SELECT trade_id, direction, entry_price, exit_price, pnl_abs, pnl_r, closed_at,
-               regime, confluence_score, exit_reason, fees_total, mae, mfe, config_hash
-        FROM trade_log
-        WHERE closed_at IS NOT NULL
+        SELECT
+            t.trade_id,
+            t.direction,
+            t.entry_price,
+            t.exit_price,
+            t.pnl_abs,
+            t.pnl_r,
+            t.closed_at,
+            t.regime,
+            t.confluence_score,
+            t.exit_reason,
+            t.fees_total,
+            t.mae,
+            t.mfe,
+            t.config_hash,
+            es.entry_price AS signal_entry_reference,
+            EXISTS (
+                SELECT 1 FROM executions e WHERE e.position_id = t.position_id
+            ) AS has_execution_record
+        FROM trade_log t
+        LEFT JOIN executable_signals es ON es.signal_id = t.signal_id
+        WHERE t.closed_at IS NOT NULL
     """
     params = []
     if current_config:
-        query += " AND config_hash = ?"
+        query += " AND t.config_hash = ?"
         params.append(current_config)
-    query += " ORDER BY closed_at DESC LIMIT ?"
+    query += " ORDER BY t.closed_at DESC LIMIT ?"
     params.append(int(limit))
     rows = conn.execute(query, tuple(params)).fetchall()
 
@@ -214,6 +236,10 @@ def read_trades_from_conn(conn: sqlite3.Connection, *, limit: int = 50, config_h
                 "mae": float(row["mae"]) if row["mae"] is not None else 0.0,
                 "mfe": float(row["mfe"]) if row["mfe"] is not None else 0.0,
                 "config_hash": str(row["config_hash"]) if "config_hash" in row.keys() else None,
+                "signal_entry_reference": (
+                    None if row["signal_entry_reference"] is None else float(row["signal_entry_reference"])
+                ),
+                "has_execution_record": bool(row["has_execution_record"]),
             }
             for row in rows
         ]
@@ -260,6 +286,7 @@ def read_signals_from_conn(conn: sqlite3.Connection, *, limit: int = 20, config_
                 "reasons": _parse_json_list(row["reasons_json"]),
                 "config_hash": str(row["config_hash"]),
                 "entry_price": None if row["entry_price"] is None else float(row["entry_price"]),
+                "signal_entry_reference": None if row["entry_price"] is None else float(row["entry_price"]),
                 "stop_loss": None if row["stop_loss"] is None else float(row["stop_loss"]),
                 "take_profit_1": None if row["take_profit_1"] is None else float(row["take_profit_1"]),
                 "rr_ratio": None if row["rr_ratio"] is None else float(row["rr_ratio"]),
