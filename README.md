@@ -24,6 +24,22 @@ BOT_MODE=PAPER python main.py
 BOT_MODE=LIVE BINANCE_API_KEY=... BINANCE_API_SECRET=... python main.py
 ```
 
+### Historical data backfill
+
+Before deploying experiment-v2 on a production database that predates DATA QUALITY FOUNDATION, run the one-time OI/CVD backfill:
+
+```bash
+python scripts/run_backfill.py
+```
+
+The script creates missing persistence tables, copies historical OI from `open_interest`, refreshes current OI and recent 15m prices from Binance REST, and fills `cvd_price_history`. Expected readiness output:
+
+```text
+READY: OI=60.00 days (... samples), CVD=30 bars
+```
+
+If the output is `NOT READY`, do not restart the experiment-v2 bot yet. Inspect the script logs for missing OI history, REST failures, or insufficient 15m price bars.
+
 ### Backtest (single run)
 
 ```bash
