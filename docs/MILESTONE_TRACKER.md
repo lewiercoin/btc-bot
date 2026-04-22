@@ -62,15 +62,15 @@ Last updated: 2026-04-22
 **Out of scope:** Session modeling, execution realism, parameter tuning, new data sources
 
 **Documentation:**
-- **Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready for Codex)
+- **Handoff:** ⚠️ NOT YET WRITTEN — must be created before milestone start
+- **Reference (outdated):** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` is the DATA-INTEGRITY-V1 handoff (already done), not MODELING-V1
 - **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
 
-**Implementation branch:** `data-integrity-v1` ✅ **PUSHED to origin** (backup/visibility only)  
-**Branch status:** Pre-Day14 scaffolding approved, **BLOCKED from merge until 2026-05-04**
+**Implementation branch:** ⚠️ NOT YET CREATED — create from `main` when milestone starts
 
-**Merge gate:** Claude Code audit verdict = DONE (after Task 7)
+**Merge gate:** Claude Code audit verdict = DONE
 
-**Post-milestone validation:** Experiment v2 (same config as Experiment v1, but with clean data contracts)
+**Post-milestone validation:** TBD — defined when handoff is written
 
 ---
 
