@@ -117,9 +117,9 @@ class RiskConfig:
 
     max_open_positions: int = 1
     max_trades_per_day: int = 3
-    max_consecutive_losses: int = 5
-    daily_dd_limit: float = 0.185
-    weekly_dd_limit: float = 0.063
+    max_consecutive_losses: int = 15
+    daily_dd_limit: float = 0.20
+    weekly_dd_limit: float = 0.30
     max_hold_hours: int = 3
     high_vol_stop_distance_pct: float = 0.035
     partial_exit_pct: float = 0.26

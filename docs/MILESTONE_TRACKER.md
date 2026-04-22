@@ -1,6 +1,23 @@
 # Milestone Tracker
 
-Last updated: 2026-04-21
+Last updated: 2026-04-22
+
+---
+
+## ⚠️ Open Tech Debt: Kill-Switch Limits (MUST restore before LIVE mode)
+
+**Date:** 2026-04-22  
+**Reason:** Bot is in configuration/tuning phase. Weekly DD kill-switch triggered at 6.3% blocking MODELING-V1 data collection.  
+**Action taken:** Relaxed `RiskConfig` limits in `settings.py` for paper/tuning phase:
+
+| Parameter | Production value | Current (tuning) |
+|---|---|---|
+| `weekly_dd_limit` | `0.063` (6.3%) | `0.30` (30%) |
+| `daily_dd_limit` | `0.185` (18.5%) | `0.20` (20%) |
+| `max_consecutive_losses` | `5` | `15` |
+
+**MANDATORY:** Restore production values before switching to LIVE mode.  
+**Future fix:** Implement `tuning_mode` flag (Cascade Option C) or calendar-rollover auto-recovery (Option B).
 
 ---
 
