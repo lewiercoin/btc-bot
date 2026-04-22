@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 import csv
 import io
+import logging
 import re
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
@@ -22,6 +24,9 @@ from settings import load_settings
 
 _LOG_TS_RE = re.compile(r"^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
 _TAIL_BYTES = 256 * 1024
+
+_SETTINGS_RELOAD_INTERVAL = 60
+_DASH_LOG = logging.getLogger(__name__)
 
 
 def _extract_log_ts(line: str) -> datetime | None:
@@ -91,8 +96,19 @@ def _parse_egress_events(log_path: Path) -> dict[str, Any]:
         "last_ban_at": _iso(last_ban_at),
         "last_rotation_at": _iso(last_rotation_at),
     }
+
+
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 STATIC_DIR = PROJECT_ROOT / "dashboard" / "static"
+
+
+async def _settings_hot_reload(app: FastAPI) -> None:
+    while True:
+        await asyncio.sleep(_SETTINGS_RELOAD_INTERVAL)
+        try:
+            app.state.settings = load_settings(project_root=PROJECT_ROOT)
+        except Exception as exc:
+            _DASH_LOG.warning("Settings hot-reload failed: %s", exc)
 
 
 @asynccontextmanager
@@ -106,7 +122,13 @@ async def lifespan(app: FastAPI):
         project_root=PROJECT_ROOT,
         operator_log_path=settings.storage.logs_dir / "dashboard_operator.jsonl",
     )
+    reload_task = asyncio.create_task(_settings_hot_reload(app))
     yield
+    reload_task.cancel()
+    try:
+        await reload_task
+    except asyncio.CancelledError:
+        pass
 
 
 class StartBotRequest(BaseModel):
