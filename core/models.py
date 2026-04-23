@@ -80,17 +80,27 @@ class MarketSnapshot:
     price: float
     bid: float
     ask: float
+    snapshot_id: str | None = None
+    exchange_timestamp: datetime | None = None
+    source: str = "mixed"
+    latency_ms: float | None = None
+    data_quality_flag: str = "unknown"
+    book_ticker: dict[str, Any] = field(default_factory=dict)
+    open_interest_payload: dict[str, Any] = field(default_factory=dict)
     candles_15m: list[dict[str, Any]] = field(default_factory=list)
     candles_1h: list[dict[str, Any]] = field(default_factory=list)
     candles_4h: list[dict[str, Any]] = field(default_factory=list)
     funding_history: list[dict[str, Any]] = field(default_factory=list)
     open_interest: float = 0.0
+    aggtrade_events_60s: list[dict[str, Any]] = field(default_factory=list)
+    aggtrade_events_15m: list[dict[str, Any]] = field(default_factory=list)
     aggtrades_bucket_60s: dict[str, Any] = field(default_factory=dict)
     aggtrades_bucket_15m: dict[str, Any] = field(default_factory=dict)
     force_order_events_60s: list[dict[str, Any]] = field(default_factory=list)
     etf_bias_daily: float | None = None
     dxy_daily: float | None = None
     quality: dict[str, FeatureQuality] = field(default_factory=dict)
+    source_meta: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -129,6 +139,17 @@ class Features:
     force_order_decreasing: bool = False
     passive_etf_bias_5d: float | None = None
     quality: dict[str, FeatureQuality] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class FeatureSnapshot:
+    feature_snapshot_id: str
+    snapshot_id: str
+    cycle_timestamp: datetime
+    schema_version: str
+    config_hash: str
+    features_json: dict[str, Any] = field(default_factory=dict)
+    quality_json: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass(slots=True)

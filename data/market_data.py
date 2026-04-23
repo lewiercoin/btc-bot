@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import sqlite3
+import time
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from datetime import timezone
@@ -99,19 +100,40 @@ class MarketDataAssembler:
 
     def build_snapshot(self, symbol: str, timestamp: datetime) -> MarketSnapshot:
         now = timestamp.astimezone(timezone.utc)
+        build_started = time.perf_counter()
 
+        ticker_started = time.perf_counter()
         ticker = self.rest_client.fetch_book_ticker(symbol)
+        ticker_latency_ms = (time.perf_counter() - ticker_started) * 1000.0
+        candles_15m_started = time.perf_counter()
         candles_15m = self.rest_client.fetch_klines(symbol, "15m", limit=self.config.candles_limit)
+        candles_15m_latency_ms = (time.perf_counter() - candles_15m_started) * 1000.0
+        candles_1h_started = time.perf_counter()
         candles_1h = self.rest_client.fetch_klines(symbol, "1h", limit=self.config.candles_limit)
+        candles_1h_latency_ms = (time.perf_counter() - candles_1h_started) * 1000.0
+        candles_4h_started = time.perf_counter()
         candles_4h = self.rest_client.fetch_klines(symbol, "4h", limit=self.config.candles_limit)
+        candles_4h_latency_ms = (time.perf_counter() - candles_4h_started) * 1000.0
+        funding_started = time.perf_counter()
         funding_history = self.rest_client.fetch_funding_history(symbol, limit=self.config.funding_limit)
+        funding_latency_ms = (time.perf_counter() - funding_started) * 1000.0
+        oi_started = time.perf_counter()
         open_interest = self.rest_client.fetch_open_interest(symbol)
+        open_interest_latency_ms = (time.perf_counter() - oi_started) * 1000.0
 
         self._persist_oi_sample(symbol=symbol, sample=open_interest, captured_at=now)
 
-        agg_60s, agg_15m, flow_quality = self._load_agg_trade_windows(symbol=symbol, now=now)
+        (
+            agg_60s,
+            agg_15m,
+            agg_events_60s,
+            agg_events_15m,
+            flow_quality,
+            agg_meta,
+        ) = self._load_agg_trade_windows(symbol=symbol, now=now)
         force_orders_60s = self._load_force_order_window(now=now)
         etf_bias_daily, dxy_daily = self._load_external_bias(now=now)
+        total_latency_ms = (time.perf_counter() - build_started) * 1000.0
 
         bid = float(ticker["bid"])
         ask = float(ticker["ask"])
@@ -122,26 +144,69 @@ class MarketDataAssembler:
             price_close=price,
             captured_at=now,
         )
+        exchange_timestamp = self._resolve_exchange_timestamp(
+            candles_15m=candles_15m,
+            open_interest=open_interest,
+            agg_events_15m=agg_events_15m,
+            force_orders_60s=force_orders_60s,
+        )
+        data_quality_flag = self._rollup_quality_flag(flow_quality)
         return MarketSnapshot(
             symbol=symbol.upper(),
             timestamp=now,
             price=price,
             bid=bid,
             ask=ask,
+            exchange_timestamp=exchange_timestamp,
+            source="mixed",
+            latency_ms=total_latency_ms,
+            data_quality_flag=data_quality_flag,
+            book_ticker=ticker,
+            open_interest_payload=open_interest,
             candles_15m=candles_15m,
             candles_1h=candles_1h,
             candles_4h=candles_4h,
             funding_history=funding_history,
             open_interest=float(open_interest["oi_value"]),
+            aggtrade_events_60s=agg_events_60s,
+            aggtrade_events_15m=agg_events_15m,
             aggtrades_bucket_60s=agg_60s,
             aggtrades_bucket_15m=agg_15m,
             force_order_events_60s=force_orders_60s,
             etf_bias_daily=etf_bias_daily,
             dxy_daily=dxy_daily,
             quality=flow_quality,
+            source_meta={
+                "book_ticker": {"source": "rest", "latency_ms": ticker_latency_ms},
+                "candles_15m": {"source": "rest", "latency_ms": candles_15m_latency_ms},
+                "candles_1h": {"source": "rest", "latency_ms": candles_1h_latency_ms},
+                "candles_4h": {"source": "rest", "latency_ms": candles_4h_latency_ms},
+                "funding_history": {"source": "rest", "latency_ms": funding_latency_ms},
+                "open_interest": {"source": "rest", "latency_ms": open_interest_latency_ms},
+                "aggtrade_60s": agg_meta["aggtrade_60s"],
+                "aggtrade_15m": agg_meta["aggtrade_15m"],
+                "force_orders_60s": {
+                    "source": "ws" if force_orders_60s else "none",
+                    "events_count": len(force_orders_60s),
+                    "last_event_time": force_orders_60s[-1]["event_time"].isoformat() if force_orders_60s else None,
+                },
+                "build_latency_ms": total_latency_ms,
+                "ws_last_message_at": self._last_ws_message_at_iso(),
+            },
         )
 
-    def _load_agg_trade_windows(self, symbol: str, now: datetime) -> tuple[dict[str, Any], dict[str, Any], dict[str, FeatureQuality]]:
+    def _load_agg_trade_windows(
+        self,
+        symbol: str,
+        now: datetime,
+    ) -> tuple[
+        dict[str, Any],
+        dict[str, Any],
+        list[dict[str, Any]],
+        list[dict[str, Any]],
+        dict[str, FeatureQuality],
+        dict[str, dict[str, Any]],
+    ]:
         ws_events: list[dict[str, Any]] = []
         source = "ws"
         if self.websocket_client is not None:
@@ -188,10 +253,20 @@ class MarketDataAssembler:
             now=now,
             metadata=coverage_15m,
         )
-        return bucket_60s, bucket_15m, {
-            "flow_60s": self._quality_from_flow_metadata(coverage_60s),
-            "flow_15m": self._quality_from_flow_metadata(coverage_15m),
-        }
+        return (
+            bucket_60s,
+            bucket_15m,
+            trades_60s,
+            trades_15m,
+            {
+                "flow_60s": self._quality_from_flow_metadata(coverage_60s),
+                "flow_15m": self._quality_from_flow_metadata(coverage_15m),
+            },
+            {
+                "aggtrade_60s": coverage_60s,
+                "aggtrade_15m": coverage_15m,
+            },
+        )
 
     def _flow_window_metadata(
         self,
@@ -304,6 +379,50 @@ class MarketDataAssembler:
             return []
         events = self.websocket_client.get_recent_force_orders(60)
         return filter_events_by_window(events, now=now, window_seconds=60)
+
+    def _resolve_exchange_timestamp(
+        self,
+        *,
+        candles_15m: list[dict[str, Any]],
+        open_interest: dict[str, Any],
+        agg_events_15m: list[dict[str, Any]],
+        force_orders_60s: list[dict[str, Any]],
+    ) -> datetime | None:
+        candidates: list[datetime] = []
+        oi_ts = open_interest.get("timestamp")
+        if isinstance(oi_ts, datetime):
+            candidates.append(oi_ts.astimezone(timezone.utc))
+        if candles_15m:
+            candle_open = candles_15m[-1].get("open_time")
+            if isinstance(candle_open, datetime):
+                candidates.append(candle_open.astimezone(timezone.utc))
+        if agg_events_15m:
+            event_time = agg_events_15m[-1].get("event_time")
+            if isinstance(event_time, datetime):
+                candidates.append(event_time.astimezone(timezone.utc))
+        if force_orders_60s:
+            force_event_time = force_orders_60s[-1].get("event_time")
+            if isinstance(force_event_time, datetime):
+                candidates.append(force_event_time.astimezone(timezone.utc))
+        if not candidates:
+            return None
+        return max(candidates)
+
+    @staticmethod
+    def _rollup_quality_flag(quality: dict[str, FeatureQuality]) -> str:
+        if not quality:
+            return "unknown"
+        statuses = {item.status for item in quality.values()}
+        if "unavailable" in statuses:
+            return "unavailable"
+        if "degraded" in statuses:
+            return "degraded"
+        return "ready"
+
+    def _last_ws_message_at_iso(self) -> str | None:
+        if self.websocket_client is None or self.websocket_client.last_message_at is None:
+            return None
+        return self.websocket_client.last_message_at.astimezone(timezone.utc).isoformat()
 
     def _load_external_bias(self, now: datetime) -> tuple[float | None, float | None]:
         if self.db_connection is None:

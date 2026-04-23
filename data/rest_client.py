@@ -75,6 +75,7 @@ def normalize_kline(payload: list[Any], symbol: str, timeframe: str) -> dict[str
         "low": float(payload[3]),
         "close": float(payload[4]),
         "volume": float(payload[5]),
+        "_exchange_raw": list(payload),
     }
 
 
@@ -83,6 +84,7 @@ def normalize_funding(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
         "symbol": symbol.upper(),
         "funding_time": _ms_to_utc(int(payload["fundingTime"])),
         "funding_rate": float(payload["fundingRate"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -92,6 +94,7 @@ def normalize_open_interest(payload: dict[str, Any], symbol: str) -> dict[str, A
         "symbol": symbol.upper(),
         "timestamp": _ms_to_utc(timestamp_ms),
         "oi_value": float(payload["openInterest"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -100,6 +103,7 @@ def normalize_open_interest_hist(payload: dict[str, Any], symbol: str) -> dict[s
         "symbol": symbol.upper(),
         "timestamp": _ms_to_utc(int(payload["timestamp"])),
         "oi_value": float(payload["sumOpenInterest"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -108,6 +112,7 @@ def normalize_book_ticker(payload: dict[str, Any]) -> dict[str, Any]:
         "symbol": str(payload["symbol"]).upper(),
         "bid": float(payload["bidPrice"]),
         "ask": float(payload["askPrice"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -118,6 +123,7 @@ def normalize_agg_trade(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
         "price": float(payload["p"]),
         "qty": float(payload["q"]),
         "is_buyer_maker": bool(payload["m"]),
+        "_exchange_raw": dict(payload),
     }
 
 
