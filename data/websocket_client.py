@@ -35,6 +35,7 @@ def normalize_ws_agg_trade_event(payload: dict[str, Any]) -> dict[str, Any]:
         "price": float(payload["p"]),
         "qty": float(payload["q"]),
         "is_buyer_maker": bool(payload["m"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -46,6 +47,7 @@ def normalize_ws_force_order_event(payload: dict[str, Any]) -> dict[str, Any]:
         "side": str(order["S"]).upper(),
         "qty": float(order["q"]),
         "price": float(order["p"]),
+        "_exchange_raw": dict(payload),
     }
 
 

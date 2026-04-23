@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import asdict, is_dataclass
 from datetime import date, datetime, timezone
 from typing import Any
 
 from core.execution_types import FillEvent
-from core.models import BotState, ExecutableSignal, SignalCandidate
+from core.models import BotState, ExecutableSignal, FeatureSnapshot, Features, MarketSnapshot, SignalCandidate
 
 
 def save_signal_candidate(conn: sqlite3.Connection, candidate: SignalCandidate, schema_version: str, config_hash: str) -> None:
@@ -28,6 +29,87 @@ def save_signal_candidate(conn: sqlite3.Connection, candidate: SignalCandidate, 
             json.dumps(candidate.features_json),
             schema_version,
             config_hash,
+        ),
+    )
+
+
+def insert_market_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    snapshot_id: str,
+    snapshot: MarketSnapshot,
+    captured_at: datetime,
+) -> None:
+    latest_15m = snapshot.candles_15m[-1] if snapshot.candles_15m else {}
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO market_snapshots (
+            snapshot_id, cycle_timestamp, exchange_timestamp, symbol, timeframe,
+            open, high, low, close, volume,
+            funding_rate, open_interest, bid_price, ask_price,
+            source, latency_ms, data_quality_flag,
+            book_ticker_json, open_interest_json, candles_15m_json, candles_1h_json, candles_4h_json,
+            funding_history_json, aggtrade_events_60s_json, aggtrade_events_15m_json,
+            aggtrade_bucket_60s_json, aggtrade_bucket_15m_json, force_order_events_60s_json,
+            source_meta_json, captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            snapshot_id,
+            _normalize_runtime_metric_value(snapshot.timestamp),
+            _normalize_runtime_metric_value(snapshot.exchange_timestamp),
+            snapshot.symbol,
+            "15m",
+            float(latest_15m.get("open", snapshot.price)),
+            float(latest_15m.get("high", snapshot.price)),
+            float(latest_15m.get("low", snapshot.price)),
+            float(latest_15m.get("close", snapshot.price)),
+            float(latest_15m.get("volume", 0.0)),
+            _latest_funding_rate(snapshot.funding_history),
+            float(snapshot.open_interest),
+            float(snapshot.bid),
+            float(snapshot.ask),
+            snapshot.source,
+            None if snapshot.latency_ms is None else float(snapshot.latency_ms),
+            snapshot.data_quality_flag,
+            _json_dumps(snapshot.book_ticker),
+            _json_dumps(snapshot.open_interest_payload),
+            _json_dumps(snapshot.candles_15m),
+            _json_dumps(snapshot.candles_1h),
+            _json_dumps(snapshot.candles_4h),
+            _json_dumps(snapshot.funding_history),
+            _json_dumps(snapshot.aggtrade_events_60s),
+            _json_dumps(snapshot.aggtrade_events_15m),
+            _json_dumps(snapshot.aggtrades_bucket_60s),
+            _json_dumps(snapshot.aggtrades_bucket_15m),
+            _json_dumps(snapshot.force_order_events_60s),
+            _json_dumps(snapshot.source_meta),
+            _normalize_runtime_metric_value(captured_at),
+        ),
+    )
+
+
+def insert_feature_snapshot(
+    conn: sqlite3.Connection,
+    *,
+    feature_snapshot: FeatureSnapshot,
+) -> None:
+    conn.execute(
+        """
+        INSERT OR REPLACE INTO feature_snapshots (
+            feature_snapshot_id, snapshot_id, cycle_timestamp, schema_version, config_hash,
+            features_json, quality_json, captured_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            feature_snapshot.feature_snapshot_id,
+            feature_snapshot.snapshot_id,
+            _normalize_runtime_metric_value(feature_snapshot.cycle_timestamp),
+            feature_snapshot.schema_version,
+            feature_snapshot.config_hash,
+            _json_dumps(feature_snapshot.features_json),
+            _json_dumps(feature_snapshot.quality_json),
+            _normalize_runtime_metric_value(feature_snapshot.cycle_timestamp),
         ),
     )
 
@@ -262,12 +344,15 @@ def insert_decision_outcome(
     regime: str | None = None,
     signal_id: str | None = None,
     details: dict[str, Any] | None = None,
+    snapshot_id: str | None = None,
+    feature_snapshot_id: str | None = None,
 ) -> None:
     conn.execute(
         """
         INSERT INTO decision_outcomes (
-            cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id, details_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id,
+            snapshot_id, feature_snapshot_id, details_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             _normalize_runtime_metric_value(cycle_timestamp),
@@ -276,9 +361,48 @@ def insert_decision_outcome(
             regime,
             config_hash,
             signal_id,
+            snapshot_id,
+            feature_snapshot_id,
             json.dumps(details or {}, sort_keys=True),
         ),
     )
+
+
+def fetch_market_snapshot(conn: sqlite3.Connection, snapshot_id: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        """
+        SELECT *
+        FROM market_snapshots
+        WHERE snapshot_id = ?
+        """,
+        (snapshot_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def fetch_feature_snapshot(conn: sqlite3.Connection, feature_snapshot_id: str) -> dict[str, Any] | None:
+    row = conn.execute(
+        """
+        SELECT *
+        FROM feature_snapshots
+        WHERE feature_snapshot_id = ?
+        """,
+        (feature_snapshot_id,),
+    ).fetchone()
+    return dict(row) if row else None
+
+
+def fetch_recent_feature_snapshots(conn: sqlite3.Connection, limit: int) -> list[dict[str, Any]]:
+    rows = conn.execute(
+        """
+        SELECT *
+        FROM feature_snapshots
+        ORDER BY cycle_timestamp DESC
+        LIMIT ?
+        """,
+        (max(int(limit), 1),),
+    ).fetchall()
+    return [dict(row) for row in rows]
 
 
 def fetch_decision_outcome_counts(
@@ -761,3 +885,21 @@ def _normalize_runtime_metric_value(value: Any) -> Any:
             return value.replace(tzinfo=timezone.utc).isoformat()
         return value.astimezone(timezone.utc).isoformat()
     return value
+
+
+def _json_dumps(value: Any) -> str:
+    return json.dumps(value, sort_keys=True, default=_json_default)
+
+
+def _json_default(value: Any) -> Any:
+    if isinstance(value, datetime):
+        return _normalize_runtime_metric_value(value)
+    if is_dataclass(value):
+        return asdict(value)
+    raise TypeError(f"Unsupported JSON value: {type(value)!r}")
+
+
+def _latest_funding_rate(funding_history: list[dict[str, Any]]) -> float | None:
+    if not funding_history:
+        return None
+    return float(funding_history[-1].get("funding_rate", 0.0))

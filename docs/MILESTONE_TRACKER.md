@@ -23,54 +23,79 @@ Last updated: 2026-04-22
 
 ## Current Active Milestone
 
-**EXPERIMENT-V2** — READY FOR DEPLOYMENT (branch: `experiment-v2`)
+**MARKET-TRUTH-V3** — IN PROGRESS (branch: `market-truth-v3`)
+
+**Deployment baseline:** `EXPERIMENT-V2` (branch: `experiment-v2`, commit `2088dc79`)
+
+**What:** Persistent market snapshot layer + independent feature validation infrastructure
+
+**Why:**
+- Before V3 snapshots were ephemeral, so exact inputs for a given decision cycle were not reconstructible.
+- V3 creates an auditable chain: raw market truth → feature snapshot → decision outcome.
+- MODELING-V1 should not start until this chain is deployed and validated on production data.
+
+**Implementation:**
+- New tables: `market_snapshots`, `feature_snapshots`
+- New links: `decision_outcomes.snapshot_id`, `decision_outcomes.feature_snapshot_id`
+- Orchestrator persists raw snapshot and feature snapshot for every decision cycle
+- Market data capture records exchange timestamps, source metadata, and latency
+- Independent validation module: `validation/recompute_features.py`
+
+**Status:**
+- ✅ Implementation complete locally
+- ✅ Deterministic checks and runtime-facing tests pass
+- ⏳ Branch creation / commit / push pending
+- ⏳ Production deployment pending
+- ⏳ 200+ production cycles pending for drift/timing validation
+
+**Success criteria:**
+1. `market_snapshots` and `feature_snapshots` populated for every new cycle
+2. `decision_outcomes` linked to `snapshot_id` and `feature_snapshot_id`
+3. Drift report generated on production sample (`N >= 200`)
+4. Timing validation confirms no lookahead bias and acceptable latency
+5. Snapshot → feature → decision chain reconstructible from DB evidence alone
+
+**Merge gate:** production validation complete, then final audit closure
+
+---
+
+## Deployment Baseline
+
+**EXPERIMENT-V2** — VALIDATION REFERENCE (branch: `experiment-v2`, commit `2088dc79`)
 
 **Previous milestone:** DATA-INTEGRITY-V1 — DONE (merged to `main`, commit `7ebf2d2`, 2026-04-21)
 
-**What:** Validate DATA-INTEGRITY-V1 with same experiment profile as v1 (relaxed filters)
+**What:** Validate DATA-INTEGRITY-V1 with the relaxed experiment profile used for paper-runtime comparison
 
-**Why:** Compare restart-safe persistence (v2) vs baseline (v1) for feature quality impact
+**Why:** Provide the clean post-DATA-INTEGRITY baseline that MARKET-TRUTH-V3 is built on
 
-**Composition:**
-- `main` with DATA-INTEGRITY-V1 merged ✅
-- Experiment profile from v1 (cherry-picked) ✅
-
-**Deployment target:** Production server (same as experiment-v1-unblock-filters)
-
-**Success criteria:**
+**Baseline criteria:**
 - Bootstrap summary appears in logs at startup
 - Feature quality propagates through `MarketSnapshot` → `Features`
 - OI/CVD persistence survives restart
-- Throughput comparable to v1 (baseline for comparison)
+- Production paper bot runs on post-DATA-INTEGRITY contracts
 
 ---
 
 ## Next Milestone
 
-**MODELING-V1** — BLOCKED (prerequisite: EXPERIMENT-V2 must validate DATA-INTEGRITY first)
+**MODELING-V1** — BLOCKED
 
-**Implementation commits:**
-- `256a74a` — scaffold feature quality contracts
-- `075f529` — implement restart-safe feature quality
+**Prerequisites:**
+1. ⏳ MARKET-TRUTH-V3 deployed to production
+2. ⏳ `market_snapshots` / `feature_snapshots` populated for at least 200 cycles
+3. ⏳ Drift report reviewed and accepted
+4. ⏳ Timing validation reviewed and accepted
 
-**Goal:** Make decision-path data **restart-safe, coverage-aware, and quality-explicit**.
+**Goal:** Add context-aware modeling only after raw market truth and feature reproducibility are verified.
 
-**Architecture:** Persistence + bootstrap > restart-from-zero warmup
+**Scope (future):** session/volatility context classification, neutral-mode deployment, diagnostics expansion
 
-**Scope:** Data reliability infrastructure only (OI persistence, CVD persistence, flow completeness, funding integrity, quality visibility)
+**Out of scope (for now):** execution realism, parameter tuning, new data sources, quality-aware context gating
 
-**Out of scope:** Session modeling, execution realism, parameter tuning, new data sources
+**Documentation:** final blueprint at `docs/blueprints/BLUEPRINT_MODELING_V1.md`
 
-**Documentation:**
-- **Handoff:** ⚠️ NOT YET WRITTEN — must be created before milestone start
-- **Reference (outdated):** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` is the DATA-INTEGRITY-V1 handoff (already done), not MODELING-V1
-- **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
-
-**Implementation branch:** ⚠️ NOT YET CREATED — create from `main` when milestone starts
-
-**Merge gate:** Claude Code audit verdict = DONE
-
-**Post-milestone validation:** TBD — defined when handoff is written
+**Implementation branch:** not yet created
 
 ---
 

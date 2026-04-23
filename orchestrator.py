@@ -362,6 +362,8 @@ class BotOrchestrator:
         cycle_started = time.perf_counter()
         timestamp = (now or self._now()).astimezone(timezone.utc)
         cycle_outcome = "unknown"
+        snapshot_id: str | None = None
+        feature_snapshot_id: str | None = None
         self._update_runtime_metrics(
             last_decision_cycle_started_at=timestamp,
             decision_cycle_status="running",
@@ -371,6 +373,7 @@ class BotOrchestrator:
             self.state_store.refresh_runtime_state(timestamp)
             try:
                 snapshot = self._build_snapshot(timestamp)
+                snapshot_id = self.state_store.record_market_snapshot(snapshot)
                 self._update_runtime_metrics(
                     last_snapshot_built_at=timestamp,
                     last_snapshot_symbol=snapshot.symbol,
@@ -385,6 +388,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                     details={"error": str(exc)},
                 )
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
@@ -409,6 +413,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                     details={"error": str(exc)},
                 )
                 self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
@@ -424,6 +429,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                 )
                 self.bundle.audit_logger.log_decision(
                     "orchestrator",
@@ -437,6 +443,10 @@ class BotOrchestrator:
                 schema_version=self.settings.schema_version,
                 config_hash=self.settings.config_hash,
             )
+            feature_snapshot_id = self.state_store.record_feature_snapshot(
+                snapshot_id=snapshot_id,
+                features=features,
+            )
             self._record_feature_quality(features)
             regime = self.bundle.regime_engine.classify(features)
             diagnostics = self.bundle.signal_engine.diagnose(features, regime)
@@ -449,6 +459,8 @@ class BotOrchestrator:
                     outcome_group=cycle_outcome,
                     outcome_reason=diagnostics.blocked_by or cycle_outcome,
                     regime=regime.value,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details=self._signal_diagnostics_payload(diagnostics),
                 )
                 self.bundle.audit_logger.log_decision(
@@ -482,6 +494,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"notes": governance_decision.notes},
                 )
                 self.bundle.audit_logger.log_decision(
@@ -510,6 +524,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"reason": risk_decision.reason},
                 )
                 self.bundle.audit_logger.log_decision(
@@ -555,6 +571,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details=trade_payload,
                 )
                 self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
@@ -567,6 +585,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"error": str(exc)},
                 )
                 self._critical_execution_errors += 1
@@ -746,6 +766,8 @@ class BotOrchestrator:
         outcome_reason: str,
         regime: str | None = None,
         signal_id: str | None = None,
+        snapshot_id: str | None = None,
+        feature_snapshot_id: str | None = None,
         details: dict[str, object] | None = None,
     ) -> None:
         try:
@@ -756,6 +778,8 @@ class BotOrchestrator:
                 config_hash=self.settings.config_hash,
                 regime=regime,
                 signal_id=signal_id,
+                snapshot_id=snapshot_id,
+                feature_snapshot_id=feature_snapshot_id,
                 details=details,
             )
         except Exception as exc:
