@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-22
+Last updated: 2026-04-23
 
 ---
 
@@ -42,20 +42,30 @@ Last updated: 2026-04-22
 - Independent validation module: `validation/recompute_features.py`
 
 **Status:**
-- ✅ Implementation complete locally
+- ✅ Implementation complete
 - ✅ Deterministic checks and runtime-facing tests pass
-- ⏳ Branch creation / commit / push pending
-- ⏳ Production deployment pending
+- ✅ Branch created / committed / pushed (`market-truth-v3`, commit `2aa1115`)
+- ✅ Deployed to production from `market-truth-v3`
+- ✅ First post-deploy cycle captured `market_snapshot` + `feature_snapshot` + linked `decision_outcome`
 - ⏳ 200+ production cycles pending for drift/timing validation
 
 **Success criteria:**
-1. `market_snapshots` and `feature_snapshots` populated for every new cycle
-2. `decision_outcomes` linked to `snapshot_id` and `feature_snapshot_id`
+1. ✅ `market_snapshots` and `feature_snapshots` populated for new post-deploy cycles
+2. ✅ `decision_outcomes` linked to `snapshot_id` and `feature_snapshot_id`
 3. Drift report generated on production sample (`N >= 200`)
 4. Timing validation confirms no lookahead bias and acceptable latency
 5. Snapshot → feature → decision chain reconstructible from DB evidence alone
 
 **Merge gate:** production validation complete, then final audit closure
+
+**Production evidence (2026-04-23):**
+- Deployed branch: `market-truth-v3`
+- Production commit: `2aa1115b`
+- First linked cycle: `2026-04-23T19:00:00.004217+00:00`
+- First linked chain:
+  - `snapshot_id = ms-f049dc0b161649a5a289a36b6223a55c`
+  - `feature_snapshot_id = fs-d0aa96327922441b9aef8576e96ed8e8`
+  - `outcome_reason = no_reclaim`
 
 ---
 
