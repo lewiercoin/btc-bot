@@ -144,7 +144,7 @@ class ExecutionConfig:
     live_entry_order_type: str = "LIMIT"
     live_fill_poll_seconds: float = 1.0
     health_check_interval_seconds: int = 30
-    health_failures_before_safe_mode: int = 3
+    health_failures_before_safe_mode: int = 10  # Raised for initial config phase (was: 3)
     kill_switch_max_exec_errors: int = 2
     loop_idle_sleep_seconds: float = 0.5
 

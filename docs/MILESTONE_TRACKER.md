@@ -74,6 +74,43 @@ Last updated: 2026-04-22
 
 ---
 
+## Future Milestone: SAFE-MODE-AUTO-RECOVERY
+
+**Status:** PLANNED (deferred, user priority shift 2026-04-23)
+
+**Goal:** Implement in-process auto-recovery for technical safe-mode triggers (WebSocket reconnect, transient failures)
+
+**Current behavior:**
+- Health check fails 3 times → safe mode activated
+- WebSocket reconnects → health stabilizes BUT safe mode remains active
+- Recovery requires manual restart or SQL clear
+
+**Target behavior (Hybrid Auto-Recovery):**
+- **Technical triggers** (`health_check_failure_threshold`, `feed_start_failed`, `snapshot_build_failed`):
+  - Enter safe mode: 3 consecutive health failures (current)
+  - Exit safe mode: 10 consecutive health successes (NEW - asymmetric for stability)
+  - Auto-clear without restart
+- **Capital triggers** (`daily_dd`, `weekly_dd`, `consecutive_losses`):
+  - Remain manual/calendar-based (unchanged, conservative)
+
+**Implementation approach:**
+- Add `ExecutionConfig` fields: `health_successes_to_clear_safe_mode: int = 10`, `auto_clear_technical_triggers: bool = True`
+- Extend `orchestrator._run_health_check()` to track consecutive successes
+- Auto-clear safe mode when threshold met AND trigger is in `_TECHNICAL_TRIGGERS`
+- Audit log all auto-recovery events
+
+**Rationale:** WebSocket reconnects are transient technical issues, not capital risks. Restart is heavyweight (10s downtime, state loss). In-process recovery = fast (5 min), clean, production-grade.
+
+**Quick fix applied (2026-04-23):** Raised `health_failures_before_safe_mode` from 3 → 10 for initial config phase. MUST implement proper auto-recovery before lowering threshold back to production value.
+
+**Prerequisites:** None (can implement anytime)
+
+**Merge gate:** Claude Code audit verdict = DONE + smoke test for flapping prevention
+
+**Builder:** TBD (user will assign when ready)
+
+---
+
 ## Previous Milestone: UPTREND-PULLBACK-EVAL-V1
 
 **Status:** DONE (2026-04-19, commit 5668ccd)
