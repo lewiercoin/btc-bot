@@ -23,19 +23,37 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**PHASE-0-COMPLETE** — CONSOLIDATED REMEDIATION PLANNING (branch: `market-truth-v3`)
+**PHASE-0-COMPLETE** — ALL READ-ONLY AUDITS COMPLETE (branch: `market-truth-v3`)
 
 **Date:** 2026-04-24  
 **Auditor:** Claude Code  
-**Builder:** TBD (pending user decision on remediation order)
+**Builder:** Cascade (Tier 1-2), Claude Code (Tier 3 + remaining)
 
-**Status:** ✅ ALL PHASE 0 AUDITS COMPLETE (8 audits across Tiers 1-3)  
-**Next:** Consolidated remediation plan with prioritized fix order
+**Status:** ✅ ALL PHASE 0 AUDITS COMPLETE (13 audits total)  
+**Next:** User decision — continue with Phase 1 (Market Truth 200-cycle validation) OR start remediation now
 
-**Phase 0 Summary:**
-- **Tier 1 (Security & Ops):** 4 audits complete — identified critical dashboard exposure
-- **Tier 2 (Config & Execution):** 2 audits complete — identified config incompleteness and paper execution gaps
-- **Tier 3 (PnL & Research Lab):** 2 audits complete — identified funding fee gap and methodology strengths
+**Phase 0 Complete Summary:**
+
+**Tier 1 (Security & Ops) — 4 audits:**
+- ✅ AUDIT-13: Security / Secrets / Exchange Safety (NOT_DONE — dashboard exposure FAIL)
+- ✅ AUDIT-12: Production Ops / SRE (LOOKS_DONE)
+- ✅ AUDIT-11: Observability / Dashboard (MVP_DONE)
+- ✅ AUDIT-19: Recovery / Safe Mode / State Reconciliation (MVP_DONE)
+
+**Tier 2 (Config & Execution) — 2 audits:**
+- ✅ AUDIT-14: Configuration / Reproducibility (MVP_DONE)
+- ✅ AUDIT-07: Execution / Paper Fill Integrity (NOT_DONE — paper fills unrealistic)
+
+**Tier 3 (PnL & Research Lab) — 2 audits:**
+- ✅ AUDIT-08: Trade Lifecycle / PnL Accounting (MVP_DONE — funding fees missing)
+- ✅ AUDIT-09: Backtest / Research Lab (MVP_DONE — methodology production-grade)
+
+**Lower Priority — 5 audits:**
+- ✅ AUDIT-06: Risk Engine (DONE — position sizing correct, exit logic sound)
+- ✅ AUDIT-05: Governance (DONE — filtering comprehensive, no race conditions)
+- ✅ AUDIT-10: Experiment Management (DONE — isolation exemplary)
+- ✅ AUDIT-15: Testing / CI / Quality Gates (MVP_DONE — coverage enforcement missing)
+- ✅ AUDIT-18: Documentation / Agent Workflow (DONE — 2301+ lines, comprehensive)
 
 **Critical findings requiring remediation:**
 1. 🔴 Public dashboard exposure (unauthenticated control endpoints on 0.0.0.0:8080)
@@ -44,6 +62,8 @@ Last updated: 2026-04-24
 4. 🟠 Config reproducibility incomplete (config_hash missing 50%+ of runtime surface)
 5. 🟠 Production service drift (units differ from repo)
 6. 🟠 No dependency lock (no lockfile, no `.python-version`)
+7. 🟡 Test coverage enforcement missing (no coverage threshold in CI)
+8. 🟡 Manual recovery tooling stale (scripts reference old schema)
 
 **See:** `docs/audits/PHASE_0_CONSOLIDATED_FINDINGS.md` (to be created during remediation planning)
 
