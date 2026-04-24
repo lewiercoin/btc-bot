@@ -23,14 +23,26 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**PHASE-0-COMPLETE** — ALL READ-ONLY AUDITS COMPLETE (branch: `market-truth-v3`)
+**REMEDIATION-S1-DASHBOARD-SECURITY** — Fix public dashboard exposure (branch: `market-truth-v3`)
 
-**Date:** 2026-04-24  
+**Date:** 2026-04-25  
 **Auditor:** Claude Code  
-**Builder:** Cascade (Tier 1-2), Claude Code (Tier 3 + remaining)
+**Active Builder:** Cascade  
+**Priority:** 🔴 Tier S (Security Emergency)
 
-**Status:** ✅ ALL PHASE 0 AUDITS COMPLETE (13 audits total)  
-**Next:** User decision — continue with Phase 1 (Market Truth 200-cycle validation) OR start remediation now
+**Status:** ACTIVE  
+**Scope:** Remediate public dashboard exposure (S1 from Phase 0 consolidated report)
+
+**Deliverables:**
+1. Rebind dashboard to `127.0.0.1:8080` (update `btc-bot-dashboard.service`)
+2. Remove UFW rule: `ufw delete allow 8080/tcp`
+3. Document SSH tunnel procedure for operator access
+4. Update deployed unit file to match repo configuration
+
+**Blocking for:** Live trading approval, public repo release  
+**Estimated effort:** 30 minutes to 1 hour
+
+**User Decision:** Start remediation roadmap (S1 → A1 → A2 → ...) before Phase 1
 
 **Phase 0 Complete Summary:**
 
@@ -65,7 +77,30 @@ Last updated: 2026-04-24
 7. 🟡 Test coverage enforcement missing (no coverage threshold in CI)
 8. 🟡 Manual recovery tooling stale (scripts reference old schema)
 
-**See:** `docs/audits/PHASE_0_CONSOLIDATED_FINDINGS.md` (to be created during remediation planning)
+**See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
+
+---
+
+## Completed Milestone: PHASE-0-COMPLETE
+
+**Date:** 2026-04-24  
+**Auditor:** Claude Code  
+**Builders:** Cascade (Tier 1-2), Claude Code (Tier 3 + remaining)  
+**Status:** ✅ COMPLETE
+
+**Summary:** All 13 Phase 0 audits complete. Comprehensive consolidated report generated. User decision: Start remediation (S1 → A1 → A2) before Phase 1.
+
+**Artifacts:**
+- `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` (250+ lines)
+- `docs/audits/PHASE_0_CONSOLIDATED_FINDINGS.md`
+- 13 individual audit reports
+
+**Key outcomes:**
+- 3 × DONE (Risk Engine, Governance, Experiment Management, Documentation)
+- 5 × MVP_DONE (Observability, Recovery, Config, PnL, Research Lab, Testing)
+- 2 × NOT_DONE (Security/Dashboard, Paper Execution)
+- Quantified risk: ~$3,700-$7,100 annual PnL overstatement
+- 4-phase remediation roadmap: R0 Emergency → R1 Live Readiness → R2 Hygiene → R3 Quality
 
 ---
 
