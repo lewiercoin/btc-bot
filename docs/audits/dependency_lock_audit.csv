@@ -1,0 +1,10 @@
+package,requirement_spec,observed_local_version,status,notes
+requests,>=2.32.0 <3.0.0,2.32.3,PASS,within declared range
+websockets,>=12.0 <16.0,15.0.1,PASS,within declared range
+optuna,>=3.6.0 <5.0.0,4.8.0,PASS,within declared range
+yfinance,>=0.2.52 <1.0.0,1.2.1,FAIL,installed version exceeds upper bound
+PySocks,>=1.7.1 <2.0.0,NOT_INSTALLED,FAIL,declared runtime dependency missing in audited local interpreter
+psutil,>=5.9.0 <7.0.0,NOT_INSTALLED,FAIL,declared runtime dependency missing in audited local interpreter
+python_interpreter,n/a,3.13.1,WARN,local interpreter differs from CI python-version 3.11
+lockfile,n/a,ABSENT,FAIL,no poetry.lock Pipfile.lock uv.lock or equivalent found
+python_version_file,n/a,ABSENT,FAIL,no .python-version found
