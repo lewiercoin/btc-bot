@@ -23,16 +23,39 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**QUANT-GRADE-AUDIT-PHASE-0-TIER-1** — PRODUCTION SECURITY & OPS AUDIT (branch: `market-truth-v3`)
+**QUANT-GRADE-AUDIT-PHASE-0-TIER-2** — CONFIGURATION & EXECUTION INTEGRITY AUDIT (branch: `market-truth-v3`)
 
 **Date:** 2026-04-24  
 **Active builder:** Cascade  
 **Auditor:** Claude Code
 
-**What:** Phase 0 Tier 1 read-only audits — Security, Ops/SRE, Observability, Recovery
+**What:** Phase 0 Tier 2 read-only audits — Configuration/Reproducibility, Execution/Paper Fill Integrity
 
 **Status:** ✅ DELIVERED (audit reports committed + pushed)  
-**Verdict:** MVP_DONE (all 4 audits complete, critical security issue identified)
+**Verdict:** DONE (both audits complete, high-quality evidence collection)
+
+**Audit reports:**
+- `AUDIT-14: Configuration / Reproducibility` — Verdict: MVP_DONE (config tracked but incomplete, production drift, no lockfile)
+- `AUDIT-07: Execution / Paper Fill Integrity` — Verdict: NOT_DONE (paper fills unrealistic, HIGH paper-to-live gap risk)
+
+**Key Tier 2 findings:**
+- config_hash incomplete (missing exchange, proxy, alerts, dependencies, interpreter version)
+- Production service units drift from repo (BOT_SETTINGS_PROFILE, Restart policy, dashboard binding)
+- No dependency lockfile (`requirements.txt` only, no `poetry.lock` or `Pipfile.lock`)
+- No `.python-version` (CI uses 3.11, local audit used 3.13.1)
+- Paper execution unrealistic: snapshot price, zero fees, no spread model, no partial fills
+- Executions not linked to market_snapshots (spread-at-fill not reconstructable)
+
+**Next:** Phase 0 Tier 3 audits OR consolidated remediation planning
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-1
+
+**Date:** 2026-04-24  
+**Active builder:** Cascade  
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
 
 **Audit reports:**
 - `AUDIT-13: Security / Secrets / Exchange Safety` — Verdict: NOT_DONE (dashboard exposure FAIL)
@@ -40,23 +63,13 @@ Last updated: 2026-04-24
 - `AUDIT-11: Observability / Dashboard` — Verdict: MVP_DONE (runtime freshness solid, alert coverage shallow)
 - `AUDIT-19: Recovery / Safe Mode / State Reconciliation` — Verdict: MVP_DONE (recovery logic present, manual tooling stale)
 
-**🚨 CRITICAL FINDING (Blocks All Future Work):**
+**🚨 CRITICAL FINDING:**
 
 **Production dashboard publicly exposed:**
 - Bound to `0.0.0.0:8080` (not `127.0.0.1`)
 - UFW allows `8080/tcp` from anywhere
-- Unauthenticated control endpoints:
-  - `POST /api/bot/start`
-  - `POST /api/bot/stop`
-- Verified: `curl http://204.168.146.253:8080/api/status` returns live bot state
-
-**Risk:** Any remote actor can view bot state and control bot process.
-
-**Production-repo drift:**
-- Deployed: public binding
-- Repo/docs: loopback-only + SSH tunnel
-
-**Remediation required before any other milestone.**
+- Unauthenticated control endpoints: `POST /api/bot/start`, `POST /api/bot/stop`
+- Risk: Any remote actor can view bot state and control bot process
 
 ---
 
