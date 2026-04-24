@@ -101,6 +101,16 @@ class MarketSnapshot:
     dxy_daily: float | None = None
     quality: dict[str, FeatureQuality] = field(default_factory=dict)
     source_meta: dict[str, Any] = field(default_factory=dict)
+    # Quant-grade lineage: per-input exchange timestamps
+    candles_15m_exchange_ts: datetime | None = None
+    candles_1h_exchange_ts: datetime | None = None
+    candles_4h_exchange_ts: datetime | None = None
+    funding_exchange_ts: datetime | None = None
+    oi_exchange_ts: datetime | None = None
+    aggtrades_exchange_ts: datetime | None = None
+    # Quant-grade lineage: snapshot build timing
+    snapshot_build_started_at: datetime | None = None
+    snapshot_build_finished_at: datetime | None = None
 
 
 @dataclass(slots=True)

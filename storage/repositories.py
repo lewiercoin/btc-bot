@@ -51,8 +51,11 @@ def insert_market_snapshot(
             book_ticker_json, open_interest_json, candles_15m_json, candles_1h_json, candles_4h_json,
             funding_history_json, aggtrade_events_60s_json, aggtrade_events_15m_json,
             aggtrade_bucket_60s_json, aggtrade_bucket_15m_json, force_order_events_60s_json,
-            source_meta_json, captured_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            source_meta_json, captured_at,
+            candles_15m_exchange_ts, candles_1h_exchange_ts, candles_4h_exchange_ts,
+            funding_exchange_ts, oi_exchange_ts, aggtrades_exchange_ts,
+            snapshot_build_started_at, snapshot_build_finished_at
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             snapshot_id,
@@ -85,6 +88,14 @@ def insert_market_snapshot(
             _json_dumps(snapshot.force_order_events_60s),
             _json_dumps(snapshot.source_meta),
             _normalize_runtime_metric_value(captured_at),
+            _normalize_runtime_metric_value(snapshot.candles_15m_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.candles_1h_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.candles_4h_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.funding_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.oi_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.aggtrades_exchange_ts),
+            _normalize_runtime_metric_value(snapshot.snapshot_build_started_at),
+            _normalize_runtime_metric_value(snapshot.snapshot_build_finished_at),
         ),
     )
 

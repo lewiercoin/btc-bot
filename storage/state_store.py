@@ -61,13 +61,18 @@ class StateStore:
 
         cursor = self.connection.cursor()
 
-        cursor.execute("PRAGMA table_info(bot_state)")
-        columns = {row[1] for row in cursor.fetchall()}
+        # Check if bot_state table exists before attempting migration
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_state'")
+        bot_state_exists = cursor.fetchone() is not None
 
-        if "safe_mode_entry_at" not in columns:
-            cursor.execute("ALTER TABLE bot_state ADD COLUMN safe_mode_entry_at TEXT DEFAULT NULL")
-            self.connection.commit()
-            LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
+        if bot_state_exists:
+            cursor.execute("PRAGMA table_info(bot_state)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if "safe_mode_entry_at" not in columns:
+                cursor.execute("ALTER TABLE bot_state ADD COLUMN safe_mode_entry_at TEXT DEFAULT NULL")
+                self.connection.commit()
+                LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS safe_mode_events (
@@ -204,7 +209,15 @@ class StateStore:
                 aggtrade_bucket_15m_json TEXT NOT NULL,
                 force_order_events_60s_json TEXT NOT NULL,
                 source_meta_json TEXT,
-                captured_at TEXT NOT NULL
+                captured_at TEXT NOT NULL,
+                candles_15m_exchange_ts TEXT,
+                candles_1h_exchange_ts TEXT,
+                candles_4h_exchange_ts TEXT,
+                funding_exchange_ts TEXT,
+                oi_exchange_ts TEXT,
+                aggtrades_exchange_ts TEXT,
+                snapshot_build_started_at TEXT,
+                snapshot_build_finished_at TEXT
             )
         """)
         cursor.execute(
@@ -214,6 +227,27 @@ class StateStore:
             """
         )
         self.connection.commit()
+
+        # Quant-grade lineage migration: add per-input timestamps and build timing
+        cursor.execute("PRAGMA table_info(market_snapshots)")
+        snapshot_columns = {row[1] for row in cursor.fetchall()}
+
+        quant_grade_columns = [
+            "candles_15m_exchange_ts",
+            "candles_1h_exchange_ts",
+            "candles_4h_exchange_ts",
+            "funding_exchange_ts",
+            "oi_exchange_ts",
+            "aggtrades_exchange_ts",
+            "snapshot_build_started_at",
+            "snapshot_build_finished_at",
+        ]
+
+        for col in quant_grade_columns:
+            if col not in snapshot_columns:
+                cursor.execute(f"ALTER TABLE market_snapshots ADD COLUMN {col} TEXT DEFAULT NULL")
+                self.connection.commit()
+                LOG.info(f"Migration applied: added {col} column to market_snapshots")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS feature_snapshots (

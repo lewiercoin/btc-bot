@@ -233,7 +233,17 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
     aggtrade_bucket_15m_json TEXT NOT NULL,
     force_order_events_60s_json TEXT NOT NULL,
     source_meta_json TEXT,
-    captured_at TEXT NOT NULL
+    captured_at TEXT NOT NULL,
+    -- Quant-grade lineage: per-input exchange timestamps
+    candles_15m_exchange_ts TEXT,
+    candles_1h_exchange_ts TEXT,
+    candles_4h_exchange_ts TEXT,
+    funding_exchange_ts TEXT,
+    oi_exchange_ts TEXT,
+    aggtrades_exchange_ts TEXT,
+    -- Quant-grade lineage: snapshot build timing
+    snapshot_build_started_at TEXT,
+    snapshot_build_finished_at TEXT
 );
 
 CREATE TABLE IF NOT EXISTS feature_snapshots (
