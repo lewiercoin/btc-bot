@@ -1,0 +1,2 @@
+status,count,note
+unclosed_positions_older_than_24h,0,Production query: SELECT COUNT(*) FROM positions WHERE status != 'CLOSED' AND opened_at < datetime('now' - 24 hours)
