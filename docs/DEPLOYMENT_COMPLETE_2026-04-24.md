@@ -96,7 +96,7 @@ snapshot_build_finished_at TEXT
 ### Acceptance Criteria:
 - ✅ Build timing fields populated
 - ✅ Build timing logical (start < finish)
-- ✅ Per-input timestamps populated (7/7 populated, force_orders NULL expected)
+- ✅ Required timestamps populated where source data existed (force_orders NULL expected - no events in 60s window)
 - ✅ No timestamps from future
 - ✅ Staleness within expected ranges
 - ✅ Bot remains healthy
