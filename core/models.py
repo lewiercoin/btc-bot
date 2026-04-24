@@ -108,6 +108,7 @@ class MarketSnapshot:
     funding_exchange_ts: datetime | None = None
     oi_exchange_ts: datetime | None = None
     aggtrades_exchange_ts: datetime | None = None
+    force_orders_exchange_ts: datetime | None = None
     # Quant-grade lineage: snapshot build timing
     snapshot_build_started_at: datetime | None = None
     snapshot_build_finished_at: datetime | None = None
