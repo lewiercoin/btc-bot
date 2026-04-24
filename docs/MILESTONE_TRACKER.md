@@ -31,7 +31,7 @@ Last updated: 2026-04-24
 
 **Why:**
 - Before V3: Snapshots were ephemeral, exact inputs for any decision could not be reconstructed
-- After V3: Full audit trail from raw market data → features → decision
+- After V3: Full audit trail from persisted runtime market inputs → features → decision
 - Quant-grade hardening: Per-input timestamp lineage, build timing contract, replay safety classification
 
 **Implementation:**
