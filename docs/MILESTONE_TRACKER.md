@@ -23,6 +23,43 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
+**QUANT-GRADE-AUDIT-PHASE-0-TIER-1** — PRODUCTION SECURITY & OPS AUDIT (branch: `market-truth-v3`)
+
+**Date:** 2026-04-24  
+**Active builder:** Cascade  
+**Auditor:** Claude Code
+
+**What:** Phase 0 Tier 1 read-only audits — Security, Ops/SRE, Observability, Recovery
+
+**Status:** ✅ DELIVERED (audit reports committed + pushed)  
+**Verdict:** MVP_DONE (all 4 audits complete, critical security issue identified)
+
+**Audit reports:**
+- `AUDIT-13: Security / Secrets / Exchange Safety` — Verdict: NOT_DONE (dashboard exposure FAIL)
+- `AUDIT-12: Production Ops / SRE` — Verdict: LOOKS_DONE (runbook stale, alert coverage gaps)
+- `AUDIT-11: Observability / Dashboard` — Verdict: MVP_DONE (runtime freshness solid, alert coverage shallow)
+- `AUDIT-19: Recovery / Safe Mode / State Reconciliation` — Verdict: MVP_DONE (recovery logic present, manual tooling stale)
+
+**🚨 CRITICAL FINDING (Blocks All Future Work):**
+
+**Production dashboard publicly exposed:**
+- Bound to `0.0.0.0:8080` (not `127.0.0.1`)
+- UFW allows `8080/tcp` from anywhere
+- Unauthenticated control endpoints:
+  - `POST /api/bot/start`
+  - `POST /api/bot/stop`
+- Verified: `curl http://204.168.146.253:8080/api/status` returns live bot state
+
+**Risk:** Any remote actor can view bot state and control bot process.
+
+**Production-repo drift:**
+- Deployed: public binding
+- Repo/docs: loopback-only + SSH tunnel
+
+**Remediation required before any other milestone.**
+
+---
+
 **MARKET-TRUTH-V3 + QUANT-GRADE HARDENING** — PRODUCTION VALIDATION (branch: `market-truth-v3`)
 
 **Deployment baseline:** `EXPERIMENT-V2` (branch: `experiment-v2`, commit `2088dc79`)
