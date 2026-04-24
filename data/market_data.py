@@ -160,6 +160,7 @@ class MarketDataAssembler:
         funding_exchange_ts = funding_history[-1]["funding_time"] if funding_history else None
         oi_exchange_ts = open_interest.get("timestamp")
         aggtrades_exchange_ts = agg_events_15m[-1]["event_time"] if agg_events_15m else None
+        force_orders_exchange_ts = force_orders_60s[-1]["event_time"] if force_orders_60s else None
 
         data_quality_flag = self._rollup_quality_flag(flow_quality)
         return MarketSnapshot(
@@ -211,6 +212,7 @@ class MarketDataAssembler:
             funding_exchange_ts=funding_exchange_ts,
             oi_exchange_ts=oi_exchange_ts,
             aggtrades_exchange_ts=aggtrades_exchange_ts,
+            force_orders_exchange_ts=force_orders_exchange_ts,
             snapshot_build_started_at=build_started_at,
             snapshot_build_finished_at=build_finished_at,
         )

@@ -241,6 +241,7 @@ CREATE TABLE IF NOT EXISTS market_snapshots (
     funding_exchange_ts TEXT,
     oi_exchange_ts TEXT,
     aggtrades_exchange_ts TEXT,
+    force_orders_exchange_ts TEXT,
     -- Quant-grade lineage: snapshot build timing
     snapshot_build_started_at TEXT,
     snapshot_build_finished_at TEXT

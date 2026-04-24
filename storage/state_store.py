@@ -239,6 +239,7 @@ class StateStore:
             "funding_exchange_ts",
             "oi_exchange_ts",
             "aggtrades_exchange_ts",
+            "force_orders_exchange_ts",
             "snapshot_build_started_at",
             "snapshot_build_finished_at",
         ]
