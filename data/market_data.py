@@ -100,6 +100,7 @@ class MarketDataAssembler:
 
     def build_snapshot(self, symbol: str, timestamp: datetime) -> MarketSnapshot:
         now = timestamp.astimezone(timezone.utc)
+        build_started_at = now
         build_started = time.perf_counter()
 
         ticker_started = time.perf_counter()
@@ -134,6 +135,7 @@ class MarketDataAssembler:
         force_orders_60s = self._load_force_order_window(now=now)
         etf_bias_daily, dxy_daily = self._load_external_bias(now=now)
         total_latency_ms = (time.perf_counter() - build_started) * 1000.0
+        build_finished_at = datetime.now(timezone.utc)
 
         bid = float(ticker["bid"])
         ask = float(ticker["ask"])
@@ -150,6 +152,15 @@ class MarketDataAssembler:
             agg_events_15m=agg_events_15m,
             force_orders_60s=force_orders_60s,
         )
+
+        # Extract per-input exchange timestamps for quant-grade lineage
+        candles_15m_exchange_ts = candles_15m[-1]["open_time"] if candles_15m else None
+        candles_1h_exchange_ts = candles_1h[-1]["open_time"] if candles_1h else None
+        candles_4h_exchange_ts = candles_4h[-1]["open_time"] if candles_4h else None
+        funding_exchange_ts = funding_history[-1]["funding_time"] if funding_history else None
+        oi_exchange_ts = open_interest.get("timestamp")
+        aggtrades_exchange_ts = agg_events_15m[-1]["event_time"] if agg_events_15m else None
+
         data_quality_flag = self._rollup_quality_flag(flow_quality)
         return MarketSnapshot(
             symbol=symbol.upper(),
@@ -193,6 +204,15 @@ class MarketDataAssembler:
                 "build_latency_ms": total_latency_ms,
                 "ws_last_message_at": self._last_ws_message_at_iso(),
             },
+            # Quant-grade lineage fields
+            candles_15m_exchange_ts=candles_15m_exchange_ts,
+            candles_1h_exchange_ts=candles_1h_exchange_ts,
+            candles_4h_exchange_ts=candles_4h_exchange_ts,
+            funding_exchange_ts=funding_exchange_ts,
+            oi_exchange_ts=oi_exchange_ts,
+            aggtrades_exchange_ts=aggtrades_exchange_ts,
+            snapshot_build_started_at=build_started_at,
+            snapshot_build_finished_at=build_finished_at,
         )
 
     def _load_agg_trade_windows(
