@@ -1,0 +1,15 @@
+[Unit]
+Description=BTC Bot Dashboard (btc-bot)
+After=network.target
+
+[Service]
+Type=simple
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+EnvironmentFile=/home/btc-bot/btc-bot/.env
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/uvicorn dashboard.server:app --host 127.0.0.1 --port 8080
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
