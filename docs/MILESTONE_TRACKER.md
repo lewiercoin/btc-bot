@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-23
+Last updated: 2026-04-24
 
 ---
 
@@ -23,49 +23,62 @@ Last updated: 2026-04-23
 
 ## Current Active Milestone
 
-**MARKET-TRUTH-V3** — IN PROGRESS (branch: `market-truth-v3`)
+**MARKET-TRUTH-V3 + QUANT-GRADE HARDENING** — PRODUCTION VALIDATION (branch: `market-truth-v3`)
 
 **Deployment baseline:** `EXPERIMENT-V2` (branch: `experiment-v2`, commit `2088dc79`)
 
-**What:** Persistent market snapshot layer + independent feature validation infrastructure
+**What:** Persistent market snapshot layer + quant-grade source-of-truth with explicit lineage
 
 **Why:**
-- Before V3 snapshots were ephemeral, so exact inputs for a given decision cycle were not reconstructible.
-- V3 creates an auditable chain: raw market truth → feature snapshot → decision outcome.
-- MODELING-V1 should not start until this chain is deployed and validated on production data.
+- Before V3: Snapshots were ephemeral, exact inputs for any decision could not be reconstructed
+- After V3: Full audit trail from raw market data → features → decision
+- Quant-grade hardening: Per-input timestamp lineage, build timing contract, replay safety classification
 
 **Implementation:**
-- New tables: `market_snapshots`, `feature_snapshots`
+
+*Core V3 (deployed 2026-04-23):*
+- New tables: `market_snapshots`, `feature_snapshots`, `config_snapshots`
 - New links: `decision_outcomes.snapshot_id`, `decision_outcomes.feature_snapshot_id`
-- Orchestrator persists raw snapshot and feature snapshot for every decision cycle
-- Market data capture records exchange timestamps, source metadata, and latency
-- Independent validation module: `validation/recompute_features.py`
+- Orchestrator persists raw snapshot + feature snapshot per cycle
+- Exchange timestamps + latency tracking
+- Independent validation: `validation/recompute_features.py`
+
+*Quant-Grade Hardening (deployed 2026-04-24):*
+- Per-input exchange timestamps (9 fields): candles_15m/1h/4h, funding, OI, aggTrades, force_orders
+- Build timing contract: `snapshot_build_started_at`, `snapshot_build_finished_at`
+- Replay safety coverage matrix: 22 VERIFIED, 6 PARTIAL, 1 BLOCKED features
+- Verification tooling: `scripts/verify_first_snapshot.py`
+- Documentation: deployment protocol, ChatGPT audit response, hardening summary
 
 **Status:**
-- ✅ Implementation complete
-- ✅ Deterministic checks and runtime-facing tests pass
-- ✅ Branch created / committed / pushed (`market-truth-v3`, commit `2aa1115`)
-- ✅ Deployed to production from `market-truth-v3`
-- ✅ First post-deploy cycle captured `market_snapshot` + `feature_snapshot` + linked `decision_outcome`
-- ⏳ 200+ production cycles pending for drift/timing validation
+- ✅ V3 infrastructure implementation complete (commit `2aa1115`)
+- ✅ Quant-grade hardening complete (commits `147d865`, `c68d30a`, `a3ff397`, `39c718a`)
+- ✅ ChatGPT audit: APPROVED FOR PRODUCTION VALIDATION
+- ✅ Deployed to production (2026-04-24 04:10 UTC)
+- ✅ First snapshot verified: ms-d39b22439fc944c2bf11f9347217f344
+- ✅ All quant-grade lineage fields populated
+- ⏳ Collecting 200+ cycles for drift/timing validation (~50 hours)
 
 **Success criteria:**
-1. ✅ `market_snapshots` and `feature_snapshots` populated for new post-deploy cycles
-2. ✅ `decision_outcomes` linked to `snapshot_id` and `feature_snapshot_id`
-3. Drift report generated on production sample (`N >= 200`)
-4. Timing validation confirms no lookahead bias and acceptable latency
-5. Snapshot → feature → decision chain reconstructible from DB evidence alone
+1. ✅ `market_snapshots` populated with quant-grade lineage fields
+2. ✅ `feature_snapshots` linked to snapshots
+3. ✅ `decision_outcomes` linked to both snapshot layers
+4. ✅ First snapshot verification passed
+5. ⏳ 200+ cycles collected
+6. ⏳ Drift report: ATR/EMA < 1% mean error
+7. ⏳ Timing validation: p95 latency < 5s, no lookahead violations
 
-**Merge gate:** production validation complete, then final audit closure
+**Merge gate:** 200+ cycle validation → drift/timing reports → final audit → merge to `main`
 
-**Production evidence (2026-04-23):**
+**Production evidence (2026-04-24):**
 - Deployed branch: `market-truth-v3`
-- Production commit: `2aa1115b`
-- First linked cycle: `2026-04-23T19:00:00.004217+00:00`
-- First linked chain:
-  - `snapshot_id = ms-f049dc0b161649a5a289a36b6223a55c`
-  - `feature_snapshot_id = fs-d0aa96327922441b9aef8576e96ed8e8`
-  - `outcome_reason = no_reclaim`
+- Production commit: `39c718a` (quant-grade hardening + deployment protocol)
+- Deployment: 2026-04-24 04:10:43 UTC
+- First verified snapshot: `2026-04-24T04:30:00.003848+00:00`
+- Build timing: 2.43s (normal)
+- Quant-grade fields: ✅ populated (except force_orders NULL - expected)
+- Per-input timestamps: ✅ verified
+- Validation status: ⏳ IN PROGRESS (1/200+ cycles)
 
 ---
 
@@ -89,15 +102,20 @@ Last updated: 2026-04-23
 
 ## Next Milestone
 
-**MODELING-V1** — BLOCKED
+**MODELING-V1** — BLOCKED (awaiting MARKET-TRUTH-V3 validation)
 
 **Prerequisites:**
-1. ⏳ MARKET-TRUTH-V3 deployed to production
-2. ⏳ `market_snapshots` / `feature_snapshots` populated for at least 200 cycles
-3. ⏳ Drift report reviewed and accepted
-4. ⏳ Timing validation reviewed and accepted
+1. ✅ MARKET-TRUTH-V3 deployed to production (2026-04-24)
+2. ✅ Quant-grade hardening deployed (per-input lineage + build timing)
+3. ✅ First snapshot verified (quant-grade fields populated)
+4. ⏳ 200+ cycles collected (~50 hours from deploy)
+5. ⏳ Drift report generated and reviewed (ATR/EMA < 1%)
+6. ⏳ Timing validation reviewed (p95 < 5s, no lookahead)
+7. ⏳ MARKET-TRUTH-V3 merged to `main`
 
 **Goal:** Add context-aware modeling only after raw market truth and feature reproducibility are verified.
+
+**Estimated unblock:** 2026-04-26 (after 200+ cycle validation complete)
 
 **Scope (future):** session/volatility context classification, neutral-mode deployment, diagnostics expansion
 
