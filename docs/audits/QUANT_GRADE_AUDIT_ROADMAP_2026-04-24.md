@@ -1,755 +1,785 @@
-# QUANT-GRADE AUDIT ROADMAP
+# QUANT GRADE AUDIT ROADMAP
+## BTC Futures Trading Bot — `lewiercoin/btc-bot`
+
+> 📍 **Lokalizacja w repo:** `docs/audits/QUANT_GRADE_AUDIT_ROADMAP_2026-04-24.md`  
+> 🌿 **Branch:** `market-truth-v3`  
+> 🔗 **GitHub:** `https://github.com/lewiercoin/btc-bot/blob/market-truth-v3/docs/audits/QUANT_GRADE_AUDIT_ROADMAP_2026-04-24.md`
 
 **Date:** 2026-04-24  
 **Branch:** `market-truth-v3`  
-**Document:** `docs/audits/QUANT_GRADE_AUDIT_ROADMAP_2026-04-24.md`  
-**Purpose:** Quant-grade, repo-specific audit strategy for the production BTC trading bot from Market Truth validation through paper-trust, modeling unlock, research trust, and live-readiness gating  
-**Context:** Market Truth V3 + quant-grade hardening deployed and currently collecting `200+` validation cycles under runtime freeze conditions
+**Mode:** PAPER → Production Validation  
+**Status systemu:** `APPROVED FOR PRODUCTION VALIDATION` | Collecting 200+ Market Truth cycles  
+**Modeling-V1:** `BLOCKED` — czeka na Gate A
 
 ---
 
-## EXECUTIVE SUMMARY
+## ⚠️ ZŁOTA ZASADA
 
-**Current State:**
-- Market Truth V3 deployed with quant-grade per-input timestamp lineage
-- Snapshot, feature, decision, and config linkage paths exist in the current repo state
-- Production is collecting `200+` validation cycles for timing, staleness, and drift review
-- `MODELING-V1` remains blocked until Market Truth acceptance is explicitly granted
-- Current work must remain read-only with no runtime or production DB behavior changes
-
-**Strategic Imperative:**
-
-While the bot collects `200` Market Truth cycles, only **read-only audits, documentation, planning, offline analysis, and non-mutating analytical scripts** are allowed. No signal, governance, risk, execution, market-data, or restart changes should be made unless there is a critical operational need.
-
-**Roadmap Scope:**
-
-18 audit tracks organized in 5 phases:
-- **Phase 0** (NOW): 5 read-only audits during 200-cycle collection
-- **Phase 1** (POST-200): Market Truth acceptance + feature integrity
-- **Phase 2** (MODELING): Signal analysis + research lab validation
-- **Phase 3** (RESEARCH): replay, experiment lineage, and observability trust
-- **Phase 4** (LIVE READINESS): execution hardening + security + ops sign-off
-
-**Authority Note:**
-
-If any summary in the executive map below conflicts with current repo artifacts, the detailed mini-specs in Section 4 and the source-of-truth documents in `AGENTS.md`, `docs/BLUEPRINT_V1.md`, `docs/BLUEPRINT_RESEARCH_LAB.md`, `docs/MILESTONE_TRACKER.md`, and `docs/DATA_SOURCES.md` are authoritative.
+> **Podczas gdy bot zbiera 200 cykli Market Truth, wykonujemy wyłącznie audyty read-only, dokumentację i planowanie. Żadna zmiana runtime, parametrów ani logiki nie jest dozwolona.**
 
 ---
 
-## AUDIT TRACK EXECUTIVE MAP
+## CZĘŚĆ 1 — EXECUTIVE SUMMARY
 
-### 1. Market Truth / Data Source Audit
+System jest w krytycznym oknie walidacji. `market-truth-v3` przeszedł first snapshot verification (PASS) i aktualnie zbiera dane produkcyjne do finalnej walidacji source-of-truth. Do odblokowania `MODELING-V1` wymagane jest zebranie 200+ cykli bez ingerencji w runtime.
 
-**Primary Question:** Is persisted market data the true, complete, and timely record of bot inputs?
+**Kluczowy wniosek:** Ten okres jest idealny do przeprowadzenia audytów read-only (Phase 0), które zwiększają zaufanie do systemu bez ryzyka zanieczyszczenia eksperymentu. Roadmapa poniżej definiuje **19 torów audytu**, ich kolejność, kryteria i artefakty wyjściowe.
 
-**Why Important:** Foundation of all downstream decisions. Incorrect/stale market data = invalid feature computation = invalid signals.
+**Priorytety Phase 0 — sekwencja Tier:**
 
-**Key Risks:**
-- Staleness: Exchange timestamps lag cycle timestamps
-- Gaps: Missing candles, OI, funding
-- Corruption: JSON parse failures, schema mismatches
-- Lookahead: Features computed on future data
+**Tier 1 — uruchom natychmiast, niezależnie od siebie:**
+1. Security / Secrets / Exchange Safety
+2. Production Ops / SRE
+3. Observability / Dashboard
+4. **Recovery / Safe Mode / State Reconciliation** — nowy, krytyczny
 
-**Primary Files:**
-- `storage/schema.sql` (market_snapshots, feature_snapshots)
-- `data/market_data.py` (MarketDataAssembler)
-- `data/rest_client.py`, `data/websocket_client.py`
-- `validation/recompute_features.py`
+**Tier 2 — równolegle z Tier 1 lub tuż po:**
+5. Configuration / Reproducibility
+6. Execution / Paper Fill Integrity
 
-**Evidence Required:**
-- 200+ snapshots with non-NULL quant-grade lineage fields
-- Staleness analysis per input (candles_15m, candles_1h, candles_4h, funding, OI, aggTrades)
-- Build timing percentiles (p50, p95, p99)
-- Drift report: ATR/EMA < 1% mean error
+**Tier 3 — po zebraniu evidence z Tier 2:**
+7. Trade Lifecycle / PnL Accounting
+8. Backtest / Research Lab
 
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need production sample)
-
-**Output:** `docs/audits/AUDIT_MARKET_TRUTH_FINAL_2026-04-26.md`
+> ⚠️ **Uwaga:** Dodatkowe refinementy z zewnętrznych konsultacji są odroczone do **Roadmap V2** po Gate A — chyba że identyfikują bloker bezpieczeństwa lub krytyczny bloker zaufania do systemu.
 
 ---
 
-### 2. FeatureEngine Audit
+## CZĘŚĆ 2 — EXECUTIVE MAP: 19 TORÓW AUDYTU
 
-**Primary Question:** Are computed features deterministic, correct, and replayable from persisted snapshots?
+### AUDIT-01: Market Truth / Data Source Audit
 
-**Why Important:** Features drive regime classification and signal generation. Non-deterministic features = non-reproducible backtests.
-
-**Key Risks:**
-- Drift: Live features differ from recomputed features (>1% error)
-- Non-determinism: Random seeds, wall-clock dependencies
-- Warm-up: Cold-start features vs bootstrapped features
-- Time-series leakage: Using data not available at cycle timestamp
-
-**Primary Files:**
-- `core/feature_engine.py`
-- `core/models.py` (Features dataclass)
-- `validation/recompute_features.py`
-- `validation/replay_safety_coverage_matrix.md`
-
-**Evidence Required:**
-- Drift report for 200+ snapshots (ATR, EMA, equal_levels, distance metrics)
-- Replay safety validation: 22/29 VERIFIED features confirmed
-- Warm-up integrity: OI delta, CVD, funding SMA require 200+ cycles
-- Bootstrap vs cold-start comparison
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need production sample)
-
-**Output:** `docs/audits/AUDIT_FEATURE_ENGINE_INTEGRITY_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy dane rynkowe trafiające do pipeline'u są kompletne, aktualne, deterministyczne i wolne od lookahead? |
+| **Dlaczego ważne** | Cały system buduje decyzje na danych. Błąd source-of-truth = zanieczyszczony model i błędne sygnały. |
+| **Kluczowe ryzyka** | Stale data, clock drift, gaps w historii, różnice exchange vs lokalny cache, timestamp poisoning |
+| **Pliki / katalogi** | `data/`, `market_data/`, `snapshot*.py`, `market_truth*.py`, `db/migrations/`, `logs/snapshots/` |
+| **Dane / artefakty** | Snapshot logs, timestamp diff reports, gap analysis, DB row count vs expected, staleness metrics |
+| **Równolegle teraz?** | Read-only TAK — nie wolno zmieniać logiki kolekcji |
+| **Wymaga 200 cykli?** | TAK (finalny raport po 200+), read-only analiza możliwa teraz |
+| **Output** | `AUDIT_MARKET_TRUTH_DATA_SOURCE_2026-04-24.md` + staleness/gap CSV |
 
 ---
 
-### 3. Signal Modeling / Stage-1 Audit
+### AUDIT-02: FeatureEngine Audit
 
-**Primary Question:** Does current signal logic (Trial #63 baseline) have edge in post-April 2026 market?
-
-**Why Important:** Bot halted 21 days (Mar 29 - Apr 19) due to uptrend structural gap. Need to quantify current signal domain and identify regime-specific edge.
-
-**Key Risks:**
-- Regime blindness: Signal works in downtrend/chop, fails in uptrend
-- Overfitting: Walk-forward degradation -238% (trial #26)
-- Confluence threshold too high: Zero signals in April 2026 market
-- Sweep/reclaim logic inverted: Post-SWEEP-RECLAIM-FIX-V1 degradation
-
-**Primary Files:**
-- `core/signal_engine.py`
-- `settings.py` (StrategyConfig)
-- `research_lab/param_registry.py`
-- `backtest/backtest_runner.py`
-
-**Evidence Required:**
-- Signal candidates from 200+ cycles (rejected vs accepted)
-- Rejection funnel: regime veto, governance veto, risk block
-- Near-miss analysis: confluence < 3.6, sweep_depth < 0.00286
-- Uptrend continuation candidates (if allow_long_in_uptrend enabled)
-- Regime-specific expectancy: normal, compression, downtrend, uptrend, crowded_leverage, post_liquidation
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need signal candidate sample)
-
-**Output:** `docs/audits/AUDIT_SIGNAL_MODELING_STAGE1_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy wszystkie features są obliczane poprawnie, bez lookahead, z pełną determinizmem i stabilnością numeryczną? |
+| **Dlaczego ważne** | Feature leakage = invalidacja całego modelowania. Feature drift = degradacja sygnału. |
+| **Kluczowe ryzyka** | Lookahead leakage, NaN propagation, rolling window edge cases, feature ordering nieciągłości |
+| **Pliki / katalogi** | `feature_engine.py`, `features/`, `tests/test_features*.py`, `notebooks/feature_analysis/` |
+| **Dane / artefakty** | Feature distribution stats, unit testy coverage, lookahead detection script output |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE (code review + static analysis) |
+| **Output** | `AUDIT_FEATURE_ENGINE_2026-04-24.md` + feature_integrity_report.csv |
 
 ---
 
-### 4. Regime Engine / Market State Audit
+### AUDIT-03: Signal Modeling / Stage-1 Audit
 
-**Primary Question:** Does regime classification correctly capture market microstructure for signal gating?
-
-**Why Important:** Trial #63 blocks all entries in uptrend regime. Need to verify regime accuracy and whether gating is too restrictive.
-
-**Key Risks:**
-- Regime lag: Classification lags true market state
-- Regime flapping: Oscillates between states on noise
-- Regime blindness: Missing intermediate states (e.g., uptrend-chop)
-- Funding/OI bias incorrect: False regime triggers
-
-**Primary Files:**
-- `core/regime_engine.py`
-- `core/models.py` (Regime enum)
-- `settings.py` (RegimeConfig)
-
-**Evidence Required:**
-- Regime distribution from 200+ cycles
-- Regime transition matrix (normal → uptrend → downtrend → ...)
-- Regime stability: mean duration per regime
-- Regime vs BTC price correlation (does uptrend = higher highs?)
-- Regime vs signal acceptance rate
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need regime sample)
-
-**Output:** `docs/audits/AUDIT_REGIME_ENGINE_ACCURACY_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy pipeline modelowania jest gotowy do bezpiecznego uruchomienia po akceptacji Market Truth? |
+| **Dlaczego ważne** | `MODELING-V1` jest zablokowany — musimy wiedzieć, co dokładnie blokuje i co jest gotowe |
+| **Kluczowe ryzyka** | Dataset leakage, label bias, train/test contamination, premature signal confidence |
+| **Pliki / katalogi** | `signal_engine.py`, `modeling/`, `models/`, `datasets/`, `train*.py` |
+| **Dane / artefakty** | Dataset schema, label distribution, train/val/test split config |
+| **Równolegle teraz?** | Tylko code review — NIE wolno uruchamiać treningu |
+| **Wymaga 200 cykli?** | TAK (dataset export dopiero po Gate A) |
+| **Output** | `AUDIT_SIGNAL_MODELING_STAGE1_2026-04-24.md` |
 
 ---
 
-### 5. Governance Audit
+### AUDIT-04: Regime Engine / Market State Audit
 
-**Primary Question:** Is governance filtering out junk or blocking viable setups?
-
-**Why Important:** 86.2% of uptrend candidates vetoed by duplicate_level (trial #26 post-mortem). Need to verify governance is risk control, not edge killer.
-
-**Key Risks:**
-- Duplicate_level too strict: Rejects valid pullbacks in trending markets
-- Price_too_close_to_last overly conservative: Blocks valid re-entries
-- Same_side_as_open logic flawed: Prevents hedge/reversal
-- Governance notes missing: Can't diagnose veto reasons
-
-**Primary Files:**
-- `core/governance.py`
-- `settings.py` (GovernanceConfig)
-- `storage/repositories.py` (decision_outcomes.governance_notes)
-
-**Evidence Required:**
-- Governance veto breakdown from 200+ cycles: duplicate_level, price_too_close_to_last, same_side_as_open
-- Vetoed candidate quality distribution: confluence, RR, regime
-- Near-miss analysis: would-be-accepted if governance relaxed
-- Historical comparison: Run #3 vs Trial #63 governance veto rate
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need candidate sample)
-
-**Output:** `docs/audits/AUDIT_GOVERNANCE_FILTERING_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy RegimeEngine poprawnie klasyfikuje stany rynkowe i czy klasyfikacja jest stabilna i nie nadmiernie przełącza się? |
+| **Dlaczego ważne** | Błędny reżim = SignalEngine operuje w złym kontekście — fałszywe sygnały |
+| **Kluczowe ryzyka** | Regime instability (flickering), boundary artefakty, brak hysterezis, overfit do jednego reżimu |
+| **Pliki / katalogi** | `regime_engine.py`, `regime/`, `logs/regime/`, `tests/test_regime*.py` |
+| **Dane / artefakty** | Regime transition logs, distribution of regimes over 200 cykli, regime duration stats |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | Częściowo (pełna analiza po 200+) |
+| **Output** | `AUDIT_REGIME_ENGINE_2026-04-24.md` + regime_distribution.csv |
 
 ---
 
-### 6. Risk Engine Audit
+### AUDIT-05: Governance Audit
 
-**Primary Question:** Are risk limits calibrated for paper tuning vs production discipline?
-
-**Why Important:** Current limits relaxed for MODELING-V1 data collection (weekly_dd_limit 30% vs production 6.3%). Need to verify risk gate is enforceable for LIVE.
-
-**Key Risks:**
-- Kill-switch too loose: Allows catastrophic DD in LIVE
-- Kill-switch too tight: Triggers on normal variance in PAPER
-- Position sizing wrong: Leverage too high for realized volatility
-- Daily/weekly DD tracking incorrect: Accounting bugs
-
-**Primary Files:**
-- `core/risk_engine.py`
-- `settings.py` (RiskConfig)
-- `execution/paper_execution_engine.py`
-
-**Evidence Required:**
-- Risk gate rejection breakdown from 200+ cycles: position_limit, leverage_limit, daily_dd, weekly_dd, consecutive_losses
-- RR_below_min frequency: Are setups failing minimum RR threshold?
-- DD tracking accuracy: Compare computed DD vs manual PnL calculation
-- Production-ready risk limits proposal (restore from tuning → LIVE)
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES** (need risk gate sample)
-
-**Output:** `docs/audits/AUDIT_RISK_ENGINE_CALIBRATION_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy GovernanceLayer poprawnie filtruje sygnały, egzekwuje cooldowny i nie wprowadza race conditions ani stanu ubocznego? |
+| **Dlaczego ważne** | Governance jest ostatnią linią obrony przed złym sygnałem. Buggy governance = pominięte ryzyko. |
+| **Kluczowe ryzyka** | State persistence bugs, cooldown bypassy, race conditions w multi-thread, brak audit trail |
+| **Pliki / katalogi** | `governance*.py`, `orchestrator.py`, `logs/governance/`, `tests/test_governance*.py` |
+| **Dane / artefakty** | Governance decision logs, cooldown timestamps, rejected signal stats |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE (code review możliwy teraz) |
+| **Output** | `AUDIT_GOVERNANCE_2026-04-24.md` |
 
 ---
 
-### 7. Execution / Paper-Live Parity Audit
+### AUDIT-06: Risk Engine Audit
 
-**Primary Question:** Do paper fills match realistic live execution expectations?
-
-**Why Important:** Known bug: TP fills in 10-15 seconds with negative PnL, MAE=0 cases (perfect fills). Paper results corrupt if fills unrealistic.
-
-**Key Risks:**
-- Instant fills at snapshot.price: No slippage/spread
-- TP/SL fills <30s: Unrealistic in illiquid periods
-- Negative PnL on TP exit: Logic bug in paper engine
-- MAE=0: Fill at exact stop (impossible)
-- Funding not applied: Paper PnL ignores 8h charges
-
-**Primary Files:**
-- `execution/paper_execution_engine.py`
-- `execution/execution_engine.py`
-- `backtest/fill_model.py`
-- `storage/repositories.py` (executions table)
-
-**Evidence Required:**
-- Fill timing distribution: entry, TP1, TP2, SL (histogram)
-- Fill price vs reference price delta (should have slippage)
-- MAE/MFE distribution (should never be MAE=0 or MFE=0)
-- PnL sanity check: TP exits should be positive, SL exits should be negative
-- Funding impact on PnL (8h cycles)
-
-**Can Run Now?** ✅ **READY_NOW** (production DB has ~7 paper trades from March/April)
-
-**Output:** `docs/audits/AUDIT_EXECUTION_PAPER_FILL_INTEGRITY_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy RiskEngine poprawnie oblicza rozmiary pozycji, drawdown limits i czy limity są faktycznie respektowane w runtime? |
+| **Dlaczego ważne** | Risk engine = granica między stratą kontrolowaną a katastrofą. Błąd = nadekspozycja. |
+| **Kluczowe ryzyka** | Rozmiar pozycji off-by-one, margin calculation error, drawdown counter reset bug, soft vs hard limit confuzja |
+| **Pliki / katalogi** | `risk_engine.py`, `risk/`, `tests/test_risk*.py`, `logs/risk/` |
+| **Dane / artefakty** | Position size audit (expected vs actual), drawdown tracking logs, limit breach reports |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE (code + log analysis) |
+| **Output** | `AUDIT_RISK_ENGINE_2026-04-24.md` + position_size_audit.csv |
 
 ---
 
-### 8. Trade Lifecycle / PnL Accounting Audit
+### AUDIT-07: Execution / Paper-Live Parity Audit
 
-**Primary Question:** Is trade PnL correctly computed from entry → TP/SL → funding → fees?
-
-**Why Important:** Corrupt PnL metrics = wrong backtesting results = bad optimization = losing LIVE strategy.
-
-**Key Risks:**
-- TP/SL exit PnL sign wrong: Gains shown as losses
-- Funding not applied: 8h charges missing
-- Fees not applied: Maker/taker ignored
-- MAE/MFE incorrect: Excursion tracking logic bug
-- Position size wrong: Leverage miscalculation
-
-**Primary Files:**
-- `execution/paper_execution_engine.py`
-- `storage/repositories.py` (trade_log, executions)
-- `core/models.py` (Trade, Execution)
-
-**Evidence Required:**
-- Manual PnL recalculation for 5-10 trades: entry_price → exit_price → position_size → fees → funding
-- TP exit PnL distribution (should be >0)
-- SL exit PnL distribution (should be <0)
-- MAE/MFE bounds check (0 < MAE < |PnL|, 0 < MFE)
-- Funding application verification (8h cycles logged in executions)
-
-**Can Run Now?** ✅ **READY_NOW** (production DB has trade_log + executions)
-
-**Output:** `docs/audits/AUDIT_TRADE_LIFECYCLE_PNL_ACCOUNTING_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy paper fills odzwierciedlają realistyczne warunki rynkowe? Czy symulacja execution nie jest nadmiernie optymistyczna? |
+| **Dlaczego ważne** | Paper-to-live gap = główne ryzyko przy przejściu na live trading |
+| **Kluczowe ryzyka** | Instant fill assumption, zero slippage, brak partial fills, brak latency modelowania |
+| **Pliki / katalogi** | `execution*.py`, `paper_broker*.py`, `logs/execution/`, `tests/test_execution*.py` |
+| **Dane / artefakty** | Fill timestamps vs signal timestamps, theoretical vs actual fill price, slippage distribution |
+| **Równolegle teraz?** | Read-only TAK (analiza logów) |
+| **Wymaga 200 cykli?** | Częściowo (więcej danych = lepsza statystyka) |
+| **Output** | `AUDIT_EXECUTION_PAPER_FILL_INTEGRITY_2026-04-24.md` |
 
 ---
 
-### 9. Backtest / Replay / Research Lab Audit
+### AUDIT-08: Trade Lifecycle / PnL Accounting Audit
 
-**Primary Question:** Is backtest engine replay-safe and free of lookahead bias?
-
-**Why Important:** Optimization campaigns (Run #12, Run #13) depend on backtest accuracy. Lookahead = false edge = losing LIVE.
-
-**Key Risks:**
-- Lookahead bias: Features use future data
-- Survivor bias: Only backtesting winners
-- Overfitting: Walk-forward degradation -238%
-- Fill model unrealistic: Instant fills at midpoint
-- Warm-up missing: Cold-start features vs production
-
-**Primary Files:**
-- `backtest/backtest_runner.py`
-- `backtest/fill_model.py`
-- `research_lab/research_backtest_runner.py`
-- `validation/replay_safety_coverage_matrix.md`
-
-**Evidence Required:**
-- Replay safety validation: 22/29 VERIFIED features confirmed from production snapshots
-- Lookahead scan: grep for datetime.now(), time.time() in feature/signal code
-- Walk-forward methodology audit: anchored_expanding (730/365) vs rolling (180/90)
-- Fill model audit: slippage, latency, spread assumptions
-- Warm-up policy: OI delta, CVD, funding SMA require 200+ bars
-
-**Can Run Now?** ✅ **READY_NOW** (can audit code + methodology without production data)
-
-**Output:** `docs/audits/AUDIT_BACKTEST_REPLAY_RESEARCH_LAB_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy każda transakcja od otwarcia do zamknięcia jest kompletnie i poprawnie zaksięgowana w PnL? |
+| **Dlaczego ważne** | Błąd w accounting = fałszywy performance report — złe decyzje o strategii |
+| **Kluczowe ryzyka** | Unclosed positions, funding fee pominięcie, commission accounting error, PnL double-counting |
+| **Pliki / katalogi** | `trade_lifecycle*.py`, `pnl*.py`, `db/trades/`, `reports/`, `logs/trades/` |
+| **Dane / artefakty** | SQL: open vs closed trades reconciliation, PnL waterfall, funding fee ledger |
+| **Równolegle teraz?** | Read-only TAK (SQL queries na kopii / read replica) |
+| **Wymaga 200 cykli?** | NIE — im wcześniej tym lepiej |
+| **Output** | `AUDIT_TRADE_LIFECYCLE_PNL_ACCOUNTING_2026-04-24.md` + pnl_reconciliation.csv |
 
 ---
 
-### 10. Experiment Management Audit
+### AUDIT-09: Backtest / Replay / Research Lab Audit
 
-**Primary Question:** Is research lab trial lineage traceable and reproducible?
-
-**Why Important:** 310 trials (Run #12) produced 176 zero-vector failures, 63 constraint violations, 15 credible candidates. Need to verify trial context is reproducible.
-
-**Key Risks:**
-- Trial context missing: protocol_hash, search_space_signature, regime_signature
-- Warm-start contamination: Mismatched protocol/date-range seeds
-- Baseline gate too loose: Broken pipelines pass (expectancy -0.87 accepted)
-- Pareto artifacts missing: Can't reproduce trial #26 config
-
-**Primary Files:**
-- `research_lab/param_registry.py`
-- `research_lab/workflows/optimize.py`
-- `research_lab/workflows/autoresearch.py`
-- `storage/optimization_trials` (SQLite table)
-
-**Evidence Required:**
-- Trial lineage audit: protocol_hash, search_space_signature, regime_signature populated for Run #12/#13
-- Warm-start filtering audit: Does context matching prevent contamination?
-- Baseline gate audit: Does check_baseline_hard() block broken pipelines?
-- Pareto artifact audit: Can trial #26 be reproduced from stored config?
-
-**Can Run Now?** ✅ **READY_NOW** (research DB + trial artifacts available)
-
-**Output:** `docs/audits/AUDIT_EXPERIMENT_MANAGEMENT_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy backtest engine jest wolny od lookahead, parity z produkcją i metodologicznie sound? |
+| **Dlaczego ważne** | Overfitted backtest = fałszywa pewność siebie przed live. |
+| **Kluczowe ryzyka** | Look-ahead leakage, survivorship bias, cost/slippage model brakujący, walk-forward brak |
+| **Pliki / katalogi** | `backtest_runner.py`, `research/`, `notebooks/`, `backtest/`, `replay*.py` |
+| **Dane / artefakty** | Backtest methodology doc, cost model config, walk-forward setup, replay vs live comparison |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE (code review + methodology review) |
+| **Output** | `AUDIT_BACKTEST_RESEARCH_LAB_2026-04-24.md` |
 
 ---
 
-### 11. Observability / Dashboard Audit
+### AUDIT-10: Experiment Management Audit
 
-**Primary Question:** Does dashboard surface current bot state without stale/wrong data?
-
-**Why Important:** User reported dashboard shows December 2025/March 2026 data instead of current April 2026 paper trades.
-
-**Key Risks:**
-- Config_hash filtering missing: Shows backtest data mixed with live
-- Timestamp filtering missing: Shows old data mixed with recent
-- Safe_mode not visible: Operator unaware bot is halted
-- Egress/proxy health missing: Can't diagnose CloudFront blocking
-
-**Primary Files:**
-- `dashboard/server.py`
-- `dashboard/db_reader.py`
-- `dashboard/static/app.js`, `dashboard/static/index.html`
-
-**Evidence Required:**
-- `/api/trades` filtered by current config_hash
-- `/api/signals` filtered by current config_hash
-- `/api/metrics` filtered by last 7 days
-- `/api/alerts` filtered by last 24 hours
-- Safe mode banner visible when safe_mode=true
-- Egress panel shows current proxy exit IP
-
-**Can Run Now?** ✅ **READY_NOW** (dashboard running on production)
-
-**Output:** `docs/audits/AUDIT_OBSERVABILITY_DASHBOARD_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy eksperymenty są izolowane, reproducible i czy nie ma ryzyka zanieczyszczenia produkcji przez research branch? |
+| **Dlaczego ważne** | Experiment bleed = nieświadoma zmiana zachowania bota |
+| **Kluczowe ryzyka** | Shared DB między prod i research, brak experiment IDs, brak seed fixowania, brak isolation |
+| **Pliki / katalogi** | `config/`, `experiments/`, `.env*`, `docker-compose*.yml`, `Makefile` |
+| **Dane / artefakty** | Experiment isolation audit, DB schema per env, seed config audit |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_EXPERIMENT_MANAGEMENT_2026-04-24.md` |
 
 ---
 
-### 12. Production Ops / SRE Audit
+### AUDIT-11: Observability / Dashboard Audit
 
-**Primary Question:** Is production deployment reproducible, monitored, and recoverable?
-
-**Why Important:** Multiple deployment issues (WebSocket migration, egress proxy, safe_mode sticky, RAM pressure) indicate ops gaps.
-
-**Key Risks:**
-- Deployment not documented: No runbook for deploy/restart/rollback
-- Backup/restore not tested: DR plan untested
-- Resource limits unknown: RAM/CPU/disk exhaustion scenarios
-- Log rotation missing: Disk fills with btc_bot.log
-- Service dependencies fragile: Dashboard/collectors crash bot
-
-**Primary Files:**
-- `scripts/server/btc-bot.service`
-- `scripts/server/btc-bot-dashboard.service`
-- `scripts/server/btc-bot-force-collector.service`
-- `scripts/server/btc-bot-daily-collector.service`
-- `docs/SERVER_DEPLOYMENT.md`, `docs/DISASTER_RECOVERY.md`
-
-**Evidence Required:**
-- Deployment checklist: SSH, git pull, systemctl restart, health check, rollback plan
-- Backup policy: Daily automated, 30-day retention, verified restore test
-- Resource monitoring: RAM/CPU/disk usage baselines, alert thresholds
-- Log rotation: btc_bot.log, dashboard.log, collector logs
-- Service dependency map: What crashes if dashboard fails?
-
-**Can Run Now?** ✅ **READY_NOW** (can audit docs + systemd configs)
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy monitoring i dashboardy dają pełny, poprawny obraz stanu systemu w real-time? |
+| **Dlaczego ważne** | Blind spot w monitoringu = wykrywamy problem zbyt późno |
+| **Kluczowe ryzyka** | Metryki lagging, missing alerts, dashboard showing stale data, no anomaly detection |
+| **Pliki / katalogi** | `monitoring/`, `dashboards/`, `alerts/`, `metrics*.py`, `grafana/`, `prometheus/` |
+| **Dane / artefakty** | Alert coverage matrix, dashboard screenshot + gap analysis, metric staleness report |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_OBSERVABILITY_DASHBOARD_2026-04-24.md` |
 
 ---
 
-### 13. Security / Secrets / Exchange Safety Audit
+### AUDIT-12: Production Ops / SRE Audit
 
-**Primary Question:** Are API keys, DB credentials, and exchange rate limits protected?
-
-**Why Important:** Live mode requires real capital. Leaked API keys = account drain. Rate limit violations = IP ban.
-
-**Key Risks:**
-- API keys in git: BINANCE_API_KEY committed to repo
-- .env not gitignored: Secrets exposed
-- API key permissions too broad: WITHDRAWAL enabled (should be NO)
-- Rate limits not enforced: Binance CloudFront ban risk
-- Proxy credentials exposed: SOCKS5 password in logs
-
-**Primary Files:**
-- `.env.example`, `.gitignore`
-- `settings.py` (load from environment)
-- `data/rest_client.py` (rate limiting)
-- `data/exchange_guard.py`
-
-**Evidence Required:**
-- git log scan: grep for API_KEY, SECRET, PASSWORD
-- .gitignore audit: .env, *.key, credentials.json listed
-- API key permissions audit: Binance dashboard screenshot (should be READ + TRADE only, NO WITHDRAWAL)
-- Rate limit enforcement audit: Does REST client respect 2400 req/min?
-- Proxy credential audit: Are SOCKS5 passwords logged?
-
-**Can Run Now?** ✅ **READY_NOW** (can audit code + git history)
-
-**Output:** `docs/audits/AUDIT_SECURITY_SECRETS_EXCHANGE_SAFETY.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy system jest operacyjnie stabilny, auto-restartuje się poprawnie i ma kompletny runbook? |
+| **Dlaczego ważne** | Brak ops discipline = nieplanowany downtime podczas krytycznej sesji rynkowej |
+| **Kluczowe ryzyka** | Restart bez state recovery, brak healthcheck, brak alertu na crash, brak runbook |
+| **Pliki / katalogi** | `ops/`, `scripts/`, `systemd/`, `docker/`, `recovery.py`, `README.md`, `docs/ops/` |
+| **Dane / artefakty** | Uptime logs, restart history, process manager config, runbook completeness checklist |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_PRODUCTION_OPS_SRE_2026-04-24.md` |
 
 ---
 
-### 14. Configuration / Reproducibility Audit
+### AUDIT-13: Security / Secrets / Exchange Safety Audit
 
-**Primary Question:** Is bot configuration versioned, traceable, and reproducible per deployment?
-
-**Why Important:** Dashboard shows config_hash e8c7180d... but expected f807b7057... (Trial #63). Need to verify config consistency.
-
-**Key Risks:**
-- Config drift: Live bot settings ≠ expected trial config
-- Config_hash collision: Different params → same hash
-- Config not versioned: Can't reproduce trial #26 setup
-- Config snapshot missing: decision_outcomes not linked to config
-
-**Primary Files:**
-- `settings.py` (StrategyConfig, RiskConfig, GovernanceConfig)
-- `storage/repositories.py` (config_snapshots table)
-- `core/models.py` (config dataclasses)
-
-**Evidence Required:**
-- Config_hash reproducibility: Does same StrategyConfig → same hash?
-- Config snapshot persistence: Does decision_outcomes.config_hash link to config_snapshots?
-- Trial #63 config audit: Does production config_hash match trial artifact?
-- Live vs research split audit: Are live overrides (min_sweep_depth_pct 0.0001) documented?
-
-**Can Run Now?** ✅ **READY_NOW** (can query production DB + compare trial artifacts)
-
-**Output:** `docs/audits/AUDIT_CONFIGURATION_REPRODUCIBILITY_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy klucze API, sekrety i uprawnienia są zarządzane bezpiecznie i z minimalnym zakresem? |
+| **Dlaczego ważne** | Leak API key = utrata środków na giełdzie. Brak kill-switch = brak kontroli nad botem. |
+| **Kluczowe ryzyka** | Secrets w repo, nierotowane klucze, brak IP whitelist, brak withdraw disabled, brak kill-switch |
+| **Pliki / katalogi** | `.env*`, `config/`, `.gitignore`, `secrets/`, `exchange_client*.py` |
+| **Dane / artefakty** | Secret scanning report (git history), API key permission audit, kill-switch test plan |
+| **Równolegle teraz?** | Read-only TAK (git history scan offline) |
+| **Wymaga 200 cykli?** | NIE — krytyczne |
+| **Output** | `AUDIT_SECURITY_SECRETS_2026-04-24.md` |
 
 ---
 
-### 15. Testing / CI / Quality Gates Audit
+### AUDIT-14: Configuration / Reproducibility Audit
 
-**Primary Question:** Do tests and CI protect the contracts that matter for a production trading system?
-
-**Why Important:** A green pipeline does not help if execution, lifecycle, and persistence contracts are under-tested.
-
-**Key Risks:**
-- Smoke coverage misses critical failures
-- CI green status hides audit-critical blind spots
-- Integration coverage too shallow around decision persistence and trade lifecycle
-
-**Primary Files:**
-- `.github/workflows/ci.yml`
-- `pytest.ini`
-- `tests/test_market_truth_layer.py`
-- `tests/test_paper_fill_fix.py`
-- `tests/test_orchestrator_runtime_logging.py`
-- `tests/test_research_lab_smoke.py`
-
-**Evidence Required:**
-- Test inventory mapped to critical modules
-- CI workflow coverage for compile, tests, smoke checks
-- Gap map for execution, accounting, dashboard, and research-lab contracts
-
-**Can Run Now?** ✅ **READY_NOW** (code and tests can be audited read-only)
-
-**Output:** `docs/audits/AUDIT_TESTING_CI_QUALITY_GATES_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy konfiguracja jest wersjonowana, deterministyczna i czy można odtworzyć dokładny stan bota z danego dnia? |
+| **Dlaczego ważne** | Brak reproducibility = niemożność debugowania incydentów post-factum |
+| **Kluczowe ryzyka** | Config drift bez wersjonowania, env-specific overrides niezadokumentowane, brak config snapshot |
+| **Pliki / katalogi** | `config/`, `settings*.py`, `pyproject.toml`, `requirements*.txt`, `.python-version` |
+| **Dane / artefakty** | Config snapshot per deploy, dependency lock audit, config diff between envs |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_CONFIGURATION_REPRODUCIBILITY_2026-04-24.md` |
 
 ---
 
-### 16. Live Readiness Audit
+### AUDIT-15: Testing / CI / Quality Gates Audit
 
-**Primary Question:** After paper validation and audit closure, what blocks minimal live deployment?
-
-**Why Important:** Live readiness is a systems gate, not just a code-complete gate.
-
-**Key Risks:**
-- Recovery path unproven
-- Kill-switch behavior not fully signed off
-- Live order path assumptions not reconciled with paper findings
-
-**Primary Files:**
-- `execution/live_execution_engine.py`
-- `execution/order_manager.py`
-- `execution/recovery.py`
-- `data/exchange_guard.py`
-- `docs/paper_trading_validation.md`
-- `docs/DISASTER_RECOVERY.md`
-
-**Evidence Required:**
-- Live engine contract review
-- Recovery behavior review
-- Kill-switch readiness checklist
-- Security and ops sign-off package
-
-**Can Run Now?** ⏳ **WAIT_FOR_PRIOR_GATES**
-
-**Output:** `docs/audits/AUDIT_LIVE_READINESS_CANDIDATE_2026-04-27.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy testy pokrywają krytyczne ścieżki, CI blokuje regresje i czy są quality gates przed deployem? |
+| **Dlaczego ważne** | Brak quality gates = regresja dociera na produkcję bez wykrycia |
+| **Kluczowe ryzyka** | Niska coverage na risk/execution, brak integration testów, CI tylko lint, brak contract testów |
+| **Pliki / katalogi** | `tests/`, `.github/workflows/`, `Makefile`, `pytest.ini`, `coverage*.xml` |
+| **Dane / artefakty** | Coverage report, CI pipeline audit, test classification matrix (unit/integration/e2e) |
+| **Równolegle teraz?** | Read-only TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_TESTING_CI_QUALITY_GATES_2026-04-24.md` |
 
 ---
 
-### 17. Performance / Latency / Resource Audit
+### AUDIT-16: Live Readiness Audit
 
-**Primary Question:** Does runtime timing and resource behavior stay inside acceptable bounds during the validation window?
-
-**Why Important:** Market Truth acceptance depends on timing trust, not only on correct schemas.
-
-**Key Risks:**
-- Snapshot-build tail latency
-- Resource creep across long-running paper validation
-- Runtime freshness degradation under load
-
-**Primary Files:**
-- `orchestrator.py`
-- `data/market_data.py`
-- `storage/state_store.py`
-- `monitoring/metrics.py`
-- `monitoring/health.py`
-- `validation/timing_validation_report.md`
-
-**Evidence Required:**
-- p50 / p95 / p99 timing summaries
-- Runtime freshness evidence
-- Resource baseline observations
-
-**Can Run Now?** ⏳ **WAIT_FOR_200_CYCLES**
-
-**Output:** `docs/audits/AUDIT_PERFORMANCE_LATENCY_RESOURCES_2026-04-26.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy system jest gotowy do przejścia z PAPER na LIVE trading z akceptowalnym ryzykiem? |
+| **Dlaczego ważne** | Premature live = ryzyko finansowe. Za późno live = stracone okazje. |
+| **Kluczowe ryzyka** | Paper-live behavior divergence, brak kill-switch, brak circuit breaker, exchange failure handling |
+| **Pliki / katalogi** | `execution*.py`, `live_broker*.py`, `risk_engine.py`, `docs/live_readiness/` |
+| **Dane / artefakty** | Live readiness checklist, paper-live simulation diff, exchange failure test cases |
+| **Równolegle teraz?** | Tylko planowanie |
+| **Wymaga 200 cykli?** | TAK (Gate D) |
+| **Output** | `AUDIT_LIVE_READINESS_2026-04-24.md` |
 
 ---
 
-### 18. Documentation / Agent Workflow Audit
+### AUDIT-17: Performance / Latency / Resource Audit
 
-**Primary Question:** Are source-of-truth docs and agent workflow files aligned with the repo and current validation state?
-
-**Why Important:** Workflow discipline is part of the system safety model.
-
-**Key Risks:**
-- Milestone tracker drift
-- Blueprint / repo drift
-- Builder / auditor role ambiguity
-
-**Primary Files:**
-- `AGENTS.md`
-- `CASCADE.md`
-- `GROK.md`
-- `docs/BLUEPRINT_V1.md`
-- `docs/BLUEPRINT_RESEARCH_LAB.md`
-- `docs/MILESTONE_TRACKER.md`
-- `docs/templates/AUDIT_TEMPLATE.md`
-
-**Evidence Required:**
-- Source-of-truth comparison
-- Milestone-state comparison
-- Workflow-role comparison
-
-**Can Run Now?** ✅ **READY_NOW**
-
-**Output:** `docs/audits/AUDIT_DOCUMENTATION_AGENT_WORKFLOW_2026-04-24.md`
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy bot mieści się w wymaganiach latencji i nie powoduje resource leaków pod obciążeniem? |
+| **Dlaczego ważne** | Memory leak = crash po N godzinach. High latency = stale signal execution. |
+| **Kluczowe ryzyka** | Memory growth w pętli głównej, CPU spikes przy feature calc, DB connection pool exhaustion |
+| **Pliki / katalogi** | `orchestrator.py`, `feature_engine.py`, `monitoring/metrics/`, `logs/perf/` |
+| **Dane / artefakty** | Memory/CPU profile over 200 cykli, signal-to-execution latency histogram, DB query timing |
+| **Równolegle teraz?** | Read-only TAK (profiling logs analiza) |
+| **Wymaga 200 cykli?** | Częściowo |
+| **Output** | `AUDIT_PERFORMANCE_LATENCY_2026-04-24.md` |
 
 ---
 
-## PRIORITY PHASING
+### AUDIT-18: Documentation / Agent Workflow Audit
 
-### Phase 0 — During 200-cycle collection
-
-- **Rule:** read-only only
-- **Priority:** execution fill integrity, trade lifecycle accounting, production ops / SRE, backtest / replay / research-lab methodology, security / secrets / exchange safety
-- **Allowed:** documentation, planning, offline analysis, non-mutating analytical scripts
-- **Forbidden:** runtime behavior changes, parameter changes, data-collection changes, non-critical restarts
-
-### Phase 1 — After 200+ Market Truth cycles
-
-- **Goal:** decide Gate A (`Market Truth Accepted`)
-- **Priority:** Market Truth final audit, FeatureEngine integrity, replay / timing confirmation, config reconciliation
-- **Output:** merge / no-merge recommendation for `market-truth-v3`
-
-### Phase 2 — Modeling unlock
-
-- **Goal:** decide Gate B (`MODELING-V1 Unblocked`)
-- **Priority:** signal funnel, rejected vs accepted dataset, near-miss analysis, regime-specific behavior, governance / risk interpretation
-- **Output:** modeling-ready dataset and modeling-unlock recommendation
-
-### Phase 3 — Research / optimization trust
-
-- **Goal:** decide Gate C (`Research Lab Trusted`)
-- **Priority:** replay parity, walk-forward discipline, experiment lineage, observability of research outputs
-- **Output:** research trust verdict and methodology closure
-
-### Phase 4 — Live readiness
-
-- **Goal:** decide Gate D (`Live Readiness Candidate`)
-- **Priority:** live order path, risk hardening, kill-switch, security sign-off, ops sign-off, recovery path
-- **Output:** live-readiness recommendation for minimal deployment
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy dokumentacja i workflow dla AI agentów (Claude/GPT) jest wystarczająca do bezpiecznej kontynuacji pracy? |
+| **Dlaczego ważne** | Brak kontekstu = AI agent może wprowadzić zmianę bez rozumienia implikacji |
+| **Kluczowe ryzyka** | Brak CLAUDE.md, brak claude-progress.txt, blueprint nieaktualny, brak decision log |
+| **Pliki / katalogi** | `docs/`, `CLAUDE.md`, `claude-progress.txt`, `gpt_bot_instytuzional_blueprint_v1.md`, `CHANGELOG.md` |
+| **Dane / artefakty** | Doc completeness checklist, agent workflow review, decision log audit |
+| **Równolegle teraz?** | Read-only + tworzenie dokumentów TAK |
+| **Wymaga 200 cykli?** | NIE |
+| **Output** | `AUDIT_DOCUMENTATION_AGENT_WORKFLOW_2026-04-24.md` |
 
 ---
 
-## AUDIT MINI-SPECS
+### AUDIT-19: Recovery / Safe Mode / State Reconciliation Audit
 
-| Audit | Status | Scope | Evidence | DONE / PARTIAL / FAIL | Output |
-|---|---|---|---|---|---|
-| Market Truth / Data Source | `WAIT_FOR_200_CYCLES` | lineage, staleness, snapshot linkage, timing contract | `market_snapshots`, `feature_snapshots`, `decision_outcomes`, recompute report | DONE = `200+` cycles and no critical freshness gap; PARTIAL = usable but degraded slices; FAIL = broken source-of-truth chain | `AUDIT_MARKET_TRUTH_FINAL_2026-04-26.md` |
-| FeatureEngine | `WAIT_FOR_200_CYCLES` | determinism, drift, replayability, warmup | recompute report, replay-safety matrix, feature samples | DONE = decision-critical features reproduce; PARTIAL = core passes but rolling gaps remain; FAIL = core reproducibility broken | `AUDIT_FEATURE_ENGINE_INTEGRITY_2026-04-26.md` |
-| Signal Modeling / Stage-1 | `WAIT_FOR_200_CYCLES` | candidate funnel, labels, near-misses, dataset shape | signal candidates, decision outcomes, executable signals, trade log | DONE = clean labeled funnel; PARTIAL = low sample or config-mixed; FAIL = not trustworthy enough to unblock modeling | `AUDIT_SIGNAL_MODELING_STAGE1_2026-04-26.md` |
-| Regime Engine / Market State | `WAIT_FOR_200_CYCLES` | classification, transitions, relation to outcomes | regime distribution, transition matrix, snapshot slices | DONE = interpretable and stable; PARTIAL = useful but noisy; FAIL = not actionable | `AUDIT_REGIME_ENGINE_MARKET_STATE_2026-04-26.md` |
-| Governance | `WAIT_FOR_200_CYCLES` | veto reasons, session logic, cooldowns, funnel | rejection cohorts, notes, time-of-day veto patterns | DONE = veto path explainable; PARTIAL = reasons exist but weak resolution; FAIL = cannot audit from stored evidence | `AUDIT_GOVERNANCE_FILTERING_2026-04-26.md` |
-| Risk Engine | `WAIT_FOR_200_CYCLES` | RR floor, sizing, leverage, DD state | decision outcomes, bot state, daily metrics, trade log | DONE = math and state reconcile; PARTIAL = mostly correct but live calibration open; FAIL = material sizing or DD error | `AUDIT_RISK_ENGINE_CALIBRATION_2026-04-26.md` |
-| Execution / Paper-Live Parity | `READY_NOW` | fill semantics, TP/SL timing, exit reason vs PnL | trade log, positions, executions, paper validation report | DONE = no semantic contradictions; PARTIAL = coherent but realism weak; FAIL = critical contradiction like TP-negative-PnL | `AUDIT_EXECUTION_PAPER_FILL_INTEGRITY_2026-04-24.md` |
-| Trade Lifecycle / PnL Accounting | `READY_NOW` | open-close lifecycle, close bookkeeping, PnL sign, MAE/MFE | trade log, positions, executions, daily metrics | DONE = outcomes reconcile from stored values; PARTIAL = core signs correct but costs partial; FAIL = material accounting mismatch | `AUDIT_TRADE_LIFECYCLE_PNL_ACCOUNTING_2026-04-24.md` |
-| Backtest / Replay / Research Lab | `READY_NOW` | replay safety, lookahead, walk-forward, warmup, fill realism | replay matrix, backtest contracts, smoke tests, research outputs | DONE = no lookahead blocker; PARTIAL = replay-safe core but realism weak; FAIL = invalidates optimization trust | `AUDIT_BACKTEST_REPLAY_RESEARCH_LAB_2026-04-24.md` |
-| Experiment Management | `READY_NOW` | trial lineage, recommendation lineage, protocol reproducibility | experiment store schema, trials, reports, recommendations | DONE = reproducible lineage; PARTIAL = useful but incomplete context; FAIL = cannot reconstruct experiments | `AUDIT_EXPERIMENT_MANAGEMENT_LINEAGE_2026-04-24.md` |
-| Observability / Dashboard | `READY_NOW` | current-state visibility, filtering, safe mode, freshness | API payloads, screenshots, dashboard tests | DONE = current truth visible; PARTIAL = mostly correct with stale slices; FAIL = operator view misleading | `AUDIT_OBSERVABILITY_DASHBOARD_2026-04-24.md` |
-| Production Ops / SRE | `READY_NOW` | service topology, deploy workflow, backup/restore, log rotation | service files, backup scripts, DR docs, deployment docs | DONE = deploy/recovery path auditable; PARTIAL = path exists but proof incomplete; FAIL = no credible recovery path | `AUDIT_PRODUCTION_OPS_SRE_2026-04-24.md` |
-| Security / Secrets / Exchange Safety | `READY_NOW` | secret handling, key permissions, proxy hygiene, request discipline | git scan, ignore rules, env-loading review, key policy checklist | DONE = controls auditably safe; PARTIAL = no exposure but proof manual; FAIL = material secret or exchange-safety gap | `AUDIT_SECURITY_SECRETS_EXCHANGE_SAFETY_2026-04-24.md` |
-| Configuration / Reproducibility | `READY_NOW_FOR_STRUCTURE` | config hash, config snapshots, runtime profile differences | config snapshots, decision outcomes, settings profile tests | DONE = config lineage reproducible; PARTIAL = structure exists but deployment lineage manual; FAIL = config lineage ambiguous | `AUDIT_CONFIGURATION_REPRODUCIBILITY_2026-04-26.md` |
-| Testing / CI / Quality Gates | `READY_NOW` | CI workflow, smoke inventory, audit-critical test coverage | CI config, tests, smoke scripts, gap map | DONE = critical contracts covered; PARTIAL = CI green but gaps remain; FAIL = major critical paths unguarded | `AUDIT_TESTING_CI_QUALITY_GATES_2026-04-24.md` |
-| Live Readiness | `WAIT_FOR_PRIOR_GATES` | live order path, recovery, kill-switch, final sign-off | live engine review, recovery review, sign-off package | DONE = preconditions closed; PARTIAL = one sign-off family open; FAIL = unsafe to promote | `AUDIT_LIVE_READINESS_CANDIDATE_2026-04-27.md` |
-| Performance / Latency / Resource | `WAIT_FOR_200_CYCLES` | timing, freshness, storage latency, resource stability | timing report, freshness data, resource observations | DONE = no material cadence risk; PARTIAL = cadence holds but tail-risk open; FAIL = timing/resource behavior undermines trust | `AUDIT_PERFORMANCE_LATENCY_RESOURCES_2026-04-26.md` |
-| Documentation / Agent Workflow | `READY_NOW` | source-of-truth docs, milestone state, role clarity | blueprint comparison, milestone comparison, workflow comparison | DONE = coherent authority chain; PARTIAL = mostly coherent with lagging docs; FAIL = material doc/workflow conflict | `AUDIT_DOCUMENTATION_AGENT_WORKFLOW_2026-04-24.md` |
+| Pole | Wartość |
+|------|---------|
+| **Główne pytanie** | Czy bot poprawnie odtwarza swój stan po restarcie, safe_mode nie jest sticky bez powodu i nie istnieje ryzyko phantom position po awarii? |
+| **Dlaczego ważne** | Historia bota obejmuje incydenty: sticky safe_mode, niepewny stan po restarcie, ryzyko phantom position. To bezpośrednio wpływa na zaufanie do systemu — niezależnie od Market Truth walidacji. |
+| **Kluczowe ryzyka** | Stale safe_mode po restarcie, phantom position (bot myśli że ma pozycję gdy jej nie ma lub odwrotnie), DB state vs runtime state desync, brak auto-recovery rules, ręczna ścieżka recovery niezdefiniowana |
+| **Pliki / katalogi** | `orchestrator.py`, `storage/state_store.py`, `storage/repositories.py`, `core/risk_engine.py`, `execution/paper_execution_engine.py`, `storage/schema.sql`, service logs, startup logs |
+| **Dane / artefakty** | Startup log analysis, safe_mode transition history, bot_state DB snapshot vs runtime state, open position reconciliation report |
+| **Równolegle teraz?** | Read-only TAK — Tier 1, nie wymaga żadnych zmian runtime |
+| **Wymaga 200 cykli?** | NIE — krytyczne niezależnie od fazy |
+| **Output** | `docs/audits/AUDIT_RECOVERY_SAFE_MODE_STATE_RECONCILIATION_2026-04-24.md` |
 
 ---
 
-## FIRST 5 AUDITS (READY NOW)
+## CZĘŚĆ 3 — PRIORYTETY FAZOWE
 
-### 1. Execution / Paper Fill Integrity Audit
+### 🟢 Phase 0 — TERAZ (podczas 200-cycle collection, read-only only)
 
-- **Why now** Known paper-fill integrity questions directly affect trust in every paper-trading result.
-- **Read-only** Yes.
-- **Needs production access** Yes, for trade / execution evidence.
-- **Effort** Medium.
-- **Deliverable** `docs/audits/AUDIT_EXECUTION_PAPER_FILL_INTEGRITY_2026-04-24.md`
-- **Pass condition** No critical contradiction between fill semantics, exit reason, and stored PnL.
+> Podzielone na Tiery — nie "wszystko równolegle". Tier 1 startuje natychmiast i niezależnie.
 
-### 2. Trade Lifecycle / PnL Accounting Audit
+**Tier 1 — start natychmiast, bez dependencji:**
 
-- **Why now** It validates whether lifecycle bookkeeping and derived PnL are reliable enough for later research and risk audits.
-- **Read-only** Yes.
-- **Needs production access** Yes.
-- **Effort** Medium.
-- **Deliverable** `docs/audits/AUDIT_TRADE_LIFECYCLE_PNL_ACCOUNTING_2026-04-24.md`
-- **Pass condition** Manual reconciliation matches stored lifecycle outcomes for representative trades.
+| Priorytet | Audyt | Status |
+|-----------|-------|--------|
+| P0.1 | AUDIT-13: Security / Secrets / Exchange Safety | **READY_NOW** |
+| P0.2 | AUDIT-12: Production Ops / SRE | **READY_NOW** |
+| P0.3 | AUDIT-11: Observability / Dashboard | **READY_NOW** |
+| P0.4 | AUDIT-19: Recovery / Safe Mode / State Reconciliation | **READY_NOW** |
 
-### 3. Production Ops / SRE Audit
+**Tier 2 — równolegle z Tier 1 lub po jego starcie:**
 
-- **Why now** It can be completed during the freeze window and directly improves trust in recoverability and operator discipline.
-- **Read-only** Yes.
-- **Needs production access** Yes, for service and backup verification.
-- **Effort** Small.
-- **Deliverable** `docs/audits/AUDIT_PRODUCTION_OPS_SRE_2026-04-24.md`
-- **Pass condition** Service topology, deployment path, backup path, and restore path are explicit and credible.
+| Priorytet | Audyt | Status |
+|-----------|-------|--------|
+| P0.5 | AUDIT-14: Configuration / Reproducibility | **READY_NOW** |
+| P0.6 | AUDIT-07: Execution / Paper Fill Integrity | **READY_NOW** |
 
-### 4. Backtest / Replay / Research Lab Audit
+**Tier 3 — po zebraniu evidence z Tier 2:**
 
-- **Why now** It is safe to audit methodology before `MODELING-V1` and before any new optimization work is trusted.
-- **Read-only** Yes.
-- **Needs production access** No.
-- **Effort** Large.
-- **Deliverable** `docs/audits/AUDIT_BACKTEST_REPLAY_RESEARCH_LAB_2026-04-24.md`
-- **Pass condition** No lookahead blocker and no unexplained replay / methodology contract gap.
+| Priorytet | Audyt | Status |
+|-----------|-------|--------|
+| P0.7 | AUDIT-08: Trade Lifecycle / PnL Accounting | **READY_NOW** |
+| P0.8 | AUDIT-09: Backtest / Research Lab | **READY_NOW** |
 
-### 5. Security / Secrets / Exchange Safety Audit
+**Pozostałe (Phase 0, lower priority):**
 
-- **Why now** It is fully read-only and must be closed before any future live-readiness decision.
-- **Read-only** Yes.
-- **Needs production access** No.
-- **Effort** Small.
-- **Deliverable** `docs/audits/AUDIT_SECURITY_SECRETS_EXCHANGE_SAFETY_2026-04-24.md`
-- **Pass condition** No material secret-handling or exchange-safety gap.
+| Priorytet | Audyt | Status |
+|-----------|-------|--------|
+| P0.9 | AUDIT-06: Risk Engine (code review tylko) | **READY_NOW** |
+| P0.10 | AUDIT-15: Testing / CI / Quality Gates | **READY_NOW** |
+| P0.11 | AUDIT-18: Documentation / Agent Workflow | **READY_NOW** |
 
 ---
 
-## STATUS GATES
+### 🟡 Phase 1 — Po 200+ Market Truth Cycles (Gate A)
 
-### Gate A — Market Truth Accepted
-
-- **Pass when** `200+` cycles exist, timing/freshness are acceptable, and Market Truth plus FeatureEngine audits have no critical blocker.
-- **If pass** Accept `market-truth-v3` as source-of-truth baseline and unblock `MODELING-V1`.
-- **If fail** Fix source-of-truth gaps and repeat validation.
-
-### Gate B — MODELING-V1 Unblocked
-
-- **Pass when** Gate A passes and a clean labeled signal dataset exists from trusted production truth.
-- **If pass** Start modeling work from the accepted dataset only.
-- **If fail** Keep modeling blocked and resolve label / funnel / config-lineage ambiguity.
-
-### Gate C — Research Lab Trusted
-
-- **Pass when** replay, walk-forward, and experiment-lineage audits show that research outputs are methodologically trustworthy.
-- **If pass** Research optimization can be treated as decision-supporting evidence.
-- **If fail** Research remains advisory only and cannot drive promotion decisions.
-
-### Gate D — Live Readiness Candidate
-
-- **Pass when** execution, accounting, risk, security, ops, and recovery audits all close without critical blockers.
-- **If pass** Approve minimal live-readiness candidate review.
-- **If fail** Stay in paper / validation mode.
+| Priorytet | Audyt |
+|-----------|-------|
+| P1.1 | AUDIT-01: Market Truth final validation |
+| P1.2 | AUDIT-02: FeatureEngine drift validation |
+| P1.3 | AUDIT-04: Regime Engine distribution analysis |
+| P1.4 | Merge decision dla `market-truth-v3` |
 
 ---
 
-## RECOMMENDATIONS
+### 🟵 Phase 2 — Modeling Unlock (Gate B)
 
-### What to do now
-
-- **Run the first five audits** in parallel where they are independent.
-- **Keep all work read-only** during the 200-cycle window.
-- **Prepare query packs and offline worksheets** for Gate A as data accumulates.
-- **Document every finding as PASS / PARTIAL / FAIL** with explicit evidence and open questions.
-
-### What not to do now
-
-- **Do not change runtime behavior** in signal, governance, risk, execution, or market-data paths.
-- **Do not restart the bot** unless there is a critical operational reason.
-- **Do not mix validation with tuning** or promotion work.
-- **Do not treat research outputs as trusted** until Gate C.
+| Priorytet | Audyt |
+|-----------|-------|
+| P2.1 | AUDIT-03: Signal Modeling / Stage-1 |
+| P2.2 | `uptrend_continuation_weak` signal deep-dive |
+| P2.3 | Rejected vs accepted signal dataset |
+| P2.4 | Near-miss candidate analysis |
+| P2.5 | Regime-specific signal behavior analysis |
 
 ---
 
-## CONCLUSION
+### 🟣 Phase 3 — Research / Optimization (Gate C)
 
-This roadmap defines the full quant-grade audit surface of the bot, the correct phase order, the evidence required per audit, the first five safe audits to run now, and the decision gates that separate Market Truth validation, modeling unlock, research trust, and live readiness.
-
-**Expected completion:** 2026-04-26 (initial validation window plus immediate read-only audits)  
-**Gate A decision target:** Market Truth accepted → unblock `MODELING-V1`  
-**Final goal:** Gate D passed → minimal live-readiness candidate
+| Priorytet | Audyt |
+|-----------|-------|
+| P3.1 | AUDIT-09: Backtest parity (full) |
+| P3.2 | Walk-forward methodology validation |
+| P3.3 | Optuna hyperparameter audit |
+| P3.4 | AUDIT-10: Experiment Management (full) |
+| P3.5 | Autoresearch readiness review |
 
 ---
 
-**Roadmap prepared for:** `market-truth-v3` validation window
+### 🔴 Phase 4 — Live Readiness (Gate D)
+
+| Priorytet | Audyt |
+|-----------|-------|
+| P4.1 | AUDIT-16: Live Readiness (pełny checklist) |
+| P4.2 | Risk hardening final review |
+| P4.3 | Exchange failure handling |
+| P4.4 | Kill-switch end-to-end test |
+| P4.5 | Security / API key policy final |
+| P4.6 | Production incident playbook |
+
+---
+
+## CZĘŚĆ 4 — SPEC PIERWSZYCH 5 AUDYTÓW (READY_NOW)
+
+---
+
+## AUDIT-07 — EXECUTION / PAPER FILL INTEGRITY
+
+**Status:** READY_NOW
+
+**Primary question:**  
+Czy paper broker symuluje realistyczne fills — czy zakłada instant execution bez slippage i tym samym zawyża wyniki?
+
+**Scope:**  
+Analiza logów execution z aktualnych cykli, porównanie timestamp sygnału do timestamp fill, analiza rozpiętości cen w momencie fill, identyfikacja czy fill ceny są inside bid/ask czy na midprice.
+
+**Out of scope:**  
+Nie wolno zmieniać logiki paper brokera — to jest read-only analiza.
+
+**Evidence required:**  
+- Logi execution: signal timestamp, fill timestamp, fill price, market price at fill
+- SQL: `SELECT signal_ts, fill_ts, fill_price, side, qty FROM executions ORDER BY signal_ts DESC`
+- Spread data z tego samego timestamp co fill
+
+**Files to inspect:**  
+```
+execution*.py
+paper_broker*.py
+logs/execution/
+db/tables/executions (schema + sample rows)
+tests/test_execution*.py
+```
+
+**Read-only now?** YES
+
+**Acceptance criteria:**  
+- **DONE:** Fill timestamps within acceptable latency, fill prices realistic vs spread, no instant fill at better-than-market prices
+- **PARTIAL:** Niektóre fills podejrzane, ale pattern niezrozumiały — wymaga dalszej analizy
+- **FAIL:** Fills systematically at mid-price ignoring spread / zero latency — paper PnL zawyżony
+
+**Expected output:**  
+`docs/audits/AUDIT_EXECUTION_PAPER_FILL_INTEGRITY_2026-04-24.md`  
++ `artifacts/execution_fill_audit.csv`
+
+---
+
+## AUDIT-08 — TRADE LIFECYCLE / PnL ACCOUNTING
+
+**Status:** READY_NOW
+
+**Primary question:**  
+Czy każda transakcja jest kompletnie zaksięgowana — otwarcie, zamknięcie, prowizja, funding fee — i czy PnL jest poprawnie obliczany bez double-counting?
+
+**Scope:**  
+Reconciliation wszystkich trades: open/close integrity, PnL waterfall, commission accounting, funding fee inclusion, unclosed position detection.
+
+**Out of scope:**  
+Nie wolno edytować DB ani korygować rekordów. Tylko read i raport.
+
+**Evidence required:**  
+```sql
+-- Unclosed positions check
+SELECT * FROM trades WHERE close_ts IS NULL AND open_ts < NOW() - INTERVAL '24 hours';
+
+-- PnL reconciliation
+SELECT trade_id, (close_price - open_price) * qty * direction AS raw_pnl, 
+       commission_paid, funding_paid, realized_pnl 
+FROM trades WHERE close_ts IS NOT NULL;
+
+-- Funding fee coverage
+SELECT COUNT(*) FROM trades WHERE funding_paid IS NULL AND close_ts IS NOT NULL;
+```
+
+**Files to inspect:**  
+```
+pnl*.py
+trade_lifecycle*.py
+db/trades/ (schema)
+reports/daily_pnl*
+logs/trades/
+```
+
+**Read-only now?** YES (read replica lub SELECT-only session)
+
+**Acceptance criteria:**  
+- **DONE:** 0 unclosed trades starszych niż 24h, PnL match ±0.01%, funding fees included
+- **PARTIAL:** <5 anomalii, wytłumaczalne technicznie
+- **FAIL:** Systematyczny błąd accounting, unclosed positions, funding fee missing mass
+
+**Expected output:**  
+`docs/audits/AUDIT_TRADE_LIFECYCLE_PNL_ACCOUNTING_2026-04-24.md`  
++ `artifacts/pnl_reconciliation.csv`
+
+---
+
+## AUDIT-12 — PRODUCTION OPS / SRE
+
+**Status:** READY_NOW
+
+**Primary question:**  
+Czy bot działa stabilnie, auto-restartuje się poprawnie i czy istnieje kompletny runbook dla operatora?
+
+**Scope:**  
+Analiza uptime logów, konfiguracji process manager (systemd/supervisord/PM2), healthcheck endpoints, restart policy, alert coverage dla crash event.
+
+**Out of scope:**  
+Nie wolno restartować bota ani zmieniać systemd unit files.
+
+**Evidence required:**  
+- `journalctl -u btc-bot --since "30 days ago"` (read-only SSH)
+- Process manager config file
+- Uptime / crash history
+- Alert routing config (PagerDuty/Slack webhook)
+- Runbook dokument (jeśli istnieje)
+
+**Files to inspect:**  
+```
+ops/
+systemd/*.service lub supervisord.conf lub pm2.config.js
+recovery.py
+scripts/healthcheck*.sh
+docs/ops/runbook*.md
+monitoring/alerts/
+```
+
+**Read-only now?** YES (wymaga SSH read-only na prod)
+
+**Acceptance criteria:**  
+- **DONE:** Auto-restart działa, runbook istnieje i jest aktualny, alert na crash działa, healthcheck endpoint odpowiada
+- **PARTIAL:** Auto-restart OK, ale brak runbooka lub brak alertu
+- **FAIL:** Brak auto-restart, brak alertu, bot mógł być down bez wiedzy
+
+**Expected output:**  
+`docs/audits/AUDIT_PRODUCTION_OPS_SRE_2026-04-24.md`  
++ ops_gap_list.md
+
+---
+
+## AUDIT-09 — BACKTEST / RESEARCH LAB
+
+**Status:** READY_NOW
+
+**Primary question:**  
+Czy backtest engine jest metodologicznie sound — brak lookahead, realistyczny model kosztów, separacja train/test — i czy wyniki można zaufać jako bazę dla Modeling-V1?
+
+**Scope:**  
+Code review backtest_runner.py, cost/slippage/funding model, walk-forward setup, data split configuration, replay vs live comparison (read-only).
+
+**Out of scope:**  
+Nie wolno uruchamiać nowych backtest runs z nowymi parametrami — tylko analiza istniejącego kodu i wyników.
+
+**Evidence required:**  
+- `backtest_runner.py` — szukaj: forward-looking funkcji w features, `.shift(-N)` patterns, czy test set jest "unseen"
+- Cost model config — czy prowizja, slippage i funding fee są uwzględnione
+- Walk-forward config — czy istnieje i jest poprawny
+- Stare wyniki backtest — czy są archiwizowane z wersją kodu?
+
+**Files to inspect:**  
+```
+backtest_runner.py
+research/
+notebooks/*.ipynb
+backtest/config/*.yaml
+replay*.py
+docs/research/methodology*.md
+```
+
+**Read-only now?** YES
+
+**Acceptance criteria:**  
+- **DONE:** Brak lookahead, cost model kompletny, walk-forward zdefiniowany, wyniki archiwizowane z hash commitu
+- **PARTIAL:** Drobne metodologiczne luki, ale nie dyskwalifikujące
+- **FAIL:** Lookahead wykryty, brak cost model, overfitted in-sample results
+
+**Expected output:**  
+`docs/audits/AUDIT_BACKTEST_RESEARCH_LAB_2026-04-24.md`  
++ backtest_methodology_checklist.md
+
+---
+
+## AUDIT-13 — SECURITY / SECRETS / EXCHANGE SAFETY
+
+**Status:** READY_NOW — KRYTYCZNY
+
+**Primary question:**  
+Czy klucze API giełdy mają minimalne uprawnienia, nie ma secretów w repo, withdrawal jest wyłączone i istnieje kill-switch?
+
+**Scope:**  
+Git history scan na sekrety, analiza uprawnień API key, konfiguracja IP whitelist, withdrawal disabled check, kill-switch existence.
+
+**Out of scope:**  
+Nie wolno rotować kluczy podczas zbierania cykli (chyba że wykryty leak — wtedy priorytet bezpieczeństwa).
+
+**Evidence required:**  
+```bash
+# Git secret scan (lokalnie/offline)
+git log --all --full-history -- "**/.env*" 
+trufflehog git file://. --only-verified
+# lub: gitleaks detect --source .
+
+# API key permissions (read-only API call)
+# Sprawdzić: trading=YES, withdrawal=NO, IP restriction=YES
+```
+
+**Files to inspect:**  
+```
+.env (lokalna kopia, nie commit)
+.gitignore (czy .env jest ignorowane)
+.git/logs/ (git history na wycieki)
+exchange_client*.py (jak są ładowane klucze)
+config/api_config*.py
+docs/security/
+```
+
+**Read-only now?** YES (git scan offline, API permission check read-only)
+
+**Acceptance criteria:**  
+- **DONE:** 0 secretów w git history, withdrawal disabled, IP whitelist aktywna, kill-switch istnieje
+- **PARTIAL:** IP whitelist brak, ale withdrawal disabled i brak w git
+- **FAIL:** Secret w git history, withdrawal enabled, brak kill-switch
+
+**Expected output:**  
+`docs/audits/AUDIT_SECURITY_SECRETS_EXCHANGE_SAFETY_2026-04-24.md`  
+⚠️ Jeśli FAIL — immediate remediation plan niezależnie od 200-cycle freeze
+
+---
+
+## CZĘŚĆ 5 — STATUS GATES
+
+### 🟢 Gate A — Market Truth Accepted
+
+**Warunki wejścia:**
+
+| Kryterium | Wymagany status |
+|-----------|----------------|
+| 200+ cycles collected | PASS |
+| Drift report (feature stability) | PASS |
+| Timing/staleness report | PASS lub DOCUMENTED |
+| No critical source-of-truth gaps | CONFIRMED |
+| AUDIT-01 Market Truth final | DONE lub PARTIAL (z akceptacją) |
+
+**Decyzja:** Merge `market-truth-v3` do main — odblokowanie Gate B
+
+---
+
+### 🟵 Gate B — Modeling-V1 Unblocked
+
+**Warunki wejścia:**
+
+| Kryterium | Wymagany status |
+|-----------|----------------|
+| Gate A | PASSED |
+| AUDIT-02 FeatureEngine | DONE |
+| Modeling dataset export spec | READY |
+| Rejected/candidate signal labels | AVAILABLE |
+| No known feature integrity blocker | CONFIRMED |
+
+**Decyzja:** Uruchomienie MODELING-V1 pipeline
+
+---
+
+### 🟣 Gate C — Research Lab Trusted
+
+**Warunki wejścia:**
+
+| Kryterium | Wymagany status |
+|-----------|----------------|
+| Gate B | PASSED |
+| AUDIT-09 Backtest (full) | DONE |
+| No lookahead leakage | CONFIRMED |
+| Walk-forward methodology | ACCEPTED |
+| Cost/slippage/funding model | DOCUMENTED |
+
+**Decyzja:** Wyniki backtestów można użyć jako podstawy decyzji o strategii
+
+---
+
+### 🔴 Gate D — Live Readiness Candidate
+
+**Warunki wejścia:**
+
+| Kryterium | Wymagany status |
+|-----------|----------------|
+| Gate C | PASSED |
+| AUDIT-07 Paper fill parity | DONE |
+| AUDIT-08 PnL Accounting | DONE |
+| AUDIT-06 Risk Engine | DONE |
+| AUDIT-12 Ops / SRE | DONE |
+| AUDIT-13 Security | DONE |
+| AUDIT-19 Recovery / Safe Mode | DONE |
+| Kill-switch | TESTED |
+| Exchange failure handling | TESTED |
+| Production incident playbook | EXISTS |
+
+**Decyzja:** Zielone światło dla przejścia PAPER → LIVE (z osobną decyzją o kapitale)
+
+---
+
+## CZĘŚĆ 6 — PHASE 0 TIER 1 — PIERWSZE 4 AUDYTY (START NATYCHMIAST)
+
+| # | Audyt | Dlaczego teraz | Read-only | SSH prod | Effort | Deliverable | Blokuje |
+|---|-------|---------------|-----------|----------|--------|-------------|---------|
+| 1 | Security / Secrets / Exchange Safety | Leak API key lub withdrawal enabled = ryzyko finansowe niezależnie od fazy. Zerowy koszt, maksymalny ROI. | YES | NIE (git scan lokalnie) | **S** | `docs/audits/AUDIT_SECURITY_SECRETS_EXCHANGE_SAFETY_2026-04-24.md` | Wszystkie fazy |
+| 2 | Production Ops / SRE | Bot musi zebrać 200 cykli bez przerwy — auto-restart i alert muszą działać zanim dojdzie do incydentu. | YES | TAK (journalctl) | **S** | `docs/audits/AUDIT_PRODUCTION_OPS_SRE_2026-04-24.md` | Live Readiness |
+| 3 | Observability / Dashboard | Bez monitoringu blind spot na cały czas walidacji. Audyt jest read-only i nie wymaga SSH. | YES | NIE | **S** | `docs/audits/AUDIT_OBSERVABILITY_DASHBOARD_2026-04-24.md` | Live Readiness |
+| 4 | **Recovery / Safe Mode / State Reconciliation** | Historia incydentów: sticky safe_mode, phantom position, restart recovery. Dotyczy zaufania do produkcji, nie wymaga 200 cykli. | YES | TAK (logi startowe) | **M** | `docs/audits/AUDIT_RECOVERY_SAFE_MODE_STATE_RECONCILIATION_2026-04-24.md` | Live Readiness + Gate D |
+
+---
+
+## CZĘŚĆ 7 — REKOMENDACJE
+
+### ✅ CO ROBIĆ TERAZ
+
+**Tier 1 — start natychmiast:**
+1. **Uruchom AUDIT-13 (Security) jako pierwsze** — jeśli jest leak secretu, remediation jest priorytetem absolutnym, niezależnie od freeze.
+2. **Uruchom AUDIT-12 (Ops/SRE)** — bot musi zebrać 200 cykli bez przerwy; auto-restart i alert muszą działać.
+3. **Uruchom AUDIT-11 (Observability)** — bez dashboardu jesteś ślepy przez cały czas walidacji.
+4. **Uruchom AUDIT-19 (Recovery / Safe Mode)** — historia incydentów sticky safe_mode i phantom position wymaga osobnego audytu zaufania.
+
+**Tier 2 — po starcie Tier 1:**
+
+5. **AUDIT-14 (Configuration / Reproducibility)** — zweryfikuj deterministyczność przed Gate A.
+6. **AUDIT-07 (Execution Fill Integrity)** — buduj baseline paper-vs-live expectations.
+
+**Tier 3 — po zebraniu evidence:**
+
+7. **AUDIT-08 (PnL Accounting)** — SELECT-only query na DB, 0 ryzyka, dużo wartości.
+8. **AUDIT-09 (Backtest)** — code review + methodology doc, gotowość na Gate B.
+
+### ❌ CZEGO NIE ROBIĆ TERAZ
+
+- ❌ Nie zmieniaj `SignalEngine`, `RiskEngine`, `GovernanceLayer`, `ExecutionEngine`
+- ❌ Nie restartuj bota bez krytycznej potrzeby
+- ❌ Nie uruchamiaj nowych backtest runs z nowymi parametrami
+- ❌ Nie rozpoczynaj MODELING-V1 przed Gate A
+- ❌ Nie merguj żadnego branch do main przed Gate A
+- ❌ Nie zmieniaj schemy DB produkcyjnej
+- ❌ Nie wprowadzaj nowych dependencies do runtime
+
+---
+
+## APPENDIX — QUICK REFERENCE
+
+### Legenda statusów
+
+| Status | Znaczenie |
+|--------|-----------|
+| `READY_NOW` | Można zacząć natychmiast, read-only |
+| `WAIT_FOR_200_CYCLES` | Blokowane przez Gate A |
+| `BLOCKED` | Zależy od wcześniejszego gate |
+| `TODO` | Zaplanowane, jeszcze nie priorytetyzowane |
+
+### Legenda Effort
+
+| Effort | Szacunkowy czas |
+|--------|----------------|
+| **S** | 2–4h |
+| **M** | 1–2 dni |
+| **L** | 3–5 dni |
+
+---
+
+*Dokument wygenerowany: 2026-04-24*  
+*Patch v1.1 — 2026-04-24: dodano AUDIT-19, zaktualizowano Phase 0 Tier sequencing, ujednolicono nazwy artefaktów*  
+*Branch: `market-truth-v3`*  
+*Następna rewizja: Roadmap V2 po Gate A (200+ cykli zebranych)*
