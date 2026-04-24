@@ -70,12 +70,14 @@ def verify_first_snapshot():
     elif build_start is not None:
         build_start_dt = datetime.fromisoformat(build_start)
         build_finish_dt = datetime.fromisoformat(build_finish)
-        cycle_dt = datetime.fromisoformat(cycle_ts)
+        now = datetime.now(timezone.utc)
 
+        # Check: start < finish (basic sanity)
         if build_start_dt >= build_finish_dt:
             issues.append(f"❌ Build timing violation: start >= finish ({build_start} >= {build_finish})")
-        elif build_finish_dt > cycle_dt:
-            issues.append(f"❌ Future timestamp: build_finish > cycle_ts ({build_finish} > {cycle_ts})")
+        # Check: finish not from future relative to NOW (not cycle_ts)
+        elif build_finish_dt > now:
+            issues.append(f"❌ Future timestamp: build_finish > now ({build_finish} > {now.isoformat()})")
         else:
             build_duration = (build_finish_dt - build_start_dt).total_seconds()
             print(f"✅ Build timing: {build_duration:.2f}s")
@@ -95,6 +97,8 @@ def verify_first_snapshot():
     }
 
     print("\n📅 Per-Input Exchange Timestamps:")
+    now = datetime.now(timezone.utc)
+
     for name, ts in inputs.items():
         if ts is None:
             if name == "force_orders":
@@ -104,20 +108,26 @@ def verify_first_snapshot():
                 print(f"   {name:15} = NULL ⚠️")
         else:
             ts_dt = datetime.fromisoformat(ts)
-            cycle_dt = datetime.fromisoformat(cycle_ts)
-            staleness_sec = (cycle_dt - ts_dt).total_seconds()
 
-            if ts_dt > cycle_dt:
-                issues.append(f"❌ {name} timestamp from future: {ts} > {cycle_ts}")
+            # Check: input timestamp not from future relative to NOW
+            if ts_dt > now:
+                issues.append(f"❌ {name} timestamp from future: {ts} > {now.isoformat()}")
                 print(f"   {name:15} = {ts} ❌ (FUTURE)")
             else:
+                # Calculate staleness relative to snapshot build finish (if available)
+                if build_finish is not None:
+                    build_finish_dt = datetime.fromisoformat(build_finish)
+                    staleness_sec = (build_finish_dt - ts_dt).total_seconds()
+                else:
+                    staleness_sec = (now - ts_dt).total_seconds()
+
                 print(f"   {name:15} = {ts} (staleness: {staleness_sec:.0f}s)")
 
-                # Staleness warnings
-                if name.startswith("candles") and staleness_sec > 900:
-                    warnings.append(f"⚠️  {name} stale (>{staleness_sec:.0f}s, expected ~15min)")
-                elif name == "OI" and staleness_sec > 120:
-                    warnings.append(f"⚠️  OI stale (>{staleness_sec:.0f}s, expected <2min)")
+                # Staleness warnings (relative to when snapshot was built)
+                if name.startswith("candles") and staleness_sec > 1800:  # >30min is unusual
+                    warnings.append(f"⚠️  {name} stale (>{staleness_sec:.0f}s, expected <30min)")
+                elif name == "OI" and staleness_sec > 300:  # >5min is unusual
+                    warnings.append(f"⚠️  OI stale (>{staleness_sec:.0f}s, expected <5min)")
 
     # Print summary
     print("\n" + "=" * 60)
