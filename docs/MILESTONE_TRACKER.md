@@ -23,16 +23,58 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**QUANT-GRADE-AUDIT-PHASE-0-TIER-2** — CONFIGURATION & EXECUTION INTEGRITY AUDIT (branch: `market-truth-v3`)
+**PHASE-0-COMPLETE** — CONSOLIDATED REMEDIATION PLANNING (branch: `market-truth-v3`)
+
+**Date:** 2026-04-24  
+**Auditor:** Claude Code  
+**Builder:** TBD (pending user decision on remediation order)
+
+**Status:** ✅ ALL PHASE 0 AUDITS COMPLETE (8 audits across Tiers 1-3)  
+**Next:** Consolidated remediation plan with prioritized fix order
+
+**Phase 0 Summary:**
+- **Tier 1 (Security & Ops):** 4 audits complete — identified critical dashboard exposure
+- **Tier 2 (Config & Execution):** 2 audits complete — identified config incompleteness and paper execution gaps
+- **Tier 3 (PnL & Research Lab):** 2 audits complete — identified funding fee gap and methodology strengths
+
+**Critical findings requiring remediation:**
+1. 🔴 Public dashboard exposure (unauthenticated control endpoints on 0.0.0.0:8080)
+2. 🔴 Funding fees NOT tracked anywhere (no schema, no backtest, no paper runtime)
+3. 🟠 Paper execution unrealistic (zero fees, snapshot price, no spread, no partial fills)
+4. 🟠 Config reproducibility incomplete (config_hash missing 50%+ of runtime surface)
+5. 🟠 Production service drift (units differ from repo)
+6. 🟠 No dependency lock (no lockfile, no `.python-version`)
+
+**See:** `docs/audits/PHASE_0_CONSOLIDATED_FINDINGS.md` (to be created during remediation planning)
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-3
+
+**Date:** 2026-04-24  
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
+
+**Audit reports:**
+- `AUDIT-08: Trade Lifecycle / PnL Accounting` — Verdict: MVP_DONE (PnL math correct, funding fees NOT tracked, paper runtime zero fees)
+- `AUDIT-09: Backtest / Research Lab` — Verdict: MVP_DONE (methodology production-grade, no lookahead, funding fees NOT simulated)
+
+**Key Tier 3 findings:**
+- PnL calculation mathematically correct (raw_pnl matches pnl_abs exactly when fees=0)
+- Zero unclosed positions >24h (trade lifecycle complete)
+- **Funding fees NOT tracked:** no `funding_paid` column in schema, not simulated in backtest, not tracked in paper runtime
+- **Backtest-paper fee parity broken:** backtest charges 0.04% fees, paper charges 0% fees
+- Research lab methodology production-grade: no lookahead, comprehensive governance, approval gates
+- Walk-forward validation sound (post-hoc and nested modes supported)
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-2
 
 **Date:** 2026-04-24  
 **Active builder:** Cascade  
-**Auditor:** Claude Code
-
-**What:** Phase 0 Tier 2 read-only audits — Configuration/Reproducibility, Execution/Paper Fill Integrity
-
-**Status:** ✅ DELIVERED (audit reports committed + pushed)  
-**Verdict:** DONE (both audits complete, high-quality evidence collection)
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
 
 **Audit reports:**
 - `AUDIT-14: Configuration / Reproducibility` — Verdict: MVP_DONE (config tracked but incomplete, production drift, no lockfile)
@@ -45,8 +87,6 @@ Last updated: 2026-04-24
 - No `.python-version` (CI uses 3.11, local audit used 3.13.1)
 - Paper execution unrealistic: snapshot price, zero fees, no spread model, no partial fills
 - Executions not linked to market_snapshots (spread-at-fill not reconstructable)
-
-**Next:** Phase 0 Tier 3 audits OR consolidated remediation planning
 
 ---
 
