@@ -23,6 +23,7 @@ from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
 from settings import AppSettings, build_signal_regime_direction_whitelist, load_settings
+from storage.repositories import fetch_funding_rates
 
 
 @dataclass(slots=True)
@@ -72,6 +73,7 @@ class _OpenPositionRecord:
     initial_stop_loss: float
     atr_15m: float
     total_fees: float = 0.0
+    funding_paid: float = 0.0
     realized_pnl_abs_gross: float = 0.0
     closed_qty: float = 0.0
     exit_notional_sum: float = 0.0
@@ -79,6 +81,7 @@ class _OpenPositionRecord:
     trailing_stop: float | None = None
     highest_high_since_partial: float | None = None
     lowest_low_since_partial: float | None = None
+    last_funding_accrual_at: datetime | None = None
     slippage_samples: list[float] = field(default_factory=list)
     candles_path: list[dict[str, Any]] = field(default_factory=list)
 
@@ -144,6 +147,7 @@ class BacktestRunner:
                 fee_rate_taker=config.fee_rate_taker,
             )
         )
+        funding_samples = fetch_funding_rates(self.connection, symbol=symbol)
         feature_engine, regime_engine, signal_engine, governance, risk_engine = self._build_engines()
 
         open_positions: list[_OpenPositionRecord] = []
@@ -178,6 +182,7 @@ class BacktestRunner:
                 closed_records=closed_records,
                 closed_pnl_events=closed_pnl_events,
                 fill_model=fill_model,
+                funding_samples=funding_samples,
                 risk_engine=risk_engine,
             )
             self._runtime = self._compute_runtime_state(
@@ -230,6 +235,7 @@ class BacktestRunner:
                 closed_records=closed_records,
                 closed_pnl_events=closed_pnl_events,
                 fill_model=fill_model,
+                funding_samples=funding_samples,
                 risk_engine=risk_engine,
             )
             equity_curve.append((last_snapshot_ts, equity))
@@ -402,6 +408,8 @@ class BacktestRunner:
             initial_stop_loss=executable.stop_loss,
             atr_15m=max(atr_15m, 0.0),
             total_fees=entry_fill.fee_paid,
+            funding_paid=0.0,
+            last_funding_accrual_at=now,
             slippage_samples=[entry_fill.slippage_bps],
         )
 
@@ -413,6 +421,7 @@ class BacktestRunner:
         closed_records: list[_ClosedTradeRecord],
         closed_pnl_events: list[tuple[datetime, float]],
         fill_model: FillModel,
+        funding_samples: list[dict[str, Any]],
         risk_engine: RiskEngine,
     ) -> float:
         if not open_positions:
@@ -438,6 +447,12 @@ class BacktestRunner:
         remaining: list[_OpenPositionRecord] = []
         equity_delta = 0.0
         for record in open_positions:
+            self._accrue_funding(
+                record=record,
+                funding_samples=funding_samples,
+                accrued_until=snapshot.timestamp,
+                fill_model=fill_model,
+            )
             _append_candle(record.candles_path, latest_candle)
             self._update_trailing_stop(
                 record=record,
@@ -517,7 +532,7 @@ class BacktestRunner:
             )
             total_gross_pnl_abs = record.realized_pnl_abs_gross + settlement.pnl_abs
             fees_total = record.total_fees + exit_fill.fee_paid
-            pnl_abs_net = total_gross_pnl_abs - fees_total
+            pnl_abs_net = total_gross_pnl_abs - fees_total - record.funding_paid
             total_closed_qty = record.closed_qty + closing_position.size
             total_exit_notional = record.exit_notional_sum + (settlement.exit_price * closing_position.size)
             effective_exit_price = total_exit_notional / max(total_closed_qty, 1e-8)
@@ -554,6 +569,7 @@ class BacktestRunner:
                 mae=final_metrics.mae,
                 mfe=final_metrics.mfe,
                 exit_reason=final_metrics.exit_reason,
+                funding_paid=record.funding_paid,
                 features_at_entry_json=record.candidate.features_json,
             )
             closed_position = replace(
@@ -613,6 +629,7 @@ class BacktestRunner:
         closed_records: list[_ClosedTradeRecord],
         closed_pnl_events: list[tuple[datetime, float]],
         fill_model: FillModel,
+        funding_samples: list[dict[str, Any]],
         risk_engine: RiskEngine,
     ) -> float:
         synthetic_snapshot = {
@@ -625,6 +642,12 @@ class BacktestRunner:
         }
         equity_delta = 0.0
         for record in list(open_positions):
+            self._accrue_funding(
+                record=record,
+                funding_samples=funding_samples,
+                accrued_until=now,
+                fill_model=fill_model,
+            )
             _append_candle(record.candles_path, synthetic_snapshot)
             close_side = "SELL" if record.position.direction == "LONG" else "BUY"
             exit_fill = fill_model.simulate(
@@ -642,7 +665,7 @@ class BacktestRunner:
             )
             total_gross_pnl_abs = record.realized_pnl_abs_gross + settlement.pnl_abs
             fees_total = record.total_fees + exit_fill.fee_paid
-            pnl_abs_net = total_gross_pnl_abs - fees_total
+            pnl_abs_net = total_gross_pnl_abs - fees_total - record.funding_paid
             total_closed_qty = record.closed_qty + closing_position.size
             total_exit_notional = record.exit_notional_sum + (settlement.exit_price * closing_position.size)
             effective_exit_price = total_exit_notional / max(total_closed_qty, 1e-8)
@@ -679,6 +702,7 @@ class BacktestRunner:
                 mae=final_metrics.mae,
                 mfe=final_metrics.mfe,
                 exit_reason=final_metrics.exit_reason,
+                funding_paid=record.funding_paid,
                 features_at_entry_json=record.candidate.features_json,
             )
             closed_position = replace(
@@ -702,6 +726,33 @@ class BacktestRunner:
 
         open_positions.clear()
         return equity_delta
+
+    @staticmethod
+    def _accrue_funding(
+        *,
+        record: _OpenPositionRecord,
+        funding_samples: list[dict[str, Any]],
+        accrued_until: datetime,
+        fill_model: FillModel,
+    ) -> None:
+        last_accrual_at = record.last_funding_accrual_at or record.position.opened_at
+        accrued_until_utc = _to_utc(accrued_until)
+        if accrued_until_utc <= _to_utc(last_accrual_at):
+            return
+
+        notional = max(record.position.entry_price * record.position.size, 0.0)
+        if notional <= 0.0:
+            record.last_funding_accrual_at = accrued_until_utc
+            return
+
+        record.funding_paid += fill_model.calculate_funding(
+            direction=record.position.direction,
+            notional=notional,
+            opened_at=last_accrual_at,
+            closed_at=accrued_until_utc,
+            funding_samples=funding_samples,
+        )
+        record.last_funding_accrual_at = accrued_until_utc
 
     def _compute_runtime_state(
         self,
@@ -819,9 +870,10 @@ class BacktestRunner:
                 """
                 INSERT OR REPLACE INTO trade_log (
                     trade_id, signal_id, position_id, opened_at, closed_at, direction, regime,
-                    confluence_score, entry_price, exit_price, size, fees_total, slippage_bps_avg,
-                    pnl_abs, pnl_r, mae, mfe, exit_reason, features_at_entry_json, schema_version, config_hash
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    confluence_score, entry_price, exit_price, size, fees_total, funding_paid,
+                    slippage_bps_avg, pnl_abs, pnl_r, mae, mfe, exit_reason, features_at_entry_json,
+                    schema_version, config_hash
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     trade.trade_id,
@@ -836,6 +888,7 @@ class BacktestRunner:
                     trade.exit_price,
                     trade.size,
                     trade.fees,
+                    trade.funding_paid,
                     trade.slippage_bps,
                     trade.pnl_abs,
                     trade.pnl_r,

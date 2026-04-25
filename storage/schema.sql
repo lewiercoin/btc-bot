@@ -143,6 +143,7 @@ CREATE TABLE IF NOT EXISTS trade_log (
     exit_price REAL,
     size REAL NOT NULL,
     fees_total REAL NOT NULL DEFAULT 0,
+    funding_paid REAL NOT NULL DEFAULT 0,
     slippage_bps_avg REAL NOT NULL DEFAULT 0,
     pnl_abs REAL NOT NULL DEFAULT 0,
     pnl_r REAL NOT NULL DEFAULT 0,

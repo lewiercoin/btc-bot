@@ -612,6 +612,37 @@ def insert_execution_fill_event(
     )
 
 
+def fetch_funding_rates(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    start_ts: datetime | None = None,
+    end_ts: datetime | None = None,
+) -> list[dict[str, Any]]:
+    table_row = conn.execute(
+        "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'funding'"
+    ).fetchone()
+    if table_row is None:
+        return []
+
+    query = """
+        SELECT symbol, funding_time, funding_rate
+        FROM funding
+        WHERE symbol = ?
+    """
+    params: list[Any] = [symbol.upper()]
+    if start_ts is not None:
+        query += " AND funding_time > ?"
+        params.append(start_ts.astimezone(timezone.utc).isoformat())
+    if end_ts is not None:
+        query += " AND funding_time <= ?"
+        params.append(end_ts.astimezone(timezone.utc).isoformat())
+    query += " ORDER BY funding_time ASC"
+
+    rows = conn.execute(query, tuple(params)).fetchall()
+    return [dict(row) for row in rows]
+
+
 def fetch_open_trade_positions(conn: sqlite3.Connection) -> list[dict]:
     rows = conn.execute(
         """
@@ -660,9 +691,10 @@ def insert_trade_log_open(
         """
         INSERT OR REPLACE INTO trade_log (
             trade_id, signal_id, position_id, opened_at, closed_at, direction, regime,
-            confluence_score, entry_price, exit_price, size, fees_total, slippage_bps_avg,
-            pnl_abs, pnl_r, mae, mfe, exit_reason, features_at_entry_json, schema_version, config_hash
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            confluence_score, entry_price, exit_price, size, fees_total, funding_paid,
+            slippage_bps_avg, pnl_abs, pnl_r, mae, mfe, exit_reason, features_at_entry_json,
+            schema_version, config_hash
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             trade_id,
@@ -676,6 +708,7 @@ def insert_trade_log_open(
             entry_price,
             None,
             size,
+            0.0,
             0.0,
             0.0,
             0.0,
@@ -713,6 +746,7 @@ def update_trade_log_close(
     mae: float,
     mfe: float,
     exit_reason: str,
+    funding_paid: float = 0.0,
 ) -> None:
     conn.execute(
         """
@@ -723,7 +757,8 @@ def update_trade_log_close(
             pnl_r = ?,
             mae = ?,
             mfe = ?,
-            exit_reason = ?
+            exit_reason = ?,
+            funding_paid = ?
         WHERE trade_id = ?
           AND closed_at IS NULL
         """,
@@ -735,6 +770,7 @@ def update_trade_log_close(
             mae,
             mfe,
             exit_reason,
+            funding_paid,
             trade_id,
         ),
     )
