@@ -1,5 +1,19 @@
 # Core runtime dependencies for btc-bot v1.0.
 # Keep this list explicit and pinned during stabilization.
+#
+# Dependency management:
+# - requirements.txt: high-level dependencies with version constraints
+# - requirements.lock: lockfile with pinned transitive dependencies + SHA256 hashes
+# - .python-version: Python version pinning (3.12.3 = production)
+#
+# Install for development:
+#   pip install -r requirements.txt
+#
+# Install for production (exact reproducibility):
+#   pip install -r requirements.lock
+#
+# Update lockfile after changing requirements.txt:
+#   pip-compile requirements.txt --output-file=requirements.lock --generate-hashes --allow-unsafe
 requests>=2.32.0,<3.0.0
 websockets>=12.0,<16.0
 optuna>=3.6.0,<5.0.0
