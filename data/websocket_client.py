@@ -31,6 +31,7 @@ def _ms_to_utc(ms: int) -> datetime:
 def normalize_ws_agg_trade_event(payload: dict[str, Any]) -> dict[str, Any]:
     return {
         "symbol": str(payload["s"]).upper(),
+        "aggregate_trade_id": int(payload["a"]),
         "event_time": _ms_to_utc(int(payload["T"])),
         "price": float(payload["p"]),
         "qty": float(payload["q"]),
@@ -99,6 +100,12 @@ class BinanceFuturesWebsocketClient:
     def _build_market_stream_url(self) -> str:
         base = self.config.ws_market_base_url.rstrip("/")
         symbol = self._symbol.lower()
+        if base.endswith("/market"):
+            base = base[: -len("/market")] + "/stream"
+        elif base.endswith("/ws"):
+            base = base[: -len("/ws")] + "/stream"
+        elif not base.endswith("/stream"):
+            base = f"{base}/stream"
         return f"{base}?streams={symbol}@aggTrade/{symbol}@forceOrder"
 
     def _build_legacy_stream_url(self) -> str:

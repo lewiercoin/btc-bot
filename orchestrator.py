@@ -142,6 +142,7 @@ def build_default_bundle(
             config=MarketDataConfig(
                 candles_limit=300,
                 funding_limit=max(settings.strategy.funding_window_days * 3 + 3, 200),
+                funding_window_days=settings.strategy.funding_window_days,
                 agg_trades_limit=1000,
                 flow_coverage_ready=settings.data_quality.flow_coverage_ready,
                 flow_coverage_degraded=settings.data_quality.flow_coverage_degraded,

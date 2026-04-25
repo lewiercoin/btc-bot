@@ -119,6 +119,7 @@ def normalize_book_ticker(payload: dict[str, Any]) -> dict[str, Any]:
 def normalize_agg_trade(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
     return {
         "symbol": symbol.upper(),
+        "aggregate_trade_id": int(payload["a"]),
         "event_time": _ms_to_utc(int(payload["T"])),
         "price": float(payload["p"]),
         "qty": float(payload["q"]),
@@ -384,12 +385,15 @@ class BinanceFuturesRestClient:
         limit: int = 1000,
         start_time_ms: int | None = None,
         end_time_ms: int | None = None,
+        from_id: int | None = None,
     ) -> list[dict[str, Any]]:
         params: dict[str, Any] = {"symbol": symbol.upper(), "limit": int(limit)}
         if start_time_ms is not None:
             params["startTime"] = int(start_time_ms)
         if end_time_ms is not None:
             params["endTime"] = int(end_time_ms)
+        if from_id is not None:
+            params["fromId"] = int(from_id)
 
         payload = self._request("/fapi/v1/aggTrades", params)
         return [normalize_agg_trade(item, symbol=symbol) for item in payload]

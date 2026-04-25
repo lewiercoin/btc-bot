@@ -17,6 +17,7 @@ from storage.repositories import save_cvd_price_bar, save_oi_sample
 class MarketDataConfig:
     candles_limit: int = 300
     funding_limit: int = 200
+    funding_window_days: int = 60
     agg_trades_limit: int = 1000
     flow_coverage_ready: float = 0.90
     flow_coverage_degraded: float = 0.70
@@ -116,7 +117,7 @@ class MarketDataAssembler:
         candles_4h = self.rest_client.fetch_klines(symbol, "4h", limit=self.config.candles_limit)
         candles_4h_latency_ms = (time.perf_counter() - candles_4h_started) * 1000.0
         funding_started = time.perf_counter()
-        funding_history = self.rest_client.fetch_funding_history(symbol, limit=self.config.funding_limit)
+        funding_history = self._load_funding_window(symbol=symbol, now=now)
         funding_latency_ms = (time.perf_counter() - funding_started) * 1000.0
         oi_started = time.perf_counter()
         open_interest = self.rest_client.fetch_open_interest(symbol)
@@ -236,29 +237,29 @@ class MarketDataAssembler:
 
         if not ws_events:
             source = "rest"
-            ws_events = self.rest_client.fetch_agg_trades_window(
+            ws_events = self._load_rest_agg_trade_window(
                 symbol=symbol,
                 start_time=now - timedelta(seconds=15 * 60),
                 end_time=now,
-                limit=self.config.agg_trades_limit,
             )
 
         trades_60s = filter_events_by_window(ws_events, now=now, window_seconds=60)
         trades_15m = filter_events_by_window(ws_events, now=now, window_seconds=15 * 60)
+        limit_reached = bool(source == "rest" and len(ws_events) >= self.config.agg_trades_limit)
 
         coverage_60s = self._flow_window_metadata(
             trades_60s,
             now=now,
             window_seconds=60,
             source=source,
-            limit_reached=len(ws_events) >= self.config.agg_trades_limit,
+            limit_reached=limit_reached,
         )
         coverage_15m = self._flow_window_metadata(
             trades_15m,
             now=now,
             window_seconds=15 * 60,
             source=source,
-            limit_reached=len(ws_events) >= self.config.agg_trades_limit,
+            limit_reached=limit_reached,
         )
 
         bucket_60s = aggregate_aggtrade_bucket(
@@ -289,6 +290,115 @@ class MarketDataAssembler:
                 "aggtrade_15m": coverage_15m,
             },
         )
+
+    def _load_rest_agg_trade_window(
+        self,
+        *,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[dict[str, Any]]:
+        start_utc = start_time.astimezone(timezone.utc)
+        end_utc = end_time.astimezone(timezone.utc)
+        batch_limit = max(int(self.config.agg_trades_limit), 1)
+        seen_ids: set[int] = set()
+        all_trades: list[dict[str, Any]] = []
+
+        batch = self.rest_client.fetch_agg_trades_window(
+            symbol=symbol,
+            start_time=start_utc,
+            end_time=end_utc,
+            limit=batch_limit,
+        )
+        all_trades.extend(self._dedupe_agg_trades(batch, seen_ids))
+        if len(batch) < batch_limit:
+            return all_trades
+
+        while batch:
+            last_id = self._agg_trade_id(batch[-1])
+            if last_id is None:
+                break
+            batch = self.rest_client.fetch_agg_trades(
+                symbol=symbol,
+                from_id=last_id + 1,
+                limit=batch_limit,
+            )
+            if not batch:
+                break
+            in_window = [
+                trade
+                for trade in batch
+                if start_utc <= trade["event_time"].astimezone(timezone.utc) <= end_utc
+            ]
+            all_trades.extend(self._dedupe_agg_trades(in_window, seen_ids))
+            if len(batch) < batch_limit:
+                break
+            if batch[0]["event_time"].astimezone(timezone.utc) > end_utc:
+                break
+
+        return sorted(all_trades, key=lambda item: item["event_time"])
+
+    def _load_funding_window(self, *, symbol: str, now: datetime) -> list[dict[str, Any]]:
+        window_end = now.astimezone(timezone.utc)
+        window_start = window_end - timedelta(days=self.config.funding_window_days)
+        batch_limit = max(min(int(self.config.funding_limit), 1000), 1)
+        cursor_ms = int(window_start.timestamp() * 1000)
+        end_ms = int(window_end.timestamp() * 1000)
+        seen_times: set[str] = set()
+        rows: list[dict[str, Any]] = []
+
+        while cursor_ms <= end_ms:
+            batch = self.rest_client.fetch_funding_history(
+                symbol,
+                limit=batch_limit,
+                start_time_ms=cursor_ms,
+                end_time_ms=end_ms,
+            )
+            if not batch:
+                break
+
+            new_rows = 0
+            last_ts_ms: int | None = None
+            for row in batch:
+                funding_time = row["funding_time"].astimezone(timezone.utc)
+                key = funding_time.isoformat()
+                if key in seen_times:
+                    continue
+                seen_times.add(key)
+                rows.append(row)
+                new_rows += 1
+                last_ts_ms = int(funding_time.timestamp() * 1000)
+
+            if last_ts_ms is None or new_rows == 0 or len(batch) < batch_limit:
+                break
+            cursor_ms = last_ts_ms + 1
+
+        return sorted(rows, key=lambda item: item["funding_time"])
+
+    @staticmethod
+    def _agg_trade_id(trade: dict[str, Any]) -> int | None:
+        raw = trade.get("_exchange_raw")
+        if isinstance(raw, dict) and raw.get("a") is not None:
+            return int(raw["a"])
+        aggregate_trade_id = trade.get("aggregate_trade_id")
+        if aggregate_trade_id is None:
+            return None
+        return int(aggregate_trade_id)
+
+    def _dedupe_agg_trades(
+        self,
+        trades: Iterable[dict[str, Any]],
+        seen_ids: set[int],
+    ) -> list[dict[str, Any]]:
+        deduped: list[dict[str, Any]] = []
+        for trade in trades:
+            trade_id = self._agg_trade_id(trade)
+            if trade_id is not None:
+                if trade_id in seen_ids:
+                    continue
+                seen_ids.add(trade_id)
+            deduped.append(trade)
+        return deduped
 
     def _flow_window_metadata(
         self,
