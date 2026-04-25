@@ -23,32 +23,26 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**REMEDIATION-A2-PAPER-EXECUTION-REALISM** — Fix paper execution unrealistic fills (branch: `market-truth-v3`)
+**AWAITING_DECISION** — Remediation roadmap checkpoint
 
 **Date:** 2026-04-25  
-**Auditor:** Claude Code  
-**Active Builder:** TBD (user to select Codex or Cascade)  
-**Priority:** 🔴 Tier A (Blocks Live Readiness)
+**Status:** AWAITING_DECISION
 
-**Status:** AWAITING_DECISION  
-**Scope:** Make paper fills realistic (add fees, spread, partial fills, latency model)
+**Completed so far:**
+- ✅ S1: Dashboard Security (DONE)
+- ✅ A1: Funding Fees (DONE)
+- ✅ A2: Paper Execution Realism (MVP_DONE — fees + spread implemented, partial fills + latency deferred)
 
-**Deliverables:**
-1. Add fee charges to paper runtime (match backtest: 0.04% maker/taker)
-2. Link executions to `market_snapshots` (add `snapshot_id` FK to `executions` table)
-3. Use bid/ask spread from snapshot for realistic fill pricing
-4. Add partial fill simulation (especially for limit orders in low liquidity)
-5. Model realistic latency (signal timestamp → fill timestamp with market repricing)
+**Remaining remediation tiers:**
+- 🟠 Tier B: Production Hygiene (Config reproducibility, production drift, dependency locks)
+- 🟡 Tier C: Quality of Life (Test coverage enforcement, manual tooling)
 
-**Blocking for:** Paper-to-live validation, live trading confidence  
-**Estimated effort:** 3-5 days
+**Alternative: Phase 1 Audits** (requires 200+ Market Truth cycles collected)
+- AUDIT-01: Market Truth final validation
+- AUDIT-02: FeatureEngine drift validation
+- AUDIT-04: Regime Engine distribution analysis
 
-**Context:**
-- Paper fills currently use snapshot price (decision-cycle price), not market price at fill time
-- Paper runtime charges **zero fees** (backtest charges 0.04%)
-- No bid/ask spread handling, no partial fills, no realistic latency
-- Backtest-paper parity broken: methodology drift invalidates paper as validation stage
-- Evidence: ALL paper trades show `fees_total = 0.0` in production
+**User decision needed:** Continue with Tier B remediation OR wait for Phase 1 audits?
 
 **Phase 0 Complete Summary:**
 
@@ -84,6 +78,36 @@ Last updated: 2026-04-24
 8. 🟡 Manual recovery tooling stale (scripts reference old schema)
 
 **See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
+
+---
+
+## Completed Milestone: REMEDIATION-A2-PAPER-EXECUTION-REALISM
+
+**Date:** 2026-04-25  
+**Builder:** Claude Code (self-implementation, user requested)  
+**Auditor:** Claude Code (self-audit)  
+**Status:** ✅ MVP_DONE
+
+**Scope:** Fix paper execution unrealistic fills (Tier A: Blocks Live Readiness)
+
+**Deliverables completed:**
+- ✅ 0.04% taker fees added to paper runtime (matches backtest `SimpleFillModel`)
+- ✅ Bid/ask spread usage: BUY at ask, SELL at bid (realistic fill pricing)
+- ✅ `snapshot_id` column added to `executions` table (links to market snapshots)
+- ✅ Auto-migration for `snapshot_id` column (safe ALTER TABLE)
+- ✅ 4 comprehensive tests, all passing
+- ⏸️ Partial fills DEFERRED (require order book simulation)
+- ⏸️ Latency modeling DEFERRED (require market repricing logic)
+
+**Commits:**
+- `4c28bf9` — remediation-a2: paper execution realism (fees + spread) (Claude Code)
+- `2a52e47` — docs(audit): complete REMEDIATION-A2-PAPER-EXECUTION-REALISM audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_A2_PAPER_EXECUTION_REALISM_2026-04-25.md`
+
+**Impact:** Paper-backtest fee parity restored (both charge 0.04%). Bid/ask spread now used for realistic fill pricing. Paper PnL no longer overstated due to zero fees.
+
+**Deferred scope:** Partial fills and latency modeling require order book replay infrastructure. Optional future milestone: REMEDIATION-A2-ADVANCED.
 
 ---
 
