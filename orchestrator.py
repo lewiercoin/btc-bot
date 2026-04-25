@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
@@ -43,6 +43,7 @@ from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
 from settings import AppSettings, BotMode, build_signal_regime_direction_whitelist
 from storage.position_persister import SqlitePositionPersister
 from storage.repositories import (
+    fetch_funding_rates,
     fetch_cvd_price_history,
     fetch_oi_samples,
     get_daily_metrics,
@@ -50,6 +51,7 @@ from storage.repositories import (
     save_signal_candidate,
 )
 from storage.state_store import StateStore
+from core.funding import compute_funding_paid
 
 LOG = logging.getLogger(__name__)
 
@@ -939,6 +941,19 @@ class BotOrchestrator:
                 exit_reason=decision.reason,
                 candles_15m=candles_path,
             )
+            funding_paid = self._compute_position_funding_paid(
+                symbol=record.position.symbol,
+                direction=record.position.direction,
+                entry_price=record.position.entry_price,
+                size=record.position.size,
+                opened_at=record.position.opened_at,
+                closed_at=snapshot.timestamp,
+            )
+            settlement = replace(
+                settlement,
+                pnl_abs=settlement.pnl_abs - funding_paid,
+                funding_paid=funding_paid,
+            )
             self.state_store.settle_trade_close(
                 position_id=record.position.position_id,
                 settlement=settlement,
@@ -957,6 +972,30 @@ class BotOrchestrator:
                 }
             )
         return closed_events
+
+    def _compute_position_funding_paid(
+        self,
+        *,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        size: float,
+        opened_at: datetime,
+        closed_at: datetime,
+    ) -> float:
+        funding_samples = fetch_funding_rates(
+            self.conn,
+            symbol=symbol,
+            start_ts=opened_at,
+            end_ts=closed_at,
+        )
+        return compute_funding_paid(
+            direction=direction,
+            notional=max(float(entry_price) * float(size), 0.0),
+            opened_at=opened_at,
+            closed_at=closed_at,
+            funding_samples=funding_samples,
+        )
 
     @staticmethod
     def _candles_since_open(candles_15m: list[dict], opened_at: datetime) -> list[dict]:

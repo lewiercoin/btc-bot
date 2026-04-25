@@ -8,6 +8,7 @@ from typing import Any
 from backtest.backtest_runner import BacktestConfig, BacktestResult, BacktestRunner
 from core.models import Features, RegimeState, SignalCandidate
 from core.signal_engine import SignalEngine
+from storage.repositories import fetch_funding_rates
 
 logger = logging.getLogger(__name__)
 
@@ -66,6 +67,7 @@ class ResearchBacktestRunner(BacktestRunner):
 
         replay_loader = self._custom_replay_loader or self._build_default_replay_loader(config)
         fill_model = self._custom_fill_model or self._build_default_fill_model(config)
+        funding_samples = fetch_funding_rates(self.connection, symbol=symbol)
         feature_engine, regime_engine, signal_engine, governance, risk_engine = self._build_engines()
         self._log_uptrend_continuation_config()
 
@@ -101,6 +103,7 @@ class ResearchBacktestRunner(BacktestRunner):
                 closed_records=closed_records,
                 closed_pnl_events=closed_pnl_events,
                 fill_model=fill_model,
+                funding_samples=funding_samples,
                 risk_engine=risk_engine,
             )
             self._runtime = self._compute_runtime_state(
@@ -167,6 +170,7 @@ class ResearchBacktestRunner(BacktestRunner):
                 closed_records=closed_records,
                 closed_pnl_events=closed_pnl_events,
                 fill_model=fill_model,
+                funding_samples=funding_samples,
                 risk_engine=risk_engine,
             )
             equity_curve.append((last_snapshot_ts, equity))

@@ -74,6 +74,16 @@ class StateStore:
                 self.connection.commit()
                 LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='trade_log'")
+        trade_log_exists = cursor.fetchone() is not None
+        if trade_log_exists:
+            cursor.execute("PRAGMA table_info(trade_log)")
+            trade_log_columns = {row[1] for row in cursor.fetchall()}
+            if "funding_paid" not in trade_log_columns:
+                cursor.execute("ALTER TABLE trade_log ADD COLUMN funding_paid REAL NOT NULL DEFAULT 0.0")
+                self.connection.commit()
+                LOG.info("Migration applied: added funding_paid column to trade_log")
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS safe_mode_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -532,6 +542,7 @@ class StateStore:
             mae=settlement.mae,
             mfe=settlement.mfe,
             exit_reason=settlement.exit_reason,
+            funding_paid=settlement.funding_paid,
         )
 
         opened_at = datetime.fromisoformat(open_trade["opened_at"])

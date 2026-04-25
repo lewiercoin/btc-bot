@@ -249,6 +249,7 @@ class TradeLog:
     mae: float
     mfe: float
     exit_reason: str | None
+    funding_paid: float = 0.0
     features_at_entry_json: dict[str, Any] = field(default_factory=dict)
 
 
@@ -303,3 +304,4 @@ class SettlementMetrics:
     mae: float
     mfe: float
     exit_reason: str
+    funding_paid: float = 0.0
