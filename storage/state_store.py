@@ -84,6 +84,16 @@ class StateStore:
                 self.connection.commit()
                 LOG.info("Migration applied: added funding_paid column to trade_log")
 
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='executions'")
+        executions_exists = cursor.fetchone() is not None
+        if executions_exists:
+            cursor.execute("PRAGMA table_info(executions)")
+            executions_columns = {row[1] for row in cursor.fetchall()}
+            if "snapshot_id" not in executions_columns:
+                cursor.execute("ALTER TABLE executions ADD COLUMN snapshot_id TEXT")
+                self.connection.commit()
+                LOG.info("Migration applied: added snapshot_id column to executions")
+
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS safe_mode_events (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,

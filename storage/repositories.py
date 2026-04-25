@@ -594,8 +594,8 @@ def insert_execution_fill_event(
         """
         INSERT INTO executions (
             execution_id, position_id, order_type, side, requested_price, filled_price,
-            qty, fees, slippage_bps, executed_at
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            qty, fees, slippage_bps, executed_at, snapshot_id
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             fill_event.execution_id,
@@ -608,6 +608,7 @@ def insert_execution_fill_event(
             fill_event.fees,
             fill_event.slippage_bps,
             fill_event.executed_at.isoformat(),
+            fill_event.snapshot_id,
         ),
     )
 

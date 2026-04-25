@@ -547,6 +547,9 @@ class BotOrchestrator:
                     size=risk_decision.size,
                     leverage=risk_decision.leverage,
                     snapshot_price=paper_fill_price,
+                    bid_price=snapshot.bid if self.settings.mode == BotMode.PAPER else None,
+                    ask_price=snapshot.ask if self.settings.mode == BotMode.PAPER else None,
+                    snapshot_id=snapshot.snapshot_id if self.settings.mode == BotMode.PAPER else None,
                 )
                 self.state_store.record_trade_open(
                     candidate=candidate,
