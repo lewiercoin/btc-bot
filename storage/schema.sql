@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS executions (
     fees REAL NOT NULL DEFAULT 0,
     slippage_bps REAL NOT NULL DEFAULT 0,
     executed_at TEXT NOT NULL,
+    snapshot_id TEXT,
     FOREIGN KEY (position_id) REFERENCES positions(position_id)
 );
 
