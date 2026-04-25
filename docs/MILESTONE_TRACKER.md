@@ -23,7 +23,7 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**REMEDIATION-A1-FUNDING-FEES** — Add funding fee tracking (branch: `market-truth-v3`)
+**REMEDIATION-A2-PAPER-EXECUTION-REALISM** — Fix paper execution unrealistic fills (branch: `market-truth-v3`)
 
 **Date:** 2026-04-25  
 **Auditor:** Claude Code  
@@ -31,23 +31,24 @@ Last updated: 2026-04-24
 **Priority:** 🔴 Tier A (Blocks Live Readiness)
 
 **Status:** AWAITING_DECISION  
-**Scope:** Implement funding fee tracking across schema, backtest, and paper runtime
+**Scope:** Make paper fills realistic (add fees, spread, partial fills, latency model)
 
 **Deliverables:**
-1. Add `funding_paid` column to `trade_log` schema
-2. Implement funding fee collection: sample funding rate at position open/close, calculate cumulative funding for multi-period positions
-3. Add funding simulation to `SimpleFillModel` in backtest
-4. Track funding in paper runtime execution
-5. Deduct funding from `pnl_abs`: `pnl_abs_net = gross_pnl - fees - funding`
+1. Add fee charges to paper runtime (match backtest: 0.04% maker/taker)
+2. Link executions to `market_snapshots` (add `snapshot_id` FK to `executions` table)
+3. Use bid/ask spread from snapshot for realistic fill pricing
+4. Add partial fill simulation (especially for limit orders in low liquidity)
+5. Model realistic latency (signal timestamp → fill timestamp with market repricing)
 
-**Blocking for:** Live trading validation, accurate paper-to-live comparison  
-**Estimated effort:** 2-3 days
+**Blocking for:** Paper-to-live validation, live trading confidence  
+**Estimated effort:** 3-5 days
 
 **Context:**
-- Binance perpetual futures charge funding fees every 8 hours
-- Multi-day positions incur material untracked cost (~0.27% additional cost for 3-day position)
-- Backtest and paper PnL currently overstated relative to live trading reality
-- Quantified impact: ~$3,700-$7,100 annual PnL overstatement
+- Paper fills currently use snapshot price (decision-cycle price), not market price at fill time
+- Paper runtime charges **zero fees** (backtest charges 0.04%)
+- No bid/ask spread handling, no partial fills, no realistic latency
+- Backtest-paper parity broken: methodology drift invalidates paper as validation stage
+- Evidence: ALL paper trades show `fees_total = 0.0` in production
 
 **Phase 0 Complete Summary:**
 
@@ -83,6 +84,36 @@ Last updated: 2026-04-24
 8. 🟡 Manual recovery tooling stale (scripts reference old schema)
 
 **See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
+
+---
+
+## Completed Milestone: REMEDIATION-A1-FUNDING-FEES
+
+**Date:** 2026-04-25  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Status:** ✅ DONE
+
+**Scope:** Implement funding fee tracking (Tier A: Blocks Live Readiness)
+
+**Deliverables completed:**
+- ✅ `funding_paid REAL NOT NULL DEFAULT 0` column added to `trade_log` schema
+- ✅ Safe migration: auto-detect + ALTER TABLE in `StateStore`
+- ✅ Deterministic funding calculator: `core/funding.py` (shared by backtest + paper runtime)
+- ✅ Backtest incremental accrual: `_accrue_funding()` every snapshot
+- ✅ Paper runtime integration: `_compute_position_funding_paid()` + `fetch_funding_rates()`
+- ✅ PnL deduction: `pnl_abs_net = gross_pnl - fees - funding_paid`
+- ✅ 43 tests passing (5 funding-specific + 38 regression)
+
+**Commits:**
+- `40a9338` — remediation-a1: funding-fee tracking (Codex)
+- `7f11f38` — docs(audit): complete REMEDIATION-A1-FUNDING-FEES audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_A1_FUNDING_FEES_2026-04-25.md`
+
+**Impact:** Funding fees now tracked. Backtest and paper PnL no longer overstated. Production ready (6,164 funding samples in DB, 2020-2026).
+
+**Warnings:** 8-day funding data gap (2026-04-17 to 2026-04-25) — backfill needed for accurate recent trade PnL.
 
 ---
 
