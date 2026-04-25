@@ -23,26 +23,31 @@ Last updated: 2026-04-24
 
 ## Current Active Milestone
 
-**REMEDIATION-S1-DASHBOARD-SECURITY** — Fix public dashboard exposure (branch: `market-truth-v3`)
+**REMEDIATION-A1-FUNDING-FEES** — Add funding fee tracking (branch: `market-truth-v3`)
 
 **Date:** 2026-04-25  
 **Auditor:** Claude Code  
-**Active Builder:** Cascade  
-**Priority:** 🔴 Tier S (Security Emergency)
+**Active Builder:** TBD (user to select Codex or Cascade)  
+**Priority:** 🔴 Tier A (Blocks Live Readiness)
 
-**Status:** ACTIVE  
-**Scope:** Remediate public dashboard exposure (S1 from Phase 0 consolidated report)
+**Status:** AWAITING_DECISION  
+**Scope:** Implement funding fee tracking across schema, backtest, and paper runtime
 
 **Deliverables:**
-1. Rebind dashboard to `127.0.0.1:8080` (update `btc-bot-dashboard.service`)
-2. Remove UFW rule: `ufw delete allow 8080/tcp`
-3. Document SSH tunnel procedure for operator access
-4. Update deployed unit file to match repo configuration
+1. Add `funding_paid` column to `trade_log` schema
+2. Implement funding fee collection: sample funding rate at position open/close, calculate cumulative funding for multi-period positions
+3. Add funding simulation to `SimpleFillModel` in backtest
+4. Track funding in paper runtime execution
+5. Deduct funding from `pnl_abs`: `pnl_abs_net = gross_pnl - fees - funding`
 
-**Blocking for:** Live trading approval, public repo release  
-**Estimated effort:** 30 minutes to 1 hour
+**Blocking for:** Live trading validation, accurate paper-to-live comparison  
+**Estimated effort:** 2-3 days
 
-**User Decision:** Start remediation roadmap (S1 → A1 → A2 → ...) before Phase 1
+**Context:**
+- Binance perpetual futures charge funding fees every 8 hours
+- Multi-day positions incur material untracked cost (~0.27% additional cost for 3-day position)
+- Backtest and paper PnL currently overstated relative to live trading reality
+- Quantified impact: ~$3,700-$7,100 annual PnL overstatement
 
 **Phase 0 Complete Summary:**
 
@@ -78,6 +83,33 @@ Last updated: 2026-04-24
 8. 🟡 Manual recovery tooling stale (scripts reference old schema)
 
 **See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
+
+---
+
+## Completed Milestone: REMEDIATION-S1-DASHBOARD-SECURITY
+
+**Date:** 2026-04-25  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Status:** ✅ DONE
+
+**Scope:** Fix public dashboard exposure (Tier S Emergency)
+
+**Deliverables completed:**
+- ✅ Dashboard rebound to `127.0.0.1:8080` (production + repo unit file)
+- ✅ UFW rule `8080/tcp` removed
+- ✅ SSH tunnel documentation: `docs/ops/SSH_TUNNEL_ACCESS.md`
+- ✅ Public access blocked (verified: connection timeout)
+- ✅ Local server access via SSH works
+- ✅ Service restarted cleanly (no errors)
+
+**Commits:**
+- `8c71360` — security: harden dashboard access path (Codex)
+- `2bb6c0c` — docs(audit): complete REMEDIATION-S1-DASHBOARD-SECURITY audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_S1_DASHBOARD_SECURITY_2026-04-25.md`
+
+**Impact:** Security emergency remediated. Dashboard no longer exposed to public internet. Unauthenticated control endpoints now localhost-only.
 
 ---
 
