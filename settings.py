@@ -261,9 +261,58 @@ class AppSettings:
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
             "data_quality": asdict(self.data_quality),
+            "exchange": {
+                "futures_rest_base_url": self.exchange.futures_rest_base_url,
+                "futures_ws_base_url": self.exchange.futures_ws_base_url,
+                "futures_ws_market_base_url": self.exchange.futures_ws_market_base_url,
+                "futures_ws_stream_base_url": self.exchange.futures_ws_stream_base_url,
+                "recv_window_ms": self.exchange.recv_window_ms,
+                "isolated_only": self.exchange.isolated_only,
+                "api_key_env": self.exchange.api_key_env,
+                "api_secret_env": self.exchange.api_secret_env,
+            },
+            "proxy": {
+                "enabled": self.proxy.enabled,
+                "proxy_enabled_env": self.proxy.proxy_enabled_env,
+                "proxy_url_env": self.proxy.proxy_url_env,
+                "proxy_type_env": self.proxy.proxy_type_env,
+                "sticky_minutes_env": self.proxy.sticky_minutes_env,
+                "failover_list_env": self.proxy.failover_list_env,
+            },
+            "alerts": {
+                "telegram_enabled": self.alerts.telegram_enabled,
+                "telegram_bot_token_env": self.alerts.telegram_bot_token_env,
+                "telegram_chat_id_env": self.alerts.telegram_chat_id_env,
+            },
+            "storage": {
+                "project_root": str(self.storage.project_root) if self.storage else None,
+                "db_path": str(self.storage.db_path) if self.storage else None,
+                "schema_path": str(self.storage.schema_path) if self.storage else None,
+                "logs_dir": str(self.storage.logs_dir) if self.storage else None,
+            },
+            "python_version": self._get_python_version(),
+            "dependency_hash": self._get_dependency_hash(),
+            "settings_profile": os.getenv("BOT_SETTINGS_PROFILE", "unknown"),
         }
         data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(data).hexdigest()
+
+    def _get_python_version(self) -> str:
+        """Read Python version from .python-version file."""
+        if self.storage:
+            python_version_file = self.storage.project_root / ".python-version"
+            if python_version_file.exists():
+                return python_version_file.read_text().strip()
+        return "unknown"
+
+    def _get_dependency_hash(self) -> str:
+        """Compute hash of requirements.lock for dependency tracking."""
+        if self.storage:
+            lockfile = self.storage.project_root / "requirements.lock"
+            if lockfile.exists():
+                data = lockfile.read_bytes()
+                return hashlib.sha256(data).hexdigest()
+        return "unknown"
 
 
 def _parse_mode(raw_mode: str) -> BotMode:
