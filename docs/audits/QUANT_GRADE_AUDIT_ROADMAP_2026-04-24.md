@@ -371,6 +371,46 @@ System jest w krytycznym oknie walidacji. `market-truth-v3` przeszedł first sna
 
 ---
 
+## Gate A — Unlock Criteria
+
+**Primary unlock counter:** 200+ unique post-fix quality-ready 15m buckets
+
+**quality-ready definition:**
+- Count at the **15m bucket level**, not per raw database row
+- A bucket counts once if **at least one** row in that bucket has full lineage:
+  `market_snapshot -> feature_snapshot -> decision_outcome`
+- All 5 core features must have `status='ready'`:
+  - `flow_15m`
+  - `flow_60s`
+  - `funding_window`
+  - `oi_baseline`
+  - `cvd_divergence`
+
+**Post-fix counting window:**
+- Count only buckets from **2026-04-25 00:45 UTC** onward
+- This is the **first post-fix quality-ready bucket**
+- Pre-fix buckets are excluded from the unlock counter due to documented collection-quality issues
+
+**Rationale:**
+- Pre-fix cycles have known quality defects:
+  - `flow_15m` degraded / clipped
+  - `flow_60s` unavailable
+  - `funding_window` incomplete
+- They may remain useful for structural lineage analysis, but not for Phase 1 quality validation
+
+**Supporting Gate A conditions still apply:**
+- Timing/staleness report = `PASS` or `DOCUMENTED`
+- No critical source-of-truth gaps = `CONFIRMED`
+- AUDIT-01 Market Truth final = `DONE` or accepted `PARTIAL`
+
+**Current progress (as of 2026-04-26 17:45 UTC):**
+- Quality-ready cycles: **163 / 200** (81.5%)
+- Remaining: **37 cycles**
+- Collection rate: 4 cycles/hour (every 15min)
+- ETA to Gate A: **~9.25 hours** (2026-04-27 ~03:00 UTC)
+
+---
+
 ### 🟡 Phase 1 — Po 200+ Market Truth Cycles (Gate A)
 
 | Priorytet | Audyt |
