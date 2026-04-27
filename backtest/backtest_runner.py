@@ -9,6 +9,7 @@ from typing import Any
 from backtest.fill_model import FillModel, FillModelConfig, SimpleFillModel
 from backtest.performance import PerformanceReport, summarize
 from backtest.replay_loader import ReplayLoader, ReplayLoaderConfig
+from core.context_engine import ContextEngine
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
 from core.models import (
@@ -148,7 +149,7 @@ class BacktestRunner:
             )
         )
         funding_samples = fetch_funding_rates(self.connection, symbol=symbol)
-        feature_engine, regime_engine, signal_engine, governance, risk_engine = self._build_engines()
+        feature_engine, regime_engine, context_engine, signal_engine, governance, risk_engine = self._build_engines()
 
         open_positions: list[_OpenPositionRecord] = []
         closed_records: list[_ClosedTradeRecord] = []
@@ -199,7 +200,8 @@ class BacktestRunner:
                 config_hash=self.settings.config_hash,
             )
             regime = regime_engine.classify(features)
-            candidate = signal_engine.generate(features, regime)
+            context = context_engine.classify(features)
+            candidate = signal_engine.generate(features, regime, context=context)
             if candidate is not None:
                 self._signal_counter += 1
                 candidate.signal_id = self._make_signal_id(now, self._signal_counter)
@@ -249,7 +251,7 @@ class BacktestRunner:
             equity_curve=equity_curve,
         )
 
-    def _build_engines(self) -> tuple[FeatureEngine, RegimeEngine, SignalEngine, GovernanceLayer, RiskEngine]:
+    def _build_engines(self) -> tuple[FeatureEngine, RegimeEngine, ContextEngine, SignalEngine, GovernanceLayer, RiskEngine]:
         strategy = self.settings.strategy
         risk = self.settings.risk
         signal_whitelist = build_signal_regime_direction_whitelist(strategy)
@@ -338,7 +340,8 @@ class BacktestRunner:
             ),
             state_provider=self._risk_state_provider,
         )
-        return feature_engine, regime_engine, signal_engine, governance, risk_engine
+        context_engine = ContextEngine(config=self.settings.context)
+        return feature_engine, regime_engine, context_engine, signal_engine, governance, risk_engine
 
     def _governance_state_provider(self) -> GovernanceRuntimeState:
         return GovernanceRuntimeState(
