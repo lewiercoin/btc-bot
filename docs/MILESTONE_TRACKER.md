@@ -1,10 +1,10 @@
-# Milestone Tracker
+﻿# Milestone Tracker
 
 Last updated: 2026-04-27
 
 ---
 
-## ⚠️ Open Tech Debt: Kill-Switch Limits (MUST restore before LIVE mode)
+## âš ď¸Ź Open Tech Debt: Kill-Switch Limits (MUST restore before LIVE mode)
 
 **Date:** 2026-04-22  
 **Reason:** Bot is in configuration/tuning phase. Weekly DD kill-switch triggered at 6.3% blocking MODELING-V1 data collection.  
@@ -23,35 +23,45 @@ Last updated: 2026-04-27
 
 ## Current Active Milestone
 
-**LIVE-EXECUTION-TEST-COVERAGE** — BLOCKING LIVE DEPLOYMENT
+**MODELING-CONTEXT-CLOSURE** â€” BLOCKING EDGE CLOSURE
 
 **Date:** 2026-04-27
-**Status:** OPEN (blocks live trading readiness)
+**Status:** OPEN (blocks modeling activation and further edge work)
 **Builder:** TBD
 **Auditor:** Claude Code
 
-**Scope:** Add test coverage for live execution layer (execution-layer testing ONLY, no logic changes)
+**Scope:** Close the modeling path opened by DATA-INTEGRITY-V1 -> MARKET-TRUTH-V3 -> MODELING-V1.
 
 **Deliverables:**
-- Unit tests for `LiveExecutionEngine` (entry submission, fill confirmation, timeout, exit orders, partial fills)
-- Unit tests for `OrderManager` (submit/query/cancel, error mapping, price formatting)
-- Integration smoke test (end-to-end order flow on testnet or mocked exchange)
+- Ensure decision-grade context telemetry for validation:
+  `atr_4h_norm` and context bucket data must be reconstructable for the post-MODELING-V1 sample without large `UNKNOWN` leakage
+- Re-run `MODELING-V1-VALIDATION` on a clean, explicit post-deploy window
+- Reduce `UNKNOWN volatility` share to `<= 20%` or document the exact blocking contract that still prevents decision-grade volatility analysis
+- Produce a deterministic activation verdict:
+  `keep_neutral`, `activate_selected_context_filters`, or `redesign_context_model`
+- Produce an explicit strategy conclusion on how context work relates to future uptrend/trend-continuation research
 
 **Out of scope:**
-- ❌ Do NOT change live execution logic (test current behavior first)
-- ❌ Do NOT change `consecutive_losses` semantics (separate policy decision)
+- âťŚ Do NOT run Optuna / new parameter search
+- âťŚ Do NOT activate live trading work
+- âťŚ Do NOT redesign or enable the old uptrend pullback path inside this milestone
+- âťŚ Do NOT change `neutral_mode` before validation evidence is decision-grade
 
-**Rationale:** Paper trading path is production-ready, but `LiveExecutionEngine` (375 lines) + `OrderManager` (212 lines) have **zero tests**. Untested money-moving path is a blocker for live deployment.
+**Rationale:** The `206+` quality-ready cycles collected for Gate A proved data integrity and replay safety. They did **not** prove that context buckets improve trade decisions. `MODELING-V1-VALIDATION` remained partial because volatility telemetry was not decision-grade (`75% UNKNOWN`) and the trade sample was too thin for activation.
+
+**Deferred until this milestone closes:**
+- `LIVE-EXECUTION-TEST-COVERAGE` â€” still required before any live deployment, but not the current priority
+- `RESEARCH-OPTUNA-V1` â€” infrastructure exists, but no run is approved before modeling closure
 
 ---
 
 ## Completed Milestone: PHASE-1-AUDITS
 
 **Date:** 2026-04-27
-**Status:** ✅ COMPLETE (paper path) / ⚠️ BLOCKED (live path)
+**Status:** âś… COMPLETE (paper path) / âš ď¸Ź BLOCKED (live path)
 **Auditor:** Claude Code
 
-**Paper Trading Readiness: COMPLETE** ✅
+**Paper Trading Readiness: COMPLETE** âś…
 
 | Audit | Component | Verdict | Tests | Evidence |
 |---|---|---|---|---|
@@ -62,20 +72,20 @@ Last updated: 2026-04-27
 | State Persistence | Recovery, DD calculation | MVP_DONE | 4 unit + 1 smoke | 790 trades |
 | Paper Execution | Fills, fees, slippage | MVP_DONE | 9 | 790 trades |
 
-**Live Trading Readiness: BLOCKED** ⚠️
+**Live Trading Readiness: BLOCKED** âš ď¸Ź
 
 | Audit | Component | Verdict | Blocker |
 |---|---|---|---|
 | AUDIT-08 | Live Execution | NOT_DONE | 0 tests (LiveExecutionEngine + OrderManager) |
 
 **Audit reports:**
-- ✅ `AUDIT_GATE_A_VERDICT_2026-04-27.md` — Market Truth V3 validation (PASS, 206 quality-ready buckets)
-- ✅ `AUDIT_SIGNAL_ENGINE_2026-04-27.md` — Signal generation logic (MVP_DONE)
-- ✅ `AUDIT_RESEARCH_LAB_2026-04-27.md` — Research lab methodology (DONE)
-- ✅ `AUDIT_FEATURE_ENGINE_2026-04-27.md` — Feature calculation (MVP_DONE)
-- ✅ `AUDIT_RISK_ENGINE_2026-04-24.md` — Position sizing, risk limits (DONE)
-- ✅ `AUDIT_STATE_PERSISTENCE_2026-04-27.md` — Recovery, DD calculation (MVP_DONE)
-- ⚠️ `AUDIT_EXECUTION_TIMING_2026-04-27.md` — Paper DONE, Live NOT_DONE
+- âś… `AUDIT_GATE_A_VERDICT_2026-04-27.md` â€” Market Truth V3 validation (PASS, 206 quality-ready buckets)
+- âś… `AUDIT_SIGNAL_ENGINE_2026-04-27.md` â€” Signal generation logic (MVP_DONE)
+- âś… `AUDIT_RESEARCH_LAB_2026-04-27.md` â€” Research lab methodology (DONE)
+- âś… `AUDIT_FEATURE_ENGINE_2026-04-27.md` â€” Feature calculation (MVP_DONE)
+- âś… `AUDIT_RISK_ENGINE_2026-04-24.md` â€” Position sizing, risk limits (DONE)
+- âś… `AUDIT_STATE_PERSISTENCE_2026-04-27.md` â€” Recovery, DD calculation (MVP_DONE)
+- âš ď¸Ź `AUDIT_EXECUTION_TIMING_2026-04-27.md` â€” Paper DONE, Live NOT_DONE
 
 **Deferred work:**
 - Feature Engine: ATR/EMA/funding/OI unit tests (regression prevention)
@@ -87,41 +97,41 @@ Last updated: 2026-04-27
 - **Live trading:** BLOCKED until live execution test coverage exists
 
 **Remaining remediation tiers:**
-- 🟠 Tier B: Production Hygiene (Config reproducibility, production drift, dependency locks)
-- 🟡 Tier C: Quality of Life (Test coverage enforcement, manual tooling)
+- đźź  Tier B: Production Hygiene (Config reproducibility, production drift, dependency locks)
+- đźźˇ Tier C: Quality of Life (Test coverage enforcement, manual tooling)
 
 **Phase 0 Complete Summary:**
 
-**Tier 1 (Security & Ops) — 4 audits:**
-- ✅ AUDIT-13: Security / Secrets / Exchange Safety (NOT_DONE — dashboard exposure FAIL)
-- ✅ AUDIT-12: Production Ops / SRE (LOOKS_DONE)
-- ✅ AUDIT-11: Observability / Dashboard (MVP_DONE)
-- ✅ AUDIT-19: Recovery / Safe Mode / State Reconciliation (MVP_DONE)
+**Tier 1 (Security & Ops) â€” 4 audits:**
+- âś… AUDIT-13: Security / Secrets / Exchange Safety (NOT_DONE â€” dashboard exposure FAIL)
+- âś… AUDIT-12: Production Ops / SRE (LOOKS_DONE)
+- âś… AUDIT-11: Observability / Dashboard (MVP_DONE)
+- âś… AUDIT-19: Recovery / Safe Mode / State Reconciliation (MVP_DONE)
 
-**Tier 2 (Config & Execution) — 2 audits:**
-- ✅ AUDIT-14: Configuration / Reproducibility (MVP_DONE)
-- ✅ AUDIT-07: Execution / Paper Fill Integrity (NOT_DONE — paper fills unrealistic)
+**Tier 2 (Config & Execution) â€” 2 audits:**
+- âś… AUDIT-14: Configuration / Reproducibility (MVP_DONE)
+- âś… AUDIT-07: Execution / Paper Fill Integrity (NOT_DONE â€” paper fills unrealistic)
 
-**Tier 3 (PnL & Research Lab) — 2 audits:**
-- ✅ AUDIT-08: Trade Lifecycle / PnL Accounting (MVP_DONE — funding fees missing)
-- ✅ AUDIT-09: Backtest / Research Lab (MVP_DONE — methodology production-grade)
+**Tier 3 (PnL & Research Lab) â€” 2 audits:**
+- âś… AUDIT-08: Trade Lifecycle / PnL Accounting (MVP_DONE â€” funding fees missing)
+- âś… AUDIT-09: Backtest / Research Lab (MVP_DONE â€” methodology production-grade)
 
-**Lower Priority — 5 audits:**
-- ✅ AUDIT-06: Risk Engine (DONE — position sizing correct, exit logic sound)
-- ✅ AUDIT-05: Governance (DONE — filtering comprehensive, no race conditions)
-- ✅ AUDIT-10: Experiment Management (DONE — isolation exemplary)
-- ✅ AUDIT-15: Testing / CI / Quality Gates (MVP_DONE — coverage enforcement missing)
-- ✅ AUDIT-18: Documentation / Agent Workflow (DONE — 2301+ lines, comprehensive)
+**Lower Priority â€” 5 audits:**
+- âś… AUDIT-06: Risk Engine (DONE â€” position sizing correct, exit logic sound)
+- âś… AUDIT-05: Governance (DONE â€” filtering comprehensive, no race conditions)
+- âś… AUDIT-10: Experiment Management (DONE â€” isolation exemplary)
+- âś… AUDIT-15: Testing / CI / Quality Gates (MVP_DONE â€” coverage enforcement missing)
+- âś… AUDIT-18: Documentation / Agent Workflow (DONE â€” 2301+ lines, comprehensive)
 
 **Critical findings requiring remediation:**
-1. 🔴 Public dashboard exposure (unauthenticated control endpoints on 0.0.0.0:8080)
-2. 🔴 Funding fees NOT tracked anywhere (no schema, no backtest, no paper runtime)
-3. 🟠 Paper execution unrealistic (zero fees, snapshot price, no spread, no partial fills)
-4. 🟠 Config reproducibility incomplete (config_hash missing 50%+ of runtime surface)
-5. 🟠 Production service drift (units differ from repo)
-6. 🟠 No dependency lock (no lockfile, no `.python-version`)
-7. 🟡 Test coverage enforcement missing (no coverage threshold in CI)
-8. 🟡 Manual recovery tooling stale (scripts reference old schema)
+1. đź”´ Public dashboard exposure (unauthenticated control endpoints on 0.0.0.0:8080)
+2. đź”´ Funding fees NOT tracked anywhere (no schema, no backtest, no paper runtime)
+3. đźź  Paper execution unrealistic (zero fees, snapshot price, no spread, no partial fills)
+4. đźź  Config reproducibility incomplete (config_hash missing 50%+ of runtime surface)
+5. đźź  Production service drift (units differ from repo)
+6. đźź  No dependency lock (no lockfile, no `.python-version`)
+7. đźźˇ Test coverage enforcement missing (no coverage threshold in CI)
+8. đźźˇ Manual recovery tooling stale (scripts reference old schema)
 
 **See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
 
@@ -132,22 +142,22 @@ Last updated: 2026-04-27
 **Date:** 2026-04-25  
 **Builder:** Claude Code (self-implementation, user requested)  
 **Auditor:** Claude Code (self-audit)  
-**Status:** ✅ MVP_DONE
+**Status:** âś… MVP_DONE
 
 **Scope:** Fix paper execution unrealistic fills (Tier A: Blocks Live Readiness)
 
 **Deliverables completed:**
-- ✅ 0.04% taker fees added to paper runtime (matches backtest `SimpleFillModel`)
-- ✅ Bid/ask spread usage: BUY at ask, SELL at bid (realistic fill pricing)
-- ✅ `snapshot_id` column added to `executions` table (links to market snapshots)
-- ✅ Auto-migration for `snapshot_id` column (safe ALTER TABLE)
-- ✅ 4 comprehensive tests, all passing
-- ⏸️ Partial fills DEFERRED (require order book simulation)
-- ⏸️ Latency modeling DEFERRED (require market repricing logic)
+- âś… 0.04% taker fees added to paper runtime (matches backtest `SimpleFillModel`)
+- âś… Bid/ask spread usage: BUY at ask, SELL at bid (realistic fill pricing)
+- âś… `snapshot_id` column added to `executions` table (links to market snapshots)
+- âś… Auto-migration for `snapshot_id` column (safe ALTER TABLE)
+- âś… 4 comprehensive tests, all passing
+- âŹ¸ď¸Ź Partial fills DEFERRED (require order book simulation)
+- âŹ¸ď¸Ź Latency modeling DEFERRED (require market repricing logic)
 
 **Commits:**
-- `4c28bf9` — remediation-a2: paper execution realism (fees + spread) (Claude Code)
-- `2a52e47` — docs(audit): complete REMEDIATION-A2-PAPER-EXECUTION-REALISM audit (Claude Code)
+- `4c28bf9` â€” remediation-a2: paper execution realism (fees + spread) (Claude Code)
+- `2a52e47` â€” docs(audit): complete REMEDIATION-A2-PAPER-EXECUTION-REALISM audit (Claude Code)
 
 **Audit report:** `docs/audits/AUDIT_REMEDIATION_A2_PAPER_EXECUTION_REALISM_2026-04-25.md`
 
@@ -162,28 +172,28 @@ Last updated: 2026-04-27
 **Date:** 2026-04-25  
 **Builder:** Codex  
 **Auditor:** Claude Code  
-**Status:** ✅ DONE
+**Status:** âś… DONE
 
 **Scope:** Implement funding fee tracking (Tier A: Blocks Live Readiness)
 
 **Deliverables completed:**
-- ✅ `funding_paid REAL NOT NULL DEFAULT 0` column added to `trade_log` schema
-- ✅ Safe migration: auto-detect + ALTER TABLE in `StateStore`
-- ✅ Deterministic funding calculator: `core/funding.py` (shared by backtest + paper runtime)
-- ✅ Backtest incremental accrual: `_accrue_funding()` every snapshot
-- ✅ Paper runtime integration: `_compute_position_funding_paid()` + `fetch_funding_rates()`
-- ✅ PnL deduction: `pnl_abs_net = gross_pnl - fees - funding_paid`
-- ✅ 43 tests passing (5 funding-specific + 38 regression)
+- âś… `funding_paid REAL NOT NULL DEFAULT 0` column added to `trade_log` schema
+- âś… Safe migration: auto-detect + ALTER TABLE in `StateStore`
+- âś… Deterministic funding calculator: `core/funding.py` (shared by backtest + paper runtime)
+- âś… Backtest incremental accrual: `_accrue_funding()` every snapshot
+- âś… Paper runtime integration: `_compute_position_funding_paid()` + `fetch_funding_rates()`
+- âś… PnL deduction: `pnl_abs_net = gross_pnl - fees - funding_paid`
+- âś… 43 tests passing (5 funding-specific + 38 regression)
 
 **Commits:**
-- `40a9338` — remediation-a1: funding-fee tracking (Codex)
-- `7f11f38` — docs(audit): complete REMEDIATION-A1-FUNDING-FEES audit (Claude Code)
+- `40a9338` â€” remediation-a1: funding-fee tracking (Codex)
+- `7f11f38` â€” docs(audit): complete REMEDIATION-A1-FUNDING-FEES audit (Claude Code)
 
 **Audit report:** `docs/audits/AUDIT_REMEDIATION_A1_FUNDING_FEES_2026-04-25.md`
 
 **Impact:** Funding fees now tracked. Backtest and paper PnL no longer overstated. Production ready (6,164 funding samples in DB, 2020-2026).
 
-**Warnings:** 8-day funding data gap (2026-04-17 to 2026-04-25) — backfill needed for accurate recent trade PnL.
+**Warnings:** 8-day funding data gap (2026-04-17 to 2026-04-25) â€” backfill needed for accurate recent trade PnL.
 
 ---
 
@@ -192,21 +202,21 @@ Last updated: 2026-04-27
 **Date:** 2026-04-25  
 **Builder:** Codex  
 **Auditor:** Claude Code  
-**Status:** ✅ DONE
+**Status:** âś… DONE
 
 **Scope:** Fix public dashboard exposure (Tier S Emergency)
 
 **Deliverables completed:**
-- ✅ Dashboard rebound to `127.0.0.1:8080` (production + repo unit file)
-- ✅ UFW rule `8080/tcp` removed
-- ✅ SSH tunnel documentation: `docs/ops/SSH_TUNNEL_ACCESS.md`
-- ✅ Public access blocked (verified: connection timeout)
-- ✅ Local server access via SSH works
-- ✅ Service restarted cleanly (no errors)
+- âś… Dashboard rebound to `127.0.0.1:8080` (production + repo unit file)
+- âś… UFW rule `8080/tcp` removed
+- âś… SSH tunnel documentation: `docs/ops/SSH_TUNNEL_ACCESS.md`
+- âś… Public access blocked (verified: connection timeout)
+- âś… Local server access via SSH works
+- âś… Service restarted cleanly (no errors)
 
 **Commits:**
-- `8c71360` — security: harden dashboard access path (Codex)
-- `2bb6c0c` — docs(audit): complete REMEDIATION-S1-DASHBOARD-SECURITY audit (Claude Code)
+- `8c71360` â€” security: harden dashboard access path (Codex)
+- `2bb6c0c` â€” docs(audit): complete REMEDIATION-S1-DASHBOARD-SECURITY audit (Claude Code)
 
 **Audit report:** `docs/audits/AUDIT_REMEDIATION_S1_DASHBOARD_SECURITY_2026-04-25.md`
 
@@ -219,9 +229,9 @@ Last updated: 2026-04-27
 **Date:** 2026-04-24  
 **Auditor:** Claude Code  
 **Builders:** Cascade (Tier 1-2), Claude Code (Tier 3 + remaining)  
-**Status:** ✅ COMPLETE
+**Status:** âś… COMPLETE
 
-**Summary:** All 13 Phase 0 audits complete. Comprehensive consolidated report generated. User decision: Start remediation (S1 → A1 → A2) before Phase 1.
+**Summary:** All 13 Phase 0 audits complete. Comprehensive consolidated report generated. User decision: Start remediation (S1 â†’ A1 â†’ A2) before Phase 1.
 
 **Artifacts:**
 - `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` (250+ lines)
@@ -229,11 +239,11 @@ Last updated: 2026-04-27
 - 13 individual audit reports
 
 **Key outcomes:**
-- 3 × DONE (Risk Engine, Governance, Experiment Management, Documentation)
-- 5 × MVP_DONE (Observability, Recovery, Config, PnL, Research Lab, Testing)
-- 2 × NOT_DONE (Security/Dashboard, Paper Execution)
+- 3 Ă— DONE (Risk Engine, Governance, Experiment Management, Documentation)
+- 5 Ă— MVP_DONE (Observability, Recovery, Config, PnL, Research Lab, Testing)
+- 2 Ă— NOT_DONE (Security/Dashboard, Paper Execution)
 - Quantified risk: ~$3,700-$7,100 annual PnL overstatement
-- 4-phase remediation roadmap: R0 Emergency → R1 Live Readiness → R2 Hygiene → R3 Quality
+- 4-phase remediation roadmap: R0 Emergency â†’ R1 Live Readiness â†’ R2 Hygiene â†’ R3 Quality
 
 ---
 
@@ -241,11 +251,11 @@ Last updated: 2026-04-27
 
 **Date:** 2026-04-24  
 **Auditor:** Claude Code  
-**Status:** ✅ COMPLETE
+**Status:** âś… COMPLETE
 
 **Audit reports:**
-- `AUDIT-08: Trade Lifecycle / PnL Accounting` — Verdict: MVP_DONE (PnL math correct, funding fees NOT tracked, paper runtime zero fees)
-- `AUDIT-09: Backtest / Research Lab` — Verdict: MVP_DONE (methodology production-grade, no lookahead, funding fees NOT simulated)
+- `AUDIT-08: Trade Lifecycle / PnL Accounting` â€” Verdict: MVP_DONE (PnL math correct, funding fees NOT tracked, paper runtime zero fees)
+- `AUDIT-09: Backtest / Research Lab` â€” Verdict: MVP_DONE (methodology production-grade, no lookahead, funding fees NOT simulated)
 
 **Key Tier 3 findings:**
 - PnL calculation mathematically correct (raw_pnl matches pnl_abs exactly when fees=0)
@@ -262,11 +272,11 @@ Last updated: 2026-04-27
 **Date:** 2026-04-24  
 **Active builder:** Cascade  
 **Auditor:** Claude Code  
-**Status:** ✅ COMPLETE
+**Status:** âś… COMPLETE
 
 **Audit reports:**
-- `AUDIT-14: Configuration / Reproducibility` — Verdict: MVP_DONE (config tracked but incomplete, production drift, no lockfile)
-- `AUDIT-07: Execution / Paper Fill Integrity` — Verdict: NOT_DONE (paper fills unrealistic, HIGH paper-to-live gap risk)
+- `AUDIT-14: Configuration / Reproducibility` â€” Verdict: MVP_DONE (config tracked but incomplete, production drift, no lockfile)
+- `AUDIT-07: Execution / Paper Fill Integrity` â€” Verdict: NOT_DONE (paper fills unrealistic, HIGH paper-to-live gap risk)
 
 **Key Tier 2 findings:**
 - config_hash incomplete (missing exchange, proxy, alerts, dependencies, interpreter version)
@@ -283,15 +293,15 @@ Last updated: 2026-04-27
 **Date:** 2026-04-24  
 **Active builder:** Cascade  
 **Auditor:** Claude Code  
-**Status:** ✅ COMPLETE
+**Status:** âś… COMPLETE
 
 **Audit reports:**
-- `AUDIT-13: Security / Secrets / Exchange Safety` — Verdict: NOT_DONE (dashboard exposure FAIL)
-- `AUDIT-12: Production Ops / SRE` — Verdict: LOOKS_DONE (runbook stale, alert coverage gaps)
-- `AUDIT-11: Observability / Dashboard` — Verdict: MVP_DONE (runtime freshness solid, alert coverage shallow)
-- `AUDIT-19: Recovery / Safe Mode / State Reconciliation` — Verdict: MVP_DONE (recovery logic present, manual tooling stale)
+- `AUDIT-13: Security / Secrets / Exchange Safety` â€” Verdict: NOT_DONE (dashboard exposure FAIL)
+- `AUDIT-12: Production Ops / SRE` â€” Verdict: LOOKS_DONE (runbook stale, alert coverage gaps)
+- `AUDIT-11: Observability / Dashboard` â€” Verdict: MVP_DONE (runtime freshness solid, alert coverage shallow)
+- `AUDIT-19: Recovery / Safe Mode / State Reconciliation` â€” Verdict: MVP_DONE (recovery logic present, manual tooling stale)
 
-**🚨 CRITICAL FINDING:**
+**đźš¨ CRITICAL FINDING:**
 
 **Production dashboard publicly exposed:**
 - Bound to `0.0.0.0:8080` (not `127.0.0.1`)
@@ -301,7 +311,7 @@ Last updated: 2026-04-27
 
 ---
 
-**MARKET-TRUTH-V3 + QUANT-GRADE HARDENING** — GATE A PASS (merged to `main`)
+**MARKET-TRUTH-V3 + QUANT-GRADE HARDENING** â€” GATE A PASS (merged to `main`)
 
 **Deployment baseline:** `EXPERIMENT-V2` (branch: `experiment-v2`, commit `2088dc79`)
 
@@ -309,7 +319,7 @@ Last updated: 2026-04-27
 
 **Why:**
 - Before V3: Snapshots were ephemeral, exact inputs for any decision could not be reconstructed
-- After V3: Full audit trail from persisted runtime market inputs → features → decision
+- After V3: Full audit trail from persisted runtime market inputs â†’ features â†’ decision
 - Quant-grade hardening: Per-input timestamp lineage, build timing contract, replay safety classification
 
 **Implementation:**
@@ -329,26 +339,26 @@ Last updated: 2026-04-27
 - Documentation: deployment protocol, ChatGPT audit response, hardening summary
 
 **Status:**
-- ✅ V3 infrastructure implementation complete (commit `2aa1115`)
-- ✅ Quant-grade hardening complete (commits `147d865`, `c68d30a`, `a3ff397`, `39c718a`)
-- ✅ ChatGPT audit: APPROVED FOR PRODUCTION VALIDATION
-- ✅ Deployed to production (2026-04-24 04:10 UTC)
-- ✅ First snapshot verified: ms-d39b22439fc944c2bf11f9347217f344
-- ✅ All quant-grade lineage fields populated
-- ✅ Gate A PASS (2026-04-27, commit `a0540e1`)
-- ✅ Timing audit semantics corrected and verified (commit `e06a3dd`)
-- ✅ Merge to `main` approved after Gate A PASS
+- âś… V3 infrastructure implementation complete (commit `2aa1115`)
+- âś… Quant-grade hardening complete (commits `147d865`, `c68d30a`, `a3ff397`, `39c718a`)
+- âś… ChatGPT audit: APPROVED FOR PRODUCTION VALIDATION
+- âś… Deployed to production (2026-04-24 04:10 UTC)
+- âś… First snapshot verified: ms-d39b22439fc944c2bf11f9347217f344
+- âś… All quant-grade lineage fields populated
+- âś… Gate A PASS (2026-04-27, commit `a0540e1`)
+- âś… Timing audit semantics corrected and verified (commit `e06a3dd`)
+- âś… Merge to `main` approved after Gate A PASS
 
 **Success criteria:**
-1. ✅ `market_snapshots` populated with quant-grade lineage fields
-2. ✅ `feature_snapshots` linked to snapshots
-3. ✅ `decision_outcomes` linked to both snapshot layers
-4. ✅ First snapshot verification passed
-5. ✅ 200+ post-fix quality-ready cycles collected
-6. ✅ Feature Drift query pack PASS
-7. ✅ Timing/Staleness query pack PASS after `snapshot_build_finished_at` timing correction
+1. âś… `market_snapshots` populated with quant-grade lineage fields
+2. âś… `feature_snapshots` linked to snapshots
+3. âś… `decision_outcomes` linked to both snapshot layers
+4. âś… First snapshot verification passed
+5. âś… 200+ post-fix quality-ready cycles collected
+6. âś… Feature Drift query pack PASS
+7. âś… Timing/Staleness query pack PASS after `snapshot_build_finished_at` timing correction
 
-**Merge gate:** ✅ COMPLETE — 200+ cycle validation → drift/timing reports → final audit → merge to `main`
+**Merge gate:** âś… COMPLETE â€” 200+ cycle validation â†’ drift/timing reports â†’ final audit â†’ merge to `main`
 
 **Production evidence (2026-04-24):**
 - Deployed branch: `market-truth-v3`
@@ -356,17 +366,17 @@ Last updated: 2026-04-27
 - Deployment: 2026-04-24 04:10:43 UTC
 - First verified snapshot: `2026-04-24T04:30:00.003848+00:00`
 - Build timing: 2.43s (normal)
-- Quant-grade fields: ✅ populated (except force_orders NULL - expected)
-- Per-input timestamps: ✅ verified
-- Validation status: ✅ Gate A PASS (`206+` quality-ready cycles independently verified by Claude Code)
+- Quant-grade fields: âś… populated (except force_orders NULL - expected)
+- Per-input timestamps: âś… verified
+- Validation status: âś… Gate A PASS (`206+` quality-ready cycles independently verified by Claude Code)
 
 ---
 
 ## Deployment Baseline
 
-**EXPERIMENT-V2** — VALIDATION REFERENCE (branch: `experiment-v2`, commit `2088dc79`)
+**EXPERIMENT-V2** â€” VALIDATION REFERENCE (branch: `experiment-v2`, commit `2088dc79`)
 
-**Previous milestone:** DATA-INTEGRITY-V1 — DONE (merged to `main`, commit `7ebf2d2`, 2026-04-21)
+**Previous milestone:** DATA-INTEGRITY-V1 â€” DONE (merged to `main`, commit `7ebf2d2`, 2026-04-21)
 
 **What:** Validate DATA-INTEGRITY-V1 with the relaxed experiment profile used for paper-runtime comparison
 
@@ -374,7 +384,7 @@ Last updated: 2026-04-27
 
 **Baseline criteria:**
 - Bootstrap summary appears in logs at startup
-- Feature quality propagates through `MarketSnapshot` → `Features`
+- Feature quality propagates through `MarketSnapshot` â†’ `Features`
 - OI/CVD persistence survives restart
 - Production paper bot runs on post-DATA-INTEGRITY contracts
 
@@ -382,20 +392,20 @@ Last updated: 2026-04-27
 
 ## Completed Milestone
 
-**MODELING-V1** — DONE (merged to main 2026-04-27)
+**MODELING-V1** â€” DONE (merged to main 2026-04-27)
 
 **Unblocked:** 2026-04-27 (Gate A PASS)
 **Implemented:** 2026-04-27 (Cascade builder)
-**Audit:** ChatGPT — DONE verdict for neutral mode (2026-04-27)
+**Audit:** ChatGPT â€” DONE verdict for neutral mode (2026-04-27)
 **Merged:** 2026-04-27, merge commit `2dc3112` on `main`
 
 **What was implemented:**
 - `SessionBucket`, `VolatilityBucket`, `MarketContext` (frozen) added to `core/models.py`
 - `SignalDiagnostics` extended with 6 context fields
-- `core/context_engine.py` — new `ContextEngine.classify()`: deterministic, stateless, UTC-enforced
+- `core/context_engine.py` â€” new `ContextEngine.classify()`: deterministic, stateless, UTC-enforced
 - `ContextConfig` added to `settings.py` with `config_hash` integration
 - `SignalEngine.diagnose/generate` updated: optional `context` param, context gate after base edge
-- `ContextEngine` inserted in `orchestrator.py` pipeline (regime → context → signal)
+- `ContextEngine` inserted in `orchestrator.py` pipeline (regime â†’ context â†’ signal)
 - Runtime context path mirrored in `backtest/backtest_runner.py`
 - 6 context columns in `decision_outcomes` (schema.sql + idempotent migration)
 - Audit hardening: UTC enforcement in `_classify_session`, telemetry tests for all decision paths
@@ -403,33 +413,91 @@ Last updated: 2026-04-27
 
 **Final smoke on main:**
 - `compileall`: PASS
-- `pytest`: 279 passed, 24 skipped (pre-existing), coverage 70.69% ≥ 65%, exit code 0
+- `pytest`: 279 passed, 24 skipped (pre-existing), coverage 70.69% â‰Ą 65%, exit code 0
 
-**Neutral mode:** `neutral_mode=True` (default) — no production behavior change on deploy.
+**Neutral mode:** `neutral_mode=True` (default) â€” no production behavior change on deploy.
 **Active context blocking:** NOT APPROVED. Stays neutral until MODELING-V1-VALIDATION analysis.
 
-## Active Milestone
+## Deferred Milestone
 
-**MODELING-V1-VALIDATION** — PLANNED
+**RESEARCH-OPTUNA-V1** — DEFERRED (branch: `research-optuna-v1`)
 
-**Goal:** Empirical analysis — does existing reclaim edge perform differently by session/volatility context?
+**Status:** Infrastructure built. Full run intentionally postponed pending modeling closure.
 
-**Prerequisites:**
-- ✅ MODELING-V1 merged to main
-- ✅ Deploy to production in neutral mode (context telemetry active)
-- Minimum data: ~200 cycles with context fields populated in `decision_outcomes`
+**Decision (2026-04-27):**
+- Do NOT run the full Optuna campaign now
+- Keep the branch as research infrastructure only
+- Revisit only after `MODELING-CONTEXT-CLOSURE` produces a clear context verdict
 
-**Analysis required** (`docs/analysis/MODELING_V1_VALIDATION_YYYY-MM-DD.md`):
-1. Trade count by session bucket
-2. Win rate by session bucket
-3. Expectancy R by session bucket
-4. Profit factor by session bucket
-5. Trade count by volatility bucket
-6. Win rate by volatility bucket
-7. Expectancy R by volatility bucket
-8. Session × volatility matrix
-9. Base edge present vs no edge by context
-10. Whether activation criteria are met
+**Constraints (hard):**
+- Do NOT modify live/paper runtime behavior
+- Do NOT change `neutral_mode`
+- Do NOT change context whitelist
+- Do NOT activate context gating
+- Do NOT modify production config defaults
+- Do NOT touch LiveExecutionEngine
+- Do NOT promote parameters without all gates passing
+
+**What was built (2026-04-27, Cascade builder):**
+- `research_lab/configs/reclaim_edge_v1.json` — new protocol config:
+  - `window_mode: rolling`, `train_days: 180`, `validation_days: 90`, `step_days: 90`
+  - `min_trades_full_candidate: 30`, `promotion_requires_all_windows_pass: true`
+  - `active_params_whitelist`: `confluence_min`, `sweep_buf_atr`, `reclaim_buf_atr`,
+    `wick_min_atr`, `min_sweep_depth_pct`, `entry_offset_atr`, `invalidation_offset_atr`,
+    `tp1_atr_mult`, `tp2_atr_mult`, `min_rr`
+- `research_lab/context_diagnostics.py` — session + volatility breakdown of backtest trades
+  - RESEARCH_ONLY diagnostic overlay, NOT used in objective function
+  - Reuses same session thresholds as ContextEngine
+- `scripts/run_optuna_research_v1.py` — orchestration script:
+  - Runs `run_optimize_loop()` with `reclaim_edge_v1.json` protocol
+  - Computes context diagnostics for top Pareto candidates (replay backtest)
+  - Writes `docs/analysis/OPTUNA_RESEARCH_V1_<date>.md` + JSON artifact
+  - All output explicitly labeled RESEARCH_ONLY
+- `tests/test_optuna_research_v1.py` — 48 new tests:
+  - Session classification (ASIA/EU/EU_US/US boundaries, UTC enforcement)
+  - Volatility classification (LOW/NORMAL/HIGH/UNKNOWN thresholds)
+  - `compute_context_diagnostics`: PARTIAL/FULL grade, bucket stats, note
+  - Protocol config: required fields, active_params, min_trades, WF settings
+  - Objective gates: MIN_TRADES_NOT_MET, MAX_TRADES_VOLUME_CONSTRAINT
+  - Promotion gates: `walkforward_not_passed`, `walkforward_fragile` in BLOCKING_RISKS
+  - Config lineage: `build_search_space_signature`, `build_trial_context_signature`
+
+**Smoke tests:** 327 passed, 24 skipped (pre-existing), coverage 70.69% >= 65%
+
+**How to run:**
+```bash
+python scripts/run_optuna_research_v1.py \\
+  --source-db-path /path/to/btc_bot.db \\
+  --start-date 2024-01-01 \\
+  --end-date 2026-04-01 \\
+  --n-trials 50 \\
+  --output-dir docs/analysis
+```
+
+**Promotion gates (all required before any config change):**
+1. Walk-forward pass — all windows
+2. `min_trades >= 30` per candidate
+3. `profit_factor >= 1.1` per window
+4. `max_drawdown_pct <= 40%` per window
+5. No single context bucket dominates all profit without warning
+6. Human review + approval bundle generated
+7. Separate MODELING-V1-ACTIVATION milestone opened
+
+---
+
+**MODELING-V1-VALIDATION** — CHECKPOINT COMPLETE (result: PARTIAL, activation blocked)
+
+**Deployed:** 2026-04-27 (main @ `cd02953`, production server)
+**Context telemetry verified:** `EU|HIGH|eligible=1|neutral_mode_active=1` ✅
+**TOR A report:** `docs/analysis/MODELING_V1_VALIDATION_2026-04-27.md`
+
+**Report grade:** ⚠️ PARTIAL
+- 16 trades, baseline WR 50%, 998 decision cycles
+- 75% UNKNOWN volatility (atr_4h_norm missing from features_at_entry_json)
+- EU session: 100% WR (N=3), p=0.055 — borderline, NOT eligible (p>0.05)
+- No bucket meets activation criteria
+
+**Verdict:** `neutral_mode=True` stays. Activation is blocked until context telemetry is decision-grade.
 
 **Activation criteria (from blueprint):**
 - `win_rate_delta >= 10.0` percentage points vs baseline
@@ -443,6 +511,11 @@ Last updated: 2026-04-27
 - Do NOT tune thresholds based on intuition
 - Analysis first, then decision
 
+**Closure note:**
+- This checkpoint closed the question "is Modeling V1 immediately activatable?" with a clear answer: **no**
+- The missing piece is not more Gate A integrity work; it is context-validation completeness
+- Next required milestone: `MODELING-CONTEXT-CLOSURE`
+
 ---
 
 ## Future Milestone: SAFE-MODE-AUTO-RECOVERY
@@ -452,8 +525,8 @@ Last updated: 2026-04-27
 **Goal:** Implement in-process auto-recovery for technical safe-mode triggers (WebSocket reconnect, transient failures)
 
 **Current behavior:**
-- Health check fails 3 times → safe mode activated
-- WebSocket reconnects → health stabilizes BUT safe mode remains active
+- Health check fails 3 times â†’ safe mode activated
+- WebSocket reconnects â†’ health stabilizes BUT safe mode remains active
 - Recovery requires manual restart or SQL clear
 
 **Target behavior (Hybrid Auto-Recovery):**
@@ -472,7 +545,7 @@ Last updated: 2026-04-27
 
 **Rationale:** WebSocket reconnects are transient technical issues, not capital risks. Restart is heavyweight (10s downtime, state loss). In-process recovery = fast (5 min), clean, production-grade.
 
-**Quick fix applied (2026-04-23):** Raised `health_failures_before_safe_mode` from 3 → 10 for initial config phase. MUST implement proper auto-recovery before lowering threshold back to production value.
+**Quick fix applied (2026-04-23):** Raised `health_failures_before_safe_mode` from 3 â†’ 10 for initial config phase. MUST implement proper auto-recovery before lowering threshold back to production value.
 
 **Prerequisites:** None (can implement anytime)
 
@@ -492,23 +565,23 @@ Last updated: 2026-04-27
 
 ---
 
-## 🎯 DATA QUALITY FOUNDATION (2026-04-21)
+## đźŽŻ DATA QUALITY FOUNDATION (2026-04-21)
 
 **Historical Significance:** First time bot has complete, correct, restart-safe data contracts.
 
 This is a **critical milestone** that combines two fundamental fixes establishing the data foundation for all future work:
 
-### Fix 1: DATA-INTEGRITY-V1 (Commit 7ebf2d2 → main)
-- ✅ Restart-safe OI/CVD persistence (`oi_samples`, `cvd_price_history` tables)
-- ✅ Feature quality contracts (ready/degraded/unavailable)
-- ✅ Bootstrap from DB on startup (no more cold-start penalty)
-- ✅ Observable quality state (logs + dashboard `/api/feature-quality`)
+### Fix 1: DATA-INTEGRITY-V1 (Commit 7ebf2d2 â†’ main)
+- âś… Restart-safe OI/CVD persistence (`oi_samples`, `cvd_price_history` tables)
+- âś… Feature quality contracts (ready/degraded/unavailable)
+- âś… Bootstrap from DB on startup (no more cold-start penalty)
+- âś… Observable quality state (logs + dashboard `/api/feature-quality`)
 
-### Fix 2: Paper Execution Realism (Commit df30615 → main)
-- ✅ Fills at `snapshot.price` (not `signal.entry_price` reference)
-- ✅ Execution audit trail (`executions` table populated)
-- ✅ Correct PnL metrics (no more corrupted paper results)
-- ✅ Dashboard visibility (Signal Reference vs Fill Entry)
+### Fix 2: Paper Execution Realism (Commit df30615 â†’ main)
+- âś… Fills at `snapshot.price` (not `signal.entry_price` reference)
+- âś… Execution audit trail (`executions` table populated)
+- âś… Correct PnL metrics (no more corrupted paper results)
+- âś… Dashboard visibility (Signal Reference vs Fill Entry)
 
 ### Integration: EXPERIMENT-V2 (Commit 0607b3e)
 Both fixes integrated with experiment profile (relaxed filters) for validation.
@@ -542,13 +615,13 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **What:** Make decision-path data restart-safe, coverage-aware, and quality-explicit
 
 **Deliverables:**
-- ✅ Task 1: `FeatureQuality` model integrated into `MarketSnapshot` and `Features`
-- ✅ Task 2: OI sample persistence + bootstrap (table: `oi_samples`)
-- ✅ Task 3: Flow window completeness validation (config-driven thresholds)
-- ✅ Task 4: CVD/price history persistence + bootstrap (table: `cvd_price_history`)
-- ✅ Task 5: Funding window integrity validation
-- ✅ Task 6: Operational visibility (bootstrap logs, `/api/feature-quality` endpoint)
-- ✅ Task 7: Integration + regression tests (20 tests pass)
+- âś… Task 1: `FeatureQuality` model integrated into `MarketSnapshot` and `Features`
+- âś… Task 2: OI sample persistence + bootstrap (table: `oi_samples`)
+- âś… Task 3: Flow window completeness validation (config-driven thresholds)
+- âś… Task 4: CVD/price history persistence + bootstrap (table: `cvd_price_history`)
+- âś… Task 5: Funding window integrity validation
+- âś… Task 6: Operational visibility (bootstrap logs, `/api/feature-quality` endpoint)
+- âś… Task 7: Integration + regression tests (20 tests pass)
 
 **Architecture:** Persistence + bootstrap > restart-from-zero warmup
 
@@ -577,10 +650,10 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **Evaluation results (March 2026):**
 
 **Funnel breakdown:**
-- 286 detected → 58 candidates (79.7% died as `uptrend_pullback_weak`)
-- 58 candidates → 50 governance veto (86.2%, of which 45 were `duplicate_level`)
-- 58 candidates → 5 risk block
-- 3 trades opened → 3 closed (all losses)
+- 286 detected â†’ 58 candidates (79.7% died as `uptrend_pullback_weak`)
+- 58 candidates â†’ 50 governance veto (86.2%, of which 45 were `duplicate_level`)
+- 58 candidates â†’ 5 risk block
+- 3 trades opened â†’ 3 closed (all losses)
 
 **Performance:**
 - PnL: -$319.52
@@ -593,8 +666,8 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 2. **Governance duplicate_level dominance** - 45/50 vetoes are duplicate_level (geometry problem, not threshold)
 3. **No viable cohort** - 0% win rate, higher confluence (12.95) setups rejected by risk (`rr_below_min`)
 
-**Codex recommendation:** ✅ **Redesign path, NOT tune thresholds**  
-**Claude Code assessment:** ✅ **Fully agree**
+**Codex recommendation:** âś… **Redesign path, NOT tune thresholds**  
+**Claude Code assessment:** âś… **Fully agree**
 
 **Why tuning won't work:**
 - Duplicate_level = geometry issue (pullbacks cluster at same levels in uptrend)
@@ -621,12 +694,12 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **What:** Add feature-flagged uptrend pullback continuation logic + observability infrastructure
 
 **Deliverables completed:**
-- ✅ D1: Uptrend pullback signal path (regime=UPTREND + sweep_side=LOW → LONG)
-- ✅ D2: Decision outcome histogram (`decision_outcomes` table + `/api/decision-funnel` endpoint)
-- ✅ D3: Config snapshot persistence (`config_snapshots` table + `/api/config/{hash}` endpoint)
-- ✅ D4: Feature flag `allow_uptrend_pullback=False` (default OFF, research ENV override, live hard-locked)
-- ✅ D5: Tests (92 passed, 2 skipped, all milestone tests pass)
-- ✅ D6: Backtest comparison March 2026 (OFF vs ON, info only)
+- âś… D1: Uptrend pullback signal path (regime=UPTREND + sweep_side=LOW â†’ LONG)
+- âś… D2: Decision outcome histogram (`decision_outcomes` table + `/api/decision-funnel` endpoint)
+- âś… D3: Config snapshot persistence (`config_snapshots` table + `/api/config/{hash}` endpoint)
+- âś… D4: Feature flag `allow_uptrend_pullback=False` (default OFF, research ENV override, live hard-locked)
+- âś… D5: Tests (92 passed, 2 skipped, all milestone tests pass)
+- âś… D6: Backtest comparison March 2026 (OFF vs ON, info only)
 
 **Files changed (18):**
 - `settings.py`, `core/signal_engine.py`, `orchestrator.py`, `backtest/backtest_runner.py`
@@ -639,13 +712,13 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 - OFF: 44 signals, 7 trades, PnL $1,394, expectancy 2.66R
 - ON: 102 signals (+58 uptrend), 9 trades, PnL $859 (-$535), expectancy 1.33R (-1.33R)
 - 86 governance vetoes, 7 risk blocks in ON run
-- **Verdict:** Coverage ↑, quality ↓ — hypothesis does NOT demonstrate edge yet
+- **Verdict:** Coverage â†‘, quality â†“ â€” hypothesis does NOT demonstrate edge yet
 
 **Audit notes:**
 - Architecture discipline excellent (isolated path, feature flag safety, frozen params)
 - Config snapshots + decision funnel are valuable observability investments
 - Governance/risk correctly filtering low-quality candidates
-- **DO NOT enable in live** — research hypothesis only
+- **DO NOT enable in live** â€” research hypothesis only
 
 **Next recommended milestone:** UPTREND-PULLBACK-EVAL-V1  
 **Scope:** Breakdown rejection reasons, candidate quality segmentation, identify viable vs junk subgroups
@@ -657,9 +730,9 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **Active builders:** Cascade (started), Codex (finished)
 **Commits:** `1da4664` feat(research-lab): harden 2-phase workflow and warm-start hygiene
 
-**What:** Formalize research lab as staged 2-phase system (Optuna discovery → Autoresearch refinement) with metodologiczna higiena
+**What:** Formalize research lab as staged 2-phase system (Optuna discovery â†’ Autoresearch refinement) with metodologiczna higiena
 
-**Why:** Address metodologiczne słabości identified by Perplexity architectural review:
+**Why:** Address metodologiczne sĹ‚aboĹ›ci identified by Perplexity architectural review:
 - Warm-start contamination from mixed contexts (different protocols, date ranges, search spaces)
 - Baseline gate too restrictive (blocked weak-but-valid baselines, prevented improvement)
 - No trial context reproducibility (couldn't match exact optimization conditions)
@@ -673,7 +746,7 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
   - Add trial lineage tracking: search_space_signature, regime_signature, trial_context_signature, baseline_version
   - Schema migrations + indexes for performance
 - **P2 - High Priority:**
-  - Create `docs/RESEARCH_LAB_WORKFLOW.md` formalizing Optuna→Autoresearch 2-phase workflow
+  - Create `docs/RESEARCH_LAB_WORKFLOW.md` formalizing Optunaâ†’Autoresearch 2-phase workflow
   - Add CLI flags: `--warm-start-ignore-protocol` (bypass filter), `--seed-from-pareto` (handoff)
 - **P3 - Medium Priority:**
   - Rank drawdown ahead of profit_factor in autoresearch candidate ordering
@@ -697,14 +770,14 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 - Baseline gate = hard block for broken pipeline, soft warning for weak strategy
 
 **Acceptance criteria met:**
-- ✅ Protocol/context filtering implemented + tested
-- ✅ Baseline gate split implemented + tested
-- ✅ Trial context tracking implemented + tested
-- ✅ Workflow documentation created
-- ✅ CLI handoff support added + tested
-- ✅ Ranking priority fixed + tested
-- ✅ All tests pass
-- ✅ Zero tech debt introduced
+- âś… Protocol/context filtering implemented + tested
+- âś… Baseline gate split implemented + tested
+- âś… Trial context tracking implemented + tested
+- âś… Workflow documentation created
+- âś… CLI handoff support added + tested
+- âś… Ranking priority fixed + tested
+- âś… All tests pass
+- âś… Zero tech debt introduced
 
 **Future work (deferred to next milestones):**
 - P4: Adaptive autoresearch (mutation rate, exploration scoring, lineage)
@@ -745,14 +818,14 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **Verdict:** DONE (all audit axes PASS)
 
 **Acceptance criteria met:**
-- ✅ Overlay pattern correctly implemented (both candidates always evaluated)
-- ✅ Selection logic deterministic (higher confluence, base on tie)
-- ✅ Config logging for trial validation (once per run)
-- ✅ Tests validate overlay behavior (7 passed)
-- ✅ Layer separation preserved (research_lab only)
-- ✅ Determinism preserved (no randomness)
-- ✅ Tech debt low (clean implementation)
-- ✅ AGENTS.md compliance (WHAT/WHY/STATUS commit message)
+- âś… Overlay pattern correctly implemented (both candidates always evaluated)
+- âś… Selection logic deterministic (higher confluence, base on tie)
+- âś… Config logging for trial validation (once per run)
+- âś… Tests validate overlay behavior (7 passed)
+- âś… Layer separation preserved (research_lab only)
+- âś… Determinism preserved (no randomness)
+- âś… Tech debt low (clean implementation)
+- âś… AGENTS.md compliance (WHAT/WHY/STATUS commit message)
 
 **Next steps:**
 1. Re-run RUN14 campaign (trials 26-80) with overlay fix
@@ -774,12 +847,12 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
 **Why:** `DEPLOYMENT-REMEDIATION-2026-04-17` removed the live blockers (`healthy=1`, `safe_mode=0`, fresh collectors, fresh DB). The next required truth is whether the remaining `no_signal` comes from current market conditions or from an overly restrictive strategy setup.
 
 **Acceptance criteria:**
-- ✅ Fresh-data decision cycles after `2026-04-17T13:32:54Z` inspected
-- ✅ Exact rejection stage identified in the live pipeline
-- ✅ Counts documented for `decision -> signal_candidates -> executable_signals -> trades`
-- ✅ Current market snapshot compared to Trial #63 edge requirements
-- ✅ ETF-bias partiality assessed for relevance to the active signal path
-- ✅ Evidence-backed verdict written to tracker and analysis doc
+- âś… Fresh-data decision cycles after `2026-04-17T13:32:54Z` inspected
+- âś… Exact rejection stage identified in the live pipeline
+- âś… Counts documented for `decision -> signal_candidates -> executable_signals -> trades`
+- âś… Current market snapshot compared to Trial #63 edge requirements
+- âś… ETF-bias partiality assessed for relevance to the active signal path
+- âś… Evidence-backed verdict written to tracker and analysis doc
 
 **In-scope:**
 - read-only pipeline-stage breakdown on fresh runtime data
@@ -848,7 +921,7 @@ Both fixes integrated with experiment profile (relaxed filters) for validation.
   - future research/tuning if more uptrend participation is desired
 - Do not modify strategy parameters inside this assessment milestone
 
-**Previous milestone:** `DEPLOYMENT-REMEDIATION-2026-04-17` — CLOSED / AUDITED
+**Previous milestone:** `DEPLOYMENT-REMEDIATION-2026-04-17` â€” CLOSED / AUDITED
 - Clean redeploy to `1efa7e55051196702aa123f7e3d55d94957bbc9b`
 - Collectors restored, DB freshness recovered, runtime verified `healthy=1`, `safe_mode=0`
 - Audit baseline: `docs/audits/AUDIT_DEPLOYMENT_REMEDIATION_2026-04-17.md`
@@ -876,8 +949,8 @@ Last reconciled: 2026-04-16
 
 ---
 
-**Milestone:** DIAGNOSE-RUNTIME-LOOP-HANG — Diagnose why bot never reaches decision cycles
-**Status:** CLOSED — FALSE ALARM / RESOLVED BY MVP (2026-04-15)
+**Milestone:** DIAGNOSE-RUNTIME-LOOP-HANG â€” Diagnose why bot never reaches decision cycles
+**Status:** CLOSED â€” FALSE ALARM / RESOLVED BY MVP (2026-04-15)
 **Active builder:** Cascade
 
 **Findings:**
@@ -886,17 +959,17 @@ Last reconciled: 2026-04-16
 - Decision cycle fired at exactly 12:30:00 UTC and completed in <1 second
 - Root cause of perceived "hang": old Fix #8 sticky safe_mode code silently blocked all
   decision cycles via audit_logger only (no output to btc_bot.log)
-- Test windows never reached a 15-minute boundary before restart — cycles were simply scheduled
+- Test windows never reached a 15-minute boundary before restart â€” cycles were simply scheduled
   for the next 15m slot
 
 **Resolution:** SAFE-MODE-AUTO-RECOVERY-MVP (commit 93faed56) already resolved the underlying
 issue. safe_mode=False confirmed. Bot is operational and running cycles normally.
 
 **Debug commits (reverted):**
-- `30b40b9` — 25 debug logs in startup methods
-- `49c4a95` — debug logs in event loop and health check
-- `bc76968` — revert event loop debug
-- `91597da` — revert startup debug (current HEAD)
+- `30b40b9` â€” 25 debug logs in startup methods
+- `49c4a95` â€” debug logs in event loop and health check
+- `bc76968` â€” revert event loop debug
+- `91597da` â€” revert startup debug (current HEAD)
 
 **Report:** docs/audits/DIAGNOSTIC_RUNTIME_LOOP_HANG.md
 
@@ -904,7 +977,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ## Previous Milestones
 
-**Milestone:** SAFE-MODE-AUTO-RECOVERY-MVP — Fix sticky safe_mode + DB divergence bug
+**Milestone:** SAFE-MODE-AUTO-RECOVERY-MVP â€” Fix sticky safe_mode + DB divergence bug
 **Status:** MVP_DONE + DEPLOYED (commit 93faed56, 2026-04-15)
 **Active builder:** Cascade
 
@@ -919,7 +992,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-**Milestone:** REPO-CONSISTENCY-VERIFICATION-2026-04-15 — Verify full code consistency between main and all side branches
+**Milestone:** REPO-CONSISTENCY-VERIFICATION-2026-04-15 â€” Verify full code consistency between main and all side branches
 **Status:** DONE (branch: main, commit d07ddd0, 2026-04-15)
 **Active builder:** Cascade
 
@@ -932,14 +1005,14 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - Deleted local branch `infra/egress-vultr-fix` (fully merged, no longer needed)
 
 **Branches analyzed:**
-- `main` (HEAD): d07ddd0 — REPO-CONSISTENCY-VERIFICATION
-- `terminal-diagnostics-safe-mode` (local + remote): 0f6c129 — same as main (fully merged, up-to-date)
-- `websocket-migration` (remote): dcc0105 — merged at 820024b
-- `dashboard-server-resources` (remote): 6cb9421 — merged at 5991b09
-- `dashboard-risk-visualisation` (remote): 24b1bff — merged at 787a67d
-- `dashboard-access-guide` (remote): 3e034a0 — merged at ff1e0b3
-- `dashboard-egress-integration` (remote): 153659a — merged at aae0226
-- `infra/egress-vultr-fix` (remote): f5baaf0 — merged at 3afa91c (local branch deleted)
+- `main` (HEAD): d07ddd0 â€” REPO-CONSISTENCY-VERIFICATION
+- `terminal-diagnostics-safe-mode` (local + remote): 0f6c129 â€” same as main (fully merged, up-to-date)
+- `websocket-migration` (remote): dcc0105 â€” merged at 820024b
+- `dashboard-server-resources` (remote): 6cb9421 â€” merged at 5991b09
+- `dashboard-risk-visualisation` (remote): 24b1bff â€” merged at 787a67d
+- `dashboard-access-guide` (remote): 3e034a0 â€” merged at ff1e0b3
+- `dashboard-egress-integration` (remote): 153659a â€” merged at aae0226
+- `infra/egress-vultr-fix` (remote): f5baaf0 â€” merged at 3afa91c (local branch deleted)
 
 **Implementation quality verification:**
 - All merged commits follow AGENTS.md commit discipline (WHAT/WHY/STATUS)
@@ -950,7 +1023,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - All smoke tests pass (93/93, 24 skipped)
 
 **Cleanup recommendations:**
-- ✅ Local branch `infra/egress-vultr-fix` deleted (fully merged)
+- âś… Local branch `infra/egress-vultr-fix` deleted (fully merged)
 - Local branch `terminal-diagnostics-safe-mode` can be kept as reference (at same commit as main)
 - Remote branches can be safely deleted after confirmation:
   - `origin/dashboard-access-guide`
@@ -964,22 +1037,22 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 **Why:** Uncertainty about whether previous feature branches were correctly merged into main. Risk of code duplicates or incomplete merges breaking architecture. Full verification ensures branch hygiene and architectural integrity.
 
 **Acceptance criteria:**
-- ✅ All 8 branches enumerated with merge status
-- ✅ All branches verified as fully merged into main (no unique commits in branches)
-- ✅ Implementation quality verified for all merged changes (layer separation, contracts, determinism, AGENTS.md compliance)
-- ✅ No discrepancies, duplicates, or implementation errors found
-- ✅ Cleanup recommendations documented
-- ✅ Local branch `infra/egress-vultr-fix` deleted
-- ✅ MILESTONE_TRACKER.md updated with milestone entry
-- ✅ git push origin main completed
-- ✅ Smoke tests pass (93/93, 24 skipped)
+- âś… All 8 branches enumerated with merge status
+- âś… All branches verified as fully merged into main (no unique commits in branches)
+- âś… Implementation quality verified for all merged changes (layer separation, contracts, determinism, AGENTS.md compliance)
+- âś… No discrepancies, duplicates, or implementation errors found
+- âś… Cleanup recommendations documented
+- âś… Local branch `infra/egress-vultr-fix` deleted
+- âś… MILESTONE_TRACKER.md updated with milestone entry
+- âś… git push origin main completed
+- âś… Smoke tests pass (93/93, 24 skipped)
 
 **In-scope:** All git branches in repository, diff analysis, implementation quality verification, branch cleanup recommendations, MILESTONE_TRACKER.md update, smoke tests
 **Out-of-scope:** Modifying production code (no fix commits required), changing merge history (rebase/force push), remote repository configuration
 
 ---
 
-**Milestone:** TERMINAL-DIAGNOSTICS-SAFE-MODE — Prepare copy-paste terminal diagnostic script for safe mode troubleshooting
+**Milestone:** TERMINAL-DIAGNOSTICS-SAFE-MODE â€” Prepare copy-paste terminal diagnostic script for safe mode troubleshooting
 **Status:** MVP_DONE (branch: terminal-diagnostics-safe-mode, 2026-04-14)
 **Active builder:** Cascade
 
@@ -987,25 +1060,25 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - `scripts/diagnostics/check_safe_mode.sh`: read-only bash script with 7 diagnostic sections (service status, bot log tail, dashboard API egress, dashboard API server resources, DB bot_state query, WebSocket URL config, WebSocket connection attempts)
 - `docs/diagnostics/safe-mode-check.md`: step-by-step copy-paste instructions, manual diagnostic commands, common causes (WebSocket failure, egress proxy issues, resource exhaustion, DB corruption), next steps guidance
 - `README.md`: added Diagnostyka section with quick start command and reference to detailed guide
-- Script is read-only — zero mutations, no service restarts, no DB writes
+- Script is read-only â€” zero mutations, no service restarts, no DB writes
 
 **Why:** Bot remains in safe mode after WebSocket migration. Diagnostic script provides operator with ready-to-run commands to gather information without manual command recall. Read-only design prevents accidental state changes during diagnosis.
 
 **Acceptance criteria:**
-- ✅ `scripts/diagnostics/check_safe_mode.sh` created with all 7 diagnostic sections
-- ✅ `docs/diagnostics/safe-mode-check.md` created with step-by-step instructions and common causes
-- ✅ `README.md` Diagnostyka section added with quick start
-- ✅ `docs/MILESTONE_TRACKER.md` updated with milestone entry
-- ✅ Zero changes to `core/**`, `execution/**`, `dashboard/**`, `ProxyTransport`
-- ✅ Script is read-only (no mutations, no restarts)
-- ✅ All existing tests pass (93/93, 24 skipped)
+- âś… `scripts/diagnostics/check_safe_mode.sh` created with all 7 diagnostic sections
+- âś… `docs/diagnostics/safe-mode-check.md` created with step-by-step instructions and common causes
+- âś… `README.md` Diagnostyka section added with quick start
+- âś… `docs/MILESTONE_TRACKER.md` updated with milestone entry
+- âś… Zero changes to `core/**`, `execution/**`, `dashboard/**`, `ProxyTransport`
+- âś… Script is read-only (no mutations, no restarts)
+- âś… All existing tests pass (93/93, 24 skipped)
 
 **In-scope:** `scripts/diagnostics/check_safe_mode.sh` (new), `docs/diagnostics/safe-mode-check.md` (new), `docs/MILESTONE_TRACKER.md`, `README.md`
 **Out-of-scope:** `core/**`, `execution/**`, `dashboard/**`, `ProxyTransport`, any production code mutations, service restart commands, DB write operations
 
 ---
 
-**Milestone:** WEBSOCKET-MIGRATION — Migrate WebSocket URLs to new Binance official /market/ paths
+**Milestone:** WEBSOCKET-MIGRATION â€” Migrate WebSocket URLs to new Binance official /market/ paths
 **Status:** DONE (branch: websocket-migration, commit dcc0105, 2026-04-14)
 **Active builder:** Cascade
 
@@ -1020,111 +1093,111 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 **Why:** Binance announced deprecation of legacy `/stream/` WebSocket paths in favor of new `/market/` paths. Migration ensures future-proof connectivity. Fallback logic prevents production downtime if new path has issues.
 
 **Acceptance criteria:**
-- ✅ `settings.py` has new `futures_ws_market_base_url` and `futures_ws_stream_base_url` constants
-- ✅ `data/websocket_client.py` uses `/market/` path by default via `_build_market_stream_url()`
-- ✅ Fallback logic implemented: if `/market/` fails, retry with `/stream/` (legacy)
-- ✅ Logging added to track which path is being used (market vs legacy)
-- ✅ `orchestrator.py` updated to pass `ws_market_base_url` parameter
-- ✅ All existing tests pass (93/93, 24 skipped)
-- ✅ Zero changes to `core/**`, `execution/**` beyond `orchestrator.py` URL parameter
+- âś… `settings.py` has new `futures_ws_market_base_url` and `futures_ws_stream_base_url` constants
+- âś… `data/websocket_client.py` uses `/market/` path by default via `_build_market_stream_url()`
+- âś… Fallback logic implemented: if `/market/` fails, retry with `/stream/` (legacy)
+- âś… Logging added to track which path is being used (market vs legacy)
+- âś… `orchestrator.py` updated to pass `ws_market_base_url` parameter
+- âś… All existing tests pass (93/93, 24 skipped)
+- âś… Zero changes to `core/**`, `execution/**` beyond `orchestrator.py` URL parameter
 **Out-of-scope:** `core/**`, `execution/**` (except `orchestrator.py`), new WebSocket features, stream reconnection logic changes
 
 ---
 
 ---
 
-**Milestone:** DASHBOARD-SERVER-RESOURCES — Server resource monitoring panel in dashboard
+**Milestone:** DASHBOARD-SERVER-RESOURCES â€” Server resource monitoring panel in dashboard
 **Status:** DONE (branch: dashboard-server-resources, commit 6cb9421, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Extended dashboard with Server Resources panel:
 - Added `psutil` to `requirements.txt` (lightweight cross-platform system metrics library)
 - `/api/server-resources` endpoint: reads CPU %, memory % (total/used GB), load average (1m/5m/15m), disk % (total/used GB) via psutil
-- Server Resources panel in UI: after Risk & Governance, displays CPU/Memory/Load/Disk with color-coded badges (green <80%, amber ≥80%, red ≥95%)
+- Server Resources panel in UI: after Risk & Governance, displays CPU/Memory/Load/Disk with color-coded badges (green <80%, amber â‰Ą80%, red â‰Ą95%)
 - Auto-refreshes every 10s (same pattern as Egress/Risk panels)
 
 **Why:** Operator visibility into server health without SSH. Detects resource pressure (CPU/RAM/Disk) early before it affects bot performance. Lightweight, read-only, no impact on core pipeline.
 
 **Acceptance criteria:**
-- ✅ `/api/server-resources` returns correct schema (cpu_percent, memory_percent, memory_total_gb, memory_used_gb, load_avg, disk_percent, disk_total_gb, disk_used_gb)
-- ✅ Server Resources panel visible after Risk & Governance section (10s refresh)
-- ✅ Display: CPU %, Memory % (GB), Load (1m/5m/15m), Disk % (GB)
-- ✅ Color-coded badges: green <80%, amber ≥80%, red ≥95%
-- ✅ `psutil` added to `requirements.txt`
-- ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
+- âś… `/api/server-resources` returns correct schema (cpu_percent, memory_percent, memory_total_gb, memory_used_gb, load_avg, disk_percent, disk_total_gb, disk_used_gb)
+- âś… Server Resources panel visible after Risk & Governance section (10s refresh)
+- âś… Display: CPU %, Memory % (GB), Load (1m/5m/15m), Disk % (GB)
+- âś… Color-coded badges: green <80%, amber â‰Ą80%, red â‰Ą95%
+- âś… `psutil` added to `requirements.txt`
+- âś… Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
 
 **In-scope:** `requirements.txt`, `dashboard/server.py`, `dashboard/static/index.html`, `dashboard/static/app.js`, `dashboard/static/style.css`, `docs/dashboard/server-resources.md`, `docs/MILESTONE_TRACKER.md`
-**Out-of-scope:** All trading pipeline code — `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
+**Out-of-scope:** All trading pipeline code â€” `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `ProxyTransport`
 
 ---
 
 ---
 
-**Milestone:** DASHBOARD-RISK-VISUALISATION — Live Risk & Governance panel in dashboard
+**Milestone:** DASHBOARD-RISK-VISUALISATION â€” Live Risk & Governance panel in dashboard
 **Status:** DONE (branch: dashboard-risk-visualisation, commit 24b1bff, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Extended dashboard with Risk & Governance panel:
 - `/api/risk` endpoint: reads `AppSettings.risk` + `AppSettings.strategy` (limits) + `bot_state` (usage) + `signal_candidates`/`executable_signals` (latest signal)
 - Risk & Governance panel in UI: current regime, progress bars for Daily DD / Weekly DD / consecutive losses / open positions (usage vs limit), latest signal card with direction, confluence_score, reasons[], Promoted/Vetoed badge, governance_notes
-- Yellow alert row when governance blocked OR risk limit near breach (≥80%) OR RiskGate blocking
+- Yellow alert row when governance blocked OR risk limit near breach (â‰Ą80%) OR RiskGate blocking
 - Auto-refreshes every 10s (same pattern as Egress panel)
 
 **Why:** Operator visibility into RiskGate + Governance decisions without SSH. Shows exactly why a signal was vetoed (governance_notes) and whether trading is currently blocked by risk limits.
 
 **Acceptance criteria:**
-- ✅ `/api/risk` returns correct schema (regime, latest_signal, risk_limits, risk_usage, governance_blocked, risk_blocked, safe_mode)
-- ✅ Risk & Governance panel visible after Egress Health section (10s refresh)
-- ✅ Alert row for governance veto / risk block / DD ≥80% warning
-- ✅ Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`, `ProxyTransport`
-- ✅ `docs/dashboard/risk-visualisation.md` created
-- ✅ All existing tests pass (93/93)
+- âś… `/api/risk` returns correct schema (regime, latest_signal, risk_limits, risk_usage, governance_blocked, risk_blocked, safe_mode)
+- âś… Risk & Governance panel visible after Egress Health section (10s refresh)
+- âś… Alert row for governance veto / risk block / DD â‰Ą80% warning
+- âś… Zero changes to `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`, `ProxyTransport`
+- âś… `docs/dashboard/risk-visualisation.md` created
+- âś… All existing tests pass (93/93)
 
 **In-scope:** `dashboard/server.py`, `dashboard/static/index.html`, `dashboard/static/app.js`, `dashboard/static/style.css`, `docs/dashboard/risk-visualisation.md`, `docs/MILESTONE_TRACKER.md`
-**Out-of-scope:** All trading pipeline code — `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`
+**Out-of-scope:** All trading pipeline code â€” `core/**`, `execution/**`, `orchestrator.py`, `data/**`, `settings.py`
 
 ---
 
 ---
 
-**Milestone:** DASHBOARD-ACCESS-GUIDE — Production run/access documentation for dashboard
+**Milestone:** DASHBOARD-ACCESS-GUIDE â€” Production run/access documentation for dashboard
 **Status:** DONE (branch: dashboard-access-guide, commit 3e034a0, 2026-04-14)
 **Active builder:** Cascade
 
 **What:** Added complete operational documentation for running and accessing the dashboard in production:
-- `docs/dashboard/access-guide.md` (new): step-by-step — SSH access, systemd start/stop/enable, external binding override, UFW rule, SSH tunnel, health check, log rotation, deploy update procedure, Egress Health interpretation table
+- `docs/dashboard/access-guide.md` (new): step-by-step â€” SSH access, systemd start/stop/enable, external binding override, UFW rule, SSH tunnel, health check, log rotation, deploy update procedure, Egress Health interpretation table
 - `README.md`: expanded Dashboard section with "How to run & access Dashboard" (systemd, health check, SSH tunnel, links)
 - `docs/MILESTONE_TRACKER.md`: this entry
 
 **Acceptance criteria:**
-- ✅ `docs/dashboard/access-guide.md` covers: start (systemd + manual), UFW, external binding, SSH tunnel, health check, log rotation, deploy updates, Egress Health interpretation
-- ✅ `README.md` "How to run & access Dashboard" section present with key commands
-- ✅ Zero code changes (docs only)
-- ✅ All existing tests pass (93/93)
+- âś… `docs/dashboard/access-guide.md` covers: start (systemd + manual), UFW, external binding, SSH tunnel, health check, log rotation, deploy updates, Egress Health interpretation
+- âś… `README.md` "How to run & access Dashboard" section present with key commands
+- âś… Zero code changes (docs only)
+- âś… All existing tests pass (93/93)
 
 **In-scope:** `README.md`, `docs/dashboard/access-guide.md`, `docs/MILESTONE_TRACKER.md`
-**Out-of-scope:** All code — `dashboard/**`, `core/**`, `data/**`, `execution/**`, `orchestrator.py`, `settings.py`
+**Out-of-scope:** All code â€” `dashboard/**`, `core/**`, `data/**`, `execution/**`, `orchestrator.py`, `settings.py`
 
 ---
 
 ---
 
-**Milestone:** DASHBOARD-EGRESS-INTEGRATION — Live egress/proxy health panel in dashboard
+**Milestone:** DASHBOARD-EGRESS-INTEGRATION â€” Live egress/proxy health panel in dashboard
 **Status:** DONE (branch: dashboard-egress-integration, commit 153659a, 2026-04-14)
 **Active builder:** Cascade
 
-**What:** Extended existing dashboard (FastAPI m3→m4) with:
+**What:** Extended existing dashboard (FastAPI m3â†’m4) with:
 - `/api/egress` endpoint: reads `settings.proxy` (env vars) + parses bot log tail for ProxyTransport events + reads `bot_state.safe_mode` from SQLite
-- Egress Health panel in UI: exit node IP, session age, bans (24h), rotation, safe mode status — auto-refresh 10s
+- Egress Health panel in UI: exit node IP, session age, bans (24h), rotation, safe mode status â€” auto-refresh 10s
 - Safe mode alert banner: red banner at top of page when `safe_mode = true`
 
 **Acceptance criteria:**
-- ✅ `/api/egress` returns correct schema
-- ✅ Egress Health panel visible in UI (10s refresh)
-- ✅ Safe mode alert banner functional
-- ✅ Zero changes to ProxyTransport, orchestrator.py, core/, execution/, settings.py
-- ✅ All existing tests pass (93/93)
-- ✅ `docs/dashboard/egress-integration.md` created
+- âś… `/api/egress` returns correct schema
+- âś… Egress Health panel visible in UI (10s refresh)
+- âś… Safe mode alert banner functional
+- âś… Zero changes to ProxyTransport, orchestrator.py, core/, execution/, settings.py
+- âś… All existing tests pass (93/93)
+- âś… `docs/dashboard/egress-integration.md` created
 
 **In-scope:** `dashboard/**` only + docs
 **Out-of-scope:** ProxyTransport code, orchestrator, core/, execution/, DB schema
@@ -1133,24 +1206,24 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-**Milestone:** INFRA-EGRESS-VULTR — Dedicated SOCKS5 exit node via Vultr
+**Milestone:** INFRA-EGRESS-VULTR â€” Dedicated SOCKS5 exit node via Vultr
 **Status:** DONE (branch: infra/egress-vultr-fix, commit 590064c, 2026-04-14)
 **Active builder:** Cascade
 **Commits:** 590064c chore: add Vultr SOCKS5 egress node documentation and config
 
-**Why:** IPRoyal residential proxy exit IP was partially blocked by Binance CloudFront (bookTicker and critical endpoints returned 404). Vultr exit node routes REST traffic through a clean IP — all critical endpoints (ping, time, bookTicker) return HTTP 200.
+**Why:** IPRoyal residential proxy exit IP was partially blocked by Binance CloudFront (bookTicker and critical endpoints returned 404). Vultr exit node routes REST traffic through a clean IP â€” all critical endpoints (ping, time, bookTicker) return HTTP 200.
 
 **Acceptance criteria:**
-- ✅ SOCKS5 daemon running and stable on Vultr (danted active, port 1080)
-- ✅ Firewall: only Hetzner IP allowed on port 1080
-- ✅ `/fapi/v1/ping` → HTTP 200 via SOCKS5
-- ✅ `/fapi/v1/time` → HTTP 200 via SOCKS5
-- ✅ `/fapi/v1/ticker/bookTicker?symbol=BTCUSDT` → HTTP 200 via SOCKS5
-- ✅ Bot log: `Proxy transport enabled: type=socks5, sticky=60 min, failover_count=0`
-- ✅ No REST retry errors after restart
-- ✅ 1h paper mode stability (zero REST errors, session reinit at 10:22:35 UTC as expected)
+- âś… SOCKS5 daemon running and stable on Vultr (danted active, port 1080)
+- âś… Firewall: only Hetzner IP allowed on port 1080
+- âś… `/fapi/v1/ping` â†’ HTTP 200 via SOCKS5
+- âś… `/fapi/v1/time` â†’ HTTP 200 via SOCKS5
+- âś… `/fapi/v1/ticker/bookTicker?symbol=BTCUSDT` â†’ HTTP 200 via SOCKS5
+- âś… Bot log: `Proxy transport enabled: type=socks5, sticky=60 min, failover_count=0`
+- âś… No REST retry errors after restart
+- âś… 1h paper mode stability (zero REST errors, session reinit at 10:22:35 UTC as expected)
 
-**Changes (repo only — no code changes):**
+**Changes (repo only â€” no code changes):**
 - Added `docs/infra/egress-vultr.md` (IP, port, config, destroy instructions)
 - Added `.env.example` (PROXY_SOCKS5_URL template + all env vars documented)
 - Updated `README.md` (Egress Configuration section)
@@ -1166,7 +1239,7 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-**Milestone:** INFRA-RESILIENCE-PROXY-2026 — Configurable proxy layer for Binance REST client
+**Milestone:** INFRA-RESILIENCE-PROXY-2026 â€” Configurable proxy layer for Binance REST client
 **Status:** MVP_DONE (commit 7622f8b, 2026-04-14)
 **Active builder:** Cascade
 **Commits:**
@@ -1186,15 +1259,15 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - Added tests/test_proxy_transport.py with 12 tests (all passing)
 
 **Acceptance criteria met:**
-- ✅ Proxy transport layer implemented with HTTP/SOCKS5 support
-- ✅ Sticky session logic (configurable 30-60 min via PROXY_STICKY_MINUTES)
-- ✅ CloudFront ban detection (x-cache header + HTTP 404)
-- ✅ Automatic failover (PROXY_FAILOVER_LIST with rotation logic)
-- ✅ Logging + alert on ban detection (ERROR log for ban, WARNING for rotation)
-- ✅ Smoke tests PASSED (93 passed, 24 skipped)
-- ✅ Zero regression in existing logic (all existing tests still pass)
-- ✅ Zero changes in core logic, feature_engine, regime_engine, signal path, WebSocket
-- ✅ Determinism preserved (no randomness in core path)
+- âś… Proxy transport layer implemented with HTTP/SOCKS5 support
+- âś… Sticky session logic (configurable 30-60 min via PROXY_STICKY_MINUTES)
+- âś… CloudFront ban detection (x-cache header + HTTP 404)
+- âś… Automatic failover (PROXY_FAILOVER_LIST with rotation logic)
+- âś… Logging + alert on ban detection (ERROR log for ban, WARNING for rotation)
+- âś… Smoke tests PASSED (93 passed, 24 skipped)
+- âś… Zero regression in existing logic (all existing tests still pass)
+- âś… Zero changes in core logic, feature_engine, regime_engine, signal path, WebSocket
+- âś… Determinism preserved (no randomness in core path)
 
 **Pending deployment verification:**
 - Configure proxy credentials via .env (PROXY_URL, PROXY_TYPE, PROXY_STICKY_MINUTES, PROXY_FAILOVER_LIST)
@@ -1208,8 +1281,8 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 
 ---
 
-**Milestone:** RUN13-REGIME-AWARE — Regime-robust campaign with anchored walk-forward
-**Status:** ACTIVE — Run #13 running on server (tmux `optimize13`, PID 120863, started 2026-04-13 10:50 UTC)
+**Milestone:** RUN13-REGIME-AWARE â€” Regime-robust campaign with anchored walk-forward
+**Status:** ACTIVE â€” Run #13 running on server (tmux `optimize13`, PID 120863, started 2026-04-13 10:50 UTC)
 **Active builder:** Codex (D1-D4) + Cascade (commit cleanup)
 **Decision date:** 2026-04-13
 **Commits:**
@@ -1224,41 +1297,41 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 - n_trials: 300
 - start_date: 2022-01-01 / end_date: 2026-03-01
 - max_sweep_rate: 1.0
-- warm_start: yes — seeded from Run #12 winners (trial #26 and #31)
+- warm_start: yes â€” seeded from Run #12 winners (trial #26 and #31)
 
 **Key changes vs Run #12:**
-- Hard min_trades floor: trades<80 → constraint violation (hard block), not soft penalty
+- Hard min_trades floor: trades<80 â†’ constraint violation (hard block), not soft penalty
 - Walk-forward: anchored_expanding mode, train_days=730, validation_days=365, step_days=365
-  (was rolling 180/90 — too short to evaluate 2022-2026 regime robustness)
+  (was rolling 180/90 â€” too short to evaluate 2022-2026 regime robustness)
 - Warm start: loads Run #12 Pareto winners before baseline (fixed ordering + compatibility filter)
-- Protocol: 2 anchored windows — train 2022-2024 + val 2024-2025, train 2022-2025 + val 2025-2026
+- Protocol: 2 anchored windows â€” train 2022-2024 + val 2024-2025, train 2022-2025 + val 2025-2026
 
 **Run #13 mid-campaign results (119+ trials, 2026-04-13 ~15:00 UTC):**
 
 | Trial | exp_r | PF | DD | trades | Note |
 |-------|-------|-----|-----|--------|------|
 | #0/#1 | +0.636 | 1.617 | 40.5% | 339 | warm start = Run #12 #26 |
-| **#63** | **+0.994** | **2.486** | **5.4%** | **183** | **NEW BEST — anchored WF PASSED** |
+| **#63** | **+0.994** | **2.486** | **5.4%** | **183** | **NEW BEST â€” anchored WF PASSED** |
 | #19 | +0.155 | 1.292 | 12.7% | 464 | stable backup |
 
 **Trial #63 walk-forward result (anchored expanding, 730/365 days):**
-- passed: TRUE — 2/2 windows (100%)
+- passed: TRUE â€” 2/2 windows (100%)
 - fragile: FALSE
-- **degradation: -11.2%** ← exceptional (Run #12 trial #26 had -238%)
+- **degradation: -11.2%** â† exceptional (Run #12 trial #26 had -238%)
 - failures: ZERO
 
 **DECISION (2026-04-13, prior audit verdict):** Trial #63 approved for paper trading.
 - Degradation -11.2% far below the audit threshold of -55%
 - 2/2 windows passed including 2024-2025 and 2025-2026 bull market windows
-- Note: allow_long_in_uptrend=False — bot very selective in bull markets (shorts in corrections only)
-- Note: max_leverage=high_vol_leverage=8 — monitor closely in live
+- Note: allow_long_in_uptrend=False â€” bot very selective in bull markets (shorts in corrections only)
+- Note: max_leverage=high_vol_leverage=8 â€” monitor closely in live
 
 **Campaign still running** (~7h remaining). Trial #63 is locked in as paper trading candidate.
 
 ---
 
 ## Completed Milestone: RUN12-SOFT-PENALTY
-**Status:** DONE — 310 trials, 2026-04-12/13
+**Status:** DONE â€” 310 trials, 2026-04-12/13
 **Active builder:** Cascade
 **Commits:** `45cea8a` + `51513f2` + `92df4b4` + `92bbbfd` + `e8abab3`
 
@@ -1269,22 +1342,22 @@ issue. safe_mode=False confirmed. Bot is operational and running cycles normally
 | Max penalty (0 trades) | 176 | 56% |
 | Constraint violations | 63 | 20% |
 | Real backtest | 71 | 22% |
-| Credible positive (PF≤3) | 15 | 4% |
+| Credible positive (PFâ‰¤3) | 15 | 4% |
 
-**Top credible candidates (PF≤3.0):**
+**Top credible candidates (PFâ‰¤3.0):**
 
 | Trial | exp_r | PF | DD | trades | Note |
 |-------|-------|-----|-----|--------|------|
-| #26/#93 | **+0.636** | 1.617 | 40.5% | 339 | **best — confirmed twice** |
+| #26/#93 | **+0.636** | 1.617 | 40.5% | 339 | **best â€” confirmed twice** |
 | #31/#94 | +0.384 | 1.359 | 30.2% | ~150 | solid |
 | #221 | +0.342 | 1.493 | 25.5% | ~130 | good DD |
 
-Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only 20-30 trades).
+Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, only 20-30 trades).
 
 **Walk-forward result for trial #26:**
 - Protocol: 28 rolling nested windows, 2022-2026
 - Result: PASSED (15/28 windows = 54%), fragile=false
-- **Degradation: -238%** — NOT suitable for live trading
+- **Degradation: -238%** â€” NOT suitable for live trading
 - Root cause: signal works in bear/chop 2022, fails in bull market 2023-2024
 - Windows 006-010 (2023-2024): expectancy -0.18 to -1.40 on both train and validation
 
@@ -1326,7 +1399,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - Safe_mode: true (startup recovery entered safe mode)
 - Websocket: Connected to wss://fstream.binance.com/stream
 **Restart executed:**
-- systemctl restart btc-bot → successful
+- systemctl restart btc-bot â†’ successful
 - Active: active (running) since 2026-04-14 00:10:59 UTC
 - PID: 141498 (new process)
 - Memory: 26.7M (peak: 27.1M) - reduced from 39.5M
@@ -1356,24 +1429,24 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - RAM: 3.7Gi total, 492Mi used, 3.2Gi available (+2.4GB freed)
 - CPU: Load average 0.90, 90.9% idle (+43.3% freed)
 **Installation steps:**
-- apt install python3-pip → success
-- pip3 install --break-system-packages protonvpn-cli → success (v2.2.11)
-- apt install openvpn dialog → success
+- apt install python3-pip â†’ success
+- pip3 install --break-system-packages protonvpn-cli â†’ success (v2.2.11)
+- apt install openvpn dialog â†’ success
 - Command: protonvpn (not protonvpn-cli)
 **Login attempt:**
 - OpenVPN username: g8qf5eiLrxfMAWlr
 - OpenVPN password: ejXSlrHkYxaelVm2rGXCaGFPqKBs0qRI
-- protonvpn init → HTTP Error Code: 422
+- protonvpn init â†’ HTTP Error Code: 422
 **Root cause diagnosis:**
-- curl -I https://api.protonvpn.ch → HTTP/2 404
+- curl -I https://api.protonvpn.ch â†’ HTTP/2 404
 - Server IP 204.168.146.253 is BLOCKED by:
-  - Binance CloudFront (fapi.binance.com) → HTTP 404
-  - ProtonVPN API (api.protonvpn.ch) → HTTP 404
-**Conclusion:** ❌ ProtonVPN CLI cannot be initialized because ProtonVPN API also blocks the server IP. This is not a credentials issue but a CDN/CloudFront IP blocking issue affecting multiple services. The server IP (204.168.146.253) appears to be on a blocklist used by major CDNs.
+  - Binance CloudFront (fapi.binance.com) â†’ HTTP 404
+  - ProtonVPN API (api.protonvpn.ch) â†’ HTTP 404
+**Conclusion:** âťŚ ProtonVPN CLI cannot be initialized because ProtonVPN API also blocks the server IP. This is not a credentials issue but a CDN/CloudFront IP blocking issue affecting multiple services. The server IP (204.168.146.253) appears to be on a blocklist used by major CDNs.
 **Acceptance criteria NOT met:**
-- ❌ ProtonVPN CLI cannot be initialized (API blocked)
-- ❌ Cannot connect to VPN server
-- ❌ Cannot bypass Binance CloudFront block via VPN
+- âťŚ ProtonVPN CLI cannot be initialized (API blocked)
+- âťŚ Cannot connect to VPN server
+- âťŚ Cannot bypass Binance CloudFront block via VPN
 **Next steps required (infrastructure):**
 1. Migrate server to different IP/location (Hetzner may have other IP ranges)
 2. Use proxy/VPN on a different IP
@@ -1392,7 +1465,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - Safe_mode: true (startup recovery entered safe mode)
 - Websocket: Connected to wss://fstream.binance.com/stream
 **Restart executed:**
-- systemctl restart btc-bot → successful
+- systemctl restart btc-bot â†’ successful
 - Active: active (running) since 2026-04-13 23:28:05 UTC
 - PID: 137248 (new process)
 - Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718 (unchanged)
@@ -1422,7 +1495,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - VPN config files: No /etc/wireguard/, no ~/.config/protonvpn, only /etc/apparmor.d/vpnns (system default)
 - VPN logs: No vpn/proton/wireguard/cloudfront entries in recent logs
 - Package history: No proton/wireguard/openvpn packages ever installed (dpkg.log/apt history clean)
-**Conclusion:** ❌ ProtonVPN NEVER configured on this server. ❌ NO VPN (WireGuard, OpenVPN) is running. ✅ Server uses direct IP: 204.168.146.253. ✅ No old Proton configurations exist. The Binance API CloudFront 404 issue is caused by IP blocking of the server's direct IP (204.168.146.253), NOT by VPN. VPN was never used as "protection".
+**Conclusion:** âťŚ ProtonVPN NEVER configured on this server. âťŚ NO VPN (WireGuard, OpenVPN) is running. âś… Server uses direct IP: 204.168.146.253. âś… No old Proton configurations exist. The Binance API CloudFront 404 issue is caused by IP blocking of the server's direct IP (204.168.146.253), NOT by VPN. VPN was never used as "protection".
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
 ### SAFE_MODE_HARDCODE_CHECK
@@ -1430,18 +1503,18 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 **Builder:** Cascade
 **What:** Verified that safe_mode is NOT hardcoded to True anywhere in the production code.
 **Grep results:**
-- `safe_mode.*=.*True`: Found in test files (smoke_recovery.py expected values), message template (telegram_notifier.py default), and RecoveryReport returns — none set safe_mode directly
-- `safe_mode = True`: No results ✅
-- `safe_mode=True`: No results ✅
-- `enter_safe_mode`: No results ✅
+- `safe_mode.*=.*True`: Found in test files (smoke_recovery.py expected values), message template (telegram_notifier.py default), and RecoveryReport returns â€” none set safe_mode directly
+- `safe_mode = True`: No results âś…
+- `safe_mode=True`: No results âś…
+- `enter_safe_mode`: No results âś…
 **Where safe_mode is set to True (conditional only):**
 - orchestrator.py: `_activate_safe_mode()` (health check failures, critical execution errors), feed start failures
 - execution\recovery.py: exchange sync failures, recovery inconsistencies
 - scripts\smoke_orchestrator.py: Manual override for testing only (not production)
 **Initialization:**
-- storage\state_store.py: safe_mode initialized to FALSE (line 49) ✅
+- storage\state_store.py: safe_mode initialized to FALSE (line 49) âś…
 - execution\recovery.py: Sets safe_mode to FALSE after successful recovery
-**Conclusion:** ❌ NO hardcoded safe_mode = True in production code. safe_mode enters TRUE only as a reactive measure to errors (e.g., Binance API connectivity failure). The bot's persistent safe_mode is caused by the Binance API connectivity issue, not a code bug.
+**Conclusion:** âťŚ NO hardcoded safe_mode = True in production code. safe_mode enters TRUE only as a reactive measure to errors (e.g., Binance API connectivity failure). The bot's persistent safe_mode is caused by the Binance API connectivity issue, not a code bug.
 
 ### PAPER_BOT_CONFIG_AND_CONNECTIVITY_FIX
 **Status:** BLOCKED (2026-04-14)
@@ -1450,15 +1523,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 **Config_hash findings:**
 - Local config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
 - Server config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
-- Both identical — no sync needed
+- Both identical â€” no sync needed
 - Commit d245617 (PAPER-TRADING-TRIAL63) is ancestor of HEAD
 - settings.py unchanged since d245617
 - Current config_hash e8c7180d... IS the Trial #63 configuration
 - Expected f807b7057... was from April 2 logs; current settings produce e8c7180d...
 **Connectivity diagnostics:**
-- Google (https://www.google.com): HTTP/2 200 ✅
-- Binance ping (/fapi/v1/ping): HTTP/2 404 ❌
-- Binance bookTicker (/fapi/v1/ticker/bookTicker): HTTP/2 404 ❌
+- Google (https://www.google.com): HTTP/2 200 âś…
+- Binance ping (/fapi/v1/ping): HTTP/2 404 âťŚ
+- Binance bookTicker (/fapi/v1/ticker/bookTicker): HTTP/2 404 âťŚ
 - Response: "x-cache: Error from cloudfront", "x-amz-cf-pop: HEL51-P3" (Helsinki edge)
 - DNS resolves correctly to CloudFront IPs
 - No proxy configured
@@ -1466,9 +1539,9 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - User-Agent header does not help
 **Root cause:** Server IP (204.168.146.253) blocked by Binance's CloudFront CDN. All requests to fapi.binance.com return HTTP 404 with "Error from cloudfront". This is a geolocation/IP blocking issue, not code or configuration.
 **Acceptance criteria NOT met:**
-- ❌ Cannot fix Binance connectivity via code/configuration changes
-- ❌ Bot will continue to enter safe_mode due to API unreachability
-- ❌ Config_hash already correct (e8c7180d...), not f807b7057... as expected
+- âťŚ Cannot fix Binance connectivity via code/configuration changes
+- âťŚ Bot will continue to enter safe_mode due to API unreachability
+- âťŚ Config_hash already correct (e8c7180d...), not f807b7057... as expected
 **Next steps required (infrastructure):**
 1. Use VPN/proxy to route Binance API traffic through allowed IP
 2. Contact Binance support to whitelist server IP
@@ -1485,28 +1558,28 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718
 - Safe_mode: true (snapshot_build_failed: bookTicker)
 **Restart executed:**
-- systemctl restart btc-bot → successful
+- systemctl restart btc-bot â†’ successful
 - Active: active (running) since 22:11:38 UTC
 - Config_hash: e8c7180d829d8c9c8296b09ba7ad8d0316251d4161d36be26fccc2051d4e5718 (unchanged)
-- Safe_mode: true (snapshot_build_failed: bookTicker) — IMMEDIATE RE-ENTRY
+- Safe_mode: true (snapshot_build_failed: bookTicker) â€” IMMEDIATE RE-ENTRY
 **Root cause:**
 - Bot cannot reach Binance Futures API endpoint `/fapi/v1/ticker/bookTicker`
 - Error: "Failed request GET /fapi/v1/ticker/bookTicker after retries"
 - This is a network/infrastructure issue, not a configuration issue
-- Restart cannot fix this — the bot needs working Binance API connectivity
+- Restart cannot fix this â€” the bot needs working Binance API connectivity
 **Config_hash mismatch:**
 - Expected: f807b7057... (Trial #63)
 - Actual: e8c7180d... (current server configuration)
 - The bot is using a different config_hash than expected
 - This may require settings deployment or configuration update on the server
 **Database verification:**
-- storage/btc_bot.db exists (697 MB) — correct location
+- storage/btc_bot.db exists (697 MB) â€” correct location
 - Empty btc-bot.db and storage.db files in root are artifacts (ignored)
 - Bot is correctly using storage/btc_bot.db
 **Acceptance criteria NOT met:**
-- ❌ Bot did NOT exit safe_mode (re-entered immediately due to API failure)
-- ❌ Config_hash is NOT f807b7057... (it's e8c7180d...)
-- ❌ Dashboard still shows old data (no new signals/trades generated)
+- âťŚ Bot did NOT exit safe_mode (re-entered immediately due to API failure)
+- âťŚ Config_hash is NOT f807b7057... (it's e8c7180d...)
+- âťŚ Dashboard still shows old data (no new signals/trades generated)
 **Next steps required:**
 1. Fix Binance API connectivity (network/firewall/VPN issue)
 2. Verify/update server configuration to use Trial #63 config_hash (f807b7057...)
@@ -1516,17 +1589,17 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 ### DASHBOARD_DATA_INTEGRITY_DEPLOY
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
-**What:** Deployed config_hash/timestamp filtering fix (commit 6e34649) to production server. Server updated from 131e9e7a → ccceccb5 via `git pull github main`. Restarted `btc-bot-dashboard.service`.
+**What:** Deployed config_hash/timestamp filtering fix (commit 6e34649) to production server. Server updated from 131e9e7a â†’ ccceccb5 via `git pull github main`. Restarted `btc-bot-dashboard.service`.
 **Deployment steps:**
-1. git pull github main → 3 files changed (db_reader.py +69/-20, MILESTONE_TRACKER.md +56, tests +180)
-2. systemctl restart btc-bot-dashboard → active (running) PID 134016
+1. git pull github main â†’ 3 files changed (db_reader.py +69/-20, MILESTONE_TRACKER.md +56, tests +180)
+2. systemctl restart btc-bot-dashboard â†’ active (running) PID 134016
 **Verification (2026-04-13 22:04 UTC):**
 - `/api/trades`: Returns trades filtered by most recent config_hash (all trades show same config_hash: 778678b05b5f...)
 - `/api/signals`: Returns signals filtered by most recent config_hash (all signals show same config_hash: 778678b05b5f...)
-- `/api/metrics`: Timestamp filter working → shows only last 7 days (2026-04-11 to 2026-04-13), trades_count=0
-- `/api/alerts`: Timestamp filter working → shows only last 24 hours (2026-04-13 safe mode alerts)
+- `/api/metrics`: Timestamp filter working â†’ shows only last 7 days (2026-04-11 to 2026-04-13), trades_count=0
+- `/api/alerts`: Timestamp filter working â†’ shows only last 24 hours (2026-04-13 safe mode alerts)
 - Bot status: PAPER mode, safe_mode=true (snapshot_build_failed: bookTicker)
-**Important note:** The bot is in safe_mode and has not executed any paper trades yet. The most recent config_hash in the database is from the backtest (March 2026). Once the bot exits safe_mode and generates paper trades with Trial #63 config_hash (starts with f807b7057...), the dashboard will automatically filter to the new config_hash. The filtering logic is working correctly — it just needs new paper trading data to establish the current config_hash.
+**Important note:** The bot is in safe_mode and has not executed any paper trades yet. The most recent config_hash in the database is from the backtest (March 2026). Once the bot exits safe_mode and generates paper trades with Trial #63 config_hash (starts with f807b7057...), the dashboard will automatically filter to the new config_hash. The filtering logic is working correctly â€” it just needs new paper trading data to establish the current config_hash.
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
 ### DASHBOARD_DATA_INTEGRITY_RESEARCH
@@ -1536,13 +1609,13 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 - `_get_current_config_hash()` helper: reads config_hash from most recent trade_log (fallback to signal_candidates)
 - `read_trades_from_conn`: now filters by current config_hash (optional parameter for override)
 - `read_signals_from_conn`: now filters by current config_hash (optional parameter for override)
-- `read_daily_metrics_from_conn`: added timestamp filter (last 7 days) — table has no config_hash column
-- `read_alerts_from_conn`: added timestamp filter (last 24 hours) — table has no config_hash column
+- `read_daily_metrics_from_conn`: added timestamp filter (last 7 days) â€” table has no config_hash column
+- `read_alerts_from_conn`: added timestamp filter (last 24 hours) â€” table has no config_hash column
 - Added config_hash field to trade payload for verification
 **Files changed:** dashboard/db_reader.py, tests/test_dashboard_db_reader.py
 **Tests:** 81 passed, 24 skipped (2 new tests for config_hash filtering)
-**Layer separation:** clean — only dashboard/db_reader.py, no core/ changes
-**Determinism:** preserved — no automatic data cleanup, only read-time filtering
+**Layer separation:** clean â€” only dashboard/db_reader.py, no core/ changes
+**Determinism:** preserved â€” no automatic data cleanup, only read-time filtering
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
 ### DASHBOARD_FIX_EXTERNAL_ACCESS
@@ -1550,15 +1623,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 **Builder:** Cascade
 **What:** Fixed external access blocked by UFW firewall. Dashboard was binding correctly to `0.0.0.0:8080` but UFW only allowed port 22 (SSH). Added `ufw allow 8080/tcp` to open the firewall.
 **Diagnostic findings:**
-- `ss -tlnp`: Port 8080 listening on `0.0.0.0:8080` ✅
-- `curl 127.0.0.1`: Server responded (HTTP 405 on HEAD, but GET works) ✅
-- `ufw status`: Only port 22 allowed, port 8080 blocked ❌
+- `ss -tlnp`: Port 8080 listening on `0.0.0.0:8080` âś…
+- `curl 127.0.0.1`: Server responded (HTTP 405 on HEAD, but GET works) âś…
+- `ufw status`: Only port 22 allowed, port 8080 blocked âťŚ
 - `journalctl`: uvicorn running correctly on `0.0.0.0:8080`
 **Fix executed:** `ufw allow 8080/tcp` (added rule for both IPv4 and IPv6)
 **Verified:**
-- `ufw status`: Now shows 8080/tcp ALLOWED ✅
-- External curl from Windows: `curl.exe http://204.168.146.253:8080/api/status` returns live JSON ✅
-- Dashboard accessible at http://204.168.146.253:8080 ✅
+- `ufw status`: Now shows 8080/tcp ALLOWED âś…
+- External curl from Windows: `curl.exe http://204.168.146.253:8080/api/status` returns live JSON âś…
+- Dashboard accessible at http://204.168.146.253:8080 âś…
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
 ### DASHBOARD_FIX_LIVE
@@ -1566,24 +1639,24 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 **Builder:** Cascade
 **What:** Fixed dashboard external access. systemd service had `--host 127.0.0.1` (localhost only). Changed to `--host 0.0.0.0` in `/etc/systemd/system/btc-bot-dashboard.service`, daemon-reloaded, restarted service.
 **Verified:**
-- Port 8080 now listening on `0.0.0.0:8080` (all interfaces) — externally accessible ✅
-- Dashboard service: active (running) PID 132835 ✅
-- Bot service: active (running) PID 128229, mode PAPER, uninterrupted ✅
-- `/api/status` returns dashboard_version: m3, mode: PAPER ✅
+- Port 8080 now listening on `0.0.0.0:8080` (all interfaces) â€” externally accessible âś…
+- Dashboard service: active (running) PID 132835 âś…
+- Bot service: active (running) PID 128229, mode PAPER, uninterrupted âś…
+- `/api/status` returns dashboard_version: m3, mode: PAPER âś…
 **SSH key:** `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253)
 
 ### PAPER_TRADING_ACTIVATION_DEPLOY
 **Status:** DONE (2026-04-13)
 **Builder:** Cascade
-**What:** Deployed DASHBOARD_PROD_POLISH changes (db340f0 + a17ac49 + 131e9e7a) to production server. Server updated from d2456178 → 131e9e7a via `git pull github main`. Restarted `btc-bot-dashboard.service` (systemctl). SSH key: `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253).
+**What:** Deployed DASHBOARD_PROD_POLISH changes (db340f0 + a17ac49 + 131e9e7a) to production server. Server updated from d2456178 â†’ 131e9e7a via `git pull github main`. Restarted `btc-bot-dashboard.service` (systemctl). SSH key: `c:\development\btc-bot\btc-bot-deploy` (root@204.168.146.253).
 **Verified live on server:**
-- `/api/signals` → 20 live signal entries from paper bot DB
-- `/api/metrics` → 2026-04-13 daily metrics row
-- `/api/alerts` → live alerts (id 949, decision/orchestrator)
-- `/api/trades/export` → CSV with correct headers + rows
-- `btc-bot.service` → PAPER mode, PID 128229, uninterrupted
+- `/api/signals` â†’ 20 live signal entries from paper bot DB
+- `/api/metrics` â†’ 2026-04-13 daily metrics row
+- `/api/alerts` â†’ live alerts (id 949, decision/orchestrator)
+- `/api/trades/export` â†’ CSV with correct headers + rows
+- `btc-bot.service` â†’ PAPER mode, PID 128229, uninterrupted
 - Dashboard version: m3
-**Note:** Bot in safe_mode=true due to `snapshot_build_failed: bookTicker` (Binance WS connectivity issue — pre-existing, unrelated to this deployment).
+**Note:** Bot in safe_mode=true due to `snapshot_build_failed: bookTicker` (Binance WS connectivity issue â€” pre-existing, unrelated to this deployment).
 
 ### DASHBOARD_PROD_POLISH
 **Status:** DONE (commit db340f0, 2026-04-13)
@@ -1597,9 +1670,9 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 ### SIGNAL-REVERT-V1 + SIGNAL-REVERT-V1-FIX
 **Status:** DONE (commits 45cea8a + 51513f2, 2026-04-12)
 **What:** Restored core signal files to commit 8f2c6f2 (pre-SWEEP-RECLAIM-FIX-V1). Applied cherry-pick min_hits=3. Fixed optimize_loop.py incompatibility (removed deleted FeatureEngineConfig fields).
-**Why:** Runs #5-#11 all failed. Root cause: SWEEP-RECLAIM-FIX-V1 (ba1d6d1) removed sweep/reclaim from confluence scoring AND SIGNAL-ENGINE-REARCH-V1 (cc0024c) made sweep_side the direction source — both changes broke the edge proven in Run #3. Crash Test confirmed raw signal at 8f2c6f2 is not anti-edge (expectancy -0.054).
+**Why:** Runs #5-#11 all failed. Root cause: SWEEP-RECLAIM-FIX-V1 (ba1d6d1) removed sweep/reclaim from confluence scoring AND SIGNAL-ENGINE-REARCH-V1 (cc0024c) made sweep_side the direction source â€” both changes broke the edge proven in Run #3. Crash Test confirmed raw signal at 8f2c6f2 is not anti-edge (expectancy -0.054).
 **Files changed:** core/feature_engine.py, core/signal_engine.py, settings.py, orchestrator.py, backtest/backtest_runner.py, research_lab/param_registry.py, tests/
-**Tests:** 63 passed, 24 skipped (intentional — skips reference removed fields)
+**Tests:** 63 passed, 24 skipped (intentional â€” skips reference removed fields)
 
 ### DATA-COLLECTORS-V1
 **Status:** DONE (commits 5a3c09e + a8dc92e, 2026-04-11)
@@ -1608,38 +1681,38 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ### RUN9-CONFIG / RUN10-CONFIG
 **Status:** DONE (commits cf65604, 600aada)
-**What:** Progressive lowering of min_trades_full_candidate: 750→300→100. Added warm_start flag.
+**What:** Progressive lowering of min_trades_full_candidate: 750â†’300â†’100. Added warm_start flag.
 **Result:** With min_trades=100 and warm start, baseline finally returned non-zero values (-0.874). Confirmed zero-vector problem was cliff + TPE gradient absence, not bad signal per se.
 
 ### RUN7-SEARCHSPACE
 **Status:** DONE (commit 6612dea, 2026-04-11)
 **What:** Tightened 7 unrealistic parameter ranges:
-- min_rr: [1.01, 10.0] → [1.5, 4.0]
-- tp1_atr_mult: [0.1, 10.0] → [0.5, 5.0]
-- tp2_atr_mult: [0.2, 15.0] → [1.0, 8.0]
-- high_vol_leverage: [1, 10] → [1, 9]
-- max_open_positions: [1, 10] → [1, 3]
-- max_trades_per_day: [1, 20] → [1, 6]
-- max_hold_hours: [1, 168] → [1, 72]
+- min_rr: [1.01, 10.0] â†’ [1.5, 4.0]
+- tp1_atr_mult: [0.1, 10.0] â†’ [0.5, 5.0]
+- tp2_atr_mult: [0.2, 15.0] â†’ [1.0, 8.0]
+- high_vol_leverage: [1, 10] â†’ [1, 9]
+- max_open_positions: [1, 10] â†’ [1, 3]
+- max_trades_per_day: [1, 20] â†’ [1, 6]
+- max_hold_hours: [1, 168] â†’ [1, 72]
 **Why:** Run #6 had 54% risk rejections (high_vol_leverage > max_leverage), avg min_rr=5.62 (unreachable RR). All changes still active in current campaign.
 
 ### SIGNAL-SCORE-RESTORE-V1
 **Status:** SUPERSEDED by SIGNAL-REVERT-V1 (commit d66d0d8, 2026-04-11)
-**What:** Restored weight_sweep_detected=0.35 and weight_reclaim_confirmed=0.35 to confluence scoring (removed in ba1d6d1). Also fixed weight_cvd_divergence range max 0.50→0.75.
+**What:** Restored weight_sweep_detected=0.35 and weight_reclaim_confirmed=0.35 to confluence scoring (removed in ba1d6d1). Also fixed weight_cvd_divergence range max 0.50â†’0.75.
 **Result:** Run #10 baseline improved from -0.874 to -0.795. TPE still 95% zero-vectors.
-**Why superseded:** Root cause was deeper — SIGNAL-ENGINE-REARCH-V1 sweep_side direction also needed revert. SIGNAL-REVERT-V1 is the complete fix.
+**Why superseded:** Root cause was deeper â€” SIGNAL-ENGINE-REARCH-V1 sweep_side direction also needed revert. SIGNAL-REVERT-V1 is the complete fix.
 
 ### SIGNAL-ENGINE-REARCH-V1
 **Status:** REVERTED by SIGNAL-REVERT-V1 (commit cc0024c, 2026-04-10)
-**What was wrong:** Made sweep_side the direction source (LOW→LONG, HIGH→SHORT). CVD/TFI demoted to confluence only.
-**Why reverted:** At 8f2c6f2, sweep_side was NOT the direction source — CVD/TFI + regime drove direction, sweep was a confluence weight. This architecture produced +0.141 in Run #3. Post-REARCH all campaigns produced negative or zero results.
+**What was wrong:** Made sweep_side the direction source (LOWâ†’LONG, HIGHâ†’SHORT). CVD/TFI demoted to confluence only.
+**Why reverted:** At 8f2c6f2, sweep_side was NOT the direction source â€” CVD/TFI + regime drove direction, sweep was a confluence weight. This architecture produced +0.141 in Run #3. Post-REARCH all campaigns produced negative or zero results.
 
 ### SWEEP-RECLAIM-FIX-V1
 **Status:** PARTIALLY REVERTED by SIGNAL-REVERT-V1 (commits ba1d6d1 + a111ac9 + 442ff3b, 2026-04-09)
 **What was reverted:** Removal of sweep/reclaim from confluence scoring (C2a change in ba1d6d1). Also proximity filter (a111ac9) and tightened default (442ff3b).
 **What was kept:** min_hits=3 (cherry-picked back as Test B confirmed safety).
-**level_min_age_bars=5 NOT yet implemented** — not in 8f2c6f2 codebase. Deferred to Run #13 as tunable parameter [2, 6].
-**Original problem:** sweep_detected_rate was 99.49% — real implementation bug in detect_equal_levels. Fix (min_hits) is correct; removing from scoring was wrong.
+**level_min_age_bars=5 NOT yet implemented** â€” not in 8f2c6f2 codebase. Deferred to Run #13 as tunable parameter [2, 6].
+**Original problem:** sweep_detected_rate was 99.49% â€” real implementation bug in detect_equal_levels. Fix (min_hits) is correct; removing from scoring was wrong.
 
 ### SIGNAL-INVERSION-V1
 **Status:** REVERTED by SIGNAL-REVERT-V1 (commit ab664e2, 2026-04-10)
@@ -1652,8 +1725,8 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 | Run | Trials | Best exp_r | Status | Root cause of failure |
 |-----|--------|-----------|--------|----------------------|
 | Run #1 | ~50 | +0.031 (31 trades) | Not promoted | allow_long_in_uptrend disabled; only 31 trades |
-| Run #2 | ~100 | — | Not promoted | Low trade count |
-| Run #3 | 273 | **+0.141** (607 trades) | **Best historical** | Walk-forward mixed — acceptable |
+| Run #2 | ~100 | â€” | Not promoted | Low trade count |
+| Run #3 | 273 | **+0.141** (607 trades) | **Best historical** | Walk-forward mixed â€” acceptable |
 | Run #4 | ~100 | negative | Not promoted | SWEEP-RECLAIM-FIX-V1 just applied; signal degraded |
 | Run #5 | 200 | 0.0 (all zero) | Failed | min_trades=2000 > signal frequency; TPE blind |
 | Run #6 | 300 | 0.0 (all zero) | Failed | min_trades=750, 54% risk rejections from unrealistic high_vol_leverage |
@@ -1686,8 +1759,8 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 | **Commit** | `a1a82b5` |
 | **Date** | 2026-04-01 |
 | **How to restore** | `git checkout v1.0-baseline` |
-| **What it contains** | Fazy A–H MVP_DONE · Research Lab RL-V1 do RL-FUTURE MVP_DONE · 18/18 Known Issues zamknięte · dokumentacja zsynchronizowana · 35/35 testów zielonych |
-| **Strategy at tag** | PF 1.40 · WR 43.6% · Sharpe 4.37 · DD 17.0% |
+| **What it contains** | Fazy Aâ€“H MVP_DONE Â· Research Lab RL-V1 do RL-FUTURE MVP_DONE Â· 18/18 Known Issues zamkniÄ™te Â· dokumentacja zsynchronizowana Â· 35/35 testĂłw zielonych |
+| **Strategy at tag** | PF 1.40 Â· WR 43.6% Â· Sharpe 4.37 Â· DD 17.0% |
 
 ---
 
@@ -1695,14 +1768,14 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 | Date | Decision | Outcome |
 |------|----------|---------|
-| 2026-04-09 | SWEEP-RECLAIM-FIX-V1: remove sweep from scoring, add proximity filter | REVERTED — degraded signal |
-| 2026-04-10 | SIGNAL-ENGINE-REARCH-V1: sweep_side as direction source | REVERTED — all campaigns failed |
-| 2026-04-10 | SIGNAL-INVERSION-V1: flip LONG/SHORT | REVERTED — negative expectancy |
-| 2026-04-11 | RUN7-SEARCHSPACE: realistic param ranges | KEPT — sound improvement |
-| 2026-04-12 | SIGNAL-REVERT-V1: restore 8f2c6f2 + min_hits=3 | ACTIVE — Crash Test confirmed safe |
-| 2026-04-12 | SOFT-PENALTY-V1: replace zero-vector cliff | ACTIVE — TPE death spiral broken |
-| 2026-04-12 | Anti-overfitting guard: cap PF>5.0 | ACTIVE — deployed at trial #88 |
-| 2026-04-17 | Live vs Research Settings Split | ACTIVE — live overrides for relaxed signal thresholds |
+| 2026-04-09 | SWEEP-RECLAIM-FIX-V1: remove sweep from scoring, add proximity filter | REVERTED â€” degraded signal |
+| 2026-04-10 | SIGNAL-ENGINE-REARCH-V1: sweep_side as direction source | REVERTED â€” all campaigns failed |
+| 2026-04-10 | SIGNAL-INVERSION-V1: flip LONG/SHORT | REVERTED â€” negative expectancy |
+| 2026-04-11 | RUN7-SEARCHSPACE: realistic param ranges | KEPT â€” sound improvement |
+| 2026-04-12 | SIGNAL-REVERT-V1: restore 8f2c6f2 + min_hits=3 | ACTIVE â€” Crash Test confirmed safe |
+| 2026-04-12 | SOFT-PENALTY-V1: replace zero-vector cliff | ACTIVE â€” TPE death spiral broken |
+| 2026-04-12 | Anti-overfitting guard: cap PF>5.0 | ACTIVE â€” deployed at trial #88 |
+| 2026-04-17 | Live vs Research Settings Split | ACTIVE â€” live overrides for relaxed signal thresholds |
 
 ## Live vs Research Settings Split (2026-04-17)
 
@@ -1730,8 +1803,8 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=∞, only
 
 ## Next Steps After Run #12 (proposed, pending audit)
 
-1. Filter all trials with PF > 3.0 (statistically unreliable — zero-loss over 4yr is impossible in BTC perps)
-2. Take top 5-7 credible trials (PF 1.3–2.5, trades > 120)
+1. Filter all trials with PF > 3.0 (statistically unreliable â€” zero-loss over 4yr is impossible in BTC perps)
+2. Take top 5-7 credible trials (PF 1.3â€“2.5, trades > 120)
 3. Anchored walk-forward: train 2022-2024, test 2024-2025, test 2025-2026
-4. If best candidate passes both OOS windows → paper trading validation
-5. Run #13: add level_min_age_bars as tunable [2, 6] + simple regime meta-layer (volatility × funding × cvd_strength)
+4. If best candidate passes both OOS windows â†’ paper trading validation
+5. Run #13: add level_min_age_bars as tunable [2, 6] + simple regime meta-layer (volatility Ă— funding Ă— cvd_strength)
