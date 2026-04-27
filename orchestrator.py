@@ -9,9 +9,10 @@ from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
+from core.context_engine import ContextEngine
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
-from core.models import Features, GovernanceRuntimeState, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
+from core.models import Features, GovernanceRuntimeState, MarketContext, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
@@ -61,6 +62,7 @@ class EngineBundle:
     market_data: MarketDataAssembler
     feature_engine: FeatureEngine
     regime_engine: RegimeEngine
+    context_engine: ContextEngine
     signal_engine: SignalEngine
     governance: GovernanceLayer
     risk_engine: RiskEngine
@@ -180,6 +182,7 @@ def build_default_bundle(
                 post_liq_tfi_abs_min=settings.strategy.post_liq_tfi_abs_min,
             )
         ),
+        context_engine=ContextEngine(config=settings.context),
         signal_engine=SignalEngine(
             SignalConfig(
                 confluence_min=settings.strategy.confluence_min,
@@ -452,8 +455,9 @@ class BotOrchestrator:
             )
             self._record_feature_quality(features)
             regime = self.bundle.regime_engine.classify(features)
-            diagnostics = self.bundle.signal_engine.diagnose(features, regime)
-            candidate = self.bundle.signal_engine.generate(features, regime, diagnostics=diagnostics)
+            context = self.bundle.context_engine.classify(features)
+            diagnostics = self.bundle.signal_engine.diagnose(features, regime, context)
+            candidate = self.bundle.signal_engine.generate(features, regime, diagnostics=diagnostics, context=context)
             if candidate is None:
                 cycle_outcome = "no_signal"
                 self._log_no_signal_diagnostics(timestamp, diagnostics)
@@ -465,6 +469,7 @@ class BotOrchestrator:
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
                     details=self._signal_diagnostics_payload(diagnostics),
+                    context=context,
                 )
                 self.bundle.audit_logger.log_decision(
                     "decision",
@@ -500,6 +505,7 @@ class BotOrchestrator:
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
                     details={"notes": governance_decision.notes},
+                    context=context,
                 )
                 self.bundle.audit_logger.log_decision(
                     "governance",
@@ -530,6 +536,7 @@ class BotOrchestrator:
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
                     details={"reason": risk_decision.reason},
+                    context=context,
                 )
                 self.bundle.audit_logger.log_decision(
                     "risk",
@@ -580,6 +587,7 @@ class BotOrchestrator:
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
                     details=trade_payload,
+                    context=context,
                 )
                 self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
                 self._send_telegram_alert(TelegramNotifier.ALERT_ENTRY, trade_payload)
@@ -594,6 +602,7 @@ class BotOrchestrator:
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
                     details={"error": str(exc)},
+                    context=context,
                 )
                 self._critical_execution_errors += 1
                 self.bundle.audit_logger.log_error("execution", f"Execution failed: {exc}")
@@ -775,6 +784,7 @@ class BotOrchestrator:
         snapshot_id: str | None = None,
         feature_snapshot_id: str | None = None,
         details: dict[str, object] | None = None,
+        context: MarketContext | None = None,
     ) -> None:
         try:
             self.state_store.record_decision_outcome(
@@ -787,6 +797,12 @@ class BotOrchestrator:
                 snapshot_id=snapshot_id,
                 feature_snapshot_id=feature_snapshot_id,
                 details=details,
+                context_session_label=context.session_bucket.value if context else None,
+                context_volatility_label=context.volatility_bucket.value if context else None,
+                context_policy_version=context.context_policy_version if context else None,
+                context_eligible=context.context_eligible if context else None,
+                context_block_reason=context.context_block_reason if context else None,
+                context_neutral_mode_active=context.neutral_mode_active if context else None,
             )
         except Exception as exc:
             LOG.warning("Decision outcome persistence failed: %s", exc)

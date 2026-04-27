@@ -202,7 +202,13 @@ CREATE TABLE IF NOT EXISTS decision_outcomes (
     signal_id TEXT,
     snapshot_id TEXT,
     feature_snapshot_id TEXT,
-    details_json TEXT
+    details_json TEXT,
+    context_session_label TEXT,
+    context_volatility_label TEXT,
+    context_policy_version TEXT,
+    context_eligible INTEGER,
+    context_block_reason TEXT,
+    context_neutral_mode_active INTEGER
 );
 
 CREATE TABLE IF NOT EXISTS market_snapshots (
