@@ -26,8 +26,8 @@ Last updated: 2026-04-27
 **MODELING-CONTEXT-CLOSURE** â€” BLOCKING EDGE CLOSURE
 
 **Date:** 2026-04-27
-**Status:** OPEN (blocks modeling activation and further edge work)
-**Builder:** TBD
+**Status:** STEP 1 COMPLETE (telemetry fix deployed; validation rerun pending)
+**Builder:** Codex
 **Auditor:** Claude Code
 
 **Scope:** Close the modeling path opened by DATA-INTEGRITY-V1 -> MARKET-TRUTH-V3 -> MODELING-V1.
@@ -551,7 +551,7 @@ python scripts/run_optuna_research_v1.py \\
 
 **Merge gate:** Claude Code audit verdict = DONE + smoke test for flapping prevention
 
-**Builder:** TBD (user will assign when ready)
+**Builder:** Codex (user will assign when ready)
 
 ---
 
