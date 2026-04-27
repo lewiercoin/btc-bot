@@ -185,7 +185,13 @@ class StateStore:
                 signal_id TEXT,
                 snapshot_id TEXT,
                 feature_snapshot_id TEXT,
-                details_json TEXT
+                details_json TEXT,
+                context_session_label TEXT,
+                context_volatility_label TEXT,
+                context_policy_version TEXT,
+                context_eligible INTEGER,
+                context_block_reason TEXT,
+                context_neutral_mode_active INTEGER
             )
         """)
         self.connection.commit()
@@ -197,6 +203,21 @@ class StateStore:
         if "feature_snapshot_id" not in decision_columns:
             cursor.execute("ALTER TABLE decision_outcomes ADD COLUMN feature_snapshot_id TEXT DEFAULT NULL")
             self.connection.commit()
+        context_cols = [
+            ("context_session_label", "TEXT"),
+            ("context_volatility_label", "TEXT"),
+            ("context_policy_version", "TEXT"),
+            ("context_eligible", "INTEGER"),
+            ("context_block_reason", "TEXT"),
+            ("context_neutral_mode_active", "INTEGER"),
+        ]
+        for col_name, col_type in context_cols:
+            if col_name not in decision_columns:
+                cursor.execute(
+                    f"ALTER TABLE decision_outcomes ADD COLUMN {col_name} {col_type} DEFAULT NULL"
+                )
+                self.connection.commit()
+                LOG.info("Migration applied: added %s column to decision_outcomes", col_name)
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS market_snapshots (
@@ -597,6 +618,12 @@ class StateStore:
         details: dict | None = None,
         snapshot_id: str | None = None,
         feature_snapshot_id: str | None = None,
+        context_session_label: str | None = None,
+        context_volatility_label: str | None = None,
+        context_policy_version: str | None = None,
+        context_eligible: bool | None = None,
+        context_block_reason: str | None = None,
+        context_neutral_mode_active: bool | None = None,
     ) -> None:
         self._apply_migrations()
         insert_decision_outcome(
@@ -610,6 +637,12 @@ class StateStore:
             details=details,
             snapshot_id=snapshot_id,
             feature_snapshot_id=feature_snapshot_id,
+            context_session_label=context_session_label,
+            context_volatility_label=context_volatility_label,
+            context_policy_version=context_policy_version,
+            context_eligible=context_eligible,
+            context_block_reason=context_block_reason,
+            context_neutral_mode_active=context_neutral_mode_active,
         )
         self.connection.commit()
 

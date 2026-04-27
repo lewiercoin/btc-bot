@@ -9,6 +9,8 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Any
 
+from core.models import SessionBucket, VolatilityBucket
+
 
 class BotMode(StrEnum):
     PAPER = "PAPER"
@@ -160,6 +162,40 @@ class DataQualityConfig:
 
 
 @dataclass(frozen=True)
+class ContextConfig:
+    atr_low_threshold: float = 0.002
+    atr_high_threshold: float = 0.004
+    session_volatility_whitelist: dict[
+        SessionBucket, tuple[VolatilityBucket, ...]
+    ] = field(
+        default_factory=lambda: {
+            SessionBucket.ASIA: (
+                VolatilityBucket.LOW,
+                VolatilityBucket.NORMAL,
+                VolatilityBucket.HIGH,
+            ),
+            SessionBucket.EU: (
+                VolatilityBucket.LOW,
+                VolatilityBucket.NORMAL,
+                VolatilityBucket.HIGH,
+            ),
+            SessionBucket.EU_US: (
+                VolatilityBucket.LOW,
+                VolatilityBucket.NORMAL,
+                VolatilityBucket.HIGH,
+            ),
+            SessionBucket.US: (
+                VolatilityBucket.LOW,
+                VolatilityBucket.NORMAL,
+                VolatilityBucket.HIGH,
+            ),
+        }
+    )
+    neutral_mode: bool = True
+    policy_version: str = "v1.0.0"
+
+
+@dataclass(frozen=True)
 class ProxyConfig:
     enabled: bool = False
     proxy_enabled_env: str = "PROXY_ENABLED"
@@ -250,6 +286,7 @@ class AppSettings:
     exchange: ExchangeConfig = field(default_factory=ExchangeConfig)
     proxy: ProxyConfig = field(default_factory=ProxyConfig)
     storage: StorageConfig | None = None
+    context: ContextConfig = field(default_factory=ContextConfig)
     alerts: AlertConfig = field(default_factory=AlertConfig)
 
     @property
@@ -261,6 +298,16 @@ class AppSettings:
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
             "data_quality": asdict(self.data_quality),
+            "context": {
+                "atr_low_threshold": self.context.atr_low_threshold,
+                "atr_high_threshold": self.context.atr_high_threshold,
+                "neutral_mode": self.context.neutral_mode,
+                "policy_version": self.context.policy_version,
+                "session_volatility_whitelist": {
+                    k.value: sorted(v.value for v in vs)
+                    for k, vs in self.context.session_volatility_whitelist.items()
+                },
+            },
             "exchange": {
                 "futures_rest_base_url": self.exchange.futures_rest_base_url,
                 "futures_ws_base_url": self.exchange.futures_ws_base_url,

@@ -11,6 +11,19 @@ BotMode = Literal["PAPER", "LIVE"]
 FeatureQualityStatus = Literal["ready", "degraded", "unavailable"]
 
 
+class SessionBucket(str, Enum):
+    ASIA = "ASIA"
+    EU = "EU"
+    EU_US = "EU_US"
+    US = "US"
+
+
+class VolatilityBucket(str, Enum):
+    LOW = "LOW"
+    NORMAL = "NORMAL"
+    HIGH = "HIGH"
+
+
 class RegimeState(str, Enum):
     NORMAL = "normal"
     UPTREND = "uptrend"
@@ -152,6 +165,17 @@ class Features:
     quality: dict[str, FeatureQuality] = field(default_factory=dict)
 
 
+@dataclass(slots=True, frozen=True)
+class MarketContext:
+    session_bucket: SessionBucket
+    volatility_bucket: VolatilityBucket
+    context_eligible: bool
+    context_block_reason: str | None
+    context_policy_version: str
+    neutral_mode_active: bool
+    quality_flags: tuple[str, ...] = ()
+
+
 @dataclass(slots=True)
 class FeatureSnapshot:
     feature_snapshot_id: str
@@ -197,6 +221,12 @@ class SignalDiagnostics:
     wick_vs_min_atr: float | None = None
     sweep_vs_buffer_atr: float | None = None
     candidate_reasons_preview: list[str] = field(default_factory=list)
+    context_session_label: str | None = None
+    context_volatility_label: str | None = None
+    context_policy_version: str | None = None
+    context_eligible: bool | None = None
+    context_block_reason: str | None = None
+    context_neutral_mode_active: bool | None = None
 
 
 @dataclass(slots=True)

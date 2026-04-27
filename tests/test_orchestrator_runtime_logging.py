@@ -136,8 +136,22 @@ class FakeRegimeEngine:
         return RegimeState.NORMAL
 
 
+class FakeContextEngine:
+    def classify(self, features):  # type: ignore[no-untyped-def]
+        from core.models import MarketContext, SessionBucket, VolatilityBucket
+        _ = features
+        return MarketContext(
+            session_bucket=SessionBucket.EU,
+            volatility_bucket=VolatilityBucket.NORMAL,
+            context_eligible=True,
+            context_block_reason=None,
+            context_policy_version="v1.0.0",
+            neutral_mode_active=True,
+        )
+
+
 class FakeSignalEngine:
-    def diagnose(self, features, regime):  # type: ignore[no-untyped-def]
+    def diagnose(self, features, regime, context=None):  # type: ignore[no-untyped-def]
         return SignalDiagnostics(
             timestamp=features.timestamp,
             config_hash=features.config_hash,
@@ -157,10 +171,11 @@ class FakeSignalEngine:
             candidate_reasons_preview=[],
         )
 
-    def generate(self, features, regime, diagnostics=None):  # type: ignore[no-untyped-def]
+    def generate(self, features, regime, diagnostics=None, context=None):  # type: ignore[no-untyped-def]
         _ = features
         _ = regime
         _ = diagnostics
+        _ = context
         return None
 
 
@@ -218,6 +233,7 @@ def make_bundle(conn: sqlite3.Connection, clock: FakeClock) -> EngineBundle:
         market_data=FakeMarketData(clock),  # type: ignore[arg-type]
         feature_engine=FakeFeatureEngine(),  # type: ignore[arg-type]
         regime_engine=FakeRegimeEngine(),  # type: ignore[arg-type]
+        context_engine=FakeContextEngine(),  # type: ignore[arg-type]
         signal_engine=FakeSignalEngine(),  # type: ignore[arg-type]
         governance=UnusedGovernance(),  # type: ignore[arg-type]
         risk_engine=UnusedRiskEngine(),  # type: ignore[arg-type]

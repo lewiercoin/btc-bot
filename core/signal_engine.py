@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from uuid import uuid4
 
-from core.models import Features, RegimeState, SignalCandidate, SignalDiagnostics
+from core.models import Features, MarketContext, RegimeState, SignalCandidate, SignalDiagnostics
 
 
 def _default_regime_direction_whitelist() -> dict[str, tuple[str, ...]]:
@@ -50,7 +50,12 @@ class SignalEngine:
     def __init__(self, config: SignalConfig | None = None) -> None:
         self.config = config or SignalConfig()
 
-    def diagnose(self, features: Features, regime: RegimeState) -> SignalDiagnostics:
+    def diagnose(
+        self,
+        features: Features,
+        regime: RegimeState,
+        context: MarketContext | None = None,
+    ) -> SignalDiagnostics:
         direction: str | None = None
         direction_allowed: bool | None = None
         confluence_preview: float | None = None
@@ -96,6 +101,20 @@ class SignalEngine:
                     if confluence_preview < self.config.confluence_min:
                         blocked_by = "confluence_below_min"
 
+        ctx_session: str | None = None
+        ctx_volatility: str | None = None
+        ctx_policy_version: str | None = None
+        ctx_eligible: bool | None = None
+        ctx_block_reason: str | None = None
+        ctx_neutral_mode_active: bool | None = None
+        if context is not None:
+            ctx_session = context.session_bucket.value
+            ctx_volatility = context.volatility_bucket.value
+            ctx_policy_version = context.context_policy_version
+            ctx_eligible = context.context_eligible
+            ctx_block_reason = context.context_block_reason
+            ctx_neutral_mode_active = context.neutral_mode_active
+
         return SignalDiagnostics(
             timestamp=features.timestamp,
             config_hash=features.config_hash,
@@ -113,6 +132,12 @@ class SignalEngine:
             wick_vs_min_atr=features.wick_vs_min_atr,
             sweep_vs_buffer_atr=features.sweep_vs_buffer_atr,
             candidate_reasons_preview=candidate_reasons_preview,
+            context_session_label=ctx_session,
+            context_volatility_label=ctx_volatility,
+            context_policy_version=ctx_policy_version,
+            context_eligible=ctx_eligible,
+            context_block_reason=ctx_block_reason,
+            context_neutral_mode_active=ctx_neutral_mode_active,
         )
 
     def _infer_uptrend_continuation_direction(self, features: Features) -> tuple[str | None, str | None]:
@@ -142,9 +167,12 @@ class SignalEngine:
         features: Features,
         regime: RegimeState,
         diagnostics: SignalDiagnostics | None = None,
+        context: MarketContext | None = None,
     ) -> SignalCandidate | None:
-        resolved_diagnostics = diagnostics or self.diagnose(features, regime)
+        resolved_diagnostics = diagnostics or self.diagnose(features, regime, context)
         if resolved_diagnostics.blocked_by is not None:
+            return None
+        if resolved_diagnostics.context_eligible is False:
             return None
 
         direction = resolved_diagnostics.direction_inferred
