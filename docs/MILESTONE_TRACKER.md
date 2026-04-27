@@ -23,31 +23,72 @@ Last updated: 2026-04-27
 
 ## Current Active Milestone
 
-**PHASE-1-AUDITS** — READY TO START
+**LIVE-EXECUTION-TEST-COVERAGE** — BLOCKING LIVE DEPLOYMENT
 
 **Date:** 2026-04-27
-**Status:** READY
+**Status:** OPEN (blocks live trading readiness)
+**Builder:** TBD
+**Auditor:** Claude Code
 
-**Completed so far:**
-- ✅ S1: Dashboard Security (DONE)
-- ✅ A1: Funding Fees (DONE)
-- ✅ A2: Paper Execution Realism (MVP_DONE — fees + spread implemented, partial fills + latency deferred)
-- ✅ MARKET-TRUTH-V3 Gate A: PASS (`docs/audits/AUDIT_GATE_A_VERDICT_2026-04-27.md`)
+**Scope:** Add test coverage for live execution layer (execution-layer testing ONLY, no logic changes)
 
-**Ready next:**
-- Phase 1 quant-grade audits can start from `main`
-- Start with Market Truth validation follow-through, FeatureEngine drift, and decision/risk/execution audit sequence
+**Deliverables:**
+- Unit tests for `LiveExecutionEngine` (entry submission, fill confirmation, timeout, exit orders, partial fills)
+- Unit tests for `OrderManager` (submit/query/cancel, error mapping, price formatting)
+- Integration smoke test (end-to-end order flow on testnet or mocked exchange)
+
+**Out of scope:**
+- ❌ Do NOT change live execution logic (test current behavior first)
+- ❌ Do NOT change `consecutive_losses` semantics (separate policy decision)
+
+**Rationale:** Paper trading path is production-ready, but `LiveExecutionEngine` (375 lines) + `OrderManager` (212 lines) have **zero tests**. Untested money-moving path is a blocker for live deployment.
+
+---
+
+## Completed Milestone: PHASE-1-AUDITS
+
+**Date:** 2026-04-27
+**Status:** ✅ COMPLETE (paper path) / ⚠️ BLOCKED (live path)
+**Auditor:** Claude Code
+
+**Paper Trading Readiness: COMPLETE** ✅
+
+| Audit | Component | Verdict | Tests | Evidence |
+|---|---|---|---|---|
+| Signal Engine | Direction inference, confluence | MVP_DONE | 19 | 790 trades |
+| Research Lab | Walk-forward, promotion gates | DONE | 65 | Methodology validated |
+| Feature Engine | Sweep/reclaim, CVD, regime | MVP_DONE | 10 | 790 trades |
+| Risk Engine | Position sizing, DD, exit logic | DONE | 11 | 790 trades |
+| State Persistence | Recovery, DD calculation | MVP_DONE | 4 unit + 1 smoke | 790 trades |
+| Paper Execution | Fills, fees, slippage | MVP_DONE | 9 | 790 trades |
+
+**Live Trading Readiness: BLOCKED** ⚠️
+
+| Audit | Component | Verdict | Blocker |
+|---|---|---|---|
+| AUDIT-08 | Live Execution | NOT_DONE | 0 tests (LiveExecutionEngine + OrderManager) |
+
+**Audit reports:**
+- ✅ `AUDIT_GATE_A_VERDICT_2026-04-27.md` — Market Truth V3 validation (PASS, 206 quality-ready buckets)
+- ✅ `AUDIT_SIGNAL_ENGINE_2026-04-27.md` — Signal generation logic (MVP_DONE)
+- ✅ `AUDIT_RESEARCH_LAB_2026-04-27.md` — Research lab methodology (DONE)
+- ✅ `AUDIT_FEATURE_ENGINE_2026-04-27.md` — Feature calculation (MVP_DONE)
+- ✅ `AUDIT_RISK_ENGINE_2026-04-24.md` — Position sizing, risk limits (DONE)
+- ✅ `AUDIT_STATE_PERSISTENCE_2026-04-27.md` — Recovery, DD calculation (MVP_DONE)
+- ⚠️ `AUDIT_EXECUTION_TIMING_2026-04-27.md` — Paper DONE, Live NOT_DONE
+
+**Deferred work:**
+- Feature Engine: ATR/EMA/funding/OI unit tests (regression prevention)
+- State Persistence: recovery method tests, DD edge cases
+- **Policy decision:** `consecutive_losses` day-scoped semantics (requires explicit approval before changing)
+
+**Operational status:**
+- **Paper trading:** APPROVED to continue (all components MVP_DONE or DONE)
+- **Live trading:** BLOCKED until live execution test coverage exists
 
 **Remaining remediation tiers:**
 - 🟠 Tier B: Production Hygiene (Config reproducibility, production drift, dependency locks)
 - 🟡 Tier C: Quality of Life (Test coverage enforcement, manual tooling)
-
-**Phase 1 Audits** (unblocked by Gate A PASS)
-- AUDIT-01: Market Truth final validation
-- AUDIT-02: FeatureEngine drift validation
-- AUDIT-04: Regime Engine distribution analysis
-
-**Decision:** Proceed with Phase 1 audits on `main`; keep Tier B/C remediation tracked as follow-up work.
 
 **Phase 0 Complete Summary:**
 
