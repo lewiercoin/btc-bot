@@ -380,35 +380,68 @@ Last updated: 2026-04-27
 
 ---
 
-## Active Milestone
+## Completed Milestone
 
-**MODELING-V1** — IMPLEMENTED, PENDING GROK AUDIT
+**MODELING-V1** — DONE (merged to main 2026-04-27)
 
 **Unblocked:** 2026-04-27 (Gate A PASS)
 **Implemented:** 2026-04-27 (Cascade builder)
-**Branch:** `modeling-v1`
-**Commit:** 6eec1ae
+**Audit:** ChatGPT — DONE verdict for neutral mode (2026-04-27)
+**Merged:** 2026-04-27, merge commit `2dc3112` on `main`
 
 **What was implemented:**
 - `SessionBucket`, `VolatilityBucket`, `MarketContext` (frozen) added to `core/models.py`
 - `SignalDiagnostics` extended with 6 context fields
-- `core/context_engine.py` — new `ContextEngine.classify()`: deterministic, stateless, session+volatility gating
+- `core/context_engine.py` — new `ContextEngine.classify()`: deterministic, stateless, UTC-enforced
 - `ContextConfig` added to `settings.py` with `config_hash` integration
-- `SignalEngine.diagnose/generate` updated: optional `context` param, context gate after base edge computation
-- `ContextEngine` inserted in `orchestrator.py` pipeline (between regime and signal engines)
+- `SignalEngine.diagnose/generate` updated: optional `context` param, context gate after base edge
+- `ContextEngine` inserted in `orchestrator.py` pipeline (regime → context → signal)
 - Runtime context path mirrored in `backtest/backtest_runner.py`
-- 6 context columns added to `decision_outcomes` table (schema.sql + idempotent migration)
-- `insert_decision_outcome` in `repositories.py` extended with context fields
-- 40 tests in `tests/test_context_engine.py` (T-01..T-24 + extras)
+- 6 context columns in `decision_outcomes` (schema.sql + idempotent migration)
+- Audit hardening: UTC enforcement in `_classify_session`, telemetry tests for all decision paths
+- 45 tests in `tests/test_context_engine.py` (T-01..T-24 + extras + audit hardening)
 
-**Smoke test results:**
+**Final smoke on main:**
 - `compileall`: PASS
-- `pytest`: 274 passed, 24 skipped (pre-existing), coverage 70.67% ≥ 65%
-- All context tests (T-01..T-24): PASS
+- `pytest`: 279 passed, 24 skipped (pre-existing), coverage 70.69% ≥ 65%, exit code 0
 
-**Neutral mode:** `neutral_mode=True` (default) — full backward compatibility, no production behavior change on deploy
+**Neutral mode:** `neutral_mode=True` (default) — no production behavior change on deploy.
+**Active context blocking:** NOT APPROVED. Stays neutral until MODELING-V1-VALIDATION analysis.
 
-**Status:** Awaiting Grok audit. Merge to `main` blocked until audit closure.
+## Active Milestone
+
+**MODELING-V1-VALIDATION** — PLANNED
+
+**Goal:** Empirical analysis — does existing reclaim edge perform differently by session/volatility context?
+
+**Prerequisites:**
+- ✅ MODELING-V1 merged to main
+- ✅ Deploy to production in neutral mode (context telemetry active)
+- Minimum data: ~200 cycles with context fields populated in `decision_outcomes`
+
+**Analysis required** (`docs/analysis/MODELING_V1_VALIDATION_YYYY-MM-DD.md`):
+1. Trade count by session bucket
+2. Win rate by session bucket
+3. Expectancy R by session bucket
+4. Profit factor by session bucket
+5. Trade count by volatility bucket
+6. Win rate by volatility bucket
+7. Expectancy R by volatility bucket
+8. Session × volatility matrix
+9. Base edge present vs no edge by context
+10. Whether activation criteria are met
+
+**Activation criteria (from blueprint):**
+- `win_rate_delta >= 10.0` percentage points vs baseline
+- `p_value < 0.05`
+- Both must pass to propose MODELING-V1-ACTIVATION milestone
+- If only one passes: neutral_mode stays active
+
+**Constraints:**
+- Do NOT modify `neutral_mode` during validation
+- Do NOT change whitelist during validation
+- Do NOT tune thresholds based on intuition
+- Analysis first, then decision
 
 ---
 
