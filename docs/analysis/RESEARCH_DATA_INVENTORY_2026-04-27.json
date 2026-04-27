@@ -1,0 +1,126 @@
+{
+  "run_date": "2026-04-27",
+  "symbol": "BTCUSDT",
+  "candles": {
+    "available": true,
+    "symbol": "BTCUSDT",
+    "total": 258901,
+    "by_timeframe": {
+      "15m": {
+        "count": 197262,
+        "earliest": "2020-09-01 00:00:00",
+        "latest": "2026-04-17 19:15:00",
+        "span_days": 2054,
+        "estimated_coverage_pct": 100.0,
+        "gaps_over_2x_interval": 0,
+        "max_gap_minutes": 0.0
+      },
+      "1h": {
+        "count": 49311,
+        "earliest": "2020-09-01 00:00:00",
+        "latest": "2026-04-17 14:00:00",
+        "span_days": 2054,
+        "estimated_coverage_pct": 100.0,
+        "gaps_over_2x_interval": 0,
+        "max_gap_minutes": 0.0
+      },
+      "4h": {
+        "count": 12328,
+        "earliest": "2020-09-01 00:00:00",
+        "latest": "2026-04-17 12:00:00",
+        "span_days": 2054,
+        "estimated_coverage_pct": 100.0,
+        "gaps_over_2x_interval": 0,
+        "max_gap_minutes": 0.0
+      }
+    }
+  },
+  "funding": {
+    "available": true,
+    "count": 6164,
+    "earliest": "2020-09-01 00:00:00",
+    "latest": "2026-04-17 08:00:00",
+    "gaps_over_16h": 0,
+    "max_gap_hours": 0.0
+  },
+  "open_interest": {
+    "available": true,
+    "count": 526496,
+    "earliest": "2020-09-01 00:00:00",
+    "latest": "2026-04-17 14:00:00"
+  },
+  "cvd_flow": {
+    "available": true,
+    "by_timeframe": {
+      "15m": {
+        "count": 195175,
+        "earliest": "2020-09-01 00:00:00",
+        "latest": "2026-04-17 14:00:00",
+        "gaps_over_2x_interval": 5,
+        "max_gap_minutes": 28020.0
+      },
+      "60s": {
+        "count": 2927483,
+        "earliest": "2020-09-01 00:00:00",
+        "latest": "2026-04-17 14:04:00",
+        "gaps_over_2x_interval": 14,
+        "max_gap_minutes": 28010.0
+      }
+    }
+  },
+  "force_orders": {
+    "available": true,
+    "count": 7129,
+    "earliest": "2026-04-17 14:13:16",
+    "latest": "2026-04-23 17:02:10"
+  },
+  "daily_external_bias": {
+    "available": true,
+    "count": 1422,
+    "earliest": "2020-09-01",
+    "latest": "2026-04-26",
+    "with_etf_bias": 0,
+    "with_dxy_close": 1422
+  },
+  "market_truth": {
+    "market_snapshots": {
+      "available": true,
+      "count": 681,
+      "earliest": "2026-04-23 19:00:00",
+      "latest": "2026-04-27 12:30:00"
+    },
+    "feature_snapshots": {
+      "available": true,
+      "count": 681,
+      "earliest": "2026-04-23 19:00:00",
+      "latest": "2026-04-27 12:30:00"
+    },
+    "decision_outcomes": {
+      "available": true,
+      "count": 1004,
+      "earliest": "2026-04-20 10:00:00",
+      "latest": "2026-04-27 12:30:00",
+      "with_snapshot_id": 681,
+      "with_feature_snapshot_id": 681
+    }
+  },
+  "trade_log": {
+    "available": true,
+    "total": 790,
+    "closed": 790,
+    "earliest_opened": "2022-03-09 18:30:00",
+    "latest_opened": "2026-04-27 06:45:04",
+    "with_nonzero_fees": 0,
+    "with_nonzero_funding_paid": 0
+  },
+  "backtest_readiness": {
+    "proposed_range": "2024-01-01 -> 2026-04-27",
+    "recommended_range": "2020-09-01 -> 2026-04-17",
+    "recommended_start": "2020-09-01",
+    "recommended_end": "2026-04-17",
+    "verdict": "READY",
+    "verdict_detail": "All required data sources present and coverage looks adequate.",
+    "issues": [],
+    "warnings": []
+  }
+}
