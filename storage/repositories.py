@@ -358,13 +358,21 @@ def insert_decision_outcome(
     details: dict[str, Any] | None = None,
     snapshot_id: str | None = None,
     feature_snapshot_id: str | None = None,
+    context_session_label: str | None = None,
+    context_volatility_label: str | None = None,
+    context_policy_version: str | None = None,
+    context_eligible: bool | None = None,
+    context_block_reason: str | None = None,
+    context_neutral_mode_active: bool | None = None,
 ) -> None:
     conn.execute(
         """
         INSERT INTO decision_outcomes (
             cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, signal_id,
-            snapshot_id, feature_snapshot_id, details_json
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            snapshot_id, feature_snapshot_id, details_json,
+            context_session_label, context_volatility_label, context_policy_version,
+            context_eligible, context_block_reason, context_neutral_mode_active
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         """,
         (
             _normalize_runtime_metric_value(cycle_timestamp),
@@ -376,6 +384,12 @@ def insert_decision_outcome(
             snapshot_id,
             feature_snapshot_id,
             json.dumps(details or {}, sort_keys=True),
+            context_session_label,
+            context_volatility_label,
+            context_policy_version,
+            (1 if context_eligible else 0) if context_eligible is not None else None,
+            context_block_reason,
+            (1 if context_neutral_mode_active else 0) if context_neutral_mode_active is not None else None,
         ),
     )
 

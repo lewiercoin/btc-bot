@@ -323,6 +323,7 @@ def test_backtest_runner_records_funding_paid_for_multi_period_trade(tmp_path) -
         runner._build_engines = lambda: (  # type: ignore[method-assign]
             SimpleNamespace(compute=lambda **kwargs: replace(features, timestamp=kwargs["snapshot"].timestamp)),
             SimpleNamespace(classify=lambda current_features: RegimeState.NORMAL),
+            SimpleNamespace(classify=lambda current_features: None),  # context_engine stub
             SimpleNamespace(generate=generate_signal),
             governance,
             RiskEngine(RiskConfig(min_rr=1.0, max_hold_hours=0)),
