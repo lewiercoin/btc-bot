@@ -243,7 +243,7 @@ This rule is already used in the timing and drift packs. It is repeated here so 
 
 **What exists**
 
-- exchange timestamp or build timestamp appears to be later than the cycle in a logically impossible way
+- exchange timestamp appears to be later than `snapshot_build_finished_at`, or build timing becomes negative
 
 **Why it matters**
 
@@ -332,7 +332,7 @@ This rule is already used in the timing and drift packs. It is repeated here so 
 | Counted bucket still clipped by limit | `BLOCKER` | Fix not fully validated |
 | Null exchange timestamp in canonical counted bucket | `BLOCKER` | Timing invalid |
 | Null timestamp only in excluded warm-up or non-counted rows | `DOCUMENTED` | Record and continue |
-| Future timestamp / negative staleness | `BLOCKER` | Temporal inconsistency |
+| Future timestamp / negative staleness vs `snapshot_build_finished_at` | `BLOCKER` | Temporal inconsistency |
 | Missing critical scalar features in counted canonical rows | `BLOCKER` | Drift invalid |
 | Sparse boolean diagnostics | `DOCUMENTED` | Not a failure by itself |
 

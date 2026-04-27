@@ -5,8 +5,8 @@ This directory contains the read-only SQL pack for the Gate A timing and stalene
 ## Files
 
 - `gate_a_timing_staleness.sql`
-  - `T1`: build timing between `cycle_timestamp`, `snapshot_build_*`, and `captured_at`
-  - `T2`: exchange timestamp alignment to the cycle bucket
+  - `T1`: build timing and cycle-anchor consistency
+  - `T2`: exchange timestamp validity plus candle-family alignment
   - `T3`: per-input staleness summary
   - `T4`: per-input distribution metrics (`p50`, `p95`, `max`)
   - `T5`: websocket vs REST aggtrade staleness comparison
@@ -42,13 +42,24 @@ It first selects one canonical row per `15m` bucket using this deterministic pri
 
 This avoids polluting timing metrics with duplicate rows from the same bucket.
 
+## Timing contract
+
+The timing pack uses one canonical time reference:
+
+1. build duration = `snapshot_build_finished_at - snapshot_build_started_at`
+2. per-input latency = `snapshot_build_finished_at - <input>_exchange_ts`
+3. future timestamp = `<input>_exchange_ts > snapshot_build_finished_at`
+
+`market_snapshots.captured_at` is treated only as a persisted cycle anchor check, not as a post-build ingest timestamp.
+
 ## Interpretation order
 
 1. `T1`
-   Validate that build timing is positive and that build/capture lag is reasonable.
-   Use `T1C` for `p50/p95/max` on build duration and capture lag.
+   Validate that build timing is positive and that the persisted cycle anchor contract is stable.
+   Use `T1C` for `p50/p95/max` on build duration and cycle-to-build-finish timing.
 2. `T2`
-   Confirm that exchange timestamps are aligned with the cycle bucket and never in the future.
+   Confirm that exchange timestamps are never later than `snapshot_build_finished_at`.
+   Candle families are also checked for timeframe alignment against the cycle bucket.
 3. `T3`
    Review average and max staleness per input family.
 4. `T4`
@@ -63,7 +74,7 @@ This avoids polluting timing metrics with duplicate rows from the same bucket.
 Treat the result as a blocker and escalate before writing `Timing/Staleness = PASS` if any of the following is true:
 
 - `T1` reports negative build duration or build finish before cycle time.
-- `T2` reports future exchange timestamps for any input family.
+- `T2` or `T3` reports future exchange timestamps relative to `snapshot_build_finished_at`.
 - `T4` shows unexplained `p95` or `max` staleness above the accepted Gate A threshold.
 - `T6B` returns missing timestamp fields inside the post-fix canonical bucket set.
 
