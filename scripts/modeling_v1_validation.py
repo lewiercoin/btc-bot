@@ -115,30 +115,65 @@ def _chi2_sf(x: float, df: int = 1) -> float:
 # ---------------------------------------------------------------------------
 # Data loading
 # ---------------------------------------------------------------------------
+UNKNOWN_THRESHOLD_PCT = 20.0  # above this: volatility analysis not decision-grade
+
+
 def load_closed_trades(conn: sqlite3.Connection, since: str | None) -> list[dict]:
-    where = "closed_at IS NOT NULL AND exit_price IS NOT NULL"
+    """Load closed trades with atr_4h_norm fallback chain:
+
+    A. trade_log.features_at_entry_json.atr_4h_norm
+    B. trade_log.signal_id -> decision_outcomes.signal_id
+       -> feature_snapshots.feature_snapshot_id
+       -> feature_snapshots.features_json.atr_4h_norm
+    """
+    where = "tl.closed_at IS NOT NULL AND tl.exit_price IS NOT NULL"
     params: list = []
     if since:
-        where += " AND opened_at >= ?"
+        where += " AND tl.opened_at >= ?"
         params.append(since)
     rows = conn.execute(
         f"""
-        SELECT trade_id, opened_at, closed_at, direction, regime,
-               pnl_r, pnl_abs, exit_reason, features_at_entry_json
-        FROM trade_log
+        SELECT
+            tl.trade_id, tl.signal_id, tl.opened_at, tl.closed_at,
+            tl.direction, tl.regime, tl.pnl_r, tl.pnl_abs,
+            tl.exit_reason, tl.features_at_entry_json,
+            fs.features_json AS fs_features_json
+        FROM trade_log tl
+        LEFT JOIN (
+            SELECT signal_id, feature_snapshot_id
+            FROM decision_outcomes
+            WHERE signal_id IS NOT NULL AND feature_snapshot_id IS NOT NULL
+            GROUP BY signal_id
+        ) do_mapped ON do_mapped.signal_id = tl.signal_id
+        LEFT JOIN feature_snapshots fs
+               ON fs.feature_snapshot_id = do_mapped.feature_snapshot_id
         WHERE {where}
-        ORDER BY opened_at
+        ORDER BY tl.opened_at
         """,
         params,
     ).fetchall()
 
     trades = []
     for row in rows:
+        # A: primary source
+        atr_norm = None
+        atr_source = "missing"
         try:
             feats = json.loads(row["features_at_entry_json"] or "{}")
+            atr_norm = feats.get("atr_4h_norm")
+            if atr_norm is not None:
+                atr_source = "primary"
         except Exception:
-            feats = {}
-        atr_norm = feats.get("atr_4h_norm")
+            pass
+        # B: fallback via feature_snapshots
+        if atr_norm is None and row["fs_features_json"]:
+            try:
+                fs_feats = json.loads(row["fs_features_json"])
+                atr_norm = fs_feats.get("atr_4h_norm")
+                if atr_norm is not None:
+                    atr_source = "fallback_fs"
+            except Exception:
+                pass
         trades.append(
             {
                 "trade_id": row["trade_id"],
@@ -151,10 +186,34 @@ def load_closed_trades(conn: sqlite3.Connection, since: str | None) -> list[dict
                 "session": classify_session(row["opened_at"]),
                 "volatility": classify_volatility(atr_norm),
                 "atr_4h_norm": atr_norm,
+                "atr_source": atr_source,
                 "win": (row["pnl_r"] is not None and row["pnl_r"] > 0),
             }
         )
     return trades
+
+
+def compute_data_quality(trades: list[dict]) -> dict:
+    """Compute atr_4h_norm coverage stats and determine report grade."""
+    n = len(trades)
+    if n == 0:
+        return {
+            "n": 0, "n_primary": 0, "n_fallback": 0, "n_missing": 0,
+            "unknown_pct": 0.0, "report_grade": "PARTIAL",
+        }
+    n_primary = sum(1 for t in trades if t["atr_source"] == "primary")
+    n_fallback = sum(1 for t in trades if t["atr_source"] == "fallback_fs")
+    n_missing = sum(1 for t in trades if t["atr_source"] == "missing")
+    unknown_pct = n_missing / n * 100
+    report_grade = "PARTIAL" if unknown_pct > UNKNOWN_THRESHOLD_PCT else "FULL"
+    return {
+        "n": n,
+        "n_primary": n_primary,
+        "n_fallback": n_fallback,
+        "n_missing": n_missing,
+        "unknown_pct": unknown_pct,
+        "report_grade": report_grade,
+    }
 
 
 def load_decision_cycles(conn: sqlite3.Connection, since: str | None) -> list[dict]:
@@ -374,6 +433,7 @@ def generate_report(
     activation_results: list,
     since: str | None,
     db_path: str,
+    data_quality: dict | None = None,
 ) -> str:
     now = datetime.now(timezone.utc)
     date_str = now.strftime("%Y-%m-%d")
@@ -383,12 +443,18 @@ def generate_report(
     baseline_wr = all_wins / n_trades * 100 if n_trades > 0 else 0.0
     all_r = [t["pnl_r"] for t in trades if t["pnl_r"] is not None]
     baseline_expectancy = sum(all_r) / len(all_r) if all_r else 0.0
+    dq = data_quality or {}
+    report_grade = dq.get("report_grade", "FULL")
+    unknown_pct = dq.get("unknown_pct", 0.0)
+    is_partial = report_grade == "PARTIAL"
+    grade_label = "⚠️ PARTIAL" if is_partial else "✅ FULL"
 
     lines = [
         f"# MODELING-V1-VALIDATION: Offline Retrospective Analysis",
         f"",
         f"> **Type:** OFFLINE RETROSPECTIVE — context reconstructed from historical data",
         f"> **NOT** runtime telemetry (context fields start populating after Modeling V1 deploy)",
+        f"> **Report grade:** {grade_label}",
         f"",
         f"**Date:** {date_str}",
         f"**DB:** `{db_path}`",
@@ -405,6 +471,43 @@ def generate_report(
         f"---",
         f"",
     ]
+
+    # -----------------------------------------------------------------------
+    # Data quality section
+    # -----------------------------------------------------------------------
+    if dq:
+        n_primary = dq.get("n_primary", 0)
+        n_fallback = dq.get("n_fallback", 0)
+        n_missing = dq.get("n_missing", 0)
+        lines += [
+            f"## Data Quality: atr_4h_norm Coverage",
+            f"",
+            f"| Source | Trades | Share |",
+            f"|--------|--------|-------|",
+            f"| A: features_at_entry_json (primary) | {n_primary} | {n_primary/n_trades*100:.1f}% |"
+            if n_trades else "| A: features_at_entry_json (primary) | 0 | — |",
+            f"| B: feature_snapshots fallback | {n_fallback} | {n_fallback/n_trades*100:.1f}% |"
+            if n_trades else "| B: feature_snapshots fallback | 0 | — |",
+            f"| Missing (UNKNOWN bucket) | {n_missing} | {unknown_pct:.1f}% |",
+            f"",
+        ]
+        if is_partial:
+            lines += [
+                f"⚠️ **PARTIAL REPORT** — UNKNOWN volatility > {UNKNOWN_THRESHOLD_PCT:.0f}% ({unknown_pct:.1f}%)",
+                f"",
+                f"- **Session analysis:** ✅ USABLE (not affected by missing atr_4h_norm)",
+                f"- **Volatility analysis:** ❌ NOT DECISION-GRADE",
+                f"- **Activation criteria (volatility buckets):** ❌ NOT APPROVED",
+                f"- **Recommendation:** Re-run after runtime telemetry collects atr_4h_norm in context fields,",
+                f"  or use fallback join via backtest feature_snapshots if available.",
+                f"",
+            ]
+        else:
+            lines += [
+                f"✅ **FULL REPORT** — UNKNOWN volatility within acceptable threshold ({unknown_pct:.1f}% ≤ {UNKNOWN_THRESHOLD_PCT:.0f}%)",
+                f"",
+            ]
+        lines += [f"---", f""]
 
     # -----------------------------------------------------------------------
     # 1-4: Session metrics
@@ -431,8 +534,9 @@ def generate_report(
     # -----------------------------------------------------------------------
     # 5-7: Volatility metrics
     # -----------------------------------------------------------------------
+    vol_note = " _(⚠️ NOT DECISION-GRADE — UNKNOWN > 20%, see Data Quality above)_" if is_partial else ""
     lines += [
-        f"## 5–7. Trade Metrics by Volatility Bucket",
+        f"## 5–7. Trade Metrics by Volatility Bucket{vol_note}",
         f"",
         f"| Volatility | Trades | Wins | Win Rate | Expectancy R | Profit Factor |",
         f"|------------|--------|------|----------|--------------|---------------|",
@@ -515,16 +619,25 @@ def generate_report(
         f"- win_rate_delta ≥ 10.0 percentage points vs baseline",
         f"- p_value < 0.05 (chi-square test vs rest of trades)",
         f"- **Both** must pass to propose MODELING-V1-ACTIVATION milestone",
+    ]
+    if is_partial:
+        lines += [
+            f"- ⚠️ **Volatility buckets: NOT APPROVED** (PARTIAL report — UNKNOWN > {UNKNOWN_THRESHOLD_PCT:.0f}%)",
+        ]
+    lines += [
         f"",
         f"| Bucket | N | Win Rate | Δ vs Baseline | p-value | WR≥10pp | p<0.05 | Eligible |",
-        f"|--------|---|----------|---------------|---------|---------|--------|---------|",
+        f"|--------|---|----------|---------------|---------|---------|--------|---------|]",
     ]
     eligible_buckets = []
     for r in sorted(activation_results, key=lambda x: -x["wr_delta_vs_baseline"]):
         wr_mark = "✅" if r["criteria_win_rate_pass"] else "❌"
         pv_mark = "✅" if r["criteria_pvalue_pass"] else "❌"
-        elig_mark = "🟢 YES" if r["activation_eligible"] else "🔴 NO"
-        if r["activation_eligible"]:
+        # Block volatility buckets in PARTIAL report
+        vol_blocked = is_partial and r["bucket"].startswith("volatility:")
+        eligible = r["activation_eligible"] and not vol_blocked
+        elig_mark = "🟢 YES" if eligible else ("🔴 BLOCKED" if vol_blocked else "🔴 NO")
+        if eligible:
             eligible_buckets.append(r["bucket"])
         lines.append(
             f"| {r['bucket']} | {r['n']} | {_fmt_pct(r['win_rate'])} "
@@ -542,6 +655,16 @@ def generate_report(
             f"⚠️ **INSUFFICIENT DATA** — no closed trades found in analyzed period.",
             f"Deploy Modeling V1, collect more trades, re-run analysis.",
         ]
+    elif is_partial and not eligible_buckets:
+        lines += [
+            f"⚠️ **PARTIAL REPORT — ACTIVATION NOT APPROVED**",
+            f"",
+            f"- Session analysis is usable but no session bucket met activation criteria.",
+            f"- Volatility analysis is not decision-grade (UNKNOWN > {UNKNOWN_THRESHOLD_PCT:.0f}%).",
+            f"→ Keep `neutral_mode=True` (no change).",
+            f"→ Re-run after runtime telemetry provides atr_4h_norm in context fields.",
+            f"→ Do NOT activate context blocking based on this analysis.",
+        ]
     elif eligible_buckets:
         lines += [
             f"🟢 **ACTIVATION CRITERIA MET** for: {', '.join(eligible_buckets)}",
@@ -551,6 +674,11 @@ def generate_report(
             f"→ Define whitelist for eligible session/volatility combinations.",
             f"→ Keep `neutral_mode=True` until activation milestone is reviewed and approved.",
         ]
+        if is_partial:
+            lines += [
+                f"",
+                f"⚠️ Note: Volatility buckets excluded from eligibility (PARTIAL report).",
+            ]
     else:
         lines += [
             f"🔴 **ACTIVATION CRITERIA NOT MET** — no bucket satisfies both conditions.",
@@ -566,13 +694,15 @@ def generate_report(
         f"",
         f"## Data Notes",
         f"",
-        f"- Source: `trade_log.features_at_entry_json` (atr_4h_norm) + `trade_log.opened_at` (session UTC hour)",
+        f"- atr_4h_norm fallback chain: A) features_at_entry_json → B) feature_snapshots (via decision_outcomes join)",
+        f"- Session classification: `trade_log.opened_at` UTC hour (not affected by missing atr_4h_norm)",
         f"- Cycle analysis: `decision_outcomes` LEFT JOIN `feature_snapshots`",
         f"- Context classification uses same thresholds as `ContextConfig` defaults",
         f"- p-values: chi-square 2×2 (bucket vs rest), df=1",
-        f"- Trades with missing `atr_4h_norm` assigned UNKNOWN volatility bucket",
+        f"- Trades with missing `atr_4h_norm` (both sources) assigned UNKNOWN volatility bucket",
+        f"- PARTIAL threshold: UNKNOWN > {UNKNOWN_THRESHOLD_PCT:.0f}% → volatility analysis not decision-grade",
         f"- This is retrospective analysis, NOT runtime telemetry",
-        f"- Runtime context telemetry (from Modeling V1 deploy) will provide cleaner future data",
+        f"- Runtime context telemetry (Modeling V1 deploy) will provide atr_4h_norm natively",
         f"",
         f"**Generated:** {now.strftime('%Y-%m-%d %H:%M:%S')} UTC",
     ]
@@ -619,6 +749,16 @@ def main() -> None:
     if not trades:
         print("WARNING: No closed trades found. Report will show insufficient data.")
 
+    # Data quality check
+    data_quality = compute_data_quality(trades)
+    print(f"  atr_4h_norm: primary={data_quality['n_primary']} "
+          f"fallback={data_quality['n_fallback']} "
+          f"missing={data_quality['n_missing']} "
+          f"({data_quality['unknown_pct']:.1f}% UNKNOWN)")
+    print(f"  Report grade: {data_quality['report_grade']}")
+    if data_quality['report_grade'] == 'PARTIAL':
+        print("  WARNING: UNKNOWN > 20% — volatility analysis not decision-grade")
+
     # Compute metrics
     session_metrics = compute_trade_metrics(trades, "session")
     volatility_metrics = compute_trade_metrics(trades, "volatility")
@@ -638,6 +778,7 @@ def main() -> None:
         activation_results=activation_results,
         since=args.since,
         db_path=str(db_path),
+        data_quality=data_quality,
     )
 
     # Determine output path
