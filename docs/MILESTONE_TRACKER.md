@@ -410,38 +410,92 @@ Last updated: 2026-04-27
 
 ## Active Milestone
 
-**MODELING-V1-VALIDATION** — PLANNED
+**RESEARCH-OPTUNA-V1** — IN PROGRESS (branch: `research-optuna-v1`)
 
-**Goal:** Empirical analysis — does existing reclaim edge perform differently by session/volatility context?
+**Status:** Infrastructure built, pending run on production DB snapshot.
 
-**Prerequisites:**
-- ✅ MODELING-V1 merged to main
-- ✅ Deploy to production in neutral mode (context telemetry active)
-- Minimum data: ~200 cycles with context fields populated in `decision_outcomes`
+**Goal:** Offline Optuna search for stable reclaim edge parameter ranges.
+RESEARCH_ONLY — no automatic promotion to production. No context gating activation.
 
-**Analysis required** (`docs/analysis/MODELING_V1_VALIDATION_YYYY-MM-DD.md`):
-1. Trade count by session bucket
-2. Win rate by session bucket
-3. Expectancy R by session bucket
-4. Profit factor by session bucket
-5. Trade count by volatility bucket
-6. Win rate by volatility bucket
-7. Expectancy R by volatility bucket
-8. Session × volatility matrix
-9. Base edge present vs no edge by context
-10. Whether activation criteria are met
+**Constraints (hard):**
+- Do NOT modify live/paper runtime behavior
+- Do NOT change `neutral_mode`
+- Do NOT change context whitelist
+- Do NOT activate context gating
+- Do NOT modify production config defaults
+- Do NOT touch LiveExecutionEngine
+- Do NOT promote parameters without all gates passing
+
+**What was built (2026-04-27, Cascade builder):**
+- `research_lab/configs/reclaim_edge_v1.json` — new protocol config:
+  - `window_mode: rolling`, `train_days: 180`, `validation_days: 90`, `step_days: 90`
+  - `min_trades_full_candidate: 30`, `promotion_requires_all_windows_pass: true`
+  - `active_params_whitelist`: `confluence_min`, `sweep_buf_atr`, `reclaim_buf_atr`,
+    `wick_min_atr`, `min_sweep_depth_pct`, `entry_offset_atr`, `invalidation_offset_atr`,
+    `tp1_atr_mult`, `tp2_atr_mult`, `min_rr`
+- `research_lab/context_diagnostics.py` — session + volatility breakdown of backtest trades
+  - RESEARCH_ONLY diagnostic overlay, NOT used in objective function
+  - Reuses same session thresholds as ContextEngine
+- `scripts/run_optuna_research_v1.py` — orchestration script:
+  - Runs `run_optimize_loop()` with `reclaim_edge_v1.json` protocol
+  - Computes context diagnostics for top Pareto candidates (replay backtest)
+  - Writes `docs/analysis/OPTUNA_RESEARCH_V1_<date>.md` + JSON artifact
+  - All output explicitly labeled RESEARCH_ONLY
+- `tests/test_optuna_research_v1.py` — 48 new tests:
+  - Session classification (ASIA/EU/EU_US/US boundaries, UTC enforcement)
+  - Volatility classification (LOW/NORMAL/HIGH/UNKNOWN thresholds)
+  - `compute_context_diagnostics`: PARTIAL/FULL grade, bucket stats, note
+  - Protocol config: required fields, active_params, min_trades, WF settings
+  - Objective gates: MIN_TRADES_NOT_MET, MAX_TRADES_VOLUME_CONSTRAINT
+  - Promotion gates: `walkforward_not_passed`, `walkforward_fragile` in BLOCKING_RISKS
+  - Config lineage: `build_search_space_signature`, `build_trial_context_signature`
+
+**Smoke tests:** 327 passed, 24 skipped (pre-existing), coverage 70.69% ≥ 65%
+
+**How to run:**
+```bash
+python scripts/run_optuna_research_v1.py \
+  --source-db-path /path/to/btc_bot.db \
+  --start-date 2024-01-01 \
+  --end-date 2026-04-01 \
+  --n-trials 50 \
+  --output-dir docs/analysis
+```
+
+**Promotion gates (all required before any config change):**
+1. Walk-forward pass — all windows
+2. `min_trades >= 30` per candidate
+3. `profit_factor >= 1.1` per window
+4. `max_drawdown_pct <= 40%` per window
+5. No single context bucket dominates all profit without warning
+6. Human review + approval bundle generated
+7. Separate MODELING-V1-ACTIVATION milestone opened
+
+---
+
+**MODELING-V1-VALIDATION** — IN PROGRESS (TOR A + TOR B complete)
+
+**Deployed:** 2026-04-27 (main @ `cd02953`, production server)
+**Context telemetry verified:** `EU|HIGH|eligible=1|neutral_mode_active=1` ✅
+**TOR A report:** `docs/analysis/MODELING_V1_VALIDATION_2026-04-27.md`
+
+**Report grade: ⚠️ PARTIAL**
+- 16 trades, baseline WR 50%, 998 decision cycles
+- 75% UNKNOWN volatility (atr_4h_norm missing from features_at_entry_json)
+- EU session: 100% WR (N=3), p=0.055 — borderline, NOT eligible (p>0.05)
+- No bucket meets activation criteria
+
+**Verdict:** `neutral_mode=True` stays. Re-run after runtime telemetry accumulates `atr_4h_norm`.
 
 **Activation criteria (from blueprint):**
 - `win_rate_delta >= 10.0` percentage points vs baseline
 - `p_value < 0.05`
 - Both must pass to propose MODELING-V1-ACTIVATION milestone
-- If only one passes: neutral_mode stays active
 
 **Constraints:**
 - Do NOT modify `neutral_mode` during validation
-- Do NOT change whitelist during validation
-- Do NOT tune thresholds based on intuition
-- Analysis first, then decision
+- Do NOT change whitelist
+- Do NOT activate context blocking
 
 ---
 
