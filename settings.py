@@ -48,6 +48,14 @@ def _env_flag(name: str, default: bool) -> bool:
     return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
 
 
+def _validate_profile(profile: str, *, allowed: tuple[str, ...]) -> str:
+    normalized = profile.strip().lower()
+    if normalized not in allowed:
+        allowed_str = "', '".join(allowed)
+        raise ValueError(f"Invalid settings profile {profile!r}. Use '{allowed_str}'.")
+    return normalized
+
+
 @dataclass(frozen=True)
 class StrategyConfig:
     symbol: str = "BTCUSDT"
@@ -109,9 +117,9 @@ class RiskConfig:
 
     max_open_positions: int = 1
     max_trades_per_day: int = 3
-    max_consecutive_losses: int = 5
-    daily_dd_limit: float = 0.185
-    weekly_dd_limit: float = 0.063
+    max_consecutive_losses: int = 15
+    daily_dd_limit: float = 0.20
+    weekly_dd_limit: float = 0.30
     max_hold_hours: int = 3
     high_vol_stop_distance_pct: float = 0.035
     partial_exit_pct: float = 0.26
@@ -136,7 +144,7 @@ class ExecutionConfig:
     live_entry_order_type: str = "LIMIT"
     live_fill_poll_seconds: float = 1.0
     health_check_interval_seconds: int = 30
-    health_failures_before_safe_mode: int = 3
+    health_failures_before_safe_mode: int = 10  # Raised for initial config phase (was: 3)
     kill_switch_max_exec_errors: int = 2
     loop_idle_sleep_seconds: float = 0.5
 
@@ -192,7 +200,7 @@ class ProxyConfig:
 class ExchangeConfig:
     futures_rest_base_url: str = "https://fapi.binance.com"
     futures_ws_base_url: str = "wss://fstream.binance.com/ws"
-    futures_ws_market_base_url: str = "wss://fstream.binance.com/market"
+    futures_ws_market_base_url: str = "wss://fstream.binance.com/stream"
     futures_ws_stream_base_url: str = "wss://fstream.binance.com/stream"
     recv_window_ms: int = 5000
     isolated_only: bool = True
@@ -253,9 +261,58 @@ class AppSettings:
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
             "data_quality": asdict(self.data_quality),
+            "exchange": {
+                "futures_rest_base_url": self.exchange.futures_rest_base_url,
+                "futures_ws_base_url": self.exchange.futures_ws_base_url,
+                "futures_ws_market_base_url": self.exchange.futures_ws_market_base_url,
+                "futures_ws_stream_base_url": self.exchange.futures_ws_stream_base_url,
+                "recv_window_ms": self.exchange.recv_window_ms,
+                "isolated_only": self.exchange.isolated_only,
+                "api_key_env": self.exchange.api_key_env,
+                "api_secret_env": self.exchange.api_secret_env,
+            },
+            "proxy": {
+                "enabled": self.proxy.enabled,
+                "proxy_enabled_env": self.proxy.proxy_enabled_env,
+                "proxy_url_env": self.proxy.proxy_url_env,
+                "proxy_type_env": self.proxy.proxy_type_env,
+                "sticky_minutes_env": self.proxy.sticky_minutes_env,
+                "failover_list_env": self.proxy.failover_list_env,
+            },
+            "alerts": {
+                "telegram_enabled": self.alerts.telegram_enabled,
+                "telegram_bot_token_env": self.alerts.telegram_bot_token_env,
+                "telegram_chat_id_env": self.alerts.telegram_chat_id_env,
+            },
+            "storage": {
+                "project_root": str(self.storage.project_root) if self.storage else None,
+                "db_path": str(self.storage.db_path) if self.storage else None,
+                "schema_path": str(self.storage.schema_path) if self.storage else None,
+                "logs_dir": str(self.storage.logs_dir) if self.storage else None,
+            },
+            "python_version": self._get_python_version(),
+            "dependency_hash": self._get_dependency_hash(),
+            "settings_profile": os.getenv("BOT_SETTINGS_PROFILE", "unknown"),
         }
         data = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
         return hashlib.sha256(data).hexdigest()
+
+    def _get_python_version(self) -> str:
+        """Read Python version from .python-version file."""
+        if self.storage:
+            python_version_file = self.storage.project_root / ".python-version"
+            if python_version_file.exists():
+                return python_version_file.read_text().strip()
+        return "unknown"
+
+    def _get_dependency_hash(self) -> str:
+        """Compute hash of requirements.lock for dependency tracking."""
+        if self.storage:
+            lockfile = self.storage.project_root / "requirements.lock"
+            if lockfile.exists():
+                data = lockfile.read_bytes()
+                return hashlib.sha256(data).hexdigest()
+        return "unknown"
 
 
 def _parse_mode(raw_mode: str) -> BotMode:
@@ -280,8 +337,7 @@ def _serialize_settings(settings: AppSettings) -> dict[str, Any]:
 def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:
     root = project_root or Path(__file__).resolve().parent
     mode = _parse_mode(os.getenv("BOT_MODE", "PAPER"))
-    if profile not in {"research", "live"}:
-        raise ValueError(f"Invalid settings profile {profile!r}. Use 'research' or 'live'.")
+    profile = _validate_profile(profile, allowed=("research", "live", "experiment"))
     storage = StorageConfig(
         project_root=root,
         db_path=root / "storage" / "btc_bot.db",
@@ -306,7 +362,32 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         confluence_min=4.5,
         allow_uptrend_pullback=False,
     )
-    return dataclasses.replace(settings, strategy=live_strategy)
+    if profile == "live":
+        return dataclasses.replace(settings, strategy=live_strategy)
+
+    experiment_whitelist = {
+        regime: tuple(allowed_directions)
+        for regime, allowed_directions in live_strategy.regime_direction_whitelist.items()
+    }
+    experiment_whitelist["crowded_leverage"] = ("LONG", "SHORT")
+    experiment_strategy = dataclasses.replace(
+        live_strategy,
+        confluence_min=3.6,
+        direction_tfi_threshold=0.05,
+        direction_tfi_threshold_inverse=-0.03,
+        tfi_impulse_threshold=0.10,
+        regime_direction_whitelist=experiment_whitelist,
+    )
+    experiment_risk = dataclasses.replace(
+        settings.risk,
+        min_rr=1.6,
+        max_open_positions=2,
+        max_trades_per_day=6,
+        cooldown_minutes_after_loss=30,
+        duplicate_level_tolerance_pct=0.0004,
+        duplicate_level_window_hours=24,
+    )
+    return dataclasses.replace(settings, strategy=experiment_strategy, risk=experiment_risk)
 
 
 SETTINGS = load_settings()

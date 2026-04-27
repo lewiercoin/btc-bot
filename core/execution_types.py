@@ -42,3 +42,4 @@ class FillEvent:
     fees: float
     slippage_bps: float
     executed_at: datetime
+    snapshot_id: str | None = None

@@ -68,6 +68,38 @@ def test_load_settings_live_profile_forces_uptrend_pullback_off_even_when_env_en
     assert settings.strategy.allow_uptrend_pullback is False
 
 
+def test_load_settings_experiment_profile_applies_runtime_throughput_overrides(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    settings = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert settings.strategy.min_sweep_depth_pct == 0.0001
+    assert settings.strategy.confluence_min == 3.6
+    assert settings.strategy.direction_tfi_threshold == 0.05
+    assert settings.strategy.direction_tfi_threshold_inverse == -0.03
+    assert settings.strategy.tfi_impulse_threshold == 0.10
+    assert settings.strategy.regime_direction_whitelist["crowded_leverage"] == ("LONG", "SHORT")
+    assert settings.risk.min_rr == 1.6
+    assert settings.risk.max_open_positions == 2
+    assert settings.risk.max_trades_per_day == 6
+    assert settings.risk.cooldown_minutes_after_loss == 30
+    assert settings.risk.duplicate_level_tolerance_pct == 0.0004
+    assert settings.risk.duplicate_level_window_hours == 24
+
+
+def test_load_settings_experiment_profile_forces_uptrend_pullback_off_even_when_env_enabled(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.setenv("ALLOW_UPTREND_PULLBACK", "true")
+
+    settings = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert settings.strategy.allow_uptrend_pullback is False
+
+
 def test_load_settings_invalid_profile_raises(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

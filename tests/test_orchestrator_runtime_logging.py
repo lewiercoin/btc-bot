@@ -10,7 +10,7 @@ from typing import Any
 
 import pytest
 
-from core.models import MarketSnapshot, RegimeState, SignalDiagnostics
+from core.models import Features, MarketSnapshot, RegimeState, SignalDiagnostics
 from dashboard.db_reader import read_config_snapshot_from_conn, read_decision_funnel_from_conn
 from monitoring.audit_logger import AuditLogger
 from monitoring.health import HealthStatus
@@ -113,9 +113,21 @@ class FakeMarketData:
 
 class FakeFeatureEngine:
     def compute(self, snapshot, schema_version: str, config_hash: str):  # type: ignore[no-untyped-def]
-        _ = schema_version
-        _ = config_hash
-        return {"timestamp": snapshot.timestamp}
+        return Features(
+            schema_version=schema_version,
+            config_hash=config_hash,
+            timestamp=snapshot.timestamp,
+            atr_15m=1.0,
+            atr_4h=4.0,
+            atr_4h_norm=0.01,
+            ema50_4h=101.0,
+            ema200_4h=100.0,
+            sweep_detected=True,
+            reclaim_detected=False,
+            sweep_level=100.0,
+            sweep_depth_pct=0.001,
+            sweep_side="HIGH",
+        )
 
 
 class FakeRegimeEngine:
@@ -127,8 +139,8 @@ class FakeRegimeEngine:
 class FakeSignalEngine:
     def diagnose(self, features, regime):  # type: ignore[no-untyped-def]
         return SignalDiagnostics(
-            timestamp=features["timestamp"],
-            config_hash="test-config",
+            timestamp=features.timestamp,
+            config_hash=features.config_hash,
             regime=regime,
             blocked_by="no_reclaim",
             sweep_detected=True,

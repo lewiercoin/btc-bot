@@ -13,7 +13,8 @@ from main import main
 
 def run() -> None:
     os.environ["BOT_MODE"] = "LIVE"
-    main()
+    os.environ["BOT_SETTINGS_PROFILE"] = "live"
+    main(["--settings-profile", "live"])
 
 
 if __name__ == "__main__":

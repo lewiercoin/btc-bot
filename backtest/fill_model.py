@@ -1,7 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal
+from datetime import datetime
+from typing import Any, Iterable, Literal
+
+from core.funding import compute_funding_paid
+from core.models import Direction
 
 OrderType = Literal["LIMIT", "MARKET"]
 OrderSide = Literal["BUY", "SELL"]
@@ -22,6 +26,17 @@ class FillModel:
         order_type: OrderType = "MARKET",
         side: OrderSide = "BUY",
     ) -> FillResult:
+        raise NotImplementedError
+
+    def calculate_funding(
+        self,
+        *,
+        direction: Direction,
+        notional: float,
+        opened_at: datetime,
+        closed_at: datetime,
+        funding_samples: Iterable[dict[str, Any]],
+    ) -> float:
         raise NotImplementedError
 
 
@@ -73,4 +88,21 @@ class SimpleFillModel(FillModel):
             filled_price=filled_price,
             slippage_bps=slippage_bps,
             fee_paid=fee_paid,
+        )
+
+    def calculate_funding(
+        self,
+        *,
+        direction: Direction,
+        notional: float,
+        opened_at: datetime,
+        closed_at: datetime,
+        funding_samples: Iterable[dict[str, Any]],
+    ) -> float:
+        return compute_funding_paid(
+            direction=direction,
+            notional=notional,
+            opened_at=opened_at,
+            closed_at=closed_at,
+            funding_samples=funding_samples,
         )

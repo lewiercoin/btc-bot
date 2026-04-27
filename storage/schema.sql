@@ -127,6 +127,7 @@ CREATE TABLE IF NOT EXISTS executions (
     fees REAL NOT NULL DEFAULT 0,
     slippage_bps REAL NOT NULL DEFAULT 0,
     executed_at TEXT NOT NULL,
+    snapshot_id TEXT,
     FOREIGN KEY (position_id) REFERENCES positions(position_id)
 );
 
@@ -143,6 +144,7 @@ CREATE TABLE IF NOT EXISTS trade_log (
     exit_price REAL,
     size REAL NOT NULL,
     fees_total REAL NOT NULL DEFAULT 0,
+    funding_paid REAL NOT NULL DEFAULT 0,
     slippage_bps_avg REAL NOT NULL DEFAULT 0,
     pnl_abs REAL NOT NULL DEFAULT 0,
     pnl_r REAL NOT NULL DEFAULT 0,
@@ -198,7 +200,65 @@ CREATE TABLE IF NOT EXISTS decision_outcomes (
     regime TEXT,
     config_hash TEXT NOT NULL,
     signal_id TEXT,
+    snapshot_id TEXT,
+    feature_snapshot_id TEXT,
     details_json TEXT
+);
+
+CREATE TABLE IF NOT EXISTS market_snapshots (
+    snapshot_id TEXT PRIMARY KEY,
+    cycle_timestamp TEXT NOT NULL,
+    exchange_timestamp TEXT,
+    symbol TEXT NOT NULL,
+    timeframe TEXT NOT NULL,
+    open REAL NOT NULL,
+    high REAL NOT NULL,
+    low REAL NOT NULL,
+    close REAL NOT NULL,
+    volume REAL NOT NULL,
+    funding_rate REAL,
+    open_interest REAL,
+    bid_price REAL,
+    ask_price REAL,
+    source TEXT NOT NULL,
+    latency_ms REAL,
+    data_quality_flag TEXT NOT NULL,
+    book_ticker_json TEXT NOT NULL,
+    open_interest_json TEXT NOT NULL,
+    candles_15m_json TEXT NOT NULL,
+    candles_1h_json TEXT NOT NULL,
+    candles_4h_json TEXT NOT NULL,
+    funding_history_json TEXT NOT NULL,
+    aggtrade_events_60s_json TEXT NOT NULL,
+    aggtrade_events_15m_json TEXT NOT NULL,
+    aggtrade_bucket_60s_json TEXT NOT NULL,
+    aggtrade_bucket_15m_json TEXT NOT NULL,
+    force_order_events_60s_json TEXT NOT NULL,
+    source_meta_json TEXT,
+    captured_at TEXT NOT NULL,
+    -- Quant-grade lineage: per-input exchange timestamps
+    candles_15m_exchange_ts TEXT,
+    candles_1h_exchange_ts TEXT,
+    candles_4h_exchange_ts TEXT,
+    funding_exchange_ts TEXT,
+    oi_exchange_ts TEXT,
+    aggtrades_exchange_ts TEXT,
+    force_orders_exchange_ts TEXT,
+    -- Quant-grade lineage: snapshot build timing
+    snapshot_build_started_at TEXT,
+    snapshot_build_finished_at TEXT
+);
+
+CREATE TABLE IF NOT EXISTS feature_snapshots (
+    feature_snapshot_id TEXT PRIMARY KEY,
+    snapshot_id TEXT NOT NULL,
+    cycle_timestamp TEXT NOT NULL,
+    schema_version TEXT NOT NULL,
+    config_hash TEXT NOT NULL,
+    features_json TEXT NOT NULL,
+    quality_json TEXT NOT NULL,
+    captured_at TEXT NOT NULL,
+    FOREIGN KEY (snapshot_id) REFERENCES market_snapshots(snapshot_id)
 );
 
 CREATE TABLE IF NOT EXISTS config_snapshots (
@@ -274,5 +334,11 @@ CREATE INDEX IF NOT EXISTS idx_decision_outcomes_ts_group
     ON decision_outcomes(cycle_timestamp, outcome_group);
 CREATE INDEX IF NOT EXISTS idx_decision_outcomes_reason
     ON decision_outcomes(outcome_reason, cycle_timestamp);
+CREATE INDEX IF NOT EXISTS idx_market_snapshots_cycle_ts
+    ON market_snapshots(cycle_timestamp);
+CREATE INDEX IF NOT EXISTS idx_feature_snapshots_snapshot_id
+    ON feature_snapshots(snapshot_id);
+CREATE INDEX IF NOT EXISTS idx_feature_snapshots_cycle_ts
+    ON feature_snapshots(cycle_timestamp);
 CREATE INDEX IF NOT EXISTS idx_alerts_errors_ts_severity
     ON alerts_errors(timestamp, severity);

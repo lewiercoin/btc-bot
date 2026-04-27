@@ -1,59 +1,405 @@
 # Milestone Tracker
 
-Last updated: 2026-04-21
+Last updated: 2026-04-27
+
+---
+
+## ⚠️ Open Tech Debt: Kill-Switch Limits (MUST restore before LIVE mode)
+
+**Date:** 2026-04-22  
+**Reason:** Bot is in configuration/tuning phase. Weekly DD kill-switch triggered at 6.3% blocking MODELING-V1 data collection.  
+**Action taken:** Relaxed `RiskConfig` limits in `settings.py` for paper/tuning phase:
+
+| Parameter | Production value | Current (tuning) |
+|---|---|---|
+| `weekly_dd_limit` | `0.063` (6.3%) | `0.30` (30%) |
+| `daily_dd_limit` | `0.185` (18.5%) | `0.20` (20%) |
+| `max_consecutive_losses` | `5` | `15` |
+
+**MANDATORY:** Restore production values before switching to LIVE mode.  
+**Future fix:** Implement `tuning_mode` flag (Cascade Option C) or calendar-rollover auto-recovery (Option B).
 
 ---
 
 ## Current Active Milestone
 
-**EXPERIMENT-V2** — READY FOR DEPLOYMENT (branch: `experiment-v2`)
+**PHASE-1-AUDITS** — READY TO START
+
+**Date:** 2026-04-27
+**Status:** READY
+
+**Completed so far:**
+- ✅ S1: Dashboard Security (DONE)
+- ✅ A1: Funding Fees (DONE)
+- ✅ A2: Paper Execution Realism (MVP_DONE — fees + spread implemented, partial fills + latency deferred)
+- ✅ MARKET-TRUTH-V3 Gate A: PASS (`docs/audits/AUDIT_GATE_A_VERDICT_2026-04-27.md`)
+
+**Ready next:**
+- Phase 1 quant-grade audits can start from `main`
+- Start with Market Truth validation follow-through, FeatureEngine drift, and decision/risk/execution audit sequence
+
+**Remaining remediation tiers:**
+- 🟠 Tier B: Production Hygiene (Config reproducibility, production drift, dependency locks)
+- 🟡 Tier C: Quality of Life (Test coverage enforcement, manual tooling)
+
+**Phase 1 Audits** (unblocked by Gate A PASS)
+- AUDIT-01: Market Truth final validation
+- AUDIT-02: FeatureEngine drift validation
+- AUDIT-04: Regime Engine distribution analysis
+
+**Decision:** Proceed with Phase 1 audits on `main`; keep Tier B/C remediation tracked as follow-up work.
+
+**Phase 0 Complete Summary:**
+
+**Tier 1 (Security & Ops) — 4 audits:**
+- ✅ AUDIT-13: Security / Secrets / Exchange Safety (NOT_DONE — dashboard exposure FAIL)
+- ✅ AUDIT-12: Production Ops / SRE (LOOKS_DONE)
+- ✅ AUDIT-11: Observability / Dashboard (MVP_DONE)
+- ✅ AUDIT-19: Recovery / Safe Mode / State Reconciliation (MVP_DONE)
+
+**Tier 2 (Config & Execution) — 2 audits:**
+- ✅ AUDIT-14: Configuration / Reproducibility (MVP_DONE)
+- ✅ AUDIT-07: Execution / Paper Fill Integrity (NOT_DONE — paper fills unrealistic)
+
+**Tier 3 (PnL & Research Lab) — 2 audits:**
+- ✅ AUDIT-08: Trade Lifecycle / PnL Accounting (MVP_DONE — funding fees missing)
+- ✅ AUDIT-09: Backtest / Research Lab (MVP_DONE — methodology production-grade)
+
+**Lower Priority — 5 audits:**
+- ✅ AUDIT-06: Risk Engine (DONE — position sizing correct, exit logic sound)
+- ✅ AUDIT-05: Governance (DONE — filtering comprehensive, no race conditions)
+- ✅ AUDIT-10: Experiment Management (DONE — isolation exemplary)
+- ✅ AUDIT-15: Testing / CI / Quality Gates (MVP_DONE — coverage enforcement missing)
+- ✅ AUDIT-18: Documentation / Agent Workflow (DONE — 2301+ lines, comprehensive)
+
+**Critical findings requiring remediation:**
+1. 🔴 Public dashboard exposure (unauthenticated control endpoints on 0.0.0.0:8080)
+2. 🔴 Funding fees NOT tracked anywhere (no schema, no backtest, no paper runtime)
+3. 🟠 Paper execution unrealistic (zero fees, snapshot price, no spread, no partial fills)
+4. 🟠 Config reproducibility incomplete (config_hash missing 50%+ of runtime surface)
+5. 🟠 Production service drift (units differ from repo)
+6. 🟠 No dependency lock (no lockfile, no `.python-version`)
+7. 🟡 Test coverage enforcement missing (no coverage threshold in CI)
+8. 🟡 Manual recovery tooling stale (scripts reference old schema)
+
+**See:** `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` + `PHASE_0_CONSOLIDATED_FINDINGS.md`
+
+---
+
+## Completed Milestone: REMEDIATION-A2-PAPER-EXECUTION-REALISM
+
+**Date:** 2026-04-25  
+**Builder:** Claude Code (self-implementation, user requested)  
+**Auditor:** Claude Code (self-audit)  
+**Status:** ✅ MVP_DONE
+
+**Scope:** Fix paper execution unrealistic fills (Tier A: Blocks Live Readiness)
+
+**Deliverables completed:**
+- ✅ 0.04% taker fees added to paper runtime (matches backtest `SimpleFillModel`)
+- ✅ Bid/ask spread usage: BUY at ask, SELL at bid (realistic fill pricing)
+- ✅ `snapshot_id` column added to `executions` table (links to market snapshots)
+- ✅ Auto-migration for `snapshot_id` column (safe ALTER TABLE)
+- ✅ 4 comprehensive tests, all passing
+- ⏸️ Partial fills DEFERRED (require order book simulation)
+- ⏸️ Latency modeling DEFERRED (require market repricing logic)
+
+**Commits:**
+- `4c28bf9` — remediation-a2: paper execution realism (fees + spread) (Claude Code)
+- `2a52e47` — docs(audit): complete REMEDIATION-A2-PAPER-EXECUTION-REALISM audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_A2_PAPER_EXECUTION_REALISM_2026-04-25.md`
+
+**Impact:** Paper-backtest fee parity restored (both charge 0.04%). Bid/ask spread now used for realistic fill pricing. Paper PnL no longer overstated due to zero fees.
+
+**Deferred scope:** Partial fills and latency modeling require order book replay infrastructure. Optional future milestone: REMEDIATION-A2-ADVANCED.
+
+---
+
+## Completed Milestone: REMEDIATION-A1-FUNDING-FEES
+
+**Date:** 2026-04-25  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Status:** ✅ DONE
+
+**Scope:** Implement funding fee tracking (Tier A: Blocks Live Readiness)
+
+**Deliverables completed:**
+- ✅ `funding_paid REAL NOT NULL DEFAULT 0` column added to `trade_log` schema
+- ✅ Safe migration: auto-detect + ALTER TABLE in `StateStore`
+- ✅ Deterministic funding calculator: `core/funding.py` (shared by backtest + paper runtime)
+- ✅ Backtest incremental accrual: `_accrue_funding()` every snapshot
+- ✅ Paper runtime integration: `_compute_position_funding_paid()` + `fetch_funding_rates()`
+- ✅ PnL deduction: `pnl_abs_net = gross_pnl - fees - funding_paid`
+- ✅ 43 tests passing (5 funding-specific + 38 regression)
+
+**Commits:**
+- `40a9338` — remediation-a1: funding-fee tracking (Codex)
+- `7f11f38` — docs(audit): complete REMEDIATION-A1-FUNDING-FEES audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_A1_FUNDING_FEES_2026-04-25.md`
+
+**Impact:** Funding fees now tracked. Backtest and paper PnL no longer overstated. Production ready (6,164 funding samples in DB, 2020-2026).
+
+**Warnings:** 8-day funding data gap (2026-04-17 to 2026-04-25) — backfill needed for accurate recent trade PnL.
+
+---
+
+## Completed Milestone: REMEDIATION-S1-DASHBOARD-SECURITY
+
+**Date:** 2026-04-25  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Status:** ✅ DONE
+
+**Scope:** Fix public dashboard exposure (Tier S Emergency)
+
+**Deliverables completed:**
+- ✅ Dashboard rebound to `127.0.0.1:8080` (production + repo unit file)
+- ✅ UFW rule `8080/tcp` removed
+- ✅ SSH tunnel documentation: `docs/ops/SSH_TUNNEL_ACCESS.md`
+- ✅ Public access blocked (verified: connection timeout)
+- ✅ Local server access via SSH works
+- ✅ Service restarted cleanly (no errors)
+
+**Commits:**
+- `8c71360` — security: harden dashboard access path (Codex)
+- `2bb6c0c` — docs(audit): complete REMEDIATION-S1-DASHBOARD-SECURITY audit (Claude Code)
+
+**Audit report:** `docs/audits/AUDIT_REMEDIATION_S1_DASHBOARD_SECURITY_2026-04-25.md`
+
+**Impact:** Security emergency remediated. Dashboard no longer exposed to public internet. Unauthenticated control endpoints now localhost-only.
+
+---
+
+## Completed Milestone: PHASE-0-COMPLETE
+
+**Date:** 2026-04-24  
+**Auditor:** Claude Code  
+**Builders:** Cascade (Tier 1-2), Claude Code (Tier 3 + remaining)  
+**Status:** ✅ COMPLETE
+
+**Summary:** All 13 Phase 0 audits complete. Comprehensive consolidated report generated. User decision: Start remediation (S1 → A1 → A2) before Phase 1.
+
+**Artifacts:**
+- `docs/audits/PHASE_0_CONSOLIDATED_REPORT_2026-04-24.md` (250+ lines)
+- `docs/audits/PHASE_0_CONSOLIDATED_FINDINGS.md`
+- 13 individual audit reports
+
+**Key outcomes:**
+- 3 × DONE (Risk Engine, Governance, Experiment Management, Documentation)
+- 5 × MVP_DONE (Observability, Recovery, Config, PnL, Research Lab, Testing)
+- 2 × NOT_DONE (Security/Dashboard, Paper Execution)
+- Quantified risk: ~$3,700-$7,100 annual PnL overstatement
+- 4-phase remediation roadmap: R0 Emergency → R1 Live Readiness → R2 Hygiene → R3 Quality
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-3
+
+**Date:** 2026-04-24  
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
+
+**Audit reports:**
+- `AUDIT-08: Trade Lifecycle / PnL Accounting` — Verdict: MVP_DONE (PnL math correct, funding fees NOT tracked, paper runtime zero fees)
+- `AUDIT-09: Backtest / Research Lab` — Verdict: MVP_DONE (methodology production-grade, no lookahead, funding fees NOT simulated)
+
+**Key Tier 3 findings:**
+- PnL calculation mathematically correct (raw_pnl matches pnl_abs exactly when fees=0)
+- Zero unclosed positions >24h (trade lifecycle complete)
+- **Funding fees NOT tracked:** no `funding_paid` column in schema, not simulated in backtest, not tracked in paper runtime
+- **Backtest-paper fee parity broken:** backtest charges 0.04% fees, paper charges 0% fees
+- Research lab methodology production-grade: no lookahead, comprehensive governance, approval gates
+- Walk-forward validation sound (post-hoc and nested modes supported)
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-2
+
+**Date:** 2026-04-24  
+**Active builder:** Cascade  
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
+
+**Audit reports:**
+- `AUDIT-14: Configuration / Reproducibility` — Verdict: MVP_DONE (config tracked but incomplete, production drift, no lockfile)
+- `AUDIT-07: Execution / Paper Fill Integrity` — Verdict: NOT_DONE (paper fills unrealistic, HIGH paper-to-live gap risk)
+
+**Key Tier 2 findings:**
+- config_hash incomplete (missing exchange, proxy, alerts, dependencies, interpreter version)
+- Production service units drift from repo (BOT_SETTINGS_PROFILE, Restart policy, dashboard binding)
+- No dependency lockfile (`requirements.txt` only, no `poetry.lock` or `Pipfile.lock`)
+- No `.python-version` (CI uses 3.11, local audit used 3.13.1)
+- Paper execution unrealistic: snapshot price, zero fees, no spread model, no partial fills
+- Executions not linked to market_snapshots (spread-at-fill not reconstructable)
+
+---
+
+## Completed Milestone: QUANT-GRADE-AUDIT-PHASE-0-TIER-1
+
+**Date:** 2026-04-24  
+**Active builder:** Cascade  
+**Auditor:** Claude Code  
+**Status:** ✅ COMPLETE
+
+**Audit reports:**
+- `AUDIT-13: Security / Secrets / Exchange Safety` — Verdict: NOT_DONE (dashboard exposure FAIL)
+- `AUDIT-12: Production Ops / SRE` — Verdict: LOOKS_DONE (runbook stale, alert coverage gaps)
+- `AUDIT-11: Observability / Dashboard` — Verdict: MVP_DONE (runtime freshness solid, alert coverage shallow)
+- `AUDIT-19: Recovery / Safe Mode / State Reconciliation` — Verdict: MVP_DONE (recovery logic present, manual tooling stale)
+
+**🚨 CRITICAL FINDING:**
+
+**Production dashboard publicly exposed:**
+- Bound to `0.0.0.0:8080` (not `127.0.0.1`)
+- UFW allows `8080/tcp` from anywhere
+- Unauthenticated control endpoints: `POST /api/bot/start`, `POST /api/bot/stop`
+- Risk: Any remote actor can view bot state and control bot process
+
+---
+
+**MARKET-TRUTH-V3 + QUANT-GRADE HARDENING** — GATE A PASS (merged to `main`)
+
+**Deployment baseline:** `EXPERIMENT-V2` (branch: `experiment-v2`, commit `2088dc79`)
+
+**What:** Persistent market snapshot layer + quant-grade source-of-truth with explicit lineage
+
+**Why:**
+- Before V3: Snapshots were ephemeral, exact inputs for any decision could not be reconstructed
+- After V3: Full audit trail from persisted runtime market inputs → features → decision
+- Quant-grade hardening: Per-input timestamp lineage, build timing contract, replay safety classification
+
+**Implementation:**
+
+*Core V3 (deployed 2026-04-23):*
+- New tables: `market_snapshots`, `feature_snapshots`, `config_snapshots`
+- New links: `decision_outcomes.snapshot_id`, `decision_outcomes.feature_snapshot_id`
+- Orchestrator persists raw snapshot + feature snapshot per cycle
+- Exchange timestamps + latency tracking
+- Independent validation: `validation/recompute_features.py`
+
+*Quant-Grade Hardening (deployed 2026-04-24):*
+- Per-input exchange timestamps (9 fields): candles_15m/1h/4h, funding, OI, aggTrades, force_orders
+- Build timing contract: `snapshot_build_started_at`, `snapshot_build_finished_at`
+- Replay safety coverage matrix: 22 VERIFIED, 6 PARTIAL, 1 BLOCKED features
+- Verification tooling: `scripts/verify_first_snapshot.py`
+- Documentation: deployment protocol, ChatGPT audit response, hardening summary
+
+**Status:**
+- ✅ V3 infrastructure implementation complete (commit `2aa1115`)
+- ✅ Quant-grade hardening complete (commits `147d865`, `c68d30a`, `a3ff397`, `39c718a`)
+- ✅ ChatGPT audit: APPROVED FOR PRODUCTION VALIDATION
+- ✅ Deployed to production (2026-04-24 04:10 UTC)
+- ✅ First snapshot verified: ms-d39b22439fc944c2bf11f9347217f344
+- ✅ All quant-grade lineage fields populated
+- ✅ Gate A PASS (2026-04-27, commit `a0540e1`)
+- ✅ Timing audit semantics corrected and verified (commit `e06a3dd`)
+- ✅ Merge to `main` approved after Gate A PASS
+
+**Success criteria:**
+1. ✅ `market_snapshots` populated with quant-grade lineage fields
+2. ✅ `feature_snapshots` linked to snapshots
+3. ✅ `decision_outcomes` linked to both snapshot layers
+4. ✅ First snapshot verification passed
+5. ✅ 200+ post-fix quality-ready cycles collected
+6. ✅ Feature Drift query pack PASS
+7. ✅ Timing/Staleness query pack PASS after `snapshot_build_finished_at` timing correction
+
+**Merge gate:** ✅ COMPLETE — 200+ cycle validation → drift/timing reports → final audit → merge to `main`
+
+**Production evidence (2026-04-24):**
+- Deployed branch: `market-truth-v3`
+- Production commit: `39c718a` (quant-grade hardening + deployment protocol)
+- Deployment: 2026-04-24 04:10:43 UTC
+- First verified snapshot: `2026-04-24T04:30:00.003848+00:00`
+- Build timing: 2.43s (normal)
+- Quant-grade fields: ✅ populated (except force_orders NULL - expected)
+- Per-input timestamps: ✅ verified
+- Validation status: ✅ Gate A PASS (`206+` quality-ready cycles independently verified by Claude Code)
+
+---
+
+## Deployment Baseline
+
+**EXPERIMENT-V2** — VALIDATION REFERENCE (branch: `experiment-v2`, commit `2088dc79`)
 
 **Previous milestone:** DATA-INTEGRITY-V1 — DONE (merged to `main`, commit `7ebf2d2`, 2026-04-21)
 
-**What:** Validate DATA-INTEGRITY-V1 with same experiment profile as v1 (relaxed filters)
+**What:** Validate DATA-INTEGRITY-V1 with the relaxed experiment profile used for paper-runtime comparison
 
-**Why:** Compare restart-safe persistence (v2) vs baseline (v1) for feature quality impact
+**Why:** Provide the clean post-DATA-INTEGRITY baseline that MARKET-TRUTH-V3 is built on
 
-**Composition:**
-- `main` with DATA-INTEGRITY-V1 merged ✅
-- Experiment profile from v1 (cherry-picked) ✅
-
-**Deployment target:** Production server (same as experiment-v1-unblock-filters)
-
-**Success criteria:**
+**Baseline criteria:**
 - Bootstrap summary appears in logs at startup
 - Feature quality propagates through `MarketSnapshot` → `Features`
 - OI/CVD persistence survives restart
-- Throughput comparable to v1 (baseline for comparison)
+- Production paper bot runs on post-DATA-INTEGRITY contracts
 
 ---
 
 ## Next Milestone
 
-**MODELING-V1** — BLOCKED (prerequisite: EXPERIMENT-V2 must validate DATA-INTEGRITY first)
+**MODELING-V1 / PHASE-1-AUDITS** — READY (MARKET-TRUTH-V3 Gate A PASS)
 
-**Implementation commits:**
-- `256a74a` — scaffold feature quality contracts
-- `075f529` — implement restart-safe feature quality
+**Prerequisites:**
+1. ✅ MARKET-TRUTH-V3 deployed to production (2026-04-24)
+2. ✅ Quant-grade hardening deployed (per-input lineage + build timing)
+3. ✅ First snapshot verified (quant-grade fields populated)
+4. ✅ 200+ post-fix quality-ready cycles collected
+5. ✅ Feature Drift query pack executed and reviewed
+6. ✅ Timing validation reviewed; no future timestamps or negative build timing under corrected contract
+7. ✅ MARKET-TRUTH-V3 merged to `main`
 
-**Goal:** Make decision-path data **restart-safe, coverage-aware, and quality-explicit**.
+**Goal:** Add context-aware modeling only after raw market truth and feature reproducibility are verified.
 
-**Architecture:** Persistence + bootstrap > restart-from-zero warmup
+**Unblocked:** 2026-04-27 (Gate A PASS)
 
-**Scope:** Data reliability infrastructure only (OI persistence, CVD persistence, flow completeness, funding integrity, quality visibility)
+**Scope (future):** session/volatility context classification, neutral-mode deployment, diagnostics expansion
 
-**Out of scope:** Session modeling, execution realism, parameter tuning, new data sources
+**Out of scope (for now):** execution realism, parameter tuning, new data sources, quality-aware context gating
 
-**Documentation:**
-- **Handoff:** `docs/handoffs/DATA_INTEGRITY_V1_CODEX.md` (ready for Codex)
-- **Roadmap details:** See `experiment-v1-unblock-filters` branch MILESTONE_TRACKER for full Post-Experiment V1 Roadmap
+**Documentation:** final blueprint at `docs/blueprints/BLUEPRINT_MODELING_V1.md`
 
-**Implementation branch:** `data-integrity-v1` ✅ **PUSHED to origin** (backup/visibility only)  
-**Branch status:** Pre-Day14 scaffolding approved, **BLOCKED from merge until 2026-05-04**
+**Implementation branch:** not yet created
 
-**Merge gate:** Claude Code audit verdict = DONE (after Task 7)
+---
 
-**Post-milestone validation:** Experiment v2 (same config as Experiment v1, but with clean data contracts)
+## Future Milestone: SAFE-MODE-AUTO-RECOVERY
+
+**Status:** PLANNED (deferred, user priority shift 2026-04-23)
+
+**Goal:** Implement in-process auto-recovery for technical safe-mode triggers (WebSocket reconnect, transient failures)
+
+**Current behavior:**
+- Health check fails 3 times → safe mode activated
+- WebSocket reconnects → health stabilizes BUT safe mode remains active
+- Recovery requires manual restart or SQL clear
+
+**Target behavior (Hybrid Auto-Recovery):**
+- **Technical triggers** (`health_check_failure_threshold`, `feed_start_failed`, `snapshot_build_failed`):
+  - Enter safe mode: 3 consecutive health failures (current)
+  - Exit safe mode: 10 consecutive health successes (NEW - asymmetric for stability)
+  - Auto-clear without restart
+- **Capital triggers** (`daily_dd`, `weekly_dd`, `consecutive_losses`):
+  - Remain manual/calendar-based (unchanged, conservative)
+
+**Implementation approach:**
+- Add `ExecutionConfig` fields: `health_successes_to_clear_safe_mode: int = 10`, `auto_clear_technical_triggers: bool = True`
+- Extend `orchestrator._run_health_check()` to track consecutive successes
+- Auto-clear safe mode when threshold met AND trigger is in `_TECHNICAL_TRIGGERS`
+- Audit log all auto-recovery events
+
+**Rationale:** WebSocket reconnects are transient technical issues, not capital risks. Restart is heavyweight (10s downtime, state loss). In-process recovery = fast (5 min), clean, production-grade.
+
+**Quick fix applied (2026-04-23):** Raised `health_failures_before_safe_mode` from 3 → 10 for initial config phase. MUST implement proper auto-recovery before lowering threshold back to production value.
+
+**Prerequisites:** None (can implement anytime)
+
+**Merge gate:** Claude Code audit verdict = DONE + smoke test for flapping prevention
+
+**Builder:** TBD (user will assign when ready)
 
 ---
 

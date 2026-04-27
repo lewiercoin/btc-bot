@@ -75,6 +75,7 @@ def normalize_kline(payload: list[Any], symbol: str, timeframe: str) -> dict[str
         "low": float(payload[3]),
         "close": float(payload[4]),
         "volume": float(payload[5]),
+        "_exchange_raw": list(payload),
     }
 
 
@@ -83,6 +84,7 @@ def normalize_funding(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
         "symbol": symbol.upper(),
         "funding_time": _ms_to_utc(int(payload["fundingTime"])),
         "funding_rate": float(payload["fundingRate"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -92,6 +94,7 @@ def normalize_open_interest(payload: dict[str, Any], symbol: str) -> dict[str, A
         "symbol": symbol.upper(),
         "timestamp": _ms_to_utc(timestamp_ms),
         "oi_value": float(payload["openInterest"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -100,6 +103,7 @@ def normalize_open_interest_hist(payload: dict[str, Any], symbol: str) -> dict[s
         "symbol": symbol.upper(),
         "timestamp": _ms_to_utc(int(payload["timestamp"])),
         "oi_value": float(payload["sumOpenInterest"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -108,16 +112,19 @@ def normalize_book_ticker(payload: dict[str, Any]) -> dict[str, Any]:
         "symbol": str(payload["symbol"]).upper(),
         "bid": float(payload["bidPrice"]),
         "ask": float(payload["askPrice"]),
+        "_exchange_raw": dict(payload),
     }
 
 
 def normalize_agg_trade(payload: dict[str, Any], symbol: str) -> dict[str, Any]:
     return {
         "symbol": symbol.upper(),
+        "aggregate_trade_id": int(payload["a"]),
         "event_time": _ms_to_utc(int(payload["T"])),
         "price": float(payload["p"]),
         "qty": float(payload["q"]),
         "is_buyer_maker": bool(payload["m"]),
+        "_exchange_raw": dict(payload),
     }
 
 
@@ -378,12 +385,15 @@ class BinanceFuturesRestClient:
         limit: int = 1000,
         start_time_ms: int | None = None,
         end_time_ms: int | None = None,
+        from_id: int | None = None,
     ) -> list[dict[str, Any]]:
         params: dict[str, Any] = {"symbol": symbol.upper(), "limit": int(limit)}
         if start_time_ms is not None:
             params["startTime"] = int(start_time_ms)
         if end_time_ms is not None:
             params["endTime"] = int(end_time_ms)
+        if from_id is not None:
+            params["fromId"] = int(from_id)
 
         payload = self._request("/fapi/v1/aggTrades", params)
         return [normalize_agg_trade(item, symbol=symbol) for item in payload]

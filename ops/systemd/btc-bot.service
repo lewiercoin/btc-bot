@@ -1,0 +1,17 @@
+[Unit]
+Description=BTC Trading Bot
+After=network.target
+
+[Service]
+Type=simple
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+Environment="BOT_SETTINGS_PROFILE=experiment"
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/python main.py --mode PAPER
+Restart=always
+RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target
