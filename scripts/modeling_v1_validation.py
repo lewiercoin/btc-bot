@@ -627,7 +627,7 @@ def generate_report(
     lines += [
         f"",
         f"| Bucket | N | Win Rate | Δ vs Baseline | p-value | WR≥10pp | p<0.05 | Eligible |",
-        f"|--------|---|----------|---------------|---------|---------|--------|---------|]",
+        f"|--------|---|----------|---------------|---------|---------|--------|---------|",
     ]
     eligible_buckets = []
     for r in sorted(activation_results, key=lambda x: -x["wr_delta_vs_baseline"]):
