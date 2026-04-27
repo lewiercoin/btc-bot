@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 
 from core.models import Features, MarketContext, SessionBucket, VolatilityBucket
 from settings import ContextConfig
@@ -44,7 +44,11 @@ class ContextEngine:
         )
 
     def _classify_session(self, timestamp: datetime) -> SessionBucket:
-        h = timestamp.hour  # UTC required
+        if timestamp.tzinfo is None:
+            ts_utc = timestamp.replace(tzinfo=timezone.utc)
+        else:
+            ts_utc = timestamp.astimezone(timezone.utc)
+        h = ts_utc.hour
         if h >= 22 or h < 7:
             return SessionBucket.ASIA
         if 7 <= h < 14:

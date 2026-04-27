@@ -564,3 +564,174 @@ def test_policy_version_propagated():
     engine = ContextEngine(config=cfg)
     ctx = engine.classify(_make_features())
     assert ctx.context_policy_version == "test-v99"
+
+
+# ---------------------------------------------------------------------------
+# Audit fix A: timezone-aware non-UTC timestamp → correct UTC bucket
+# A timestamp that is 10:00 CET (UTC+1) = 09:00 UTC → EU bucket
+# A timestamp that is 23:00 CET (UTC+1) = 22:00 UTC → ASIA bucket
+# ---------------------------------------------------------------------------
+
+def test_non_utc_timezone_normalized_to_utc_eu():
+    from datetime import timezone as tz, timedelta
+    engine = _default_engine()
+    cet = tz(timedelta(hours=1))
+    # 10:00 CET = 09:00 UTC → EU
+    ts = datetime(2024, 1, 15, 10, 0, 0, tzinfo=cet)
+    f = _make_features(hour=10)
+    f_adjusted = Features(
+        schema_version=f.schema_version,
+        config_hash=f.config_hash,
+        timestamp=ts,
+        atr_15m=f.atr_15m,
+        atr_4h=f.atr_4h,
+        atr_4h_norm=f.atr_4h_norm,
+        ema50_4h=f.ema50_4h,
+        ema200_4h=f.ema200_4h,
+        sweep_detected=f.sweep_detected,
+        reclaim_detected=f.reclaim_detected,
+        sweep_level=f.sweep_level,
+        sweep_depth_pct=f.sweep_depth_pct,
+        sweep_side=f.sweep_side,
+        cvd_bullish_divergence=f.cvd_bullish_divergence,
+        tfi_60s=f.tfi_60s,
+    )
+    ctx = engine.classify(f_adjusted)
+    assert ctx.session_bucket == SessionBucket.EU  # 09:00 UTC is EU
+
+
+def test_non_utc_timezone_normalized_to_utc_asia():
+    from datetime import timezone as tz, timedelta
+    engine = _default_engine()
+    cet = tz(timedelta(hours=1))
+    # 23:00 CET = 22:00 UTC → ASIA
+    ts = datetime(2024, 1, 15, 23, 0, 0, tzinfo=cet)
+    f = _make_features(hour=22)
+    f_adjusted = Features(
+        schema_version=f.schema_version,
+        config_hash=f.config_hash,
+        timestamp=ts,
+        atr_15m=f.atr_15m,
+        atr_4h=f.atr_4h,
+        atr_4h_norm=f.atr_4h_norm,
+        ema50_4h=f.ema50_4h,
+        ema200_4h=f.ema200_4h,
+        sweep_detected=f.sweep_detected,
+        reclaim_detected=f.reclaim_detected,
+        sweep_level=f.sweep_level,
+        sweep_depth_pct=f.sweep_depth_pct,
+        sweep_side=f.sweep_side,
+        cvd_bullish_divergence=f.cvd_bullish_divergence,
+        tfi_60s=f.tfi_60s,
+    )
+    ctx = engine.classify(f_adjusted)
+    assert ctx.session_bucket == SessionBucket.ASIA  # 22:00 UTC is ASIA
+
+
+def test_naive_datetime_treated_as_utc():
+    engine = _default_engine()
+    # naive 10:00 → treated as 10:00 UTC → EU
+    ts = datetime(2024, 1, 15, 10, 0, 0)  # no tzinfo
+    f = _make_features(hour=10)
+    f_adjusted = Features(
+        schema_version=f.schema_version,
+        config_hash=f.config_hash,
+        timestamp=ts,
+        atr_15m=f.atr_15m,
+        atr_4h=f.atr_4h,
+        atr_4h_norm=f.atr_4h_norm,
+        ema50_4h=f.ema50_4h,
+        ema200_4h=f.ema200_4h,
+        sweep_detected=f.sweep_detected,
+        reclaim_detected=f.reclaim_detected,
+        sweep_level=f.sweep_level,
+        sweep_depth_pct=f.sweep_depth_pct,
+        sweep_side=f.sweep_side,
+        cvd_bullish_divergence=f.cvd_bullish_divergence,
+        tfi_60s=f.tfi_60s,
+    )
+    ctx = engine.classify(f_adjusted)
+    assert ctx.session_bucket == SessionBucket.EU  # 10:00 naive = EU
+
+
+# ---------------------------------------------------------------------------
+# Audit fix B: context fields written to decision_outcomes for all paths
+# no_signal, governance_veto, risk_block, execution_failed, signal_generated
+# ---------------------------------------------------------------------------
+
+def test_context_telemetry_all_paths():
+    conn = _make_db_conn()
+    from storage.state_store import StateStore
+    store = StateStore(connection=conn, mode="PAPER")
+    store.ensure_initialized()
+
+    ts = datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    ctx_kwargs = dict(
+        context_session_label="EU",
+        context_volatility_label="NORMAL",
+        context_policy_version="v1.0.0",
+        context_eligible=True,
+        context_block_reason=None,
+        context_neutral_mode_active=True,
+    )
+
+    paths = [
+        ("no_signal", "no_sweep"),
+        ("governance_veto", "governance_veto"),
+        ("risk_block", "risk_block"),
+        ("execution_failed", "execution_failed"),
+        ("signal_generated", "signal_generated"),
+    ]
+
+    for outcome_group, outcome_reason in paths:
+        store.record_decision_outcome(
+            cycle_timestamp=ts,
+            outcome_group=outcome_group,
+            outcome_reason=outcome_reason,
+            config_hash="abc123",
+            regime="normal",
+            **ctx_kwargs,
+        )
+
+    rows = conn.execute(
+        "SELECT outcome_group, context_session_label, context_volatility_label, "
+        "context_policy_version, context_eligible, context_neutral_mode_active "
+        "FROM decision_outcomes ORDER BY id"
+    ).fetchall()
+
+    assert len(rows) == len(paths)
+    for row in rows:
+        assert row["context_session_label"] == "EU", f"Missing context in {row['outcome_group']}"
+        assert row["context_volatility_label"] == "NORMAL"
+        assert row["context_policy_version"] == "v1.0.0"
+        assert row["context_eligible"] == 1
+        assert row["context_neutral_mode_active"] == 1
+
+
+def test_context_telemetry_blocked_path():
+    conn = _make_db_conn()
+    from storage.state_store import StateStore
+    store = StateStore(connection=conn, mode="PAPER")
+    store.ensure_initialized()
+
+    ts = datetime(2024, 1, 15, 10, 0, 0, tzinfo=timezone.utc)
+    store.record_decision_outcome(
+        cycle_timestamp=ts,
+        outcome_group="no_signal",
+        outcome_reason="context_gate",
+        config_hash="abc123",
+        regime="normal",
+        context_session_label="ASIA",
+        context_volatility_label="HIGH",
+        context_policy_version="v1.0.0",
+        context_eligible=False,
+        context_block_reason="context_unfavorable:ASIA:HIGH",
+        context_neutral_mode_active=False,
+    )
+
+    row = conn.execute(
+        "SELECT * FROM decision_outcomes ORDER BY id DESC LIMIT 1"
+    ).fetchone()
+    assert row["context_eligible"] == 0
+    assert row["context_block_reason"] == "context_unfavorable:ASIA:HIGH"
+    assert row["context_neutral_mode_active"] == 0
