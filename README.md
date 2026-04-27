@@ -149,7 +149,7 @@ Blueprint: [`docs/BLUEPRINT_V1.md`](docs/BLUEPRINT_V1.md)
 
 Read-only observability UI (FastAPI m4, SSE log stream, polling).
 
-**Production URL:** `http://204.168.146.253:8080`
+**Production access:** SSH tunnel only to `http://127.0.0.1:8080`
 
 **Panels:** Bot Status, Bot Control (start/stop), Open Positions, Egress Health, Recent Trades, Signals, Daily Metrics, Alerts, Log Stream
 
@@ -171,14 +171,17 @@ curl -s http://localhost:8080/api/status | python3 -m json.tool | head -10
 curl -s http://localhost:8080/api/egress  | python3 -m json.tool
 ```
 
-**SSH tunnel (no firewall change needed):**
+**SSH tunnel (required in production):**
 
 ```bash
-ssh -i btc-bot-deploy -L 8080:127.0.0.1:8080 btc-bot@204.168.146.253 -N
-# then open http://localhost:8080
+ssh -i btc-bot-deploy-v2 -L 8080:127.0.0.1:8080 root@204.168.146.253 -N
+# then open http://127.0.0.1:8080
 ```
 
-Full step-by-step guide (UFW, external binding, log rotation, deploy updates): [`docs/dashboard/access-guide.md`](docs/dashboard/access-guide.md)
+Public access to `http://204.168.146.253:8080` is intentionally blocked after the dashboard security remediation.
+
+Full step-by-step guide: [`docs/dashboard/access-guide.md`](docs/dashboard/access-guide.md)
+Windows SSH tunnel runbook: [`docs/ops/SSH_TUNNEL_ACCESS.md`](docs/ops/SSH_TUNNEL_ACCESS.md)
 
 API docs (Egress Health endpoint): [`docs/dashboard/egress-integration.md`](docs/dashboard/egress-integration.md)
 
