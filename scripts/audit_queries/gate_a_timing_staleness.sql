@@ -7,6 +7,11 @@
 --   2. all five quality keys = ready
 --   3. latest captured_at
 --   4. latest feature_snapshot_id
+-- Timing contract:
+--   - build duration = snapshot_build_finished_at - snapshot_build_started_at
+--   - per-input latency = snapshot_build_finished_at - <input>_exchange_ts
+--   - future timestamp = <input>_exchange_ts > snapshot_build_finished_at
+--   - snapshot captured_at in market_snapshots is a cycle anchor, not a post-build ingest marker
 --
 -- How to run:
 --   sqlite3 -readonly storage/btc_bot.db < scripts/audit_queries/gate_a_timing_staleness.sql
@@ -74,7 +79,7 @@ canonical_rows AS (
         ROUND((julianday(snapshot_build_finished_at) - julianday(snapshot_build_started_at)) * 86400.0, 3) AS build_duration_seconds,
         ROUND((julianday(snapshot_build_started_at) - julianday(cycle_timestamp)) * 86400.0, 3) AS cycle_to_build_start_seconds,
         ROUND((julianday(snapshot_build_finished_at) - julianday(cycle_timestamp)) * 86400.0, 3) AS cycle_to_build_finish_seconds,
-        ROUND((julianday(snapshot_captured_at) - julianday(snapshot_build_finished_at)) * 86400.0, 3) AS build_finish_to_capture_seconds
+        ROUND((julianday(snapshot_captured_at) - julianday(cycle_timestamp)) * 86400.0, 3) AS captured_vs_cycle_anchor_seconds
     FROM ranked_rows
     WHERE bucket_rank = 1
 )
@@ -82,12 +87,11 @@ SELECT
     COUNT(*) AS canonical_bucket_count,
     SUM(CASE WHEN build_duration_seconds < 0 THEN 1 ELSE 0 END) AS negative_build_duration_count,
     SUM(CASE WHEN cycle_to_build_finish_seconds < 0 THEN 1 ELSE 0 END) AS build_finished_before_cycle_count,
+    SUM(CASE WHEN captured_vs_cycle_anchor_seconds != 0 THEN 1 ELSE 0 END) AS captured_not_equal_cycle_anchor_count,
     ROUND(MAX(build_duration_seconds), 3) AS max_build_duration_seconds,
     ROUND(AVG(build_duration_seconds), 3) AS avg_build_duration_seconds,
     ROUND(MAX(cycle_to_build_finish_seconds), 3) AS max_cycle_to_build_finish_seconds,
-    ROUND(AVG(cycle_to_build_finish_seconds), 3) AS avg_cycle_to_build_finish_seconds,
-    ROUND(MAX(build_finish_to_capture_seconds), 3) AS max_build_finish_to_capture_seconds,
-    ROUND(AVG(build_finish_to_capture_seconds), 3) AS avg_build_finish_to_capture_seconds
+    ROUND(AVG(cycle_to_build_finish_seconds), 3) AS avg_cycle_to_build_finish_seconds
 FROM canonical_rows;
 
 SELECT 'T1B: build timing anomalies in canonical post-fix buckets' AS query_name;
@@ -219,7 +223,7 @@ ranked_rows AS (
 canonical_rows AS (
     SELECT
         ROUND((julianday(snapshot_build_finished_at) - julianday(snapshot_build_started_at)) * 86400.0, 3) AS build_duration_seconds,
-        ROUND((julianday(snapshot_captured_at) - julianday(snapshot_build_finished_at)) * 86400.0, 3) AS capture_lag_seconds
+        ROUND((julianday(snapshot_build_finished_at) - julianday(cycle_timestamp)) * 86400.0, 3) AS cycle_to_build_finish_seconds
     FROM ranked_rows
     WHERE bucket_rank = 1
       AND snapshot_build_started_at IS NOT NULL
@@ -228,7 +232,7 @@ canonical_rows AS (
 metrics AS (
     SELECT 'build_duration_seconds' AS metric_name, build_duration_seconds AS metric_value FROM canonical_rows
     UNION ALL
-    SELECT 'capture_lag_seconds', capture_lag_seconds FROM canonical_rows
+    SELECT 'cycle_to_build_finish_seconds', cycle_to_build_finish_seconds FROM canonical_rows
 ),
 ordered AS (
     SELECT
@@ -275,6 +279,7 @@ per_row AS (
         fs.feature_snapshot_id,
         fs.cycle_timestamp,
         ms.captured_at AS snapshot_captured_at,
+        ms.snapshot_build_finished_at,
         ms.candles_15m_exchange_ts,
         ms.candles_1h_exchange_ts,
         ms.candles_4h_exchange_ts,
@@ -323,7 +328,7 @@ alignment_checks AS (
         CASE WHEN candles_15m_exchange_ts IS NULL THEN 1 ELSE 0 END AS is_null,
         CASE
             WHEN candles_15m_exchange_ts IS NOT NULL
-             AND julianday(candles_15m_exchange_ts) > julianday(cycle_timestamp)
+             AND julianday(candles_15m_exchange_ts) > julianday(snapshot_build_finished_at)
             THEN 1 ELSE 0
         END AS is_future,
         CASE
@@ -336,7 +341,7 @@ alignment_checks AS (
     SELECT
         'candles_1h', cycle_timestamp, candles_1h_exchange_ts,
         CASE WHEN candles_1h_exchange_ts IS NULL THEN 1 ELSE 0 END,
-        CASE WHEN candles_1h_exchange_ts IS NOT NULL AND julianday(candles_1h_exchange_ts) > julianday(cycle_timestamp) THEN 1 ELSE 0 END,
+        CASE WHEN candles_1h_exchange_ts IS NOT NULL AND julianday(candles_1h_exchange_ts) > julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END,
         CASE
             WHEN candles_1h_exchange_ts IS NOT NULL
              AND strftime('%Y-%m-%dT%H:00', candles_1h_exchange_ts) = strftime('%Y-%m-%dT%H:00', cycle_timestamp)
@@ -347,7 +352,7 @@ alignment_checks AS (
     SELECT
         'candles_4h', cycle_timestamp, candles_4h_exchange_ts,
         CASE WHEN candles_4h_exchange_ts IS NULL THEN 1 ELSE 0 END,
-        CASE WHEN candles_4h_exchange_ts IS NOT NULL AND julianday(candles_4h_exchange_ts) > julianday(cycle_timestamp) THEN 1 ELSE 0 END,
+        CASE WHEN candles_4h_exchange_ts IS NOT NULL AND julianday(candles_4h_exchange_ts) > julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END,
         CASE
             WHEN candles_4h_exchange_ts IS NOT NULL
              AND strftime('%Y-%m-%d', candles_4h_exchange_ts) = strftime('%Y-%m-%d', cycle_timestamp)
@@ -359,22 +364,22 @@ alignment_checks AS (
     SELECT
         'funding', cycle_timestamp, funding_exchange_ts,
         CASE WHEN funding_exchange_ts IS NULL THEN 1 ELSE 0 END,
-        CASE WHEN funding_exchange_ts IS NOT NULL AND julianday(funding_exchange_ts) > julianday(cycle_timestamp) THEN 1 ELSE 0 END,
-        CASE WHEN funding_exchange_ts IS NOT NULL AND julianday(funding_exchange_ts) <= julianday(cycle_timestamp) THEN 1 ELSE 0 END
+        CASE WHEN funding_exchange_ts IS NOT NULL AND julianday(funding_exchange_ts) > julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END,
+        CASE WHEN funding_exchange_ts IS NOT NULL AND julianday(funding_exchange_ts) <= julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END
     FROM canonical_rows
     UNION ALL
     SELECT
         'oi', cycle_timestamp, oi_exchange_ts,
         CASE WHEN oi_exchange_ts IS NULL THEN 1 ELSE 0 END,
-        CASE WHEN oi_exchange_ts IS NOT NULL AND julianday(oi_exchange_ts) > julianday(cycle_timestamp) THEN 1 ELSE 0 END,
-        CASE WHEN oi_exchange_ts IS NOT NULL AND julianday(oi_exchange_ts) <= julianday(cycle_timestamp) THEN 1 ELSE 0 END
+        CASE WHEN oi_exchange_ts IS NOT NULL AND julianday(oi_exchange_ts) > julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END,
+        CASE WHEN oi_exchange_ts IS NOT NULL AND julianday(oi_exchange_ts) <= julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END
     FROM canonical_rows
     UNION ALL
     SELECT
         'aggtrade', cycle_timestamp, aggtrades_exchange_ts,
         CASE WHEN aggtrades_exchange_ts IS NULL THEN 1 ELSE 0 END,
-        CASE WHEN aggtrades_exchange_ts IS NOT NULL AND julianday(aggtrades_exchange_ts) > julianday(cycle_timestamp) THEN 1 ELSE 0 END,
-        CASE WHEN aggtrades_exchange_ts IS NOT NULL AND julianday(aggtrades_exchange_ts) <= julianday(cycle_timestamp) THEN 1 ELSE 0 END
+        CASE WHEN aggtrades_exchange_ts IS NOT NULL AND julianday(aggtrades_exchange_ts) > julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END,
+        CASE WHEN aggtrades_exchange_ts IS NOT NULL AND julianday(aggtrades_exchange_ts) <= julianday(snapshot_build_finished_at) THEN 1 ELSE 0 END
     FROM canonical_rows
 )
 SELECT
@@ -404,6 +409,7 @@ per_row AS (
         fs.feature_snapshot_id,
         fs.cycle_timestamp,
         ms.captured_at AS snapshot_captured_at,
+        ms.snapshot_build_finished_at,
         ms.candles_15m_exchange_ts,
         ms.candles_1h_exchange_ts,
         ms.candles_4h_exchange_ts,
@@ -446,27 +452,27 @@ canonical_rows AS (
 ),
 staleness_rows AS (
     SELECT 'candles_15m' AS input_name, bucket_15m, cycle_timestamp, candles_15m_exchange_ts AS exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(candles_15m_exchange_ts)) * 86400.0, 3) AS stale_seconds
+           ROUND((julianday(snapshot_build_finished_at) - julianday(candles_15m_exchange_ts)) * 86400.0, 3) AS stale_seconds
     FROM canonical_rows
     UNION ALL
     SELECT 'candles_1h', bucket_15m, cycle_timestamp, candles_1h_exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(candles_1h_exchange_ts)) * 86400.0, 3)
+           ROUND((julianday(snapshot_build_finished_at) - julianday(candles_1h_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     UNION ALL
     SELECT 'candles_4h', bucket_15m, cycle_timestamp, candles_4h_exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(candles_4h_exchange_ts)) * 86400.0, 3)
+           ROUND((julianday(snapshot_build_finished_at) - julianday(candles_4h_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     UNION ALL
     SELECT 'funding', bucket_15m, cycle_timestamp, funding_exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(funding_exchange_ts)) * 86400.0, 3)
+           ROUND((julianday(snapshot_build_finished_at) - julianday(funding_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     UNION ALL
     SELECT 'oi', bucket_15m, cycle_timestamp, oi_exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(oi_exchange_ts)) * 86400.0, 3)
+           ROUND((julianday(snapshot_build_finished_at) - julianday(oi_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     UNION ALL
     SELECT 'aggtrade', bucket_15m, cycle_timestamp, aggtrades_exchange_ts,
-           ROUND((julianday(cycle_timestamp) - julianday(aggtrades_exchange_ts)) * 86400.0, 3)
+           ROUND((julianday(snapshot_build_finished_at) - julianday(aggtrades_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
 )
 SELECT
@@ -496,6 +502,7 @@ per_row AS (
         fs.feature_snapshot_id,
         fs.cycle_timestamp,
         ms.captured_at AS snapshot_captured_at,
+        ms.snapshot_build_finished_at,
         ms.candles_15m_exchange_ts,
         ms.candles_1h_exchange_ts,
         ms.candles_4h_exchange_ts,
@@ -537,27 +544,27 @@ canonical_rows AS (
     SELECT * FROM ranked_rows WHERE bucket_rank = 1
 ),
 staleness_rows AS (
-    SELECT 'candles_15m' AS input_name, ROUND((julianday(cycle_timestamp) - julianday(candles_15m_exchange_ts)) * 86400.0, 3) AS stale_seconds
+    SELECT 'candles_15m' AS input_name, ROUND((julianday(snapshot_build_finished_at) - julianday(candles_15m_exchange_ts)) * 86400.0, 3) AS stale_seconds
     FROM canonical_rows
     WHERE candles_15m_exchange_ts IS NOT NULL
     UNION ALL
-    SELECT 'candles_1h', ROUND((julianday(cycle_timestamp) - julianday(candles_1h_exchange_ts)) * 86400.0, 3)
+    SELECT 'candles_1h', ROUND((julianday(snapshot_build_finished_at) - julianday(candles_1h_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     WHERE candles_1h_exchange_ts IS NOT NULL
     UNION ALL
-    SELECT 'candles_4h', ROUND((julianday(cycle_timestamp) - julianday(candles_4h_exchange_ts)) * 86400.0, 3)
+    SELECT 'candles_4h', ROUND((julianday(snapshot_build_finished_at) - julianday(candles_4h_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     WHERE candles_4h_exchange_ts IS NOT NULL
     UNION ALL
-    SELECT 'funding', ROUND((julianday(cycle_timestamp) - julianday(funding_exchange_ts)) * 86400.0, 3)
+    SELECT 'funding', ROUND((julianday(snapshot_build_finished_at) - julianday(funding_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     WHERE funding_exchange_ts IS NOT NULL
     UNION ALL
-    SELECT 'oi', ROUND((julianday(cycle_timestamp) - julianday(oi_exchange_ts)) * 86400.0, 3)
+    SELECT 'oi', ROUND((julianday(snapshot_build_finished_at) - julianday(oi_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     WHERE oi_exchange_ts IS NOT NULL
     UNION ALL
-    SELECT 'aggtrade', ROUND((julianday(cycle_timestamp) - julianday(aggtrades_exchange_ts)) * 86400.0, 3)
+    SELECT 'aggtrade', ROUND((julianday(snapshot_build_finished_at) - julianday(aggtrades_exchange_ts)) * 86400.0, 3)
     FROM canonical_rows
     WHERE aggtrades_exchange_ts IS NOT NULL
 ),
@@ -606,6 +613,7 @@ per_row AS (
         fs.feature_snapshot_id,
         fs.cycle_timestamp,
         ms.captured_at AS snapshot_captured_at,
+        ms.snapshot_build_finished_at,
         ms.aggtrades_exchange_ts,
         COALESCE(json_extract(ms.source_meta_json, '$.aggtrade_15m.source'), 'missing') AS aggtrade_15m_source,
         COALESCE(json_extract(ms.source_meta_json, '$.aggtrade_60s.source'), 'missing') AS aggtrade_60s_source,
@@ -645,11 +653,12 @@ canonical_rows AS (
     SELECT
         bucket_15m,
         cycle_timestamp,
+        snapshot_build_finished_at,
         aggtrades_exchange_ts,
         aggtrade_15m_source,
         aggtrade_60s_source,
         CASE WHEN ws_last_message_at IS NOT NULL THEN 1 ELSE 0 END AS has_ws_last_message,
-        ROUND((julianday(cycle_timestamp) - julianday(aggtrades_exchange_ts)) * 86400.0, 3) AS aggtrade_stale_seconds
+        ROUND((julianday(snapshot_build_finished_at) - julianday(aggtrades_exchange_ts)) * 86400.0, 3) AS aggtrade_stale_seconds
     FROM ranked_rows
     WHERE bucket_rank = 1
 ),

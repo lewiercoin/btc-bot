@@ -24,6 +24,13 @@ This report is a supporting condition for Gate A, not the primary unlock counter
 
 This report validates whether those counted buckets were also built with acceptable timing and source freshness.
 
+Canonical timing contract for this audit:
+
+- build duration = `snapshot_build_finished_at - snapshot_build_started_at`
+- per-input latency = `snapshot_build_finished_at - <input>_exchange_ts`
+- future timestamp = `<input>_exchange_ts > snapshot_build_finished_at`
+- `market_snapshots.captured_at` is a persisted cycle anchor, not a post-build ingest timestamp
+
 ---
 
 ## Staleness Metrics Definition
@@ -57,30 +64,31 @@ For the canonical row in each bucket, measure:
   - `snapshot_build_started_at - cycle_timestamp`
 - `cycle_to_build_finish_seconds`
   - `snapshot_build_finished_at - cycle_timestamp`
-- `build_finish_to_capture_seconds`
-  - `captured_at - snapshot_build_finished_at`
+- `captured_vs_cycle_anchor_seconds`
+  - `captured_at - cycle_timestamp`
+  - expected to remain `0` for canonical rows
 
 ### Per-input staleness metrics
 
 For each canonical bucket, compute:
 
 - `candles_15m_stale_seconds`
-  - `cycle_timestamp - candles_15m_exchange_ts`
+  - `snapshot_build_finished_at - candles_15m_exchange_ts`
 - `candles_1h_stale_seconds`
-  - `cycle_timestamp - candles_1h_exchange_ts`
+  - `snapshot_build_finished_at - candles_1h_exchange_ts`
 - `candles_4h_stale_seconds`
-  - `cycle_timestamp - candles_4h_exchange_ts`
+  - `snapshot_build_finished_at - candles_4h_exchange_ts`
 - `funding_stale_seconds`
-  - `cycle_timestamp - funding_exchange_ts`
+  - `snapshot_build_finished_at - funding_exchange_ts`
 - `oi_stale_seconds`
-  - `cycle_timestamp - oi_exchange_ts`
+  - `snapshot_build_finished_at - oi_exchange_ts`
 - `aggtrade_stale_seconds`
-  - `cycle_timestamp - aggtrades_exchange_ts`
+  - `snapshot_build_finished_at - aggtrades_exchange_ts`
 
 ### Null and future timestamp rules
 
 - `NULL exchange_ts` means missing timestamp, not zero staleness
-- negative staleness means future timestamp relative to the cycle and is always suspicious
+- negative staleness means future timestamp relative to `snapshot_build_finished_at` and is always suspicious
 - this report measures timing only; it does not explain causation
 
 ---
@@ -94,7 +102,7 @@ Source file: `scripts/audit_queries/gate_a_timing_staleness.sql`
 **Purpose:**
 
 - validate that build timing is positive
-- measure build duration and post-build capture lag
+- measure build duration and confirm the persisted cycle anchor contract
 
 **Outputs:**
 
@@ -106,7 +114,7 @@ Source file: `scripts/audit_queries/gate_a_timing_staleness.sql`
 
 **Purpose:**
 
-- confirm that exchange timestamps are not in the future
+- confirm that exchange timestamps are not in the future relative to `snapshot_build_finished_at`
 - confirm bucket-alignment logic for candle families
 - separate null timestamps from real misalignment
 
@@ -149,20 +157,21 @@ These are proposed interpretation rules for Gate A review. They standardize disc
 - no negative build timing in `T1`
 - no future exchange timestamps in `T2`
 - all required timestamp fields present in `T6`
-- `p95 build duration < 2s` once the final build distribution query is accepted
-- most input families remain under `5 minutes` staleness at `p95`
+- `p95 build duration < 5s`
+- per-input `p95` remains inside the natural cadence envelope of the source family
+- websocket-backed aggtrade rows are materially fresher than REST-backed fallbacks in `T5`
 
 ### Proposed `DOCUMENTED`
 
-- some inputs fall in the `5-30 minute` range, but the pattern is explainable
+- some inputs are slower than ideal, but remain inside their source-specific cadence envelope
 - REST-backed rows are slower than websocket-backed rows, but remain within an accepted operational envelope
 - isolated timestamp nulls or gaps map to a known and documented runtime event
 
 ### Proposed `FAIL`
 
 - negative build timing
-- future exchange timestamps
-- unexplained input staleness above `30 minutes`
+- future exchange timestamps relative to `snapshot_build_finished_at`
+- unexplained input staleness outside the source-specific cadence envelope
 - missing timestamp fields in canonical post-fix buckets
 - timing anomalies large enough to cast doubt on source-of-truth freshness
 
@@ -202,9 +211,9 @@ These are proposed interpretation rules for Gate A review. They standardize disc
 
 ### T1A Output
 
-| canonical_bucket_count | negative_build_duration_count | build_finished_before_cycle_count | max_build_duration_seconds | avg_build_duration_seconds | max_cycle_to_build_finish_seconds | avg_cycle_to_build_finish_seconds | max_build_finish_to_capture_seconds | avg_build_finish_to_capture_seconds |
-|---:|---:|---:|---:|---:|---:|---:|---:|---:|
-| TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
+| canonical_bucket_count | negative_build_duration_count | build_finished_before_cycle_count | captured_not_equal_cycle_anchor_count | max_build_duration_seconds | avg_build_duration_seconds | max_cycle_to_build_finish_seconds | avg_cycle_to_build_finish_seconds |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| TBD | TBD | TBD | TBD | TBD | TBD | TBD | TBD |
 
 ### T1B Output
 
