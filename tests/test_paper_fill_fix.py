@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -78,7 +79,13 @@ def _candidate() -> SignalCandidate:
         confluence_score=5.0,
         regime=RegimeState.NORMAL,
         reasons=["reclaim_confirmed"],
-        features_json={"atr_15m": 10.0},
+        features_json={
+            "atr_15m": 10.0,
+            "atr_4h": 50.0,
+            "atr_4h_norm": 0.01,
+            "ema50_4h": 110.0,
+            "ema200_4h": 100.0,
+        },
     )
 
 
@@ -179,6 +186,55 @@ def test_record_trade_open_persists_filled_entry_price() -> None:
 
     assert row is not None
     assert float(row["entry_price"]) == 101.0
+
+
+def test_record_trade_open_persists_modeling_features_payload() -> None:
+    conn = _make_conn()
+    try:
+        opened_at = datetime(2026, 4, 21, 13, 0, tzinfo=timezone.utc)
+        candidate = _candidate()
+        _insert_candidate_row(conn, candidate)
+        save_executable_signal(conn, _signal())
+        insert_position(
+            conn,
+            position_id="paper-test",
+            signal_id="sig-test",
+            symbol="BTCUSDT",
+            direction="LONG",
+            status="OPEN",
+            entry_price=100.0,
+            size=0.5,
+            leverage=2,
+            stop_loss=95.0,
+            take_profit_1=110.0,
+            take_profit_2=120.0,
+            opened_at=opened_at,
+            updated_at=opened_at,
+        )
+
+        store = StateStore(conn, mode="PAPER")
+        store.record_trade_open(
+            candidate=candidate,
+            executable=_signal(),
+            schema_version="v1.0",
+            config_hash="hash-test",
+            filled_entry_price=101.0,
+        )
+
+        row = conn.execute(
+            "SELECT features_at_entry_json FROM trade_log WHERE signal_id = ?",
+            ("sig-test",),
+        ).fetchone()
+    finally:
+        conn.close()
+
+    assert row is not None
+    payload = json.loads(row["features_at_entry_json"])
+    assert payload["atr_15m"] == 10.0
+    assert payload["atr_4h"] == 50.0
+    assert payload["atr_4h_norm"] == 0.01
+    assert payload["ema50_4h"] == 110.0
+    assert payload["ema200_4h"] == 100.0
 
 
 def test_dashboard_exposes_signal_reference_and_execution_flag_for_positions() -> None:

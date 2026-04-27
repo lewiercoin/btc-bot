@@ -50,6 +50,24 @@ class SignalEngine:
     def __init__(self, config: SignalConfig | None = None) -> None:
         self.config = config or SignalConfig()
 
+    @staticmethod
+    def _build_candidate_features_payload(features: Features) -> dict[str, float | bool | str | None]:
+        return {
+            "atr_15m": features.atr_15m,
+            "atr_4h": features.atr_4h,
+            "atr_4h_norm": features.atr_4h_norm,
+            "ema50_4h": features.ema50_4h,
+            "ema200_4h": features.ema200_4h,
+            "sweep_depth_pct": features.sweep_depth_pct,
+            "sweep_side": features.sweep_side,
+            "funding_pct_60d": features.funding_pct_60d,
+            "oi_zscore_60d": features.oi_zscore_60d,
+            "cvd_15m": features.cvd_15m,
+            "tfi_60s": features.tfi_60s,
+            "force_order_rate_60s": features.force_order_rate_60s,
+            "force_order_spike": features.force_order_spike,
+        }
+
     def diagnose(
         self,
         features: Features,
@@ -194,17 +212,7 @@ class SignalEngine:
             confluence_score=confluence_score,
             regime=regime,
             reasons=list(resolved_diagnostics.candidate_reasons_preview),
-            features_json={
-                "atr_15m": features.atr_15m,
-                "sweep_depth_pct": features.sweep_depth_pct,
-                "sweep_side": features.sweep_side,
-                "funding_pct_60d": features.funding_pct_60d,
-                "oi_zscore_60d": features.oi_zscore_60d,
-                "cvd_15m": features.cvd_15m,
-                "tfi_60s": features.tfi_60s,
-                "force_order_rate_60s": features.force_order_rate_60s,
-                "force_order_spike": features.force_order_spike,
-            },
+            features_json=self._build_candidate_features_payload(features),
         )
 
     def _infer_direction(self, features: Features) -> str | None:

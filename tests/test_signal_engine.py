@@ -433,3 +433,25 @@ def test_generate_accepts_precomputed_diagnostics_without_changing_candidate() -
     assert precomputed.confluence_score == direct.confluence_score
     assert precomputed.reasons == direct.reasons
     assert precomputed.entry_reference == direct.entry_reference
+
+
+def test_generate_persists_modeling_fields_in_candidate_payload() -> None:
+    engine = SignalEngine()
+    features = _features(
+        sweep_side="LOW",
+        bullish_divergence=True,
+        tfi_60s=0.2,
+        funding_8h=-0.0001,
+        ema50_4h=105.0,
+        ema200_4h=100.0,
+    )
+
+    candidate = engine.generate(features, RegimeState.NORMAL)
+
+    assert candidate is not None
+    assert candidate.features_json["atr_15m"] == 10.0
+    assert candidate.features_json["atr_4h"] == 50.0
+    assert candidate.features_json["atr_4h_norm"] == 0.01
+    assert candidate.features_json["ema50_4h"] == 105.0
+    assert candidate.features_json["ema200_4h"] == 100.0
+    assert candidate.features_json["sweep_side"] == "LOW"
