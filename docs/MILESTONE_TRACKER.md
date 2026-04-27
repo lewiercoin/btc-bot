@@ -380,30 +380,35 @@ Last updated: 2026-04-27
 
 ---
 
-## Next Milestone
+## Active Milestone
 
-**MODELING-V1 / PHASE-1-AUDITS** — READY (MARKET-TRUTH-V3 Gate A PASS)
-
-**Prerequisites:**
-1. ✅ MARKET-TRUTH-V3 deployed to production (2026-04-24)
-2. ✅ Quant-grade hardening deployed (per-input lineage + build timing)
-3. ✅ First snapshot verified (quant-grade fields populated)
-4. ✅ 200+ post-fix quality-ready cycles collected
-5. ✅ Feature Drift query pack executed and reviewed
-6. ✅ Timing validation reviewed; no future timestamps or negative build timing under corrected contract
-7. ✅ MARKET-TRUTH-V3 merged to `main`
-
-**Goal:** Add context-aware modeling only after raw market truth and feature reproducibility are verified.
+**MODELING-V1** — IMPLEMENTED, PENDING GROK AUDIT
 
 **Unblocked:** 2026-04-27 (Gate A PASS)
+**Implemented:** 2026-04-27 (Cascade builder)
+**Branch:** `modeling-v1`
+**Commit:** 6eec1ae
 
-**Scope (future):** session/volatility context classification, neutral-mode deployment, diagnostics expansion
+**What was implemented:**
+- `SessionBucket`, `VolatilityBucket`, `MarketContext` (frozen) added to `core/models.py`
+- `SignalDiagnostics` extended with 6 context fields
+- `core/context_engine.py` — new `ContextEngine.classify()`: deterministic, stateless, session+volatility gating
+- `ContextConfig` added to `settings.py` with `config_hash` integration
+- `SignalEngine.diagnose/generate` updated: optional `context` param, context gate after base edge computation
+- `ContextEngine` inserted in `orchestrator.py` pipeline (between regime and signal engines)
+- Runtime context path mirrored in `backtest/backtest_runner.py`
+- 6 context columns added to `decision_outcomes` table (schema.sql + idempotent migration)
+- `insert_decision_outcome` in `repositories.py` extended with context fields
+- 40 tests in `tests/test_context_engine.py` (T-01..T-24 + extras)
 
-**Out of scope (for now):** execution realism, parameter tuning, new data sources, quality-aware context gating
+**Smoke test results:**
+- `compileall`: PASS
+- `pytest`: 274 passed, 24 skipped (pre-existing), coverage 70.67% ≥ 65%
+- All context tests (T-01..T-24): PASS
 
-**Documentation:** final blueprint at `docs/blueprints/BLUEPRINT_MODELING_V1.md`
+**Neutral mode:** `neutral_mode=True` (default) — full backward compatibility, no production behavior change on deploy
 
-**Implementation branch:** not yet created
+**Status:** Awaiting Grok audit. Merge to `main` blocked until audit closure.
 
 ---
 
