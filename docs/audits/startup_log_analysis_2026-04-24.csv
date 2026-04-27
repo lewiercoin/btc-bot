@@ -1,0 +1,5 @@
+window_utc,event_type,evidence,assessment
+2026-04-23 16:30:00-16:33:26,recovery_precursor,"Decision cycle completed; websocket legacy stream failure logged at 16:30:54; reconnect logged at 16:31:00; kill-switch activated at 16:33:26 for health_check_failure_threshold",Historical safe-mode trigger confirmed
+2026-04-24 04:10:27-04:10:43,controlled_restart,"Graceful shutdown signal received; orchestrator stop requested; bot stopped cleanly; systemd scheduled restart job; new process started at 04:10:43 UTC",Restart path appears clean
+2026-04-24 04:10:43-04:10:44,startup_recovery,"Startup logs show PAPER mode start, bootstrap summary, runtime loop start, websocket market-path 404 fallback, legacy stream connect success",Startup completed with expected fallback behavior
+2026-04-24 04:15:00-04:15:01,post_restart_validation,"Next decision cycle started and finished normally with no_signal outcome",Post-restart runtime resumed correctly

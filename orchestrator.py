@@ -5,7 +5,7 @@ import logging
 import sqlite3
 import threading
 import time
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from typing import Callable
 
@@ -43,6 +43,7 @@ from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
 from settings import AppSettings, BotMode, build_signal_regime_direction_whitelist
 from storage.position_persister import SqlitePositionPersister
 from storage.repositories import (
+    fetch_funding_rates,
     fetch_cvd_price_history,
     fetch_oi_samples,
     get_daily_metrics,
@@ -50,6 +51,7 @@ from storage.repositories import (
     save_signal_candidate,
 )
 from storage.state_store import StateStore
+from core.funding import compute_funding_paid
 
 LOG = logging.getLogger(__name__)
 
@@ -142,6 +144,7 @@ def build_default_bundle(
             config=MarketDataConfig(
                 candles_limit=300,
                 funding_limit=max(settings.strategy.funding_window_days * 3 + 3, 200),
+                funding_window_days=settings.strategy.funding_window_days,
                 agg_trades_limit=1000,
                 flow_coverage_ready=settings.data_quality.flow_coverage_ready,
                 flow_coverage_degraded=settings.data_quality.flow_coverage_degraded,
@@ -362,6 +365,8 @@ class BotOrchestrator:
         cycle_started = time.perf_counter()
         timestamp = (now or self._now()).astimezone(timezone.utc)
         cycle_outcome = "unknown"
+        snapshot_id: str | None = None
+        feature_snapshot_id: str | None = None
         self._update_runtime_metrics(
             last_decision_cycle_started_at=timestamp,
             decision_cycle_status="running",
@@ -371,6 +376,7 @@ class BotOrchestrator:
             self.state_store.refresh_runtime_state(timestamp)
             try:
                 snapshot = self._build_snapshot(timestamp)
+                snapshot_id = self.state_store.record_market_snapshot(snapshot)
                 self._update_runtime_metrics(
                     last_snapshot_built_at=timestamp,
                     last_snapshot_symbol=snapshot.symbol,
@@ -385,6 +391,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                     details={"error": str(exc)},
                 )
                 self.bundle.audit_logger.log_error("data", f"Snapshot build failed: {exc}")
@@ -409,6 +416,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                     details={"error": str(exc)},
                 )
                 self.bundle.audit_logger.log_error("lifecycle", f"Lifecycle processing failed: {exc}")
@@ -424,6 +432,7 @@ class BotOrchestrator:
                     timestamp=timestamp,
                     outcome_group=cycle_outcome,
                     outcome_reason=cycle_outcome,
+                    snapshot_id=snapshot_id,
                 )
                 self.bundle.audit_logger.log_decision(
                     "orchestrator",
@@ -437,6 +446,10 @@ class BotOrchestrator:
                 schema_version=self.settings.schema_version,
                 config_hash=self.settings.config_hash,
             )
+            feature_snapshot_id = self.state_store.record_feature_snapshot(
+                snapshot_id=snapshot_id,
+                features=features,
+            )
             self._record_feature_quality(features)
             regime = self.bundle.regime_engine.classify(features)
             diagnostics = self.bundle.signal_engine.diagnose(features, regime)
@@ -449,6 +462,8 @@ class BotOrchestrator:
                     outcome_group=cycle_outcome,
                     outcome_reason=diagnostics.blocked_by or cycle_outcome,
                     regime=regime.value,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details=self._signal_diagnostics_payload(diagnostics),
                 )
                 self.bundle.audit_logger.log_decision(
@@ -482,6 +497,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"notes": governance_decision.notes},
                 )
                 self.bundle.audit_logger.log_decision(
@@ -510,6 +527,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"reason": risk_decision.reason},
                 )
                 self.bundle.audit_logger.log_decision(
@@ -528,6 +547,9 @@ class BotOrchestrator:
                     size=risk_decision.size,
                     leverage=risk_decision.leverage,
                     snapshot_price=paper_fill_price,
+                    bid_price=snapshot.bid if self.settings.mode == BotMode.PAPER else None,
+                    ask_price=snapshot.ask if self.settings.mode == BotMode.PAPER else None,
+                    snapshot_id=snapshot.snapshot_id if self.settings.mode == BotMode.PAPER else None,
                 )
                 self.state_store.record_trade_open(
                     candidate=candidate,
@@ -555,6 +577,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details=trade_payload,
                 )
                 self.bundle.audit_logger.log_trade("execution", "Trade opened.", payload=trade_payload)
@@ -567,6 +591,8 @@ class BotOrchestrator:
                     outcome_reason=cycle_outcome,
                     regime=candidate.regime.value,
                     signal_id=candidate.signal_id,
+                    snapshot_id=snapshot_id,
+                    feature_snapshot_id=feature_snapshot_id,
                     details={"error": str(exc)},
                 )
                 self._critical_execution_errors += 1
@@ -746,6 +772,8 @@ class BotOrchestrator:
         outcome_reason: str,
         regime: str | None = None,
         signal_id: str | None = None,
+        snapshot_id: str | None = None,
+        feature_snapshot_id: str | None = None,
         details: dict[str, object] | None = None,
     ) -> None:
         try:
@@ -756,6 +784,8 @@ class BotOrchestrator:
                 config_hash=self.settings.config_hash,
                 regime=regime,
                 signal_id=signal_id,
+                snapshot_id=snapshot_id,
+                feature_snapshot_id=feature_snapshot_id,
                 details=details,
             )
         except Exception as exc:
@@ -914,6 +944,19 @@ class BotOrchestrator:
                 exit_reason=decision.reason,
                 candles_15m=candles_path,
             )
+            funding_paid = self._compute_position_funding_paid(
+                symbol=record.position.symbol,
+                direction=record.position.direction,
+                entry_price=record.position.entry_price,
+                size=record.position.size,
+                opened_at=record.position.opened_at,
+                closed_at=snapshot.timestamp,
+            )
+            settlement = replace(
+                settlement,
+                pnl_abs=settlement.pnl_abs - funding_paid,
+                funding_paid=funding_paid,
+            )
             self.state_store.settle_trade_close(
                 position_id=record.position.position_id,
                 settlement=settlement,
@@ -932,6 +975,30 @@ class BotOrchestrator:
                 }
             )
         return closed_events
+
+    def _compute_position_funding_paid(
+        self,
+        *,
+        symbol: str,
+        direction: str,
+        entry_price: float,
+        size: float,
+        opened_at: datetime,
+        closed_at: datetime,
+    ) -> float:
+        funding_samples = fetch_funding_rates(
+            self.conn,
+            symbol=symbol,
+            start_ts=opened_at,
+            end_ts=closed_at,
+        )
+        return compute_funding_paid(
+            direction=direction,
+            notional=max(float(entry_price) * float(size), 0.0),
+            opened_at=opened_at,
+            closed_at=closed_at,
+            funding_samples=funding_samples,
+        )
 
     @staticmethod
     def _candles_since_open(candles_15m: list[dict], opened_at: datetime) -> list[dict]:

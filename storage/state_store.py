@@ -6,11 +6,14 @@ from dataclasses import dataclass, replace
 from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
-from core.models import BotState, ExecutableSignal, GovernanceRuntimeState, Position, RiskRuntimeState, SettlementMetrics, SignalCandidate
+from core.models import BotState, ExecutableSignal, FeatureSnapshot, Features, GovernanceRuntimeState, MarketSnapshot, Position, RiskRuntimeState, SettlementMetrics, SignalCandidate
 from storage.repositories import (
     close_position,
     fetch_decision_outcome_counts,
+    fetch_feature_snapshot,
+    fetch_market_snapshot,
     fetch_closed_trade_pnl_series_between,
+    fetch_recent_feature_snapshots,
     fetch_open_positions,
     fetch_open_trade_positions,
     fetch_recent_closed_trade_outcomes,
@@ -23,6 +26,8 @@ from storage.repositories import (
     get_open_trade_log_for_position,
     get_open_positions_count,
     get_runtime_metrics,
+    insert_feature_snapshot,
+    insert_market_snapshot,
     insert_trade_log_open,
     insert_decision_outcome,
     sum_closed_pnl_abs_before,
@@ -56,13 +61,38 @@ class StateStore:
 
         cursor = self.connection.cursor()
 
-        cursor.execute("PRAGMA table_info(bot_state)")
-        columns = {row[1] for row in cursor.fetchall()}
+        # Check if bot_state table exists before attempting migration
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='bot_state'")
+        bot_state_exists = cursor.fetchone() is not None
 
-        if "safe_mode_entry_at" not in columns:
-            cursor.execute("ALTER TABLE bot_state ADD COLUMN safe_mode_entry_at TEXT DEFAULT NULL")
-            self.connection.commit()
-            LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
+        if bot_state_exists:
+            cursor.execute("PRAGMA table_info(bot_state)")
+            columns = {row[1] for row in cursor.fetchall()}
+
+            if "safe_mode_entry_at" not in columns:
+                cursor.execute("ALTER TABLE bot_state ADD COLUMN safe_mode_entry_at TEXT DEFAULT NULL")
+                self.connection.commit()
+                LOG.info("Migration applied: added safe_mode_entry_at column to bot_state")
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='trade_log'")
+        trade_log_exists = cursor.fetchone() is not None
+        if trade_log_exists:
+            cursor.execute("PRAGMA table_info(trade_log)")
+            trade_log_columns = {row[1] for row in cursor.fetchall()}
+            if "funding_paid" not in trade_log_columns:
+                cursor.execute("ALTER TABLE trade_log ADD COLUMN funding_paid REAL NOT NULL DEFAULT 0.0")
+                self.connection.commit()
+                LOG.info("Migration applied: added funding_paid column to trade_log")
+
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='executions'")
+        executions_exists = cursor.fetchone() is not None
+        if executions_exists:
+            cursor.execute("PRAGMA table_info(executions)")
+            executions_columns = {row[1] for row in cursor.fetchall()}
+            if "snapshot_id" not in executions_columns:
+                cursor.execute("ALTER TABLE executions ADD COLUMN snapshot_id TEXT")
+                self.connection.commit()
+                LOG.info("Migration applied: added snapshot_id column to executions")
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS safe_mode_events (
@@ -153,9 +183,118 @@ class StateStore:
                 regime TEXT,
                 config_hash TEXT NOT NULL,
                 signal_id TEXT,
+                snapshot_id TEXT,
+                feature_snapshot_id TEXT,
                 details_json TEXT
             )
         """)
+        self.connection.commit()
+        cursor.execute("PRAGMA table_info(decision_outcomes)")
+        decision_columns = {row[1] for row in cursor.fetchall()}
+        if "snapshot_id" not in decision_columns:
+            cursor.execute("ALTER TABLE decision_outcomes ADD COLUMN snapshot_id TEXT DEFAULT NULL")
+            self.connection.commit()
+        if "feature_snapshot_id" not in decision_columns:
+            cursor.execute("ALTER TABLE decision_outcomes ADD COLUMN feature_snapshot_id TEXT DEFAULT NULL")
+            self.connection.commit()
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS market_snapshots (
+                snapshot_id TEXT PRIMARY KEY,
+                cycle_timestamp TEXT NOT NULL,
+                exchange_timestamp TEXT,
+                symbol TEXT NOT NULL,
+                timeframe TEXT NOT NULL,
+                open REAL NOT NULL,
+                high REAL NOT NULL,
+                low REAL NOT NULL,
+                close REAL NOT NULL,
+                volume REAL NOT NULL,
+                funding_rate REAL,
+                open_interest REAL,
+                bid_price REAL,
+                ask_price REAL,
+                source TEXT NOT NULL,
+                latency_ms REAL,
+                data_quality_flag TEXT NOT NULL,
+                book_ticker_json TEXT NOT NULL,
+                open_interest_json TEXT NOT NULL,
+                candles_15m_json TEXT NOT NULL,
+                candles_1h_json TEXT NOT NULL,
+                candles_4h_json TEXT NOT NULL,
+                funding_history_json TEXT NOT NULL,
+                aggtrade_events_60s_json TEXT NOT NULL,
+                aggtrade_events_15m_json TEXT NOT NULL,
+                aggtrade_bucket_60s_json TEXT NOT NULL,
+                aggtrade_bucket_15m_json TEXT NOT NULL,
+                force_order_events_60s_json TEXT NOT NULL,
+                source_meta_json TEXT,
+                captured_at TEXT NOT NULL,
+                candles_15m_exchange_ts TEXT,
+                candles_1h_exchange_ts TEXT,
+                candles_4h_exchange_ts TEXT,
+                funding_exchange_ts TEXT,
+                oi_exchange_ts TEXT,
+                aggtrades_exchange_ts TEXT,
+                snapshot_build_started_at TEXT,
+                snapshot_build_finished_at TEXT
+            )
+        """)
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_market_snapshots_cycle_ts
+                ON market_snapshots(cycle_timestamp)
+            """
+        )
+        self.connection.commit()
+
+        # Quant-grade lineage migration: add per-input timestamps and build timing
+        cursor.execute("PRAGMA table_info(market_snapshots)")
+        snapshot_columns = {row[1] for row in cursor.fetchall()}
+
+        quant_grade_columns = [
+            "candles_15m_exchange_ts",
+            "candles_1h_exchange_ts",
+            "candles_4h_exchange_ts",
+            "funding_exchange_ts",
+            "oi_exchange_ts",
+            "aggtrades_exchange_ts",
+            "force_orders_exchange_ts",
+            "snapshot_build_started_at",
+            "snapshot_build_finished_at",
+        ]
+
+        for col in quant_grade_columns:
+            if col not in snapshot_columns:
+                cursor.execute(f"ALTER TABLE market_snapshots ADD COLUMN {col} TEXT DEFAULT NULL")
+                self.connection.commit()
+                LOG.info(f"Migration applied: added {col} column to market_snapshots")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS feature_snapshots (
+                feature_snapshot_id TEXT PRIMARY KEY,
+                snapshot_id TEXT NOT NULL,
+                cycle_timestamp TEXT NOT NULL,
+                schema_version TEXT NOT NULL,
+                config_hash TEXT NOT NULL,
+                features_json TEXT NOT NULL,
+                quality_json TEXT NOT NULL,
+                captured_at TEXT NOT NULL,
+                FOREIGN KEY (snapshot_id) REFERENCES market_snapshots(snapshot_id)
+            )
+        """)
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_feature_snapshots_snapshot_id
+                ON feature_snapshots(snapshot_id)
+            """
+        )
+        cursor.execute(
+            """
+            CREATE INDEX IF NOT EXISTS idx_feature_snapshots_cycle_ts
+                ON feature_snapshots(cycle_timestamp)
+            """
+        )
         self.connection.commit()
 
         cursor.execute("""
@@ -413,6 +552,7 @@ class StateStore:
             mae=settlement.mae,
             mfe=settlement.mfe,
             exit_reason=settlement.exit_reason,
+            funding_paid=settlement.funding_paid,
         )
 
         opened_at = datetime.fromisoformat(open_trade["opened_at"])
@@ -455,6 +595,8 @@ class StateStore:
         regime: str | None = None,
         signal_id: str | None = None,
         details: dict | None = None,
+        snapshot_id: str | None = None,
+        feature_snapshot_id: str | None = None,
     ) -> None:
         self._apply_migrations()
         insert_decision_outcome(
@@ -466,8 +608,90 @@ class StateStore:
             regime=regime,
             signal_id=signal_id,
             details=details,
+            snapshot_id=snapshot_id,
+            feature_snapshot_id=feature_snapshot_id,
         )
         self.connection.commit()
+
+    def record_market_snapshot(self, snapshot: MarketSnapshot) -> str:
+        self._apply_migrations()
+        snapshot_id = snapshot.snapshot_id or f"ms-{uuid4().hex}"
+        snapshot.snapshot_id = snapshot_id
+        insert_market_snapshot(
+            self.connection,
+            snapshot_id=snapshot_id,
+            snapshot=snapshot,
+            captured_at=snapshot.timestamp,
+        )
+        self.connection.commit()
+        return snapshot_id
+
+    def record_feature_snapshot(self, *, snapshot_id: str, features: Features) -> str:
+        self._apply_migrations()
+        feature_snapshot = FeatureSnapshot(
+            feature_snapshot_id=f"fs-{uuid4().hex}",
+            snapshot_id=snapshot_id,
+            cycle_timestamp=features.timestamp,
+            schema_version=features.schema_version,
+            config_hash=features.config_hash,
+            features_json={
+                "atr_15m": features.atr_15m,
+                "atr_4h": features.atr_4h,
+                "atr_4h_norm": features.atr_4h_norm,
+                "ema50_4h": features.ema50_4h,
+                "ema200_4h": features.ema200_4h,
+                "sweep_detected": features.sweep_detected,
+                "reclaim_detected": features.reclaim_detected,
+                "sweep_level": features.sweep_level,
+                "sweep_depth_pct": features.sweep_depth_pct,
+                "sweep_side": features.sweep_side,
+                "close_vs_reclaim_buffer_atr": features.close_vs_reclaim_buffer_atr,
+                "wick_vs_min_atr": features.wick_vs_min_atr,
+                "sweep_vs_buffer_atr": features.sweep_vs_buffer_atr,
+                "funding_8h": features.funding_8h,
+                "funding_sma3": features.funding_sma3,
+                "funding_sma9": features.funding_sma9,
+                "funding_pct_60d": features.funding_pct_60d,
+                "oi_value": features.oi_value,
+                "oi_zscore_60d": features.oi_zscore_60d,
+                "oi_delta_pct": features.oi_delta_pct,
+                "cvd_15m": features.cvd_15m,
+                "cvd_bullish_divergence": features.cvd_bullish_divergence,
+                "cvd_bearish_divergence": features.cvd_bearish_divergence,
+                "tfi_60s": features.tfi_60s,
+                "force_order_rate_60s": features.force_order_rate_60s,
+                "force_order_spike": features.force_order_spike,
+                "force_order_decreasing": features.force_order_decreasing,
+                "passive_etf_bias_5d": features.passive_etf_bias_5d,
+            },
+            quality_json={
+                key: {
+                    "status": value.status,
+                    "reason": value.reason,
+                    "metadata": value.metadata,
+                    "provenance": value.provenance,
+                }
+                for key, value in sorted(features.quality.items())
+            },
+        )
+        insert_feature_snapshot(
+            self.connection,
+            feature_snapshot=feature_snapshot,
+        )
+        self.connection.commit()
+        return feature_snapshot.feature_snapshot_id
+
+    def get_market_snapshot(self, snapshot_id: str) -> dict | None:
+        self._apply_migrations()
+        return fetch_market_snapshot(self.connection, snapshot_id)
+
+    def get_feature_snapshot(self, feature_snapshot_id: str) -> dict | None:
+        self._apply_migrations()
+        return fetch_feature_snapshot(self.connection, feature_snapshot_id)
+
+    def get_recent_feature_snapshots(self, limit: int) -> list[dict]:
+        self._apply_migrations()
+        return fetch_recent_feature_snapshots(self.connection, limit)
 
     def get_decision_outcome_counts(
         self,

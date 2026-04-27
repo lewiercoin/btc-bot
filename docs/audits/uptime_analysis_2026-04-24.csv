@@ -1,0 +1,5 @@
+service,restart_policy,n_restarts,active_state,sub_state,active_since_utc,notes
+btc-bot,always,1,active,running,2026-04-24 04:10:43 UTC,"current process healthy; restart followed controlled 2026-04-24 deploy/startup window"
+btc-bot-dashboard,on-failure,0,active,running,2026-04-23 06:56:44 UTC,"dashboard stable but publicly exposed on 0.0.0.0:8080"
+btc-bot,historical_event,4+,failed/restarting,2026-04-20 09:56 UTC window,"journal shows repeated status=203/EXEC failures and scheduled restart jobs"
+btc-bot,historical_event,1,kill_switch,2026-04-23 16:33:26 UTC,"journal and safe_mode_events confirm health_check_failure_threshold incident"

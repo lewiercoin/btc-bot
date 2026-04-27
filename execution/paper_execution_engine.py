@@ -20,12 +20,31 @@ class PaperExecutionEngine(ExecutionEngine):
         leverage: int,
         *,
         snapshot_price: float | None = None,
+        bid_price: float | None = None,
+        ask_price: float | None = None,
+        snapshot_id: str | None = None,
     ) -> None:
         if snapshot_price is None:
             raise ValueError("PaperExecutionEngine requires snapshot_price for fill simulation.")
-        filled_price = float(snapshot_price)
+
+        # Use bid/ask spread for realistic fill pricing (REMEDIATION-A2)
+        # BUY (LONG): fill at ask (buy from asks), SELL (SHORT): fill at bid (sell to bids)
+        side = "BUY" if signal.direction == "LONG" else "SELL"
+        if side == "BUY" and ask_price is not None and ask_price > 0:
+            filled_price = float(ask_price)
+        elif side == "SELL" and bid_price is not None and bid_price > 0:
+            filled_price = float(bid_price)
+        else:
+            # Fallback to snapshot price if bid/ask not available
+            filled_price = float(snapshot_price)
+
         if filled_price <= 0:
-            raise ValueError(f"PaperExecutionEngine received invalid snapshot_price={snapshot_price!r}.")
+            raise ValueError(f"PaperExecutionEngine received invalid fill price={filled_price!r}.")
+
+        # Calculate fees: 0.04% taker rate (match backtest SimpleFillModel)
+        fee_rate = 0.0004  # 0.04% = 4 basis points
+        notional = filled_price * float(size)
+        fees = notional * fee_rate
 
         position_id = f"paper-{uuid4().hex}"
         timestamp = datetime.now(timezone.utc)
@@ -56,13 +75,14 @@ class PaperExecutionEngine(ExecutionEngine):
                 execution_id=f"exe-{uuid4().hex}",
                 client_order_id=f"paper-{signal.signal_id[:16]}-{uuid4().hex[:8]}",
                 status=ExecutionStatus.FILLED,
-                side="BUY" if signal.direction == "LONG" else "SELL",
+                side=side,
                 requested_price=requested_price,
                 filled_price=filled_price,
                 qty=float(size),
-                fees=0.0,
+                fees=fees,
                 slippage_bps=slippage_bps,
                 executed_at=timestamp,
+                snapshot_id=snapshot_id,
             ),
         )
         self.position_persister.commit()

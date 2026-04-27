@@ -1,0 +1,2 @@
+ALTER TABLE trade_log
+ADD COLUMN funding_paid REAL NOT NULL DEFAULT 0.0;
