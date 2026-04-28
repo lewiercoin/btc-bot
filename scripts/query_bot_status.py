@@ -14,6 +14,7 @@ import json
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 
 
 def query_recent_trades(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
@@ -70,26 +71,45 @@ def query_open_positions(conn: sqlite3.Connection) -> list[dict]:
 
 
 def query_recent_signals(conn: sqlite3.Connection, limit: int = 10) -> list[dict]:
-    """Query recent signal candidates (promoted and blocked)."""
+    """Query recent signal candidates with downstream outcome context."""
     cursor = conn.cursor()
     cursor.execute("""
         SELECT
-            signal_id,
-            timestamp,
-            direction,
-            promoted,
-            regime,
-            confluence_score,
-            entry_price,
-            rr_ratio,
-            block_reason
-        FROM signal_candidates
-        ORDER BY timestamp DESC
+            sc.signal_id,
+            sc.timestamp,
+            sc.direction,
+            sc.setup_type,
+            sc.regime,
+            sc.confluence_score,
+            es.entry_price,
+            es.stop_loss,
+            es.take_profit_1,
+            es.rr_ratio,
+            do.outcome_group,
+            do.outcome_reason,
+            do.details_json
+        FROM signal_candidates sc
+        LEFT JOIN executable_signals es
+            ON es.signal_id = sc.signal_id
+        LEFT JOIN decision_outcomes do
+            ON do.id = (
+                SELECT MAX(id)
+                FROM decision_outcomes
+                WHERE signal_id = sc.signal_id
+            )
+        ORDER BY sc.timestamp DESC
         LIMIT ?
     """, (limit,))
 
+    signals = []
     cols = [d[0] for d in cursor.description]
-    return [dict(zip(cols, row)) for row in cursor.fetchall()]
+    for row in cursor.fetchall():
+        signal = dict(zip(cols, row))
+        signal["promoted"] = signal["entry_price"] is not None
+        signal["block_reason"] = _extract_signal_block_reason(signal)
+        signal.pop("details_json", None)
+        signals.append(signal)
+    return signals
 
 
 def query_recent_alerts(conn: sqlite3.Connection, limit: int = 20) -> list[dict]:
@@ -142,7 +162,7 @@ def query_bot_state(conn: sqlite3.Connection) -> dict | None:
         cursor.execute("""
             SELECT reason
             FROM safe_mode_events
-            WHERE event_type = 'ENTRY'
+            WHERE event_type IN ('entered', 'ENTRY')
             ORDER BY timestamp DESC
             LIMIT 1
         """)
@@ -185,6 +205,33 @@ def format_timestamp(ts_str: str | None) -> str:
         return dt.strftime("%Y-%m-%d %H:%M:%S UTC")
     except (ValueError, AttributeError):
         return ts_str
+
+
+def _parse_json_dict(payload: Any) -> dict[str, Any]:
+    if payload is None:
+        return {}
+    try:
+        data = json.loads(payload)
+    except (TypeError, json.JSONDecodeError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _extract_signal_block_reason(signal: dict[str, Any]) -> str | None:
+    outcome_group = signal.get("outcome_group")
+    details = _parse_json_dict(signal.get("details_json"))
+    if outcome_group == "risk_block":
+        reason = details.get("reason")
+        return str(reason) if reason else str(signal.get("outcome_reason") or "risk_block")
+    if outcome_group == "governance_veto":
+        notes = details.get("notes")
+        if isinstance(notes, list) and notes:
+            return str(notes[0])
+        return str(signal.get("outcome_reason") or "governance_veto")
+    if outcome_group == "execution_failed":
+        reason = details.get("reason") or details.get("error")
+        return str(reason) if reason else str(signal.get("outcome_reason") or "execution_failed")
+    return None
 
 
 def print_summary(conn: sqlite3.Connection):
