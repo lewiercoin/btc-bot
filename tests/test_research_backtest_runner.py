@@ -174,13 +174,14 @@ def test_run_evaluates_overlay_even_when_base_candidate_exists(tmp_path, monkeyp
     monkeypatch.setattr(
         runner,
         "_build_engines",
-        lambda: (
-            SimpleNamespace(compute=lambda **kwargs: features),
-            SimpleNamespace(classify=lambda current_features: RegimeState.UPTREND),
-            SimpleNamespace(generate=lambda current_features, current_regime: base_candidate),
-            SimpleNamespace(
-                evaluate=lambda candidate: evaluated_candidates.append(candidate)
-                or SimpleNamespace(approved=False)
+            lambda: (
+                SimpleNamespace(compute=lambda **kwargs: features),
+                SimpleNamespace(classify=lambda current_features: RegimeState.UPTREND),
+                SimpleNamespace(classify=lambda current_features: None),
+                SimpleNamespace(generate=lambda current_features, current_regime, **kwargs: base_candidate),
+                SimpleNamespace(
+                    evaluate=lambda candidate: evaluated_candidates.append(candidate)
+                    or SimpleNamespace(approved=False)
             ),
             SimpleNamespace(),
         ),
@@ -224,14 +225,15 @@ def test_run_logs_overlay_config_for_trial_validation(tmp_path, monkeypatch, cap
     monkeypatch.setattr(
         runner,
         "_build_engines",
-        lambda: (
-            SimpleNamespace(),
-            SimpleNamespace(),
-            SimpleNamespace(),
-            SimpleNamespace(),
-            SimpleNamespace(),
-        ),
-    )
+            lambda: (
+                SimpleNamespace(),
+                SimpleNamespace(),
+                SimpleNamespace(),
+                SimpleNamespace(),
+                SimpleNamespace(),
+                SimpleNamespace(),
+            ),
+        )
     monkeypatch.setattr(
         runner,
         "_summarize_trades",

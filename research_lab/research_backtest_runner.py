@@ -68,7 +68,7 @@ class ResearchBacktestRunner(BacktestRunner):
         replay_loader = self._custom_replay_loader or self._build_default_replay_loader(config)
         fill_model = self._custom_fill_model or self._build_default_fill_model(config)
         funding_samples = fetch_funding_rates(self.connection, symbol=symbol)
-        feature_engine, regime_engine, signal_engine, governance, risk_engine = self._build_engines()
+        feature_engine, regime_engine, context_engine, signal_engine, governance, risk_engine = self._build_engines()
         self._log_uptrend_continuation_config()
 
         open_positions: list[Any] = []
@@ -120,10 +120,12 @@ class ResearchBacktestRunner(BacktestRunner):
                 config_hash=self.settings.config_hash,
             )
             regime = regime_engine.classify(features)
+            context = context_engine.classify(features)
             base_candidate, uptrend_candidate, candidate = self._resolve_signal_candidates(
                 snapshot=snapshot,
                 features=features,
                 regime=regime,
+                context=context,
                 signal_engine=signal_engine,
             )
             self.signals_generated += int(base_candidate is not None) + int(uptrend_candidate is not None)
@@ -260,9 +262,10 @@ class ResearchBacktestRunner(BacktestRunner):
         snapshot: Any,
         features: Features,
         regime: RegimeState,
+        context: Any,
         signal_engine: SignalEngine,
     ) -> tuple[SignalCandidate | None, SignalCandidate | None, SignalCandidate | None]:
-        base_candidate = signal_engine.generate(features, regime)
+        base_candidate = signal_engine.generate(features, regime, context=context)
         uptrend_candidate = self._generate_uptrend_continuation_candidate(
             snapshot=snapshot,
             features=features,

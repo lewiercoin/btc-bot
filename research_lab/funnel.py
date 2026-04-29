@@ -39,12 +39,12 @@ class _SignalCountingProxy:
             return False
         return not bool(direction_allowed(direction=direction, regime=regime))
 
-    def generate(self, features: Any, regime: Any) -> Any:
+    def generate(self, features: Any, regime: Any, *, context: Any | None = None) -> Any:
         if self._is_regime_blocked(features, regime):
             self._runner.signals_regime_blocked += 1
             self._runner.signals_generated += 1
             return None
-        candidate = self._wrapped.generate(features, regime)
+        candidate = self._wrapped.generate(features, regime, context=context)
         if candidate is not None:
             self._runner.signals_generated += 1
         return candidate
@@ -92,10 +92,11 @@ class InstrumentedBacktestRunner(BacktestRunner):
         self.signals_risk_rejected = 0
 
     def _build_engines(self):  # type: ignore[override]
-        feature_engine, regime_engine, signal_engine, governance, risk_engine = super()._build_engines()
+        feature_engine, regime_engine, context_engine, signal_engine, governance, risk_engine = super()._build_engines()
         return (
             feature_engine,
             regime_engine,
+            context_engine,
             _SignalCountingProxy(signal_engine, self),
             _GovernanceCountingProxy(governance, self),
             _RiskCountingProxy(risk_engine, self),

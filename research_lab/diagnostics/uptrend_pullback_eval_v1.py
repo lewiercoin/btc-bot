@@ -196,12 +196,12 @@ class _PullbackSignalProxy:
         self._wrapped = wrapped
         self._runner = runner
 
-    def generate(self, features: Features, regime: RegimeState) -> SignalCandidate | None:
-        diagnostics = self._wrapped.diagnose(features, regime)
+    def generate(self, features: Features, regime: RegimeState, *, context: Any | None = None) -> SignalCandidate | None:
+        diagnostics = self._wrapped.diagnose(features, regime, context)
         record: PullbackEventRecord | None = None
         if _is_pullback_detected(features, regime):
             record = self._runner.register_detected_event(features, diagnostics)
-        candidate = self._wrapped.generate(features, regime, diagnostics=diagnostics)
+        candidate = self._wrapped.generate(features, regime, diagnostics=diagnostics, context=context)
         if _is_pullback_candidate(candidate):
             self._runner.register_candidate(
                 record=record,
@@ -252,10 +252,11 @@ class UptrendPullbackEvaluationRunner(BacktestRunner):
         self._event_counter = 0
 
     def _build_engines(self):  # type: ignore[override]
-        feature_engine, regime_engine, signal_engine, governance, risk_engine = super()._build_engines()
+        feature_engine, regime_engine, context_engine, signal_engine, governance, risk_engine = super()._build_engines()
         return (
             feature_engine,
             regime_engine,
+            context_engine,
             _PullbackSignalProxy(signal_engine, self),
             _PullbackGovernanceProxy(governance, self),
             _PullbackRiskProxy(risk_engine, self),
