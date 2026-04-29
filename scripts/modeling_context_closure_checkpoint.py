@@ -22,6 +22,7 @@ REQUIRED_TRADE_KEYS = ("atr_4h_norm",)
 class ModelingContextClosureCheckpoint:
     since: str
     generated_at: str
+    runtime_config: dict[str, Any]
     sample: dict[str, int]
     telemetry: dict[str, Any]
     decision_outcomes: dict[str, Any]
@@ -80,6 +81,41 @@ def build_checkpoint(
 ) -> ModelingContextClosureCheckpoint:
     since_ts = _normalize_iso_timestamp(since)
     conn.row_factory = sqlite3.Row
+
+    # Query runtime config snapshot
+    bot_state_row = conn.execute("SELECT mode, timestamp FROM bot_state WHERE id = 1").fetchone()
+    mode = str(bot_state_row["mode"]) if bot_state_row else "UNKNOWN"
+
+    config_hash_row = conn.execute(
+        "SELECT config_hash FROM decision_outcomes WHERE cycle_timestamp >= ? ORDER BY cycle_timestamp DESC LIMIT 1",
+        (since_ts,),
+    ).fetchone()
+    config_hash = str(config_hash_row["config_hash"]) if config_hash_row else None
+
+    # Infer min_rr from risk blocks (lowest rejected R:R gives lower bound on threshold)
+    min_rr_sample = conn.execute(
+        """
+        SELECT MIN(es.rr_ratio) as min_rejected_rr
+        FROM decision_outcomes do
+        JOIN executable_signals es ON do.signal_id = es.signal_id
+        WHERE do.cycle_timestamp >= ?
+          AND do.outcome_group = 'risk_block'
+          AND es.rr_ratio IS NOT NULL
+        """,
+        (since_ts,),
+    ).fetchone()
+    min_rr_lower_bound = (
+        float(min_rr_sample["min_rejected_rr"]) if min_rr_sample and min_rr_sample["min_rejected_rr"] else None
+    )
+
+    runtime_config = {
+        "mode": mode,
+        "config_hash": config_hash,
+        "note": "Full config requires settings.py access; showing observable runtime characteristics only",
+        "inferred_min_rr_threshold": (
+            f">= {min_rr_lower_bound:.3f}" if min_rr_lower_bound else "unknown (no risk blocks)"
+        ),
+    }
 
     sample = {
         "decision_cycles": conn.execute(
@@ -259,6 +295,7 @@ def build_checkpoint(
     return ModelingContextClosureCheckpoint(
         since=since_ts,
         generated_at=generated_at,
+        runtime_config=runtime_config,
         sample=sample,
         telemetry={
             "signal_candidates": signal_telemetry,
