@@ -1,0 +1,36 @@
+{
+  "protocol_name": "wf_light",
+  "version": "1.0.0",
+  "description": "Light walk-forward protocol for short data windows (preliminary screening only)",
+  "train_days": 50,
+  "validation_days": 20,
+  "step_days": 7,
+  "min_trades_per_fold": 15,
+  "promotion_gate": "preliminary_only",
+  "requires_full_wf_before_live": true,
+  "max_promotion_target": "paper_only",
+  "rationale": "Light protocol uses 3-fold WF on 87-day window. Insufficient for live deployment confidence. Candidates must pass full default protocol (730/365/365) before live promotion.",
+  "explicit_limitations": [
+    "3 foldy total - marginally sufficient for trend detection, insufficient for robust confidence intervals",
+    "~80 trades per train fold - vulnerable to regime-specific overfitting compared to full protocol",
+    "No full regime cycle guarantee - 50-day train may capture partial uptrend or partial downtrend only",
+    "87-day window = Q1 2026 only - seasonal bias risk (crypto Q1 historically differs from Q2-Q4)",
+    "Min trades gate relaxed 30→15 - increases false positive risk on marginal candidates"
+  ],
+  "expected_folds": 3,
+  "expected_trades_per_train_fold": 80,
+  "expected_trades_per_val_fold": 32,
+  "trade_rate_assumption": "~1.5-1.7 trades/day based on recent windows (geometry_sensitivity runs 2025-2026)",
+  "when_not_to_use": [
+    "Clean data ≥ 365 days available - use default protocol instead",
+    "Expected trades < 50 total in window - results will be noise",
+    "Live deployment decision - light protocol is preliminary screening only",
+    "High-stakes parameter search - need ≥10 folds for stable metric distribution"
+  ],
+  "metadata": {
+    "created": "2026-05-01",
+    "author": "Claude Code",
+    "approved_by": "External Auditor",
+    "target_window": "2026-01-01 to 2026-03-28 (87 days)"
+  }
+}
