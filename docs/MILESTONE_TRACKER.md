@@ -23,6 +23,42 @@ Last updated: 2026-05-01
 
 ## Current Active Milestone
 
+**PRODUCTION-DIAGNOSTICS-V1** — Market Truth Degradation Investigation
+
+**Date:** 2026-05-01
+**Status:** AWAITING_IMPLEMENTATION
+**Builder:** Cascade
+**Auditor:** Claude Code
+
+**Scope:** Investigate and remediate market truth degradation (ongoing since 2026-04-27T12:00)
+
+**Deliverables:**
+1. Diagnostic query - when clipping started, frequency, pattern
+2. Root cause analysis - API rate limit vs data gap vs code issue
+3. Remediation plan - backfill / fix collection / document-and-defer
+4. Health report - impact on current decision_outcomes trustworthiness
+
+**Context from db_status.py (2026-04-30 22:38 UTC):**
+- quality_ready: 223/568 (39% degraded since 2026-04-27T12:00)
+- degraded_reason: flow_window_rest_limit_clipped
+- 7 aggtrade gaps, 35 OI gaps may be related
+
+**Blocker:** Optuna with WF_LIGHT_PROTOCOL cannot proceed on degraded data.
+
+**Out of scope:**
+- Do NOT run Optuna (blocked until diagnostics complete)
+- Do NOT major backfill (tracked separately if needed)
+- Do NOT change collection code without root cause evidence
+
+**Acceptance criteria:**
+- Root cause identified with evidence
+- Remediation plan documented or executed
+- decision_outcomes trust verdict delivered
+
+---
+
+## Deferred Active Milestone
+
 **MODELING-CONTEXT-CLOSURE** â€” BLOCKING EDGE CLOSURE
 
 **Date:** 2026-04-27
