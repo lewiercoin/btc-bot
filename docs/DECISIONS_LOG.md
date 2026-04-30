@@ -75,3 +75,16 @@ document. Runtime facts live in the production database and should be checked wi
 **Consequences:** Operators and agents should run `python scripts/db_status.py` on production for current facts. This log records why decisions were made, not whether the bot is currently healthy, which branch is deployed, or how many rows are in the database today.
 
 **Related:** `scripts/db_status.py`; `docs/DATA_SOURCES.md`; DOCS-FOUNDATION-V1. [wymaga weryfikacji operatora]
+
+## 2026-05-01 — flow_window_rest_limit_clipped root cause identified
+**Decision:** Accept degraded post-2026-04-27 data for now; proceed with WF_LIGHT Optuna on pre-bug window (2026-01-01 to 2026-03-28); schedule code fix for production.
+
+**Reason:** PRODUCTION-DIAGNOSTICS-V1 investigation identified root cause: shared `limit_reached` flag bug introduced in commit `c9307f3e` (2026-04-25) causes false positive degradation for flow_60s when flow_15m hits 1000-trade REST API limit. Bug triggered 2026-04-27T00:00 when trade volume exceeded threshold. 100% systematic clipping since then (223/571 buckets degraded = 39%).
+
+**Consequences:**
+- Post-2026-04-27 decision_outcomes built on degraded features - NOT decision-grade for validation
+- WF_LIGHT_PROTOCOL window (2026-01-01 to 2026-03-28) is CLEAN - entirely pre-bug, safe for Optuna
+- Production continues collecting degraded data until code fix deployed
+- Fix requires per-window limit detection logic (2-4h implementation + test + deploy)
+
+**Related:** `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; commit `c9307f3e`; `data/market_data.py:248`; `scripts/db_status.py`. Code fix tracked as future milestone.
