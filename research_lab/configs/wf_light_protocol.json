@@ -26,7 +26,7 @@
     "~80 trades per train fold - vulnerable to regime-specific overfitting compared to full protocol",
     "No full regime cycle guarantee - 50-day train may capture partial uptrend or partial downtrend only",
     "87-day window = Q1 2026 only - seasonal bias risk (crypto Q1 historically differs from Q2-Q4)",
-    "Min trades gate relaxed 30→15 - increases false positive risk on marginal candidates"
+    "Min trades per window (15) more conservative than default protocol (5), but less than typical production threshold (30)"
   ],
   "expected_folds": 3,
   "expected_trades_per_train_fold": 80,
