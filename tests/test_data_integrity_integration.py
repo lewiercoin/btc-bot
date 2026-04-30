@@ -144,9 +144,17 @@ class FakeRestClient:
         _ = limit
         return []
 
-    def fetch_funding_history(self, symbol: str, limit: int = 200) -> list[dict]:
+    def fetch_funding_history(
+        self,
+        symbol: str,
+        limit: int = 200,
+        start_time_ms: int | None = None,
+        end_time_ms: int | None = None,
+    ) -> list[dict]:
         _ = symbol
         _ = limit
+        _ = start_time_ms
+        _ = end_time_ms
         return []
 
     def fetch_open_interest(self, symbol: str) -> dict:
