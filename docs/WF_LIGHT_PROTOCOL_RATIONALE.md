@@ -38,7 +38,8 @@ Light walk-forward protocol for **preliminary screening** of Optuna candidates w
 | `train_days` | 50 | Minimum for observing full BTC regime cycle (uptrend → downtrend or vice versa). Below 50 days, all folds may see single regime only, causing regime-specific overfitting. |
 | `validation_days` | 20 | Sufficient to observe regime shift vs train period. ~32 trades per validation window at 1.6 trades/day. Below 20 days, validation metric variance too high. |
 | `step_days` | 7 | Trade-off: larger step = fewer folds, smaller step = overlapping data. 7 days = 1 week, natural unit for BTC volatility cycles. Below 7 days, folds too correlated. |
-| `min_trades_per_fold` | 15 | Light protocol reduction from default 30 → 15. Below 15: single outlier trade has >6% impact on metrics. 15 trades = statistically sensible sample for directional edge estimation. |
+| `min_trades_per_window` | 15 | **Light protocol reduction** from default 30 → 15. Below 15: single outlier trade has >6% impact on metrics. 15 trades = statistically sensible sample for directional edge estimation. This relaxation is intentional for preliminary screening on short windows. |
+| `min_trades_full_candidate` | 50 | **Relaxed from default 100** due to 87-day window constraint (~139 total trades expected). Candidates with 50-200 trades are viable for preliminary evaluation but must meet default 100+ threshold in full WF before live promotion. |
 
 ### Trade Rate Assumption
 
@@ -131,7 +132,7 @@ folds = floor(17 / 7) + 1 = floor(2.43) + 1 = 3 folds
 
 ## Promotion Gate
 
-**Hard constraints encoded in `wf_light_protocol.json`:**
+**Operator advisory fields in `wf_light_protocol.json`:**
 
 ```json
 {
@@ -141,7 +142,11 @@ folds = floor(17 / 7) + 1 = floor(2.43) + 1 = 3 folds
 }
 ```
 
-### Promotion Rules
+**IMPORTANT:** These fields are **operator advisory only**, not code-enforced. The research lab pipeline (`approval.py`, `walkforward.py`) does not read or enforce these constraints. Operators must manually respect the paper-only intent when evaluating candidates.
+
+**Future enforcement:** Adding code-level enforcement would require modifying `research_lab/approval.py` to check `protocol.get("max_promotion_target")` and block live promotion bundles for light protocol candidates. This is tracked as future hardening work.
+
+### Promotion Rules (Operator Manual)
 
 1. **Paper trading:** Allowed after light protocol PASS + operator approval
 2. **Live trading:** **BLOCKED** until candidate passes full default protocol (730/365/365)
