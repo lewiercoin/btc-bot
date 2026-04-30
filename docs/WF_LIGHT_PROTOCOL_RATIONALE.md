@@ -38,7 +38,7 @@ Light walk-forward protocol for **preliminary screening** of Optuna candidates w
 | `train_days` | 50 | Minimum for observing full BTC regime cycle (uptrend → downtrend or vice versa). Below 50 days, all folds may see single regime only, causing regime-specific overfitting. |
 | `validation_days` | 20 | Sufficient to observe regime shift vs train period. ~32 trades per validation window at 1.6 trades/day. Below 20 days, validation metric variance too high. |
 | `step_days` | 7 | Trade-off: larger step = fewer folds, smaller step = overlapping data. 7 days = 1 week, natural unit for BTC volatility cycles. Below 7 days, folds too correlated. |
-| `min_trades_per_window` | 15 | **Light protocol reduction** from default 30 → 15. Below 15: single outlier trade has >6% impact on metrics. 15 trades = statistically sensible sample for directional edge estimation. This relaxation is intentional for preliminary screening on short windows. |
+| `min_trades_per_window` | 15 | More conservative than default protocol (5), typical production threshold is 30. Below 15: single outlier trade has >6% impact on metrics. 15 trades = statistically sensible sample for directional edge estimation. This threshold is intentional for preliminary screening on short windows. |
 | `min_trades_full_candidate` | 50 | **Relaxed from default 100** due to 87-day window constraint (~139 total trades expected). Candidates with 50-200 trades are viable for preliminary evaluation but must meet default 100+ threshold in full WF before live promotion. |
 
 ### Trade Rate Assumption

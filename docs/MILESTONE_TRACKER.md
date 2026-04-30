@@ -1,6 +1,6 @@
 ﻿# Milestone Tracker
 
-Last updated: 2026-04-27
+Last updated: 2026-05-01
 
 ---
 
@@ -52,6 +52,54 @@ Last updated: 2026-04-27
 **Deferred until this milestone closes:**
 - `LIVE-EXECUTION-TEST-COVERAGE` â€” still required before any live deployment, but not the current priority
 - `RESEARCH-OPTUNA-V1` â€” infrastructure exists, but no run is approved before modeling closure
+
+---
+
+## Recent Completed Milestones (2026-05-01)
+
+### DOCS-FOUNDATION-V1 ✅ PASS
+
+**Date:** 2026-05-01  
+**Builder:** Codex (initial), Claude Code (finalized)  
+**Auditor:** Claude Code  
+**Commits:** `49d9252`, `c8acb3c`
+
+**Deliverables:**
+- `scripts/db_status.py` - read-only production DB status reporter (replay tables, trade log, market truth, external bias, research lab)
+- `docs/DECISIONS_LOG.md` - operator decision log with rationale, consequences, lineage (7 initial entries)
+- Test fix: `FakeRestClient.fetch_funding_history()` kwargs alignment (pre-existing bug)
+
+**Rationale:** Runtime state queries were ad-hoc; decision rationale was scattered. Operator needs one-command DB health check + stable decision history separate from MILESTONE_TRACKER.
+
+**Outcome:** New source-of-truth hierarchy established:
+1. `AGENTS.md` - workflow authority
+2. `scripts/db_status.py` - current runtime/DB state
+3. `docs/DECISIONS_LOG.md` - stable operator decisions
+4. `docs/MILESTONE_TRACKER.md` - milestone history (not current state)
+
+---
+
+### WF_LIGHT_PROTOCOL_V1 ✅ PASS
+
+**Date:** 2026-05-01  
+**Builder:** Claude Code  
+**Auditor:** Claude Code (self-audit MVP_DONE), Cascade (independent audit PASS)  
+**Commits:** `ada19b3`, `c54251c`
+
+**Deliverables:**
+- `research_lab/configs/wf_light_protocol.json` - 50/20/7 day protocol for short data windows (3 folds on 87-day window)
+- `docs/WF_LIGHT_PROTOCOL_RATIONALE.md` - comprehensive documentation, fold calculations, limitations, promotion rules
+- `scripts/smoke_wf_light_protocol.py` - smoke test verifying 3 folds
+
+**Rationale:** 87-day clean window (2026-01-01 to 2026-03-28) too short for default protocol (730/365/365). Aggtrade/OI gaps block data extension. Light protocol unlocks preliminary Optuna screening without waiting for backfill.
+
+**Promotion gate:** Preliminary only, paper max, full WF required before live. Advisory-only (not code-enforced - operator must manually respect paper-only intent).
+
+**Trade rate:** ~1.6/day → ~80 train trades, ~32 val trades per fold (based on geometry_sensitivity evidence 2025-2026).
+
+**Limitations:** 3 folds = absolute minimum for trend detection, insufficient for production confidence. Q1 2026 only = seasonal bias risk.
+
+**Outcome:** Optuna unblocked for preliminary research on short window. Results are preliminary screening only, not production validation.
 
 ---
 
