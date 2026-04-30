@@ -1,6 +1,6 @@
-﻿# Milestone Tracker
+# Milestone Tracker
 
-Last updated: 2026-05-01
+Last updated: 2026-04-30
 
 ---
 
@@ -88,6 +88,36 @@ Last updated: 2026-05-01
 **Deferred until this milestone closes:**
 - `LIVE-EXECUTION-TEST-COVERAGE` â€” still required before any live deployment, but not the current priority
 - `RESEARCH-OPTUNA-V1` â€” infrastructure exists, but no run is approved before modeling closure
+
+---
+
+## Next Milestone: PRODUCTION-DIAGNOSTICS-V1
+
+**Status:** ACTIVE
+**Decision date:** 2026-04-30
+**Builder:** Cascade
+**Auditor:** Claude Code
+
+**Scope:** Investigate production signal quality degradation observed since 2026-04-27.
+
+**Deliverables:**
+- Diagnose market truth degradation (root cause: data gap, logic regression, or regime change)
+- Investigate `flow_window_rest_limit_clipped` warnings — determine if clipping affects signal quality
+- Confirm whether post-2026-04-27 trade data is decision-grade for MODELING-CONTEXT-CLOSURE validation rerun
+- Produce a diagnostic verdict: CLEAN / DEGRADED / BLOCKED with specific evidence
+
+**Why before Optuna:**
+Optuna screening on degraded production data produces invalid candidates.
+Diagnostics confirm data quality before any research run is approved.
+
+**Out of scope:**
+- Do NOT run Optuna during this milestone
+- Do NOT change strategy parameters
+- Do NOT modify live execution path
+
+**After this milestone:**
+- If CLEAN: proceed to Optuna with `wf_light_protocol.json` on 87-day window
+- If DEGRADED: fix source before any research run
 
 ---
 
