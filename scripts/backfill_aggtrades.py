@@ -48,9 +48,9 @@ _DOWNLOAD_CHUNK_BYTES = 1024 * 1024
 _RETRY_COUNT = 3
 _RETRY_SLEEP_S = 5.0
 
-_COL_QUANTITY = 2
-_COL_TIMESTAMP_MS = 5
-_COL_IS_BUYER_MAKER = 6
+_COL_QUANTITY = "quantity"
+_COL_TIMESTAMP_MS = "transact_time"
+_COL_IS_BUYER_MAKER = "is_buyer_maker"
 
 
 def _setup_logging() -> None:
@@ -214,10 +214,8 @@ def backfill_aggtrades(
             csv_name = zf.namelist()[0]
             LOG.info("Processing %s ...", csv_name)
             with zf.open(csv_name) as raw_f:
-                reader = csv.reader(io.TextIOWrapper(raw_f, encoding="utf-8"))
+                reader = csv.DictReader(io.TextIOWrapper(raw_f, encoding="utf-8"))
                 for row in reader:
-                    if len(row) < 7:
-                        continue
                     ts_ms = int(row[_COL_TIMESTAMP_MS])
 
                     if start_ms is not None and ts_ms < start_ms:

@@ -49,18 +49,27 @@ create_time,symbol,sum_open_interest,sum_open_interest_value,count_toptrader_lon
 
 ## Confirmed: AggTrades CSV
 
-Per Binance public data README (no local download needed — format documented):
+Confirmed via dry-run error (2026-05-01): the README states no header row, but
+the actual monthly files **do have a header row** with different column names.
 
-- **No header row**
-- Columns: `AggTradeId, Price, Quantity, FirstTradeId, LastTradeId, Timestamp, WasBuyerMaker`
-- `Timestamp`: Unix milliseconds
-- `WasBuyerMaker`: string `"true"` / `"false"` (lowercase)
+**Header row (confirmed from dry-run):**
+```
+agg_trade_id,price,quantity,first_trade_id,last_trade_id,transact_time,is_buyer_maker
+```
+
+- **Has header row: YES** (README is wrong — DictReader required)
+- `transact_time`: Unix milliseconds (column 5)
+- `is_buyer_maker`: string `"True"` / `"False"` (title-case, `.lower()` normalization applied)
+- `quantity`: trade size in base asset (column 2)
 
 **Bucket derivation:**
-- `taker_buy_volume` = sum(`Quantity`) where `WasBuyerMaker == "false"`
-- `taker_sell_volume` = sum(`Quantity`) where `WasBuyerMaker == "true"`
+- `taker_buy_volume` = sum(`quantity`) where `is_buyer_maker == "false"`
+- `taker_sell_volume` = sum(`quantity`) where `is_buyer_maker == "true"`
 - `tfi` = `(buy - sell) / (buy + sell)` if total > 0 else 0.0
 - `cvd` = running cumulative `(buy - sell)`, initialized from last known DB value before gap
+
+**Fix applied:** `backfill_aggtrades.py` updated from `csv.reader` + index access
+to `csv.DictReader` + named column access (`transact_time`, `quantity`, `is_buyer_maker`).
 
 ## Step 1 Implementation Ready
 
