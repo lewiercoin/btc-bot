@@ -21,65 +21,36 @@ Last updated: 2026-05-01
 
 ---
 
-## Current Active Milestone
+## Current Active Milestone: DATA-BACKFILL-V1
 
-**AWAITING_DECISION**
-
-**Date:** 2026-05-01
-**Status:** READY_FOR_NEXT_MILESTONE
-**Last completed:** FLOW-WINDOW-FIX-V1 (DONE ✅)
+**Status:** ACTIVE
+**Decision date:** 2026-05-01
+**Builder:** Cascade
 **Auditor:** Claude Code
 
-FLOW-WINDOW-FIX-V1 deployed to production and verified (commit `b8e5ba0`, branch `modeling-context-closure`).
+**Scope:** Zbadaj dostępność danych historycznych z `data.binance.vision` (OI + aggtrade).
+Jeśli dostępne — zaimplementuj backfill z zachowaniem standardów DATA-INTEGRITY-V1.
 
-**Available tracks for next milestone:**
-- `RESEARCH-OPTUNA-V1 (Tor 1: WF_LIGHT)` — WF_LIGHT window (2026-01-01 to 2026-03-28) is CLEAN; ready for preliminary Optuna screening
-- `MODELING-CONTEXT-CLOSURE` — still deferred; post-2026-04-27 data NOT decision-grade for validation rerun (degraded until 2026-05-01T16:15)
+**Step 0 (feasibility — przed kodowaniem):**
+- Czy `data.binance.vision` ma OI dla BTCUSDT Perpetual? Jaki zakres dat?
+- Czy aggtrade dostępne dla wymaganego okresu (2026-03-28 → 2026-04-17 + wcześniejsze luki)?
+- Jeśli OI niedostępne: dokumentuj jako BLOCKED, szukaj darmowej alternatywy lub defer
+- Output Step 0: feasibility report w `docs/analysis/BACKFILL_FEASIBILITY_2026-05-01.md`
 
-**Untracked analysis committed in this session (2026-05-01):**
-- `docs/analysis/FUNNEL_ANALYTICS_2026-04-29_PRODUCTION.md`
-- `docs/analysis/FUNNEL_ANALYTICS_2026-04-29_LOCAL_SNAPSHOT.md`
-- `docs/analysis/FILTER_DIAGNOSTICS_DUPLICATE_UPTREND_2026-04-30_PRODUCTION.md`
-- `docs/analysis/RR_GEOMETRY_REVIEW_2026-04-30_PRODUCTION.md`
-- `docs/analysis/TRADING_OPERATOR_PROMPT_COMPATIBILITY_2026-04-29.md`
-- `research_lab/geometry_sensitivity.py` + `tests/test_geometry_sensitivity.py`
-
----
-
-## Deferred Active Milestone
-
-**MODELING-CONTEXT-CLOSURE** â€” BLOCKING EDGE CLOSURE
-
-**Date:** 2026-04-27
-**Status:** STEP 1 COMPLETE (telemetry fix deployed; validation rerun pending)
-**Builder:** Codex
-**Auditor:** Claude Code
-
-**Scope:** Close the modeling path opened by DATA-INTEGRITY-V1 -> MARKET-TRUTH-V3 -> MODELING-V1.
-
-**Deliverables:**
-- Ensure decision-grade context telemetry for validation:
-  `atr_4h_norm` and context bucket data must be reconstructable for the post-MODELING-V1 sample without large `UNKNOWN` leakage
-- Re-run `MODELING-V1-VALIDATION` on a clean, explicit post-deploy window
-- Reduce `UNKNOWN volatility` share to `<= 20%` or document the exact blocking contract that still prevents decision-grade volatility analysis
-- Produce a deterministic activation verdict:
-  `keep_neutral`, `activate_selected_context_filters`, or `redesign_context_model`
-- Produce an explicit strategy conclusion on how context work relates to future uptrend/trend-continuation research
+**Step 1 (tylko jeśli Step 0 = GO):**
+- Import pipeline z tymi samymi standardami co DATA-INTEGRITY-V1
+- Te same tabele, te same pola, te same quality gates (`FeatureQuality`, `quality_ready`)
+- Gate check po imporcie: okno gap-free i quality-ready
 
 **Out of scope:**
-- âťŚ Do NOT run Optuna / new parameter search
-- âťŚ Do NOT activate live trading work
-- âťŚ Do NOT redesign or enable the old uptrend pullback path inside this milestone
-- âťŚ Do NOT change `neutral_mode` before validation evidence is decision-grade
+- Coinglass i inne płatne źródła — odrzucone przez operatora
+- Optuna — do czasu zakończenia backfillu i weryfikacji jakości
 
-**Rationale:** The `206+` quality-ready cycles collected for Gate A proved data integrity and replay safety. They did **not** prove that context buckets improve trade decisions. `MODELING-V1-VALIDATION` remained partial because volatility telemetry was not decision-grade (`75% UNKNOWN`) and the trade sample was too thin for activation.
-
-**Deferred until this milestone closes:**
-- `LIVE-EXECUTION-TEST-COVERAGE` â€” still required before any live deployment, but not the current priority
-- `RESEARCH-OPTUNA-V1` â€” infrastructure exists, but no run is approved before modeling closure
+**After this milestone:**
+- Jeśli CLEAN + gap-free window ≥ 365 dni → default protocol Optuna
+- Jeśli OI blocked → ocena czy sam aggtrade wystarczy dla dłuższego okna
 
 ---
-
 
 ## Recent Completed Milestones (2026-05-01)
 
