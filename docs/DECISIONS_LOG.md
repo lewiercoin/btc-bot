@@ -56,7 +56,7 @@ document. Runtime facts live in the production database and should be checked wi
 
 **Consequences:** `min_stop_relief_only` remains a research hypothesis only. Any future geometry change must include drawdown-normalized metrics, slippage stress, and audit before promotion.
 
-**Related:** `research_lab/geometry_sensitivity.py`; local generated reports under ignored `research_lab/runs/`; operator/Codex/Claude audit discussion on 2026-04-30. [wymaga weryfikacji operatora]
+**Related:** `research_lab/geometry_sensitivity.py`; local generated reports under ignored `research_lab/runs/`; operator/Codex/Claude audit discussion on 2026-04-30.
 
 ## 2026-04-30 — NEW_BASELINE_DATE_OPTUNA remains open
 **Decision:** Do not start Optuna until the replay data window and protocol are explicitly approved.
@@ -65,7 +65,7 @@ document. Runtime facts live in the production database and should be checked wi
 
 **Consequences:** Optuna must either wait for backfilled/longer data, use an explicitly labeled light protocol, or be deferred until more clean data accumulates. The default protocol must not be applied blindly to an 87-day window.
 
-**Related:** `scripts/db_status.py`; `research_lab/configs/default_protocol.json`; 2026-04-30 production DB diagnostics. [wymaga weryfikacji operatora]
+**Related:** `scripts/db_status.py`; `research_lab/configs/default_protocol.json`; 2026-04-30 production DB diagnostics.
 
 ## 2026-04-30 — Runtime state lives in `db_status.py`, decisions live in this log
 **Decision:** Do not manually maintain a status document as the source of runtime truth.
@@ -74,7 +74,7 @@ document. Runtime facts live in the production database and should be checked wi
 
 **Consequences:** Operators and agents should run `python scripts/db_status.py` on production for current facts. This log records why decisions were made, not whether the bot is currently healthy, which branch is deployed, or how many rows are in the database today.
 
-**Related:** `scripts/db_status.py`; `docs/DATA_SOURCES.md`; DOCS-FOUNDATION-V1. [wymaga weryfikacji operatora]
+**Related:** `scripts/db_status.py`; `docs/DATA_SOURCES.md`; DOCS-FOUNDATION-V1.
 
 ## 2026-05-01 — flow_window_rest_limit_clipped root cause identified
 **Decision:** Accept degraded post-2026-04-27 data for now; proceed with WF_LIGHT Optuna on pre-bug window (2026-01-01 to 2026-03-28); schedule code fix for production.
