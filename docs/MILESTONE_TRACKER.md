@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-04-30
+Last updated: 2026-05-01
 
 ---
 
@@ -23,37 +23,28 @@ Last updated: 2026-04-30
 
 ## Current Active Milestone
 
-**PRODUCTION-DIAGNOSTICS-V1** — Market Truth Degradation Investigation
+**AWAITING_CLAUDE_CODE_HANDOFF**
 
 **Date:** 2026-05-01
-**Status:** AWAITING_IMPLEMENTATION
-**Builder:** Cascade
+**Status:** AWAITING_AUDIT
+**Last builder:** Cascade
 **Auditor:** Claude Code
 
-**Scope:** Investigate and remediate market truth degradation (ongoing since 2026-04-27T12:00)
+PRODUCTION-DIAGNOSTICS-V1 deliverables are committed (commit `553ccf8`, branch `modeling-context-closure`).
+Awaiting Claude Code audit before next milestone is assigned.
 
-**Deliverables:**
-1. Diagnostic query - when clipping started, frequency, pattern
-2. Root cause analysis - API rate limit vs data gap vs code issue
-3. Remediation plan - backfill / fix collection / document-and-defer
-4. Health report - impact on current decision_outcomes trustworthiness
+**Known open items for Claude Code to adjudicate:**
+- `FLOW-CLIPPING-FIX` — bug in `data/market_data.py:248` (shared `limit_reached` flag introduced in `c9307f3e`)
+- `RESEARCH-OPTUNA-V1` — WF_LIGHT window (2026-01-01 to 2026-03-28) is CLEAN; run approval pending audit verdict
+- `MODELING-CONTEXT-CLOSURE` — still deferred; post-2026-04-27 data NOT decision-grade for validation rerun
 
-**Context from db_status.py (2026-04-30 22:38 UTC):**
-- quality_ready: 223/568 (39% degraded since 2026-04-27T12:00)
-- degraded_reason: flow_window_rest_limit_clipped
-- 7 aggtrade gaps, 35 OI gaps may be related
-
-**Blocker:** Optuna with WF_LIGHT_PROTOCOL cannot proceed on degraded data.
-
-**Out of scope:**
-- Do NOT run Optuna (blocked until diagnostics complete)
-- Do NOT major backfill (tracked separately if needed)
-- Do NOT change collection code without root cause evidence
-
-**Acceptance criteria:**
-- Root cause identified with evidence
-- Remediation plan documented or executed
-- decision_outcomes trust verdict delivered
+**Untracked analysis committed in this session (2026-05-01):**
+- `docs/analysis/FUNNEL_ANALYTICS_2026-04-29_PRODUCTION.md`
+- `docs/analysis/FUNNEL_ANALYTICS_2026-04-29_LOCAL_SNAPSHOT.md`
+- `docs/analysis/FILTER_DIAGNOSTICS_DUPLICATE_UPTREND_2026-04-30_PRODUCTION.md`
+- `docs/analysis/RR_GEOMETRY_REVIEW_2026-04-30_PRODUCTION.md`
+- `docs/analysis/TRADING_OPERATOR_PROMPT_COMPATIBILITY_2026-04-29.md`
+- `research_lab/geometry_sensitivity.py` + `tests/test_geometry_sensitivity.py`
 
 ---
 
@@ -91,37 +82,32 @@ Last updated: 2026-04-30
 
 ---
 
-## Next Milestone: PRODUCTION-DIAGNOSTICS-V1
-
-**Status:** ACTIVE
-**Decision date:** 2026-04-30
-**Builder:** Cascade
-**Auditor:** Claude Code
-
-**Scope:** Investigate production signal quality degradation observed since 2026-04-27.
-
-**Deliverables:**
-- Diagnose market truth degradation (root cause: data gap, logic regression, or regime change)
-- Investigate `flow_window_rest_limit_clipped` warnings — determine if clipping affects signal quality
-- Confirm whether post-2026-04-27 trade data is decision-grade for MODELING-CONTEXT-CLOSURE validation rerun
-- Produce a diagnostic verdict: CLEAN / DEGRADED / BLOCKED with specific evidence
-
-**Why before Optuna:**
-Optuna screening on degraded production data produces invalid candidates.
-Diagnostics confirm data quality before any research run is approved.
-
-**Out of scope:**
-- Do NOT run Optuna during this milestone
-- Do NOT change strategy parameters
-- Do NOT modify live execution path
-
-**After this milestone:**
-- If CLEAN: proceed to Optuna with `wf_light_protocol.json` on 87-day window
-- If DEGRADED: fix source before any research run
-
----
 
 ## Recent Completed Milestones (2026-05-01)
+
+### PRODUCTION-DIAGNOSTICS-V1 ✅ COMPLETE (AWAITING_AUDIT)
+
+**Date:** 2026-05-01  
+**Builder:** Cascade  
+**Auditor:** Claude Code (pending)  
+**Commit:** `553ccf8` (branch: `modeling-context-closure`)
+
+**Deliverables:**
+- `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md` — full diagnostic report (259 lines)
+- `docs/DECISIONS_LOG.md` — updated with root cause verdict + remediation decision
+- `scripts/diagnose_flow_clipping.py` — timeline analysis tool
+- `scripts/diagnose_trade_volume.py` — volume correlation tool
+
+**Root cause identified:** Shared `limit_reached` flag bug in `data/market_data.py:248`  
+Commit `c9307f3e` (2026-04-25 pagination fix) caused `flow_60s` to false-positive clip when `flow_15m` hits the 1000-trade REST API limit.  
+Bug triggered 2026-04-27T00:00 when BTC volume exceeded threshold. 100% systematic clipping since (223/571 = 39% degraded).
+
+**Verdict:**
+- Post-2026-04-27 decision_outcomes: **DEGRADED** — NOT decision-grade for MODELING-CONTEXT-CLOSURE validation rerun
+- WF_LIGHT window (2026-01-01 to 2026-03-28): **CLEAN** — pre-bug, safe for Optuna
+- Fix tracked separately as `FLOW-CLIPPING-FIX`
+
+---
 
 ### DOCS-FOUNDATION-V1 ✅ PASS
 
