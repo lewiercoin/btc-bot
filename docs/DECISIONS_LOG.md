@@ -88,3 +88,23 @@ document. Runtime facts live in the production database and should be checked wi
 - Fix requires per-window limit detection logic (2-4h implementation + test + deploy)
 
 **Related:** `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; commit `c9307f3e`; `data/market_data.py:248`; `scripts/db_status.py`. Code fix tracked as future milestone.
+
+---
+
+## Decision 8: Deploy FLOW-WINDOW-FIX-V1 to production (2026-05-01)
+
+**Decision:** Deploy fix for shared `limit_reached` bug to production immediately. Remove limit detection logic entirely, rely on coverage_ratio thresholds only.
+
+**Reason:** External auditor recommended "Path 1: Remove limit_reached entirely" over per-window calculation. Rationale: `_load_rest_agg_trade_window()` already paginates successfully (fromId cursor for aggTrades), so reaching 1000-trade fetch limit does NOT indicate incomplete data. False positive clipping eliminated by removing the check.
+
+**Consequences:**
+- Fix deployed: commit `b8e5ba0` (2026-05-01 16:00 UTC)
+- Flow window quality now determined by coverage_ratio only:
+  - coverage >= 0.90 → READY
+  - 0.70 <= coverage < 0.90 → DEGRADED (flow_window_partial)
+  - coverage < 0.70 → UNAVAILABLE
+- Regression test added: `test_flow_60s_ready_despite_high_volume_15m()` (high-volume scenario → 60s READY, 15m degraded independently)
+- Post-2026-05-01T16:15 buckets expected to show flow_60s READY (verified pending)
+- Pre-fix buckets (2026-04-27 to 2026-05-01T16:00) remain degraded in database (historical artifact)
+
+**Related:** `FLOW-WINDOW-FIX-V1` milestone; commit `b8e5ba0`; `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; `tests/test_flow_completeness.py:43`
