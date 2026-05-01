@@ -245,21 +245,18 @@ class MarketDataAssembler:
 
         trades_60s = filter_events_by_window(ws_events, now=now, window_seconds=60)
         trades_15m = filter_events_by_window(ws_events, now=now, window_seconds=15 * 60)
-        limit_reached = bool(source == "rest" and len(ws_events) >= self.config.agg_trades_limit)
 
         coverage_60s = self._flow_window_metadata(
             trades_60s,
             now=now,
             window_seconds=60,
             source=source,
-            limit_reached=limit_reached,
         )
         coverage_15m = self._flow_window_metadata(
             trades_15m,
             now=now,
             window_seconds=15 * 60,
             source=source,
-            limit_reached=limit_reached,
         )
 
         bucket_60s = aggregate_aggtrade_bucket(
@@ -407,7 +404,6 @@ class MarketDataAssembler:
         now: datetime,
         window_seconds: int,
         source: str,
-        limit_reached: bool,
     ) -> dict[str, Any]:
         trade_times = sorted(ts for event in trades if (ts := _event_time(event)) is not None)
         window_end = now.astimezone(timezone.utc)
@@ -423,7 +419,6 @@ class MarketDataAssembler:
             covered_end = min(last_ts, window_end)
             covered_seconds = max((covered_end - covered_start).total_seconds(), 0.0)
             coverage_ratio = min(covered_seconds / max(float(window_seconds), 1.0), 1.0)
-        clipped_by_limit = bool(limit_reached and first_ts is not None and first_ts > window_start)
         return {
             "source": source,
             "coverage_ratio": coverage_ratio,
@@ -431,19 +426,11 @@ class MarketDataAssembler:
             "last_event_time": last_ts.isoformat() if last_ts else None,
             "window_start": window_start.isoformat(),
             "window_end": window_end.isoformat(),
-            "limit_reached": limit_reached,
-            "clipped_by_limit": clipped_by_limit,
         }
 
     def _quality_from_flow_metadata(self, metadata: dict[str, Any]) -> FeatureQuality:
         coverage_ratio = float(metadata.get("coverage_ratio", 0.0))
         provenance = str(metadata.get("source", "unknown"))
-        if metadata.get("clipped_by_limit"):
-            return FeatureQuality.degraded(
-                reason="flow_window_rest_limit_clipped",
-                metadata=metadata,
-                provenance=provenance,
-            )
         if coverage_ratio >= self.config.flow_coverage_ready:
             return FeatureQuality.ready(
                 reason="flow_window_complete",
