@@ -104,7 +104,7 @@ document. Runtime facts live in the production database and should be checked wi
   - 0.70 <= coverage < 0.90 → DEGRADED (flow_window_partial)
   - coverage < 0.70 → UNAVAILABLE
 - Regression test added: `test_flow_60s_ready_despite_high_volume_15m()` (high-volume scenario → 60s READY, 15m degraded independently)
-- Post-2026-05-01T16:15 buckets expected to show flow_60s READY (verified pending)
-- Pre-fix buckets (2026-04-27 to 2026-05-01T16:00) remain degraded in database (historical artifact)
+- ✅ **Verified:** First post-fix bucket (2026-05-01T16:15:00) shows flow_60s=READY, flow_15m=READY (both flow_window_complete)
+- Pre-fix buckets (2026-04-27 to 2026-05-01T16:00) remain degraded in database (historical artifact, no backfill planned)
 
 **Related:** `FLOW-WINDOW-FIX-V1` milestone; commit `b8e5ba0`; `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; `tests/test_flow_completeness.py:43`
