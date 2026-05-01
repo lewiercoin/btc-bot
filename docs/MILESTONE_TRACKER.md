@@ -23,20 +23,18 @@ Last updated: 2026-05-01
 
 ## Current Active Milestone
 
-**AWAITING_CLAUDE_CODE_HANDOFF**
+**AWAITING_DECISION**
 
 **Date:** 2026-05-01
-**Status:** AWAITING_AUDIT
-**Last builder:** Cascade
+**Status:** READY_FOR_NEXT_MILESTONE
+**Last completed:** FLOW-WINDOW-FIX-V1 (DONE ✅)
 **Auditor:** Claude Code
 
-PRODUCTION-DIAGNOSTICS-V1 deliverables are committed (commit `553ccf8`, branch `modeling-context-closure`).
-Awaiting Claude Code audit before next milestone is assigned.
+FLOW-WINDOW-FIX-V1 deployed to production and verified (commit `b8e5ba0`, branch `modeling-context-closure`).
 
-**Known open items for Claude Code to adjudicate:**
-- `FLOW-CLIPPING-FIX` — bug in `data/market_data.py:248` (shared `limit_reached` flag introduced in `c9307f3e`)
-- `RESEARCH-OPTUNA-V1` — WF_LIGHT window (2026-01-01 to 2026-03-28) is CLEAN; run approval pending audit verdict
-- `MODELING-CONTEXT-CLOSURE` — still deferred; post-2026-04-27 data NOT decision-grade for validation rerun
+**Available tracks for next milestone:**
+- `RESEARCH-OPTUNA-V1 (Tor 1: WF_LIGHT)` — WF_LIGHT window (2026-01-01 to 2026-03-28) is CLEAN; ready for preliminary Optuna screening
+- `MODELING-CONTEXT-CLOSURE` — still deferred; post-2026-04-27 data NOT decision-grade for validation rerun (degraded until 2026-05-01T16:15)
 
 **Untracked analysis committed in this session (2026-05-01):**
 - `docs/analysis/FUNNEL_ANALYTICS_2026-04-29_PRODUCTION.md`
@@ -85,7 +83,43 @@ Awaiting Claude Code audit before next milestone is assigned.
 
 ## Recent Completed Milestones (2026-05-01)
 
-### PRODUCTION-DIAGNOSTICS-V1 ✅ COMPLETE (AWAITING_AUDIT)
+### FLOW-WINDOW-FIX-V1 ✅ DONE
+
+**Date:** 2026-05-01  
+**Builder:** Claude Code (exception mode, user requested)  
+**Auditor:** Claude Code (self-audit)  
+**Commits:** `b8e5ba0` (fix), `55d92c5` (Decision 8), `2ec990e` (verification), `e0b937f` (audit)  
+**Branch:** `modeling-context-closure`  
+**Deployed:** 2026-05-01 16:00:22 UTC  
+**Verified:** 2026-05-01 16:15:00 bucket (first post-fix)
+
+**Deliverables:**
+- `data/market_data.py` — removed shared `limit_reached` flag causing false positive degradation
+- `tests/test_flow_completeness.py` — updated existing test + added regression test `test_flow_60s_ready_despite_high_volume_15m()`
+- `docs/DECISIONS_LOG.md` — Decision 8 documenting deployment and verification
+- `docs/audits/AUDIT_FLOW_WINDOW_FIX_V1_2026-05-01.md` — formal audit report
+
+**Root cause fixed:** Shared `limit_reached` flag at `data/market_data.py:248` caused both flow_60s and flow_15m to degrade when either window hit 1000-trade REST limit. Pagination already worked correctly (fromId cursor), so limit detection was false positive.
+
+**Fix strategy:** Path 1 (auditor recommendation) — remove `limit_reached` entirely. Flow window quality now determined by `coverage_ratio` only:
+- coverage >= 0.90 → READY
+- 0.70 <= coverage < 0.90 → DEGRADED (flow_window_partial)  
+- coverage < 0.70 → UNAVAILABLE
+
+**Production verification:**
+- **Baseline (pre-fix):** Last 5 buckets all `flow_window_rest_limit_clipped` (both windows degraded)
+- **Post-fix:** 2026-05-01T16:15:00 bucket shows `flow_60s: ready`, `flow_15m: ready` (both `flow_window_complete`)
+- **Result:** False positive degradation eliminated ✅
+
+**Impact:** 39% degradation artifact (223/571 buckets from 2026-04-27 to 2026-05-01T16:00) remains in database as historical record. Post-2026-05-01T16:15 buckets are decision-grade quality.
+
+**Audit verdict:** DONE (all axes PASS, tech debt LOW, production verified)
+
+**Related:** `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; bug commit `c9307f3e`
+
+---
+
+### PRODUCTION-DIAGNOSTICS-V1 ✅ COMPLETE
 
 **Date:** 2026-05-01  
 **Builder:** Cascade  
