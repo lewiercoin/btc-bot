@@ -21,16 +21,26 @@ Last updated: 2026-05-01
 
 ---
 
-## Current Active Milestone: AWAITING_DECISION
+## Current Active Milestone: OPTUNA-DEFAULT-V1 — BLOCKED (diagnosis in progress)
 
-**Status:** AWAITING_DECISION
+**Status:** BLOCKED
 **Decision date:** 2026-05-02
-**Builder:** TBD
+**Builder:** Cascade
 **Auditor:** Claude Code
 
-Claude Code recommendation: **OPTUNA-WF-LIGHT-V1** — Optuna campaign on verified 87-day
-clean window (2026-01-01 → 2026-03-28) using `wf_light_protocol.json`.
-Awaiting operator approval.
+**Operator decision:** OPTUNA-DEFAULT-V1 — Optuna campaign on full clean window
+(2022-01-01 → 2026-03-28) using `default_protocol.json`. Authorized 2026-05-02.
+
+**Run result:** All 50 trials returned penalty `{expectancy_r: -2.0, profit_factor: 0.1,
+mdd: 1.0}`. Zero pareto candidates. walkforward_windows=2 (correct).
+
+**Root cause under investigation:**
+1. WAL snapshot bug (FIXED in `research_lab/db_snapshot.py`): `shutil.copy2` missed WAL
+   data; replaced with `sqlite3.Connection.backup()` API. Likely contributed to data
+   incompleteness in trial snapshots.
+2. Constraint violation saturation: ~75% estimated violation rate on full 35-param search
+   space. Remaining ~12-13 trials may have hit degenerate weight combinations → 0 trades.
+3. Pending: query `research_lab.db` rejection reasons to confirm which factor dominated.
 
 ---
 
