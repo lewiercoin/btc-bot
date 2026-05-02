@@ -21,6 +21,59 @@ Last updated: 2026-05-01
 
 ---
 
+## Running: OPTUNA-DEFAULT-V1-RERUN
+
+**Status:** RUNNING (server PID 527901, launched 2026-05-02 ~21:46 UTC)
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9` (WAL fix) + server deployment
+**Builder:** Cascade
+**Auditor:** Claude Code (post-run)
+
+**Context:** First run (study `research-lab-v0_1`, 50 trials, 2022-01-01→2026-03-28) returned all 50 trials as penalty. Two root causes confirmed.
+
+**Root cause A — CONFIRMED, FIXED (commit 1a70e0f):**
+`research_lab/db_snapshot.py` used `shutil.copy2` — on WAL-mode SQLite this missed all committed data still in the WAL. Fixed to use `sqlite3.Connection.backup()`. Deployed surgically to server (`git checkout github/claude/audit-wf-light-protocol-ZXDA9 -- research_lab/db_snapshot.py`).
+
+**Root cause B — CONFIRMED by diagnostic queries:**
+
+| Rejection reason | Count |
+|---|---|
+| `high_vol_leverage must be <= max_leverage` | 13 |
+| `MIN_TRADES_NOT_MET: trades_count=0 < min_trades=100` | 12 |
+| `uptrend_continuation_participation_min must be >= direction_tfi_threshold` | 7 |
+| `allow_long_in_uptrend and allow_uptrend_continuation cannot both be enabled` | 6 |
+| combo: high_vol_leverage + participation_min | 5 |
+| combo: high_vol_leverage + allow_long + allow_uptrend (x2) | 2 |
+| combo: high_vol_leverage + allow_long | 2 |
+| combo: allow_long + participation_min | 1 |
+| `MIN_TRADES_NOT_MET: trades_count=9` | 1 |
+| `MIN_TRADES_NOT_MET: trades_count=2` | 1 |
+| **Total** | **50** |
+
+- **36/50 (72%) constraint violations** — never ran backtest
+- **14/50 (28%) MIN_TRADES_NOT_MET** — ran backtest, got 0/2/9 trades (WAL bug)
+- WAL file: absent (already checkpointed) — `PRAGMA wal_checkpoint(FULL)` returned `(0,0,0)`
+
+**Re-run command:**
+```
+.venv/bin/python3 -m research_lab optimize \
+  --start-date 2022-01-01 --end-date 2026-03-28 \
+  --n-trials 200 --study-name optuna-default-v1-run2 \
+  --warm-start-from-store --seed 42 --max-sweep-rate 1.0
+```
+Note: `--max-sweep-rate 1.0` required because `sweep_detected_rate=0.9998` (expected for this signal config).
+Note: `--protocol-path` not specified → uses `default_protocol.json` (same as first run).
+
+**Log:** `/tmp/optuna_run2.log` on server (stays 0 bytes until run completes — Python stdout fully buffered, no logging calls during 3 pre-flight baseline/health scans).
+
+**Expected duration:** ~6-10 hours (200 trials × ~2-3 min each).
+
+**Monitor:**
+```bash
+ssh -i btc-bot-deploy-v2 root@204.168.146.253 "ps aux | grep optuna_run2 | grep -v grep; cat /tmp/optuna_run2.log"
+```
+
+---
+
 ## Current Active Milestone: DATA-BACKFILL-V1
 
 **Status:** ACTIVE
