@@ -65,11 +65,27 @@ Note: `--protocol-path` not specified → uses `default_protocol.json` (same as 
 
 **Log:** `/tmp/optuna_run2.log` on server (stays 0 bytes until run completes — Python stdout fully buffered, no logging calls during 3 pre-flight baseline/health scans).
 
-**Expected duration:** ~6-10 hours (200 trials × ~2-3 min each).
+**Pre-flight timing (observed):** ~2h 15min wallclock on this server (3.7GB RAM, 3.5GB DB — severely I/O bound). Three passes: `check_baseline_hard` + `check_baseline_soft` + `check_signal_health` (148,609 bars). Pre-flight done at ~22:06 UTC.
+
+**Trial execution rate (observed at t+17min of trial execution):**
+- 16 trials completed as of 22:28 UTC
+- Constraint violations: instant (~milliseconds)
+- Real backtests (pass constraints): ~4-5 min each (3.7GB snapshot write + backtest)
+- Throughput: ~6 trials / 10 min
+
+**WAL fix confirmed working:** trial with `trades_count=46` shows genuine backtest execution (not 0 from empty snapshot).
+
+**Expected completion:** ~05:00-06:00 UTC (03:00-04:00 UTC+02) based on ~6 trials/10min × 200 trials = ~333 min remaining from 22:11 UTC trial-start.
 
 **Monitor:**
 ```bash
-ssh -i btc-bot-deploy-v2 root@204.168.146.253 "ps aux | grep optuna_run2 | grep -v grep; cat /tmp/optuna_run2.log"
+scp -i btc-bot-deploy-v2 scripts/_tmp_check_run2.py root@204.168.146.253:/tmp/check_run2.py
+ssh -i btc-bot-deploy-v2 root@204.168.146.253 "ps aux | grep 527901 | grep -v grep; python3 /tmp/check_run2.py"
+```
+
+**Quick one-liner check:**
+```bash
+ssh -i btc-bot-deploy-v2 root@204.168.146.253 "sqlite3 /home/btc-bot/btc-bot/research_lab/research_lab.db 'SELECT COUNT(*),rejected_reason FROM trials WHERE trial_id LIKE \"optuna-default-v1-run2%\" GROUP BY rejected_reason ORDER BY COUNT(*) DESC'"
 ```
 
 ---
