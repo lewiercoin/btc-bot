@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import shutil
 import sqlite3
 from pathlib import Path
 
@@ -8,11 +7,21 @@ from research_lab.constants import SQLITE_SOURCE_TABLES
 
 
 def create_trial_snapshot(source_db_path: Path, snapshots_dir: Path, trial_id: str) -> Path:
-    """Copies source SQLite DB to snapshots_dir/trial_id.db. Returns snapshot path."""
+    """Copies source SQLite DB to snapshots_dir/trial_id.db using the .backup() API.
 
+    Uses sqlite3.Connection.backup() instead of shutil.copy2 so that WAL-mode databases
+    are checkpointed atomically into the snapshot. A raw file copy misses any committed
+    transactions still in the WAL file, producing an incomplete and silently wrong snapshot.
+    """
     snapshots_dir.mkdir(parents=True, exist_ok=True)
     snapshot_path = snapshots_dir / f"{trial_id}.db"
-    shutil.copy2(source_db_path, snapshot_path)
+    src_conn = sqlite3.connect(f"file:{source_db_path.resolve().as_posix()}?mode=ro", uri=True)
+    dst_conn = sqlite3.connect(snapshot_path)
+    try:
+        src_conn.backup(dst_conn)
+    finally:
+        dst_conn.close()
+        src_conn.close()
     return snapshot_path
 
 
