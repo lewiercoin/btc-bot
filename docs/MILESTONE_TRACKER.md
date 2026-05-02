@@ -1,6 +1,6 @@
-﻿# Milestone Tracker
+# Milestone Tracker
 
-Last updated: 2026-04-27
+Last updated: 2026-05-01
 
 ---
 
@@ -21,37 +21,142 @@ Last updated: 2026-04-27
 
 ---
 
-## Current Active Milestone
+## Current Active Milestone: AWAITING_DECISION
 
-**MODELING-CONTEXT-CLOSURE** â€” BLOCKING EDGE CLOSURE
-
-**Date:** 2026-04-27
-**Status:** STEP 1 COMPLETE (telemetry fix deployed; validation rerun pending)
-**Builder:** Codex
+**Status:** AWAITING_DECISION
+**Decision date:** 2026-05-02
+**Builder:** TBD
 **Auditor:** Claude Code
 
-**Scope:** Close the modeling path opened by DATA-INTEGRITY-V1 -> MARKET-TRUTH-V3 -> MODELING-V1.
+Claude Code recommendation: **OPTUNA-WF-LIGHT-V1** — Optuna campaign on verified 87-day
+clean window (2026-01-01 → 2026-03-28) using `wf_light_protocol.json`.
+Awaiting operator approval.
+
+---
+
+## Completed: DATA-BACKFILL-V1 ✅ DONE
+
+**Status:** DONE
+**Audit verdict:** DONE (commit f181e80)
+**Audit report:** `docs/audits/AUDIT_DATA_BACKFILL_V1_2026-05-02.md`
+**Decision date:** 2026-05-01
+**Builder:** Cascade
+**Closed:** 2026-05-02
+
+**Results:**
+- OI backfill: 60,477 rows inserted (2025-06-05 → 2026-01-01, 211 days, 5-min granularity)
+- AggTrades backfill: 1,906 buckets (2026-03-28 → 2026-04-17: 299 + 1,607)
+- Primary gaps: ZERO remaining
+- Optuna window 2026-01-01 → 2026-03-28: **CLEAN** for both OI and aggTrades ✅
+- Fix during dry-run: aggTrades CSV has header row (README wrong) — fixed before live run ✅
+
+---
+
+## Recent Completed Milestones (2026-05-01)
+
+### FLOW-WINDOW-FIX-V1 ✅ DONE
+
+**Date:** 2026-05-01  
+**Builder:** Claude Code (exception mode, user requested)  
+**Auditor:** Claude Code (self-audit)  
+**Commits:** `b8e5ba0` (fix), `55d92c5` (Decision 8), `2ec990e` (verification), `e0b937f` (audit)  
+**Branch:** `modeling-context-closure`  
+**Deployed:** 2026-05-01 16:00:22 UTC  
+**Verified:** 2026-05-01 16:15:00 bucket (first post-fix)
 
 **Deliverables:**
-- Ensure decision-grade context telemetry for validation:
-  `atr_4h_norm` and context bucket data must be reconstructable for the post-MODELING-V1 sample without large `UNKNOWN` leakage
-- Re-run `MODELING-V1-VALIDATION` on a clean, explicit post-deploy window
-- Reduce `UNKNOWN volatility` share to `<= 20%` or document the exact blocking contract that still prevents decision-grade volatility analysis
-- Produce a deterministic activation verdict:
-  `keep_neutral`, `activate_selected_context_filters`, or `redesign_context_model`
-- Produce an explicit strategy conclusion on how context work relates to future uptrend/trend-continuation research
+- `data/market_data.py` — removed shared `limit_reached` flag causing false positive degradation
+- `tests/test_flow_completeness.py` — updated existing test + added regression test `test_flow_60s_ready_despite_high_volume_15m()`
+- `docs/DECISIONS_LOG.md` — Decision 8 documenting deployment and verification
+- `docs/audits/AUDIT_FLOW_WINDOW_FIX_V1_2026-05-01.md` — formal audit report
 
-**Out of scope:**
-- âťŚ Do NOT run Optuna / new parameter search
-- âťŚ Do NOT activate live trading work
-- âťŚ Do NOT redesign or enable the old uptrend pullback path inside this milestone
-- âťŚ Do NOT change `neutral_mode` before validation evidence is decision-grade
+**Root cause fixed:** Shared `limit_reached` flag at `data/market_data.py:248` caused both flow_60s and flow_15m to degrade when either window hit 1000-trade REST limit. Pagination already worked correctly (fromId cursor), so limit detection was false positive.
 
-**Rationale:** The `206+` quality-ready cycles collected for Gate A proved data integrity and replay safety. They did **not** prove that context buckets improve trade decisions. `MODELING-V1-VALIDATION` remained partial because volatility telemetry was not decision-grade (`75% UNKNOWN`) and the trade sample was too thin for activation.
+**Fix strategy:** Path 1 (auditor recommendation) — remove `limit_reached` entirely. Flow window quality now determined by `coverage_ratio` only:
+- coverage >= 0.90 → READY
+- 0.70 <= coverage < 0.90 → DEGRADED (flow_window_partial)  
+- coverage < 0.70 → UNAVAILABLE
 
-**Deferred until this milestone closes:**
-- `LIVE-EXECUTION-TEST-COVERAGE` â€” still required before any live deployment, but not the current priority
-- `RESEARCH-OPTUNA-V1` â€” infrastructure exists, but no run is approved before modeling closure
+**Production verification:**
+- **Baseline (pre-fix):** Last 5 buckets all `flow_window_rest_limit_clipped` (both windows degraded)
+- **Post-fix:** 2026-05-01T16:15:00 bucket shows `flow_60s: ready`, `flow_15m: ready` (both `flow_window_complete`)
+- **Result:** False positive degradation eliminated ✅
+
+**Impact:** 39% degradation artifact (223/571 buckets from 2026-04-27 to 2026-05-01T16:00) remains in database as historical record. Post-2026-05-01T16:15 buckets are decision-grade quality.
+
+**Audit verdict:** DONE (all axes PASS, tech debt LOW, production verified)
+
+**Related:** `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; bug commit `c9307f3e`
+
+---
+
+### PRODUCTION-DIAGNOSTICS-V1 ✅ COMPLETE
+
+**Date:** 2026-05-01  
+**Builder:** Cascade  
+**Auditor:** Claude Code (pending)  
+**Commit:** `553ccf8` (branch: `modeling-context-closure`)
+
+**Deliverables:**
+- `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md` — full diagnostic report (259 lines)
+- `docs/DECISIONS_LOG.md` — updated with root cause verdict + remediation decision
+- `scripts/diagnose_flow_clipping.py` — timeline analysis tool
+- `scripts/diagnose_trade_volume.py` — volume correlation tool
+
+**Root cause identified:** Shared `limit_reached` flag bug in `data/market_data.py:248`  
+Commit `c9307f3e` (2026-04-25 pagination fix) caused `flow_60s` to false-positive clip when `flow_15m` hits the 1000-trade REST API limit.  
+Bug triggered 2026-04-27T00:00 when BTC volume exceeded threshold. 100% systematic clipping since (223/571 = 39% degraded).
+
+**Verdict:**
+- Post-2026-04-27 decision_outcomes: **DEGRADED** — NOT decision-grade for MODELING-CONTEXT-CLOSURE validation rerun
+- WF_LIGHT window (2026-01-01 to 2026-03-28): **CLEAN** — pre-bug, safe for Optuna
+- Fix tracked separately as `FLOW-CLIPPING-FIX`
+
+---
+
+### DOCS-FOUNDATION-V1 ✅ PASS
+
+**Date:** 2026-05-01  
+**Builder:** Codex (initial), Claude Code (finalized)  
+**Auditor:** Claude Code  
+**Commits:** `49d9252`, `c8acb3c`
+
+**Deliverables:**
+- `scripts/db_status.py` - read-only production DB status reporter (replay tables, trade log, market truth, external bias, research lab)
+- `docs/DECISIONS_LOG.md` - operator decision log with rationale, consequences, lineage (7 initial entries)
+- Test fix: `FakeRestClient.fetch_funding_history()` kwargs alignment (pre-existing bug)
+
+**Rationale:** Runtime state queries were ad-hoc; decision rationale was scattered. Operator needs one-command DB health check + stable decision history separate from MILESTONE_TRACKER.
+
+**Outcome:** New source-of-truth hierarchy established:
+1. `AGENTS.md` - workflow authority
+2. `scripts/db_status.py` - current runtime/DB state
+3. `docs/DECISIONS_LOG.md` - stable operator decisions
+4. `docs/MILESTONE_TRACKER.md` - milestone history (not current state)
+
+---
+
+### WF_LIGHT_PROTOCOL_V1 ✅ PASS
+
+**Date:** 2026-05-01  
+**Builder:** Claude Code  
+**Auditor:** Claude Code (self-audit MVP_DONE), Cascade (independent audit PASS)  
+**Commits:** `ada19b3`, `c54251c`
+
+**Deliverables:**
+- `research_lab/configs/wf_light_protocol.json` - 50/20/7 day protocol for short data windows (3 folds on 87-day window)
+- `docs/WF_LIGHT_PROTOCOL_RATIONALE.md` - comprehensive documentation, fold calculations, limitations, promotion rules
+- `scripts/smoke_wf_light_protocol.py` - smoke test verifying 3 folds
+
+**Rationale:** 87-day clean window (2026-01-01 to 2026-03-28) too short for default protocol (730/365/365). Aggtrade/OI gaps block data extension. Light protocol unlocks preliminary Optuna screening without waiting for backfill.
+
+**Promotion gate:** Preliminary only, paper max, full WF required before live. Advisory-only (not code-enforced - operator must manually respect paper-only intent).
+
+**Trade rate:** ~1.6/day → ~80 train trades, ~32 val trades per fold (based on geometry_sensitivity evidence 2025-2026).
+
+**Limitations:** 3 folds = absolute minimum for trend detection, insufficient for production confidence. Q1 2026 only = seasonal bias risk.
+
+**Outcome:** Optuna unblocked for preliminary research on short window. Results are preliminary screening only, not production validation.
 
 ---
 
