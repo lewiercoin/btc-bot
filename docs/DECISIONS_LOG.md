@@ -108,3 +108,55 @@ document. Runtime facts live in the production database and should be checked wi
 - Pre-fix buckets (2026-04-27 to 2026-05-01T16:00) remain degraded in database (historical artifact, no backfill planned)
 
 **Related:** `FLOW-WINDOW-FIX-V1` milestone; commit `b8e5ba0`; `docs/analysis/PRODUCTION_DIAGNOSTICS_V1_2026-05-01.md`; `tests/test_flow_completeness.py:43`
+
+---
+
+## Decision 9: DATA-BACKFILL-V1 complete — primary gaps filled (2026-05-01)
+
+**Decision:** Accept DATA-BACKFILL-V1 as complete. Primary gaps are filled.
+Remaining gaps are pre-existing Binance source data gaps (unavoidable). Optuna
+window (2026-01-01 → 2026-03-28) is clean for both OI and aggTrades.
+
+**Reason:** Post-fix data quality required filling two gaps before Optuna could run
+on a clean dataset:
+- `open_interest` gap: 2025-06-05 → 2026-01-01 (7 months — OI was not being persisted)
+- `aggtrade_15m` gap: 2026-03-28 → 2026-04-17 (3 weeks — collection interrupted)
+
+**Execution (2026-05-01, production server `204.168.146.253`):**
+
+*OI backfill (`scripts/backfill_oi.py`):*
+- Source: `data.binance.vision` daily metrics zips (5-min granularity, `sum_open_interest`)
+- Range: 2025-06-05 → 2026-01-01 (211 days)
+- Result: `parsed=60,765 | inserted=60,477 | skipped_dates=0`
+- 288 rows/day × 5-min intervals — column `create_time` format `YYYY-MM-DD HH:MM:SS` UTC
+
+*AggTrades backfill (`scripts/backfill_aggtrades.py`):*
+- Source: `data.binance.vision` monthly aggTrades zips (raw trades → 15m buckets)
+- 2026-03 monthly file (762 MB), filter 2026-03-28 → 2026-03-31:
+  `trades=5,895,220 | buckets_inserted=299`
+- 2026-04 monthly file (485 MB), filter 2026-04-01 → 2026-04-17:
+  `trades=24,404,348 | buckets_inserted=1,607`
+- Header row confirmed: `agg_trade_id,price,quantity,...,transact_time,is_buyer_maker`
+  (README states no header — incorrect; fixed in `scripts/backfill_aggtrades.py` commit `07448b2`)
+
+**db_status.py gate check (post-backfill):**
+```
+aggtrade_15m : 2020-09-01 -> 2026-04-17T23:45:00  [rows: 197,081, gaps: 6]
+open_interest: 2020-09-01 -> 2026-04-17T14:00:00  [rows: 586,973, gaps: 35]
+```
+Remaining gaps analysis:
+- OI 35 gaps: all from 2020-2021, source data gaps from Binance (10–90 min) — unavoidable
+- AggTrade 6 gaps: 2 from 2021/2022 (45–60 min), 2 from Feb 2024 (~24h each) — not in scope
+- **Primary gaps targeted by this milestone: ZERO remaining** ✅
+
+**Consequences:**
+- Optuna window 2026-01-01 → 2026-03-28: **CLEAN** for both OI and aggTrades ✅
+- Both scripts are idempotent (`INSERT OR IGNORE`) — safe to re-run
+- 2024-02-04 and 2024-02-23 ~24h aggtrade gaps are known and in scope for a future
+  data integrity pass if needed (they predate the Optuna window and do not affect it)
+- DATA-BACKFILL-V1: **COMPLETE** — awaiting Claude Code audit
+
+**Related:** commits `07448b2`, `bd13d62`, `f2344e5`;
+`scripts/backfill_oi.py`; `scripts/backfill_aggtrades.py`;
+`docs/analysis/BACKFILL_FEASIBILITY_2026-05-01.md`;
+`docs/analysis/BACKFILL_COLUMN_VERIFICATION_2026-05-01.md`
