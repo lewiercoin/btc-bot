@@ -1,6 +1,6 @@
 # Milestone Tracker
 
-Last updated: 2026-05-01
+Last updated: 2026-05-03
 
 ---
 
@@ -96,34 +96,49 @@ Note: `--protocol-path` not specified → uses `default_protocol.json` (same as 
 
 ---
 
-## Current Active Milestone: DATA-BACKFILL-V1
+## Completed: DATA-BACKFILL-V1 ✅ COMPLETE_AWAITING_AUDIT
 
-**Status:** ACTIVE
+**Status:** COMPLETE_AWAITING_AUDIT
 **Decision date:** 2026-05-01
+**Completed:** 2026-05-03
 **Builder:** Cascade
-**Auditor:** Claude Code
+**Auditor:** Claude Code (pending)
+**Commit:** `e5731aa` (branch: `modeling-context-closure`)
 
-**Scope:** Zbadaj dostępność danych historycznych z `data.binance.vision` (OI + aggtrade).
-Jeśli dostępne — zaimplementuj backfill z zachowaniem standardów DATA-INTEGRITY-V1.
+**Scope (actual):** Original scope (OI + aggtrades from data.binance.vision) was blocked —
+`liquidationSnapshot` files return 404, `/fapi/v1/forceOrders` requires auth. Pivoted to
+two free alternative sources for `force_orders` historical backfill.
 
-**Step 0 (feasibility — przed kodowaniem):**
-- Czy `data.binance.vision` ma OI dla BTCUSDT Perpetual? Jaki zakres dat?
-- Czy aggtrade dostępne dla wymaganego okresu (2026-03-28 → 2026-04-17 + wcześniejsze luki)?
-- Jeśli OI niedostępne: dokumentuj jako BLOCKED, szukaj darmowej alternatywy lub defer
-- Output Step 0: feasibility report w `docs/analysis/BACKFILL_FEASIBILITY_2026-05-01.md`
+**Deliverables:**
+- `scripts/backfill_force_orders_tardis.py` — backfills from Tardis.dev free liquidation
+  samples (60 monthly files Jan 2020–Dec 2024, BTCUSDT USDM perpetual)
+- `scripts/backfill_force_orders_coinm.py` — backfills from Binance COIN-M
+  liquidationSnapshot daily ZIPs (2023-06-25 → 2024-10-14, BTCUSD_PERP proxy)
 
-**Step 1 (tylko jeśli Step 0 = GO):**
-- Import pipeline z tymi samymi standardami co DATA-INTEGRITY-V1
-- Te same tabele, te same pola, te same quality gates (`FeatureQuality`, `quality_ready`)
-- Gate check po imporcie: okno gap-free i quality-ready
+**Data sources verified (2026-05-03):**
+- Tardis schema: `timestamp(μs), side(lower), price, amount(BTC qty)` — HTTP 200 ✅
+- COIN-M schema: `time(ms), side(upper), original_quantity(contracts), average_price` — HTTP 200 ✅
+- qty conversion: `original_quantity * 100.0 / average_price` → BTC equivalent
 
-**Out of scope:**
-- Coinglass i inne płatne źródła — odrzucone przez operatora
-- Optuna — do czasu zakończenia backfillu i weryfikacji jakości
+**Run results (production server):**
 
-**After this milestone:**
-- Jeśli CLEAN + gap-free window ≥ 365 dni → default protocol Optuna
-- Jeśli OI blocked → ocena czy sam aggtrade wystarczy dla dłuższego okna
+| Source | Files/Days | Rows Inserted | Range |
+|---|---|---|---|
+| Tardis (USDM) | 60 files | 123,220 | 2020-01 → 2024-12 (monthly 1st) |
+| COIN-M (daily proxy) | 457 days_ok, 16 skipped, 5 missing | 102,660 | 2023-06-25 → 2024-10-14 |
+| **Historical total** | | **225,880** | **2020-01-01 → 2024-10-14** |
+| Live (bot) | | 7,129 | 2026-04-17 → 2026-04-23 |
+| **DB total** | | **233,009** | **2020-01-01 → 2026-04-23** |
+
+**Design decisions:**
+- Watermark (Tardis): scoped to `event_time < 2025-01-01` — prevents live 2026 data
+  from contaminating historical watermark
+- Idempotency (COIN-M): per-day `_day_has_data()` check — correctly skips Tardis-covered
+  monthly 1st dates; enables resume after partial run
+- 404/403 from download: propagated directly (not retried); counted as `days_missing`
+
+**Dry-run gates:** Both passed before live runs
+**Both scripts validated:** dry-run → live → post-run monthly distribution verified
 
 ---
 
