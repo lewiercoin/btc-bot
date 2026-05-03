@@ -21,9 +21,9 @@ Last updated: 2026-05-01
 
 ---
 
-## Running: OPTUNA-DEFAULT-V1-RERUN
+## Completed: OPTUNA-DEFAULT-V1-RERUN ✅ DONE — AWAITING_CLAUDE_CODE_AUDIT
 
-**Status:** RUNNING (server PID 527901, launched 2026-05-02 ~21:46 UTC)
+**Status:** COMPLETE (PID 527901 exited cleanly, launched 2026-05-02 ~19:46 UTC, finished 2026-05-03 ~10:18 UTC, ~14.5h total)
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9` (WAL fix) + server deployment
 **Builder:** Cascade
 **Auditor:** Claude Code (post-run)
@@ -65,28 +65,34 @@ Note: `--protocol-path` not specified → uses `default_protocol.json` (same as 
 
 **Log:** `/tmp/optuna_run2.log` on server (stays 0 bytes until run completes — Python stdout fully buffered, no logging calls during 3 pre-flight baseline/health scans).
 
-**Pre-flight timing (observed):** ~2h 15min wallclock on this server (3.7GB RAM, 3.5GB DB — severely I/O bound). Three passes: `check_baseline_hard` + `check_baseline_soft` + `check_signal_health` (148,609 bars). Pre-flight done at ~22:06 UTC.
+**Pre-flight timing (observed):** ~2h 15min wallclock (3.7GB RAM, 3.5GB DB — severely I/O bound). Pre-flight done ~22:06 UTC.
+**Trial execution:** ~6 trials/10min avg | constraint violations instant | real backtests ~4-5 min each.
 
-**Trial execution rate (observed at t+17min of trial execution):**
-- 16 trials completed as of 22:28 UTC
-- Constraint violations: instant (~milliseconds)
-- Real backtests (pass constraints): ~4-5 min each (3.7GB snapshot write + backtest)
-- Throughput: ~6 trials / 10 min
+**FINAL RESULTS (200/200 trials, study `optuna-default-v1-run2`):**
 
-**WAL fix confirmed working:** trial with `trades_count=46` shows genuine backtest execution (not 0 from empty snapshot).
+| Rejection reason | Count |
+|---|---|
+| `MIN_TRADES_NOT_MET: trades_count=0` | 75 |
+| **PASSED** ✅ | **32** |
+| `high_vol_leverage must be <= max_leverage` | 30 |
+| `participation_min must be >= direction_tfi_threshold` | 22 |
+| combo: high_vol + participation | 10 |
+| `allow_long + allow_uptrend both enabled` | 10 |
+| combo: high_vol + allow_long | 5 |
+| `MIN_TRADES_NOT_MET: trades_count >0 <100` | 14 |
+| `allow_long + allow_uptrend + participation combo` | 1 |
+| **Total** | **200** |
 
-**Expected completion:** ~05:00-06:00 UTC (03:00-04:00 UTC+02) based on ~6 trials/10min × 200 trials = ~333 min remaining from 22:11 UTC trial-start.
+**WAL fix confirmed working:** genuine trade counts returned (2, 5, 7, 10, 14, 15, 18, 22, 46, 54, 70, 95) — not all-zero from empty snapshots.
 
-**Monitor:**
-```bash
-scp -i btc-bot-deploy-v2 scripts/_tmp_check_run2.py root@204.168.146.253:/tmp/check_run2.py
-ssh -i btc-bot-deploy-v2 root@204.168.146.253 "ps aux | grep 527901 | grep -v grep; python3 /tmp/check_run2.py"
-```
+**32 PASSED candidates — preliminary observations (REQUIRES Claude Code audit):**
+- Trials 91-104: Sharpe 2.2–6.2, WR 19–45% — **realistic range**
+- Trials 135-162: Sharpe 19–28, WR 85–99% — **suspicious convergence cluster**
+- Best: trial-00141 sharpe=28.5, wr=98.1%, profit_factor=1,507,074 — likely artifact
+- Warm-start (trial-00000): sharpe=9.23, wr=69.7%, trades=498 — most credible baseline
+- High-WR cluster (96-99% over 4 years) warrants walk-forward OOS validation before promotion
 
-**Quick one-liner check:**
-```bash
-ssh -i btc-bot-deploy-v2 root@204.168.146.253 "sqlite3 /home/btc-bot/btc-bot/research_lab/research_lab.db 'SELECT COUNT(*),rejected_reason FROM trials WHERE trial_id LIKE \"optuna-default-v1-run2%\" GROUP BY rejected_reason ORDER BY COUNT(*) DESC'"
-```
+**Next step:** Claude Code audit — review 32 PASSED candidates, flag artifact vs genuine edge.
 
 ---
 
