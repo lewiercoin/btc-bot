@@ -3,6 +3,17 @@ from __future__ import annotations
 from typing import Any
 
 
+_SIGNAL_WEIGHT_PARAMS = [
+    "weight_sweep_detected",
+    "weight_reclaim_confirmed",
+    "weight_cvd_divergence",
+    "weight_tfi_impulse",
+    "weight_regime_special",
+    "weight_ema_trend_alignment",
+    "weight_funding_supportive",
+]
+
+
 def validate_param_vector(params: dict[str, Any]) -> list[str]:
     violations: list[str] = []
 
@@ -72,6 +83,10 @@ def validate_param_vector(params: dict[str, Any]) -> list[str]:
             violations.append(
                 "uptrend_continuation_participation_min must be >= direction_tfi_threshold"
             )
+
+    present_weights = [params.get(w) for w in _SIGNAL_WEIGHT_PARAMS if params.get(w) is not None]
+    if present_weights and sum(float(w) for w in present_weights) < 0.5:
+        violations.append("sum of signal weights must be >= 0.5 (degenerate: no active signals)")
 
     return violations
 
