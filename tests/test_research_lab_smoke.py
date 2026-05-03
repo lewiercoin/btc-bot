@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import json
 import sqlite3
 from pathlib import Path
@@ -133,9 +134,21 @@ class _FakeOptunaTrial:
     def __init__(self, number: int) -> None:
         self.number = number
         self.user_attrs: dict[str, object] = {}
+        self.suggested_ints: dict[str, tuple[int, int, int]] = {}
+        self.int_returns: dict[str, int] = {}
 
     def set_user_attr(self, key: str, value: object) -> None:
         self.user_attrs[key] = value
+
+    def suggest_int(self, name: str, low: int, high: int, step: int = 1) -> int:
+        self.suggested_ints[name] = (low, high, step)
+        return self.int_returns.get(name, high)
+
+    def suggest_float(self, name: str, low: float, high: float, step: float | None = None) -> float:
+        return low
+
+    def suggest_categorical(self, name: str, choices: list[object]) -> object:
+        return choices[0]
 
 
 class _FakeOptunaStudy:
@@ -367,6 +380,30 @@ def test_run_optuna_study_hard_blocks_trials_below_80_trades(
     assert saved_trials[0].metrics.trades_count == 79
 
 
+def test_run_optuna_study_hard_blocks_artifact_metrics(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    evaluation = _make_trial_evaluation(trades_count=120, rejected_reason=None)
+    evaluation = dataclasses.replace(
+        evaluation,
+        metrics=dataclasses.replace(evaluation.metrics, win_rate=0.96, profit_factor=351_000_000_000.0),
+    )
+
+    study, saved_trials = _run_optuna_driver_case(
+        tmp_path=tmp_path,
+        monkeypatch=monkeypatch,
+        evaluation=evaluation,
+    )
+
+    assert study.results == [(-2.0, 0.1, 1.0)]
+    assert study.trials[0].user_attrs["constraint_violations"] == [1.0]
+    assert study.trials[0].user_attrs["rejection_reason"] == (
+        "ARTIFACT_BLOCK: win_rate=0.960, profit_factor=351000000000.00"
+    )
+    assert saved_trials[0].metrics.profit_factor == 351_000_000_000.0
+
+
 def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
@@ -588,6 +625,37 @@ def test_constraints_rejects_invalid_vectors() -> None:
     assert "min_rr must be > 1.0" in violations
 
 
+def test_constraints_rejects_degenerate_signal_weight_sum() -> None:
+    violations = validate_param_vector(
+        {
+            "weight_sweep_detected": 0.05,
+            "weight_reclaim_confirmed": 0.05,
+            "weight_cvd_divergence": 0.05,
+            "weight_tfi_impulse": 0.05,
+            "weight_regime_special": 0.05,
+            "weight_ema_trend_alignment": 0.05,
+            "weight_funding_supportive": 0.05,
+        }
+    )
+
+    assert "sum of signal weights must be >= 0.5 (degenerate: no active signals)" in violations
+
+
+def test_optuna_sampling_caps_high_vol_leverage_to_sampled_max_leverage() -> None:
+    trial = _FakeOptunaTrial(number=0)
+    trial.int_returns["max_leverage"] = 4
+
+    sampled = optuna_driver_module.build_optuna_trial_params(
+        trial,
+        active_param_names=("high_vol_leverage", "max_leverage"),
+    )
+
+    assert sampled["max_leverage"] == 4
+    assert sampled["high_vol_leverage"] == 4
+    assert list(trial.suggested_ints) == ["max_leverage", "high_vol_leverage"]
+    assert trial.suggested_ints["high_vol_leverage"] == (1, 4, 1)
+
+
 def test_param_registry_unlock_ranges_are_updated() -> None:
     registry = build_param_registry()
 
@@ -612,6 +680,16 @@ def test_param_registry_unlock_ranges_are_updated() -> None:
         registry["equal_level_tol_atr"].high,
         registry["equal_level_tol_atr"].step,
     ) == (0.01, 0.3, 0.01)
+    assert (
+        registry["invalidation_offset_atr"].low,
+        registry["invalidation_offset_atr"].high,
+        registry["invalidation_offset_atr"].step,
+    ) == (0.01, 3.0, 0.01)
+    assert (registry["max_hold_hours"].low, registry["max_hold_hours"].high, registry["max_hold_hours"].step) == (
+        1,
+        48,
+        1,
+    )
 
 
 def test_settings_adapter_roundtrip(tmp_path: Path) -> None:

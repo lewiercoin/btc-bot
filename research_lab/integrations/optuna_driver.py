@@ -119,7 +119,14 @@ def build_optuna_trial_params(
     """Samples ACTIVE params from param_registry using trial.suggest_*."""
 
     sampled: dict[str, Any] = {}
-    for name, spec in sorted(_filter_active_specs(active_param_names).items()):
+    active_items = sorted(_filter_active_specs(active_param_names).items())
+    active_names = [name for name, _ in active_items]
+    if "max_leverage" in active_names and "high_vol_leverage" in active_names:
+        max_item = active_items.pop(active_names.index("max_leverage"))
+        high_vol_index = [name for name, _ in active_items].index("high_vol_leverage")
+        active_items.insert(high_vol_index, max_item)
+
+    for name, spec in active_items:
         # Coupled pair: ema_slow must be > ema_fast
         if name == "ema_slow":
             if spec.low is None or spec.high is None:
@@ -136,6 +143,17 @@ def build_optuna_trial_params(
             tp1_val = sampled.get("tp1_atr_mult", float(spec.low))
             low = max(float(spec.low), round(float(tp1_val) + 0.1, 1))
             sampled[name] = trial.suggest_float(name, low, float(spec.high), step=0.1)
+            continue
+
+        if name == "high_vol_leverage":
+            if spec.low is None or spec.high is None:
+                raise ValueError(f"Missing int bounds for active parameter {name}")
+            max_leverage_val = sampled.get("max_leverage", int(spec.high))
+            high = min(int(spec.high), int(max_leverage_val))
+            low = int(spec.low)
+            if low > high:
+                low = high
+            sampled[name] = trial.suggest_int(name, low, high, step=1)
             continue
 
         if spec.domain_type == "int":
@@ -409,6 +427,16 @@ def run_optuna_study(
         exp_r = evaluation.metrics.expectancy_r
         pf = evaluation.metrics.profit_factor
         dd = evaluation.metrics.max_drawdown_pct
+
+        # Hard artifact block: raw metrics before any capping
+        if evaluation.metrics.win_rate > 0.85 or evaluation.metrics.profit_factor > 50.0:
+            artifact_reason = (
+                f"ARTIFACT_BLOCK: win_rate={evaluation.metrics.win_rate:.3f}, "
+                f"profit_factor={evaluation.metrics.profit_factor:.2f}"
+            )
+            trial.set_user_attr("constraint_violations", [1.0])
+            trial.set_user_attr("rejection_reason", artifact_reason)
+            return (-2.0, 0.1, 1.0)
 
         hard_min_trades = min(_HARD_MIN_TRADES_FLOOR, int(min_trades))
         if trades < hard_min_trades:
