@@ -17,26 +17,45 @@ files for BTCUSDT perpetual futures, as referenced in the milestone handoff:
 
 ---
 
-## Step 1.1 — HTTP Availability Checks
+## Step 1.1 — HTTP Availability Checks (run twice — same result both times)
 
-All requests returned **404**:
+All requests returned **404** for all years and all specific dates tested:
 
 | File | HTTP Status |
 |---|---|
 | `BTCUSDT-liquidationSnapshot-2024-01-15.zip` | 404 |
 | `BTCUSDT-liquidationSnapshot-2023-06-01.zip` | 404 |
+| `BTCUSDT-liquidationSnapshot-2022-06-15.zip` | 404 |
 | `BTCUSDT-liquidationSnapshot-2022-01-01.zip` | 404 |
+| `BTCUSDT-liquidationSnapshot-2021-01-01.zip` | 404 |
+| `BTCUSDT-liquidationSnapshot-2020-09-01.zip` | 404 |
 | `BTCUSDT-liquidationSnapshot-2020-01-01.zip` | 404 |
 | `BTCUSDT-liquidationSnapshot-2019-09-01.zip` | 404 |
+
+Verbose curl for `2022-06-15.zip` confirms the S3-level error (not a proxy/CDN artefact):
+
+```
+< HTTP/2 404
+< server: AmazonS3
+< x-cache: Error from cloudfront
+<Error><Code>NoSuchKey</Code>
+  <Message>The specified key does not exist.</Message>
+  <Key>data/futures/um/daily/liquidationSnapshot/BTCUSDT/
+       BTCUSDT-liquidationSnapshot-2022-06-15.zip</Key>
+</Error>
+```
+
+This is a definitive S3 `NoSuchKey` — the object does not exist in the bucket.
 
 ---
 
 ## Step 1.1a — S3 Directory Listing (Root Cause)
 
-S3 bucket listing confirmed: `liquidationSnapshot` **does not exist** as a data type
-on data.binance.vision — neither under `daily/` nor `monthly/`.
+S3 bucket listing (max-keys=200, `IsTruncated=false`) confirmed: `liquidationSnapshot`
+**does not exist** as a data type on data.binance.vision — neither under `daily/`
+nor `monthly/`. The complete list of all types is:
 
-**Available data types under `data/futures/um/daily/`:**
+**`data/futures/um/daily/` (complete — 9 types, IsTruncated=false):**
 
 ```
 aggTrades
@@ -50,7 +69,7 @@ premiumIndexKlines
 trades
 ```
 
-**Available data types under `data/futures/um/monthly/`:**
+**`data/futures/um/monthly/` (complete — 8 types, IsTruncated=false):**
 
 ```
 aggTrades
@@ -64,7 +83,7 @@ trades
 ```
 
 `liquidationSnapshot` is absent from both paths. No alternate spelling
-(e.g., `forceOrder`, `liquidation`) was found in either listing.
+(`forceOrder`, `liquidation`, `forceOrders`) was found in either listing.
 
 ---
 
@@ -125,38 +144,67 @@ Only an index exists: `idx_force_orders_symbol_time ON force_orders(symbol, even
 
 ---
 
+## Step 1.2 (additional) — Binance REST API `/fapi/v1/forceOrders`
+
+As part of Phase 3 pre-investigation (to give Claude Code complete information
+for re-scope adjudication), the REST endpoint was tested:
+
+| Target | URL | Result |
+|---|---|---|
+| Recent (no date filter) | `/fapi/v1/forceOrders?symbol=BTCUSDT&limit=5` | **401 Unauthorized** |
+| April 2024 | `...&startTime=2024-04-01ms&endTime=2024-04-02ms` | **401 Unauthorized** |
+| January 2022 | `...&startTime=2022-01-01ms&endTime=2022-01-02ms` | **401 Unauthorized** |
+
+`/fapi/v1/forceOrders` **requires API key authentication** for all requests.
+This endpoint cannot be used without the bot's FAPI credentials.
+
+Note: Even with authentication, Binance FAPI historical depth for this endpoint
+is typically 30 days. It would not cover 2022–2024 regardless.
+
+---
+
 ## Verdict
 
-**Phase 1 = BLOCKED (CRITICAL)**
+**Phase 1 = BLOCKED (CRITICAL) — confirmed in two separate handoffs**
 
-The proposed data source does not exist. `data.binance.vision` does not provide
-historical liquidation/force-order snapshots for any date range.
+Both available Binance data sources for historical force orders are unavailable:
 
-**Phase 2 cannot proceed** until an alternative data source is identified and
-confirmed by Claude Code.
+| Source | Status | Reason |
+|---|---|---|
+| `data.binance.vision/liquidationSnapshot` | ❌ DOES NOT EXIST | S3 `NoSuchKey` for all dates; directory absent from S3 listing |
+| Binance REST `/fapi/v1/forceOrders` | ❌ REQUIRES AUTH | 401 Unauthorized; and historical depth ~30 days anyway |
+
+**Phase 2 cannot proceed.** No free public data source for historical force orders
+has been identified.
 
 ---
 
 ## Questions for Claude Code
 
-1. **Primary blocker:** `liquidationSnapshot` is absent from data.binance.vision.
-   What is the alternative data source for historical force orders?  
-   Known alternatives (not evaluated):
-   - Binance REST API `/fapi/v1/forceOrders` (historical, but rate-limited and may have limited depth)
-   - Third-party providers (CryptoQuant, Coinalyze — likely paid)
-   - `data.binance.vision/data/futures/um/daily/trades/` (raw trades, not liquidations)
-   - Accept that `force_order_spike` feature remains frozen for backtest
+1. **Primary blocker (requires adjudication):**
+   `liquidationSnapshot` is definitively absent from data.binance.vision
+   (S3 `NoSuchKey`, directory listing absent, tested across 8 dates spanning
+   2019–2024 in two separate verification runs).
+   The GitHub issue #337 reference in the handoff appears to describe planned/requested
+   data that was never published, or data that has since been removed.
 
-2. **UNIQUE constraint:** If a new data source is found and Phase 2 approved,
-   which deduplication approach should be used?
-   - Option A: Schema migration — add `UNIQUE(symbol, event_time, side)` constraint
-   - Option B: Watermark approach — only insert rows where `event_time > MAX(event_time)` in DB
-   - Claude Code must approve before schema changes.
+   Options for milestone re-scope:
+   - **A. Accept `force_order_spike` frozen for backtest** — document as permanently
+     unavailable for historical replay. Feature remains active in live/paper runtime
+     (live collector running since 2026-04-17). Backtest simply uses the frozen default.
+   - **B. Use authenticated REST** — requires bot's FAPI API key; limited to ~30 days
+     history; would not cover 2022–2024 range. Not recommended.
+   - **C. Third-party provider** — CryptoQuant / Coinalyze historical liquidation data;
+     likely paid. Out of scope per prior operator decision (Coinglass rejected).
 
-3. **Scope re-evaluation:** Given that the data source assumption was incorrect,
-   should this milestone be re-scoped to document `force_order_spike` as permanently
-   frozen for backtest (no historical source available), or should alternative
-   sources be investigated?
+2. **UNIQUE constraint (relevant when/if source is found):**
+   - Handoff-specified watermark approach is correct given no UNIQUE constraint.
+   - No schema migration needed if watermark approach is used.
+
+3. **Recommended re-scope:** Close FORCE-ORDERS-BACKFILL-FEASIBILITY as
+   `INFEASIBLE` with documented rationale, and open a separate decision about
+   whether to formally freeze `force_order_spike` in the param registry
+   or defer to a future milestone when a data source is identified.
 
 ---
 
