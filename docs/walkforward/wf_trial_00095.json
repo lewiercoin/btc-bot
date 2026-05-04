@@ -1,0 +1,84 @@
+{
+  "trial_id": "optuna-default-v1-run2-trial-00095",
+  "trial_num": "00095",
+  "in_sample_metrics": {
+    "expectancy_r": 0.09069763804839259,
+    "max_drawdown_pct": 0.3337799598111785,
+    "pnl_abs": 1265.3933798333617,
+    "profit_factor": 1.0437953015397925,
+    "sharpe_ratio": 0.7850036921504651,
+    "trades_count": 169,
+    "win_rate": 0.2958579881656805
+  },
+  "param_flag": null,
+  "wf_report": {
+    "passed": false,
+    "windows_total": 2,
+    "windows_passed": 1,
+    "is_degradation_pct": 64.2658,
+    "fragile": true,
+    "reasons": [
+      "window_001_validation_failed: profit_factor=0.8395 < 1.0",
+      "window_001_validation_failed: sharpe_ratio=-0.8920 < 0.0",
+      "fragility_threshold_exceeded: 64.27% > 30.00%"
+    ],
+    "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f"
+  },
+  "window_details": [
+    {
+      "window_index": 0,
+      "train_start": "2022-01-01",
+      "train_end": "2024-01-01",
+      "validation_start": "2024-01-01",
+      "validation_end": "2024-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 0.229599,
+        "pf": 1.27242,
+        "mdd": 0.293951,
+        "sharpe": 1.437926,
+        "trades": 90,
+        "win_rate": 0.3,
+        "failures": []
+      },
+      "validation": {
+        "er": 0.082045,
+        "pf": 1.065439,
+        "mdd": 0.222668,
+        "sharpe": 0.883999,
+        "trades": 47,
+        "win_rate": 0.319149,
+        "failures": []
+      }
+    },
+    {
+      "window_index": 1,
+      "train_start": "2022-01-01",
+      "train_end": "2024-12-31",
+      "validation_start": "2024-12-31",
+      "validation_end": "2025-12-31",
+      "window_passed": false,
+      "train": {
+        "er": 0.178978,
+        "pf": 1.178112,
+        "mdd": 0.293951,
+        "sharpe": 1.270787,
+        "trades": 137,
+        "win_rate": 0.306569,
+        "failures": []
+      },
+      "validation": {
+        "er": 0.046531,
+        "pf": 0.839481,
+        "mdd": 0.15859,
+        "sharpe": -0.891995,
+        "trades": 18,
+        "win_rate": 0.277778,
+        "failures": [
+          "profit_factor=0.8395 < 1.0",
+          "sharpe_ratio=-0.8920 < 0.0"
+        ]
+      }
+    }
+  ]
+}

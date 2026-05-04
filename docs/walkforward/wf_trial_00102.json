@@ -1,0 +1,83 @@
+{
+  "trial_id": "optuna-default-v1-run2-trial-00102",
+  "trial_num": "00102",
+  "in_sample_metrics": {
+    "expectancy_r": 0.46579525243741426,
+    "max_drawdown_pct": 0.48046815227930534,
+    "pnl_abs": 55462.47406742166,
+    "profit_factor": 1.4869942954268114,
+    "sharpe_ratio": 2.205809968341663,
+    "trades_count": 531,
+    "win_rate": 0.2975517890772128
+  },
+  "param_flag": null,
+  "wf_report": {
+    "passed": true,
+    "windows_total": 2,
+    "windows_passed": 1,
+    "is_degradation_pct": -128.8177,
+    "fragile": false,
+    "reasons": [
+      "window_000_train_failed: expectancy_r=-0.0828 < 0.0",
+      "window_000_train_failed: profit_factor=0.9766 < 1.0"
+    ],
+    "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f"
+  },
+  "window_details": [
+    {
+      "window_index": 0,
+      "train_start": "2022-01-01",
+      "train_end": "2024-01-01",
+      "validation_start": "2024-01-01",
+      "validation_end": "2024-12-31",
+      "window_passed": false,
+      "train": {
+        "er": -0.082773,
+        "pf": 0.976551,
+        "mdd": 0.43216,
+        "sharpe": 0.134163,
+        "trades": 242,
+        "win_rate": 0.235537,
+        "failures": [
+          "expectancy_r=-0.0828 < 0.0",
+          "profit_factor=0.9766 < 1.0"
+        ]
+      },
+      "validation": {
+        "er": 1.080013,
+        "pf": 2.056587,
+        "mdd": 0.254531,
+        "sharpe": 4.172227,
+        "trades": 150,
+        "win_rate": 0.373333,
+        "failures": []
+      }
+    },
+    {
+      "window_index": 1,
+      "train_start": "2022-01-01",
+      "train_end": "2024-12-31",
+      "validation_start": "2024-12-31",
+      "validation_end": "2025-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 0.369169,
+        "pf": 1.355549,
+        "mdd": 0.480468,
+        "sharpe": 1.843309,
+        "trades": 391,
+        "win_rate": 0.289003,
+        "failures": []
+      },
+      "validation": {
+        "er": 0.844725,
+        "pf": 1.710797,
+        "mdd": 0.149123,
+        "sharpe": 3.21783,
+        "trades": 114,
+        "win_rate": 0.307018,
+        "failures": []
+      }
+    }
+  ]
+}

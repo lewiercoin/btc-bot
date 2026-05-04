@@ -1,0 +1,83 @@
+{
+  "trial_id": "optuna-default-v1-run2-trial-00052",
+  "trial_num": "00052",
+  "in_sample_metrics": {
+    "expectancy_r": 1.3503586070962508,
+    "max_drawdown_pct": 0.06030711887909602,
+    "pnl_abs": 1246988.0527689562,
+    "profit_factor": 2.290797277391142,
+    "sharpe_ratio": 6.193413570680888,
+    "trades_count": 3538,
+    "win_rate": 0.44714527981910684
+  },
+  "param_flag": {
+    "param": "confluence_min",
+    "value": 4.5,
+    "threshold": 0.5,
+    "direction": "lt",
+    "flagged": false
+  },
+  "wf_report": {
+    "passed": true,
+    "windows_total": 2,
+    "windows_passed": 2,
+    "is_degradation_pct": -5.6348,
+    "fragile": false,
+    "reasons": [],
+    "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f"
+  },
+  "window_details": [
+    {
+      "window_index": 0,
+      "train_start": "2022-01-01",
+      "train_end": "2024-01-01",
+      "validation_start": "2024-01-01",
+      "validation_end": "2024-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 1.280924,
+        "pf": 3.431909,
+        "mdd": 0.049884,
+        "sharpe": 6.016368,
+        "trades": 1616,
+        "win_rate": 0.440594,
+        "failures": []
+      },
+      "validation": {
+        "er": 1.858911,
+        "pf": 3.638723,
+        "mdd": 0.044213,
+        "sharpe": 7.907608,
+        "trades": 1003,
+        "win_rate": 0.485543,
+        "failures": []
+      }
+    },
+    {
+      "window_index": 1,
+      "train_start": "2022-01-01",
+      "train_end": "2024-12-31",
+      "validation_start": "2024-12-31",
+      "validation_end": "2025-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 1.510329,
+        "pf": 3.623038,
+        "mdd": 0.049884,
+        "sharpe": 6.730366,
+        "trades": 2625,
+        "win_rate": 0.458667,
+        "failures": []
+      },
+      "validation": {
+        "er": 0.999035,
+        "pf": 2.153916,
+        "mdd": 0.042216,
+        "sharpe": 5.133937,
+        "trades": 753,
+        "win_rate": 0.424967,
+        "failures": []
+      }
+    }
+  ]
+}
