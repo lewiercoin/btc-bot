@@ -1,0 +1,77 @@
+{
+  "trial_id": "optuna-default-v1-run2-trial-00122",
+  "trial_num": "00122",
+  "in_sample_metrics": {
+    "expectancy_r": 1.3345418949172372,
+    "max_drawdown_pct": 0.22116429877743618,
+    "pnl_abs": 14488.360050186795,
+    "profit_factor": 1.837665147309689,
+    "sharpe_ratio": 4.3033438399700765,
+    "trades_count": 150,
+    "win_rate": 0.3333333333333333
+  },
+  "param_flag": null,
+  "wf_report": {
+    "passed": true,
+    "windows_total": 2,
+    "windows_passed": 2,
+    "is_degradation_pct": -181.9854,
+    "fragile": false,
+    "reasons": [],
+    "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f"
+  },
+  "window_details": [
+    {
+      "window_index": 0,
+      "train_start": "2022-01-01",
+      "train_end": "2024-01-01",
+      "validation_start": "2024-01-01",
+      "validation_end": "2024-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 0.50232,
+        "pf": 1.185354,
+        "mdd": 0.221164,
+        "sharpe": 1.686464,
+        "trades": 69,
+        "win_rate": 0.217391,
+        "failures": []
+      },
+      "validation": {
+        "er": 2.264594,
+        "pf": 2.533083,
+        "mdd": 0.065343,
+        "sharpe": 6.743016,
+        "trades": 46,
+        "win_rate": 0.434783,
+        "failures": []
+      }
+    },
+    {
+      "window_index": 1,
+      "train_start": "2022-01-01",
+      "train_end": "2024-12-31",
+      "validation_start": "2024-12-31",
+      "validation_end": "2025-12-31",
+      "window_passed": true,
+      "train": {
+        "er": 1.238646,
+        "pf": 1.693514,
+        "mdd": 0.221164,
+        "sharpe": 3.921918,
+        "trades": 114,
+        "win_rate": 0.307018,
+        "failures": []
+      },
+      "validation": {
+        "er": 1.401452,
+        "pf": 2.062148,
+        "mdd": 0.045811,
+        "sharpe": 5.393877,
+        "trades": 29,
+        "win_rate": 0.413793,
+        "failures": []
+      }
+    }
+  ]
+}

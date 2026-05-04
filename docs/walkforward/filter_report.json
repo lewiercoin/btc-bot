@@ -1,0 +1,490 @@
+{
+  "study": "optuna-default-v1-run2",
+  "pre_filter_count": 32,
+  "post_filter_count": 16,
+  "rejected_count": 16,
+  "hard_filter_rules": {
+    "max_profit_factor": 50.0,
+    "max_win_rate": 0.85,
+    "min_expectancy_r": 0.0
+  },
+  "rejected_trials": [
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00091",
+      "trial_num": "00091",
+      "reject_reasons": [
+        "er=-0.7491 < min_er=0.0"
+      ],
+      "metrics": {
+        "expectancy_r": -0.7491158726791889,
+        "max_drawdown_pct": 0.6219874323620105,
+        "pnl_abs": -6219.8743236201135,
+        "profit_factor": 0.32999462128227797,
+        "sharpe_ratio": -7.885725805469401,
+        "trades_count": 307,
+        "win_rate": 0.19218241042345277
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00136",
+      "trial_num": "00136",
+      "reject_reasons": [
+        "pf=351028691487.874 > max_pf=50.0",
+        "wr=0.9912 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 5.66288994985454,
+        "max_drawdown_pct": 0.0257193460770209,
+        "pnl_abs": 723161639167660.6,
+        "profit_factor": 351028691487.8739,
+        "sharpe_ratio": 15.06127974064199,
+        "trades_count": 228,
+        "win_rate": 0.9912280701754386
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00138",
+      "trial_num": "00138",
+      "reject_reasons": [
+        "pf=51.242 > max_pf=50.0",
+        "wr=0.8796 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 2.887635781976555,
+        "max_drawdown_pct": 0.04654397583162998,
+        "pnl_abs": 2544059000.1640396,
+        "profit_factor": 51.24220241079881,
+        "sharpe_ratio": 22.01298291741561,
+        "trades_count": 216,
+        "win_rate": 0.8796296296296297
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00139",
+      "trial_num": "00139",
+      "reject_reasons": [
+        "wr=0.8848 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.3049149512830525,
+        "max_drawdown_pct": 0.04677082462595889,
+        "pnl_abs": 1528564256.3124053,
+        "profit_factor": 25.793287161279356,
+        "sharpe_ratio": 24.50483170080243,
+        "trades_count": 191,
+        "win_rate": 0.8848167539267016
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00140",
+      "trial_num": "00140",
+      "reject_reasons": [
+        "wr=0.8992 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.1644843721713083,
+        "max_drawdown_pct": 0.04808135204833024,
+        "pnl_abs": 41610198705.37062,
+        "profit_factor": 42.7257938101937,
+        "sharpe_ratio": 21.688290736276667,
+        "trades_count": 248,
+        "win_rate": 0.8991935483870968
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00141",
+      "trial_num": "00141",
+      "reject_reasons": [
+        "pf=1507074.264 > max_pf=50.0",
+        "wr=0.9812 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 4.0646899251980155,
+        "max_drawdown_pct": 0.045151812474602586,
+        "pnl_abs": 3895871350.3673706,
+        "profit_factor": 1507074.2635998463,
+        "sharpe_ratio": 28.505326790641487,
+        "trades_count": 160,
+        "win_rate": 0.98125
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00142",
+      "trial_num": "00142",
+      "reject_reasons": [
+        "wr=0.9670 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 4.637721206675756,
+        "max_drawdown_pct": 0.045606929864999673,
+        "pnl_abs": 155192438551.8279,
+        "profit_factor": 40.09753472163311,
+        "sharpe_ratio": 22.563268563294674,
+        "trades_count": 182,
+        "win_rate": 0.967032967032967
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00143",
+      "trial_num": "00143",
+      "reject_reasons": [
+        "pf=80.580 > max_pf=50.0",
+        "wr=0.9157 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.5299622981493015,
+        "max_drawdown_pct": 0.04846394788428127,
+        "pnl_abs": 827028753.7069134,
+        "profit_factor": 80.57960680022565,
+        "sharpe_ratio": 22.88255934905011,
+        "trades_count": 166,
+        "win_rate": 0.9156626506024096
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00144",
+      "trial_num": "00144",
+      "reject_reasons": [
+        "pf=1604.182 > max_pf=50.0",
+        "wr=0.9436 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 5.253066802581703,
+        "max_drawdown_pct": 0.026132915851099982,
+        "pnl_abs": 4425528621068.254,
+        "profit_factor": 1604.1823515994793,
+        "sharpe_ratio": 22.659924116451446,
+        "trades_count": 195,
+        "win_rate": 0.9435897435897436
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00145",
+      "trial_num": "00145",
+      "reject_reasons": [
+        "pf=4684.090 > max_pf=50.0",
+        "wr=0.9630 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 4.552872688818129,
+        "max_drawdown_pct": 0.02457296973130455,
+        "pnl_abs": 10298456549377.713,
+        "profit_factor": 4684.089876674494,
+        "sharpe_ratio": 24.30391269016769,
+        "trades_count": 243,
+        "win_rate": 0.9629629629629629
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00146",
+      "trial_num": "00146",
+      "reject_reasons": [
+        "pf=316.697 > max_pf=50.0",
+        "wr=0.9610 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.8744329483380144,
+        "max_drawdown_pct": 0.023465358095874293,
+        "pnl_abs": 1017409698.2105848,
+        "profit_factor": 316.6966956365948,
+        "sharpe_ratio": 25.489140156411363,
+        "trades_count": 154,
+        "win_rate": 0.961038961038961
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00149",
+      "trial_num": "00149",
+      "reject_reasons": [
+        "pf=130.475 > max_pf=50.0",
+        "wr=0.9379 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.8463804959187633,
+        "max_drawdown_pct": 0.08414340418693901,
+        "pnl_abs": 326692233.452749,
+        "profit_factor": 130.4749376070634,
+        "sharpe_ratio": 20.771098967511875,
+        "trades_count": 145,
+        "win_rate": 0.9379310344827586
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00151",
+      "trial_num": "00151",
+      "reject_reasons": [
+        "pf=54.126 > max_pf=50.0",
+        "wr=0.9407 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.771853729979217,
+        "max_drawdown_pct": 0.04875282669075439,
+        "pnl_abs": 81582975.34185424,
+        "profit_factor": 54.12636428078411,
+        "sharpe_ratio": 21.938616036170785,
+        "trades_count": 118,
+        "win_rate": 0.940677966101695
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00152",
+      "trial_num": "00152",
+      "reject_reasons": [
+        "pf=588.713 > max_pf=50.0",
+        "wr=0.9577 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.8627408955927733,
+        "max_drawdown_pct": 0.026683743154508697,
+        "pnl_abs": 37007656215.62737,
+        "profit_factor": 588.7127779187133,
+        "sharpe_ratio": 24.372886581942073,
+        "trades_count": 189,
+        "win_rate": 0.9576719576719577
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00162",
+      "trial_num": "00162",
+      "reject_reasons": [
+        "pf=2062.027 > max_pf=50.0",
+        "wr=0.9627 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 3.7748328749164255,
+        "max_drawdown_pct": 0.04765578476178797,
+        "pnl_abs": 294256186881.03986,
+        "profit_factor": 2062.0269775611614,
+        "sharpe_ratio": 28.163081023329422,
+        "trades_count": 241,
+        "win_rate": 0.9626556016597511
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00184",
+      "trial_num": "00184",
+      "reject_reasons": [
+        "wr=0.9741 > max_wr=0.85"
+      ],
+      "metrics": {
+        "expectancy_r": 2.8740766416472403,
+        "max_drawdown_pct": 0.041008852258211256,
+        "pnl_abs": 271819602918288.62,
+        "profit_factor": 40.7596305191653,
+        "sharpe_ratio": 28.25127236992247,
+        "trades_count": 270,
+        "win_rate": 0.9740740740740741
+      }
+    }
+  ],
+  "passed_trials": [
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00000",
+      "trial_num": "00000",
+      "metrics": {
+        "expectancy_r": 4.865402739202799,
+        "max_drawdown_pct": 0.054348719264880205,
+        "pnl_abs": 155557259824.23804,
+        "profit_factor": 6.852048374690515,
+        "sharpe_ratio": 9.225334583386038,
+        "trades_count": 498,
+        "win_rate": 0.6967871485943775
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00052",
+      "trial_num": "00052",
+      "metrics": {
+        "expectancy_r": 1.3503586070962508,
+        "max_drawdown_pct": 0.06030711887909602,
+        "pnl_abs": 1246988.0527689562,
+        "profit_factor": 2.290797277391142,
+        "sharpe_ratio": 6.193413570680888,
+        "trades_count": 3538,
+        "win_rate": 0.44714527981910684
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00095",
+      "trial_num": "00095",
+      "metrics": {
+        "expectancy_r": 0.09069763804839259,
+        "max_drawdown_pct": 0.3337799598111785,
+        "pnl_abs": 1265.3933798333617,
+        "profit_factor": 1.0437953015397925,
+        "sharpe_ratio": 0.7850036921504651,
+        "trades_count": 169,
+        "win_rate": 0.2958579881656805
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00096",
+      "trial_num": "00096",
+      "metrics": {
+        "expectancy_r": 0.9080948628125683,
+        "max_drawdown_pct": 0.2728764764704547,
+        "pnl_abs": 293238.97814119596,
+        "profit_factor": 1.7676365988870655,
+        "sharpe_ratio": 3.095322193414951,
+        "trades_count": 476,
+        "win_rate": 0.3634453781512605
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00097",
+      "trial_num": "00097",
+      "metrics": {
+        "expectancy_r": 1.4720214629081052,
+        "max_drawdown_pct": 0.2519754924346372,
+        "pnl_abs": 15826530.637910217,
+        "profit_factor": 1.8092985007616347,
+        "sharpe_ratio": 3.8541952277631726,
+        "trades_count": 905,
+        "win_rate": 0.3270718232044199
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00098",
+      "trial_num": "00098",
+      "metrics": {
+        "expectancy_r": 1.5455938297064056,
+        "max_drawdown_pct": 0.4003787868065965,
+        "pnl_abs": 1004061.7508992589,
+        "profit_factor": 1.5710092065065877,
+        "sharpe_ratio": 3.2173934569792655,
+        "trades_count": 885,
+        "win_rate": 0.288135593220339
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00099",
+      "trial_num": "00099",
+      "metrics": {
+        "expectancy_r": 0.9502588501309434,
+        "max_drawdown_pct": 0.32694922976029445,
+        "pnl_abs": 123525.08674278569,
+        "profit_factor": 2.319076567197462,
+        "sharpe_ratio": 4.181569240821949,
+        "trades_count": 237,
+        "win_rate": 0.39662447257383965
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00100",
+      "trial_num": "00100",
+      "metrics": {
+        "expectancy_r": 1.0229523177252178,
+        "max_drawdown_pct": 0.17599463141456245,
+        "pnl_abs": 16902.179507546905,
+        "profit_factor": 1.9447604039823696,
+        "sharpe_ratio": 4.104692036970492,
+        "trades_count": 122,
+        "win_rate": 0.3442622950819672
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00101",
+      "trial_num": "00101",
+      "metrics": {
+        "expectancy_r": 0.3243129766584346,
+        "max_drawdown_pct": 0.09039590414785187,
+        "pnl_abs": 3931.301692003713,
+        "profit_factor": 1.4292028226261484,
+        "sharpe_ratio": 2.693898506713844,
+        "trades_count": 351,
+        "win_rate": 0.45014245014245013
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00102",
+      "trial_num": "00102",
+      "metrics": {
+        "expectancy_r": 0.46579525243741426,
+        "max_drawdown_pct": 0.48046815227930534,
+        "pnl_abs": 55462.47406742166,
+        "profit_factor": 1.4869942954268114,
+        "sharpe_ratio": 2.205809968341663,
+        "trades_count": 531,
+        "win_rate": 0.2975517890772128
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00104",
+      "trial_num": "00104",
+      "metrics": {
+        "expectancy_r": 0.9106085529237085,
+        "max_drawdown_pct": 0.31938322853841006,
+        "pnl_abs": 111689.8090978836,
+        "profit_factor": 2.29224263526795,
+        "sharpe_ratio": 5.211304264912878,
+        "trades_count": 163,
+        "win_rate": 0.4171779141104294
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00122",
+      "trial_num": "00122",
+      "metrics": {
+        "expectancy_r": 1.3345418949172372,
+        "max_drawdown_pct": 0.22116429877743618,
+        "pnl_abs": 14488.360050186795,
+        "profit_factor": 1.837665147309689,
+        "sharpe_ratio": 4.3033438399700765,
+        "trades_count": 150,
+        "win_rate": 0.3333333333333333
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00123",
+      "trial_num": "00123",
+      "metrics": {
+        "expectancy_r": 0.944752962136246,
+        "max_drawdown_pct": 0.13188806254916513,
+        "pnl_abs": 30510.620556737576,
+        "profit_factor": 2.1082454970240665,
+        "sharpe_ratio": 5.140980628019666,
+        "trades_count": 139,
+        "win_rate": 0.43884892086330934
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00132",
+      "trial_num": "00132",
+      "metrics": {
+        "expectancy_r": 0.4490824246051519,
+        "max_drawdown_pct": 0.034178888898683965,
+        "pnl_abs": 1600.8867601835761,
+        "profit_factor": 1.6086916357254073,
+        "sharpe_ratio": 3.571603989141444,
+        "trades_count": 132,
+        "win_rate": 0.4090909090909091
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00135",
+      "trial_num": "00135",
+      "metrics": {
+        "expectancy_r": 3.3012318283946303,
+        "max_drawdown_pct": 0.2269480490561313,
+        "pnl_abs": 1.806752947773817e+16,
+        "profit_factor": 3.2571552542631497,
+        "sharpe_ratio": 12.332933004514901,
+        "trades_count": 443,
+        "win_rate": 0.6027088036117382
+      }
+    },
+    {
+      "trial_id": "optuna-default-v1-run2-trial-00161",
+      "trial_num": "00161",
+      "metrics": {
+        "expectancy_r": 2.31029452771939,
+        "max_drawdown_pct": 0.03772454346257951,
+        "pnl_abs": 27575413.40359599,
+        "profit_factor": 20.26172333510111,
+        "sharpe_ratio": 19.2606346680973,
+        "trades_count": 218,
+        "win_rate": 0.8486238532110092
+      }
+    }
+  ]
+}
