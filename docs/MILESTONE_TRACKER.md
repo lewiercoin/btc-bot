@@ -21,26 +21,73 @@ Last updated: 2026-05-01
 
 ---
 
-## Current Active Milestone: OPTUNA-DEFAULT-V1 — BLOCKED (diagnosis in progress)
+## Current Active Milestone: OPTUNA-CAMPAIGN-V2 — ACTIVE (launch pending)
 
-**Status:** BLOCKED
-**Decision date:** 2026-05-02
-**Builder:** Cascade
+**Status:** ACTIVE
+**Decision date:** 2026-05-04
+**Builder:** Codex
 **Auditor:** Claude Code
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9`
 
-**Operator decision:** OPTUNA-DEFAULT-V1 — Optuna campaign on full clean window
-(2022-01-01 → 2026-03-28) using `default_protocol.json`. Authorized 2026-05-02.
+**Context:** Campaign 1 (optuna-default-v1-run2, 200 trials) completed. 32 PASSED,
+16 clean after hard filter, WF run on 16 candidates. trial-00000 passed WF cleanly
+(OOS ER=2.668, Sharpe=13.61). User chose to run improved campaign 2 first.
 
-**Run result:** All 50 trials returned penalty `{expectancy_r: -2.0, profit_factor: 0.1,
-mdd: 1.0}`. Zero pareto candidates. walkforward_windows=2 (correct).
+**V2 architecture fixes (all committed, audited DONE at 6c8ec66):**
+1. Hard artifact block in objective(): WR>0.85 or PF>50 -> penalty + TPE infeasible signal
+2. Joint sampling: high_vol_leverage after max_leverage (eliminates constraint violations)
+3. Sum-of-weights constraint >= 0.5 (eliminates zero-trade degenerate trials)
+4. Range narrowing: invalidation_offset_atr 5.0->3.0, max_hold_hours 72->48
 
-**Root cause under investigation:**
-1. WAL snapshot bug (FIXED in `research_lab/db_snapshot.py`): `shutil.copy2` missed WAL
-   data; replaced with `sqlite3.Connection.backup()` API. Likely contributed to data
-   incompleteness in trial snapshots.
-2. Constraint violation saturation: ~75% estimated violation rate on full 35-param search
-   space. Remaining ~12-13 trials may have hit degenerate weight combinations → 0 trades.
-3. Pending: query `research_lab.db` rejection reasons to confirm which factor dominated.
+**Launch command (server: root@204.168.146.253):**
+```
+cd /home/btc-bot/btc-bot
+nohup python -m research_lab optimize \
+  --start-date 2022-01-01 --end-date 2026-03-28 \
+  --study-name optuna-default-v2 --n-trials 350 --seed 43 \
+  --warm-start-from-store --multivariate-tpe \
+  --optuna-storage-path /home/btc-bot/btc-bot/research_lab/optuna_default_v2.db \
+  > /tmp/optuna_v2.log 2>&1 &
+```
+
+**Time estimate:** ~13-15h (2h15min pre-flight + ~10-12h trials + ~30min WF on Pareto)
+**Next step after campaign:** Claude Code audit -> if PASS -> paper trading decision
+
+---
+
+## Completed: WALKFORWARD-DEFAULT-V1 - MVP_DONE
+
+**Status:** MVP_DONE / **Audit:** `docs/audits/AUDIT_WALKFORWARD_DEFAULT_V1_2026-05-03.md`
+**Decision date:** 2026-05-03 / **Builder:** Cascade / **Commit:** d5f537e
+**Results:** trial-00000 clean (OOS ER=2.668, Sharpe=13.61, 2/2 windows).
+trial-00135 blocked (pnl_abs=1.8e16, D17). Cluster 00099/100/101/104/122 rejected (2025 artefact).
+Open debt: D15 (WF artifacts not committed), D16 (min OOS trades gate), D17 (pnl_abs anomaly).
+
+---
+
+## Completed: OPTUNA-CAMPAIGN-V2-FIXES - DONE
+
+**Status:** DONE / **Audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V2_FIXES_2026-05-03.md`
+**Decision date:** 2026-05-03 / **Builder:** Codex / **Commit:** 6c8ec66
+**Deliverables:** 4 architecture fixes, 303 tests pass, 3 new tests.
+
+---
+
+## Completed: FORCE-ORDERS-BACKFILL-V1 - MVP_DONE
+
+**Status:** MVP_DONE / **Audit:** `docs/audits/AUDIT_FORCE_ORDERS_BACKFILL_V1_2026-05-03.md`
+**Decision date:** 2026-05-03 / **Builder:** Cascade / **Commit:** 2e51192
+**Results:** 233,009 rows (Tardis monthly 2020-2024 + COIN-M daily 2023-2024).
+weight_force_order_spike FROZEN (throttling bias per Boon Chuan Lim, D14).
+
+---
+
+## Completed: OPTUNA-DEFAULT-V1 - MVP_DONE
+
+**Status:** MVP_DONE / **Audit:** `docs/audits/AUDIT_OPTUNA_DEFAULT_V1_2026-05-03.md`
+**Decision date:** 2026-05-03 / **Builder:** Cascade / **Commit:** 8273bec
+**Results:** 200 trials (run2), 32 PASSED. WAL fix 1a70e0f.
+Artifacts: TPE WR=96-99%/PF=351B. Hard filter: 16/32 clean -> WF.
 
 ---
 
