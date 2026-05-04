@@ -16,7 +16,7 @@ from research_lab.types import ParamSpec
 
 _INFRA_REASON = "infrastructure params; not strategy params"
 _FROZEN_REASONS: dict[str, str] = {
-    "weight_force_order_spike": "force_orders table has 0 rows; feature unavailable",
+    "weight_force_order_spike": "throttled signal (1 snapshot/1000ms since 2021-04-27 per Binance architecture); censoring is conditional on burst intensity — largest cascades most censored; 233k historical rows backfilled (Tardis monthly 2020-2024 + COIN-M daily 2023-2024) but signal remains structurally limited; frozen until censoring process is modeled or Tardis paid data acquired",
     "ema_fast": "controls ema50_4h feature used by regime engine; feature name implies design intent for 50-period; architecture param frozen in v0.1",
     "ema_slow": "controls ema200_4h feature used by regime engine; feature name implies design intent for 200-period; architecture param frozen in v0.1",
     "crowded_funding_extreme_pct": "regime crowded-leverage funding threshold; frozen at baseline-calibrated value in v0.1",
