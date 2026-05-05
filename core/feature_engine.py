@@ -17,6 +17,7 @@ class FeatureEngineConfig:
     equal_level_lookback: int = 50
     equal_level_tol_atr: float = 0.25
     sweep_buf_atr: float = 0.15
+    sweep_proximity_atr: float = 0.4
     reclaim_buf_atr: float = 0.05
     wick_min_atr: float = 0.40
     funding_window_days: int = 60
@@ -145,10 +146,13 @@ def detect_sweep_reclaim(
     body_high = max(open_price, close_price)
 
     sweep_buffer = config.sweep_buf_atr * atr_15m
+    proximity = config.sweep_proximity_atr * atr_15m
     reclaim_buffer = config.reclaim_buf_atr * atr_15m
     wick_min = config.wick_min_atr * atr_15m
 
     for level in equal_lows:
+        if abs(open_price - level) > proximity:
+            continue
         swept = low_price < (level - sweep_buffer)
         reclaimed = close_price > (level + reclaim_buffer)
         wick_ok = (body_low - low_price) >= wick_min
@@ -169,6 +173,8 @@ def detect_sweep_reclaim(
             )
 
     for level in equal_highs:
+        if abs(open_price - level) > proximity:
+            continue
         swept = high_price > (level + sweep_buffer)
         reclaimed = close_price < (level - reclaim_buffer)
         wick_ok = (high_price - body_high) >= wick_min

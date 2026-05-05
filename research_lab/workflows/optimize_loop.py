@@ -50,6 +50,7 @@ def check_signal_health(
             equal_level_lookback=strategy.equal_level_lookback,
             equal_level_tol_atr=strategy.equal_level_tol_atr,
             sweep_buf_atr=strategy.sweep_buf_atr,
+            sweep_proximity_atr=strategy.sweep_proximity_atr,
             reclaim_buf_atr=strategy.reclaim_buf_atr,
             wick_min_atr=strategy.wick_min_atr,
             funding_window_days=strategy.funding_window_days,

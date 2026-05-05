@@ -71,7 +71,7 @@ def _low_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
         _candle(ts - timedelta(minutes=60), 101.0, 103.0, 100.0, 102.0),
         _candle(ts - timedelta(minutes=45), 102.0, 104.0, 100.0, 103.0),
         _candle(ts - timedelta(minutes=30), 103.0, 104.0, 101.0, 103.5),
-        _candle(ts - timedelta(minutes=15), 102.5, 103.0, 98.0, 101.5),
+        _candle(ts - timedelta(minutes=15), 101.0, 103.0, 98.0, 101.5),
     ]
 
 
@@ -81,7 +81,7 @@ def _high_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
         _candle(ts - timedelta(minutes=60), 101.0, 104.0, 100.0, 102.0),
         _candle(ts - timedelta(minutes=45), 101.5, 104.0, 100.5, 102.0),
         _candle(ts - timedelta(minutes=30), 102.0, 103.0, 101.0, 102.5),
-        _candle(ts - timedelta(minutes=15), 102.5, 106.0, 101.5, 102.0),
+        _candle(ts - timedelta(minutes=15), 103.8, 106.0, 101.5, 102.0),
     ]
 
 
@@ -218,6 +218,24 @@ def test_detect_sweep_reclaim_reports_high_sweep_diagnostic_margins() -> None:
     assert detected[5] == pytest.approx(0.05)
     assert detected[6] == pytest.approx(-0.1)
     assert detected[7] == pytest.approx(0.05)
+
+
+def test_detect_sweep_reclaim_ignores_levels_outside_proximity() -> None:
+    ts = datetime(2026, 1, 1, 0, 15, tzinfo=timezone.utc)
+    candles = [
+        _candle(ts - timedelta(minutes=15), 100.0, 101.0, 99.0, 100.0),
+        _candle(ts, 106.0, 107.0, 98.0, 106.0),
+    ]
+
+    detected = detect_sweep_reclaim(
+        candles,
+        equal_lows=[100.0],
+        equal_highs=[],
+        atr_15m=10.0,
+        config=FeatureEngineConfig(sweep_proximity_atr=0.4),
+    )
+
+    assert detected == (False, False, None, None, None, None, None, None)
 
 
 def test_cvd_divergence_uses_windowed_swing_reference_not_last_bar_only() -> None:

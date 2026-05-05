@@ -73,6 +73,7 @@ class StrategyConfig:
     equal_level_lookback: int = 196
     equal_level_tol_atr: float = 0.02
     sweep_buf_atr: float = 0.17
+    sweep_proximity_atr: float = 0.4
     reclaim_buf_atr: float = 0.19
     wick_min_atr: float = 0.15
 
