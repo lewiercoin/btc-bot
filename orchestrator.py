@@ -161,6 +161,7 @@ def build_default_bundle(
                 equal_level_lookback=settings.strategy.equal_level_lookback,
                 equal_level_tol_atr=settings.strategy.equal_level_tol_atr,
                 sweep_buf_atr=settings.strategy.sweep_buf_atr,
+                sweep_proximity_atr=settings.strategy.sweep_proximity_atr,
                 reclaim_buf_atr=settings.strategy.reclaim_buf_atr,
                 wick_min_atr=settings.strategy.wick_min_atr,
                 funding_window_days=settings.strategy.funding_window_days,
