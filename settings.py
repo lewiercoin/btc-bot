@@ -76,6 +76,8 @@ class StrategyConfig:
     sweep_proximity_atr: float = 0.4
     reclaim_buf_atr: float = 0.19
     wick_min_atr: float = 0.15
+    level_min_age_bars: int = 5
+    min_hits: int = 3
 
     funding_window_days: int = 82
     oi_z_window_days: int = 62

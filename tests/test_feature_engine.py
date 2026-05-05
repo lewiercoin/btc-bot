@@ -4,7 +4,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from core.feature_engine import FeatureEngine, FeatureEngineConfig, detect_sweep_reclaim
+from core.feature_engine import FeatureEngine, FeatureEngineConfig, detect_equal_levels, detect_sweep_reclaim
 from core.models import MarketSnapshot
 
 
@@ -68,19 +68,24 @@ def _snapshot(
 
 def _low_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
     return [
-        _candle(ts - timedelta(minutes=60), 101.0, 103.0, 100.0, 102.0),
-        _candle(ts - timedelta(minutes=45), 102.0, 104.0, 100.0, 103.0),
-        _candle(ts - timedelta(minutes=30), 103.0, 104.0, 101.0, 103.5),
+        _candle(ts - timedelta(minutes=105), 101.0, 103.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=90), 102.0, 104.0, 101.0, 103.0),
+        _candle(ts - timedelta(minutes=75), 103.0, 104.0, 101.0, 103.5),
+        _candle(ts - timedelta(minutes=60), 103.0, 104.0, 100.0, 103.5),
+        _candle(ts - timedelta(minutes=45), 103.0, 104.0, 101.0, 103.5),
+        _candle(ts - timedelta(minutes=30), 102.0, 104.0, 100.0, 103.0),
         _candle(ts - timedelta(minutes=15), 101.0, 103.0, 98.0, 101.5),
     ]
 
 
 def _high_sweep_candles(ts: datetime) -> list[dict[str, float | datetime]]:
     return [
-        _candle(ts - timedelta(minutes=75), 100.0, 104.0, 99.0, 101.0),
-        _candle(ts - timedelta(minutes=60), 101.0, 104.0, 100.0, 102.0),
-        _candle(ts - timedelta(minutes=45), 101.5, 104.0, 100.5, 102.0),
-        _candle(ts - timedelta(minutes=30), 102.0, 103.0, 101.0, 102.5),
+        _candle(ts - timedelta(minutes=105), 100.0, 104.0, 99.0, 101.0),
+        _candle(ts - timedelta(minutes=90), 101.0, 103.0, 100.0, 102.0),
+        _candle(ts - timedelta(minutes=75), 101.5, 103.0, 100.5, 102.0),
+        _candle(ts - timedelta(minutes=60), 102.0, 104.0, 101.0, 102.5),
+        _candle(ts - timedelta(minutes=45), 102.0, 103.0, 101.0, 102.5),
+        _candle(ts - timedelta(minutes=30), 102.0, 104.0, 101.0, 102.5),
         _candle(ts - timedelta(minutes=15), 103.8, 106.0, 101.5, 102.0),
     ]
 
@@ -176,6 +181,13 @@ def test_compute_features_marks_high_sweep_side() -> None:
     assert features.close_vs_reclaim_buffer_atr is not None
     assert features.wick_vs_min_atr is not None
     assert features.sweep_vs_buffer_atr is not None
+
+
+def test_detect_equal_levels_requires_min_hits_and_age() -> None:
+    levels = [(0, 100.0), (2, 100.1), (4, 99.9), (8, 101.0), (9, 101.1), (10, 100.9)]
+
+    assert detect_equal_levels(levels, tolerance=0.2, min_hits=3, min_age_bars=5) == []
+    assert detect_equal_levels(levels, tolerance=0.2, min_hits=3, min_age_bars=4) == [100.0]
 
 
 def test_detect_sweep_reclaim_reports_low_sweep_diagnostic_margins() -> None:

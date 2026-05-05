@@ -164,6 +164,8 @@ def build_default_bundle(
                 sweep_proximity_atr=settings.strategy.sweep_proximity_atr,
                 reclaim_buf_atr=settings.strategy.reclaim_buf_atr,
                 wick_min_atr=settings.strategy.wick_min_atr,
+                level_min_age_bars=settings.strategy.level_min_age_bars,
+                min_hits=settings.strategy.min_hits,
                 funding_window_days=settings.strategy.funding_window_days,
                 oi_z_window_days=settings.strategy.oi_z_window_days,
                 oi_baseline_days=settings.data_quality.oi_baseline_days,

@@ -19,6 +19,8 @@ _FROZEN_REASONS: dict[str, str] = {
     "weight_force_order_spike": "throttled signal (1 snapshot/1000ms since 2021-04-27 per Binance architecture); censoring is conditional on burst intensity — largest cascades most censored; 233k historical rows backfilled (Tardis monthly 2020-2024 + COIN-M daily 2023-2024) but signal remains structurally limited; frozen until censoring process is modeled or Tardis paid data acquired",
     "ema_fast": "controls ema50_4h feature used by regime engine; feature name implies design intent for 50-period; architecture param frozen in v0.1",
     "sweep_proximity_atr": "signal quality guard restored after SWEEP-PROXIMITY-RESTORE-V1; frozen so Campaign V2 does not expand search space",
+    "level_min_age_bars": "frozen for Campaign V2; validated value from SWEEP-RECLAIM-FIX",
+    "min_hits": "frozen for Campaign V2; validated value from SWEEP-RECLAIM-FIX",
     "ema_slow": "controls ema200_4h feature used by regime engine; feature name implies design intent for 200-period; architecture param frozen in v0.1",
     "crowded_funding_extreme_pct": "regime crowded-leverage funding threshold; frozen at baseline-calibrated value in v0.1",
     "crowded_oi_zscore_min": "regime crowded-leverage OI threshold; frozen at baseline-calibrated value in v0.1",
