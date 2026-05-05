@@ -53,6 +53,8 @@ def check_signal_health(
             sweep_proximity_atr=strategy.sweep_proximity_atr,
             reclaim_buf_atr=strategy.reclaim_buf_atr,
             wick_min_atr=strategy.wick_min_atr,
+            level_min_age_bars=strategy.level_min_age_bars,
+            min_hits=strategy.min_hits,
             funding_window_days=strategy.funding_window_days,
             oi_z_window_days=strategy.oi_z_window_days,
         )
