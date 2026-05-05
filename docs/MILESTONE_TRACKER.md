@@ -42,13 +42,21 @@ Last updated: 2026-05-01
 **Launch command (server: root@204.168.146.253):**
 ```
 cd /home/btc-bot/btc-bot
-nohup python -m research_lab optimize \
+nohup .venv/bin/python -m research_lab optimize \
   --start-date 2022-01-01 --end-date 2026-03-28 \
   --study-name optuna-default-v2 --n-trials 350 --seed 43 \
   --warm-start-from-store --multivariate-tpe \
+  --max-sweep-rate 0.60 \
   --optuna-storage-path /home/btc-bot/btc-bot/research_lab/optuna_default_v2.db \
   > /tmp/optuna_v2.log 2>&1 &
 ```
+
+**Launch gate override:** Campaign V2 intentionally uses `--max-sweep-rate 0.60`.
+Campaign 1 used `--max-sweep-rate 1.0`, effectively bypassing the pre-flight signal-health
+gate. The SWEEP-RECLAIM-FIX restored detector quality and reduced full-window sweep rate
+from 99.98% to 56.49%; 0.60 is more restrictive than Campaign 1 while accounting for
+2022-2026 bear/bull regime variation. V2 objective-level gates still enforce artifact
+blocks and degenerate-weight rejection.
 
 **Time estimate:** ~13-15h (2h15min pre-flight + ~10-12h trials + ~30min WF on Pareto)
 **Next step after campaign:** Claude Code audit -> if PASS -> paper trading decision
@@ -1910,6 +1918,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 | K3 | Walk-forward uses 6 windows over 4 years | MEDIUM | ~150 trades/window may be insufficient; defer to post-Run#12 |
 | K4 | level_min_age_bars not yet in 8f2c6f2 codebase | LOW | Deferred to Run #13; add as tunable [2, 6] |
 | K5 | PF=999999 trials (#47/#56/#73) in Run #12 journal | LOW | Anti-overfitting guard deployed at trial #88; future trials unaffected |
+| D18 | `max_sweep_rate` threshold not validated for full 2022-2026 range with fixed detector | MEDIUM | Campaign 1 bypassed signal-health gate with `--max-sweep-rate 1.0`; Campaign V2 launches with `0.60`. After Campaign V2, recalibrate on fixed codebase using rolling quarterly windows across 2022-2026 and set threshold at the 75th percentile |
 
 ---
 
