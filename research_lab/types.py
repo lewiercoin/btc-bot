@@ -47,6 +47,7 @@ class TrialEvaluation:
     metrics: ObjectiveMetrics
     funnel: SignalFunnel
     rejected_reason: str | None
+    objective_metrics: ObjectiveMetrics | None = None
     protocol_hash: str | None = None
     search_space_signature: str = ""
     regime_signature: str | None = None

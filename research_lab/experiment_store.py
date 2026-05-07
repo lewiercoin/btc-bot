@@ -7,7 +7,14 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-from research_lab.types import NestedWalkForwardReport, ObjectiveMetrics, RecommendationDraft, SignalFunnel, TrialEvaluation, WalkForwardReport
+from research_lab.types import (
+    NestedWalkForwardReport,
+    ObjectiveMetrics,
+    RecommendationDraft,
+    SignalFunnel,
+    TrialEvaluation,
+    WalkForwardReport,
+)
 
 
 def _utc_now_iso() -> str:
@@ -44,6 +51,14 @@ def _ensure_trial_lineage_columns(conn: sqlite3.Connection) -> None:
         conn.execute("ALTER TABLE trials ADD COLUMN baseline_version TEXT NOT NULL DEFAULT ''")
 
 
+def _ensure_trial_metric_columns(conn: sqlite3.Connection) -> None:
+    trial_columns = _table_columns(conn, "trials")
+    if "raw_metrics_json" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN raw_metrics_json TEXT NULL")
+    if "objective_metrics_json" not in trial_columns:
+        conn.execute("ALTER TABLE trials ADD COLUMN objective_metrics_json TEXT NULL")
+
+
 def _ensure_indexes(conn: sqlite3.Connection) -> None:
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_trials_warm_start_context "
@@ -63,6 +78,8 @@ def init_store(store_path: Path) -> None:
                 trial_id TEXT PRIMARY KEY,
                 params_json TEXT NOT NULL,
                 metrics_json TEXT NOT NULL,
+                raw_metrics_json TEXT NULL,
+                objective_metrics_json TEXT NULL,
                 funnel_json TEXT NOT NULL,
                 rejected_reason TEXT NULL,
                 created_at_utc TEXT NOT NULL,
@@ -96,35 +113,58 @@ def init_store(store_path: Path) -> None:
         )
         _ensure_protocol_hash_columns(conn)
         _ensure_trial_lineage_columns(conn)
+        _ensure_trial_metric_columns(conn)
         _ensure_indexes(conn)
         conn.commit()
 
 
+def _metrics_payload(metrics: ObjectiveMetrics) -> dict[str, float | int]:
+    return {
+        "expectancy_r": metrics.expectancy_r,
+        "profit_factor": metrics.profit_factor,
+        "max_drawdown_pct": metrics.max_drawdown_pct,
+        "trades_count": metrics.trades_count,
+        "sharpe_ratio": metrics.sharpe_ratio,
+        "pnl_abs": metrics.pnl_abs,
+        "win_rate": metrics.win_rate,
+    }
+
+
+def _parse_metrics_payload(payload: dict[str, Any]) -> ObjectiveMetrics:
+    return ObjectiveMetrics(
+        expectancy_r=float(payload["expectancy_r"]),
+        profit_factor=float(payload["profit_factor"]),
+        max_drawdown_pct=float(payload["max_drawdown_pct"]),
+        trades_count=int(payload["trades_count"]),
+        sharpe_ratio=float(payload["sharpe_ratio"]),
+        pnl_abs=float(payload["pnl_abs"]),
+        win_rate=float(payload["win_rate"]),
+    )
+
+
 def save_trial(evaluation: TrialEvaluation, store_path: Path) -> None:
     init_store(store_path)
+    raw_metrics_payload = _metrics_payload(evaluation.metrics)
+    objective_metrics_payload = (
+        _metrics_payload(evaluation.objective_metrics) if evaluation.objective_metrics is not None else None
+    )
     with _connect(store_path) as conn:
         conn.execute(
             """
             INSERT OR REPLACE INTO trials (
-                trial_id, params_json, metrics_json, funnel_json, rejected_reason, created_at_utc, protocol_hash,
+                trial_id, params_json, metrics_json, raw_metrics_json, objective_metrics_json,
+                funnel_json, rejected_reason, created_at_utc, protocol_hash,
                 search_space_signature, regime_signature, trial_context_signature, baseline_version
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
             (
                 evaluation.trial_id,
                 json.dumps(evaluation.params, sort_keys=True),
-                json.dumps(
-                    {
-                        "expectancy_r": evaluation.metrics.expectancy_r,
-                        "profit_factor": evaluation.metrics.profit_factor,
-                        "max_drawdown_pct": evaluation.metrics.max_drawdown_pct,
-                        "trades_count": evaluation.metrics.trades_count,
-                        "sharpe_ratio": evaluation.metrics.sharpe_ratio,
-                        "pnl_abs": evaluation.metrics.pnl_abs,
-                        "win_rate": evaluation.metrics.win_rate,
-                    },
-                    sort_keys=True,
-                ),
+                json.dumps(raw_metrics_payload, sort_keys=True),
+                json.dumps(raw_metrics_payload, sort_keys=True),
+                json.dumps(objective_metrics_payload, sort_keys=True)
+                if objective_metrics_payload is not None
+                else None,
                 json.dumps(
                     {
                         "signals_generated": evaluation.funnel.signals_generated,
@@ -196,20 +236,17 @@ def save_recommendation(rec: RecommendationDraft, store_path: Path) -> None:
 
 def _parse_trial_row(row: sqlite3.Row) -> TrialEvaluation:
     params = json.loads(str(row["params_json"]))
-    metrics_payload: dict[str, Any] = json.loads(str(row["metrics_json"]))
+    raw_metrics_json = row["raw_metrics_json"] if "raw_metrics_json" in row.keys() else None
+    objective_metrics_json = row["objective_metrics_json"] if "objective_metrics_json" in row.keys() else None
+    metrics_payload: dict[str, Any] = json.loads(str(raw_metrics_json or row["metrics_json"]))
+    objective_metrics = None
+    if objective_metrics_json is not None:
+        objective_metrics = _parse_metrics_payload(json.loads(str(objective_metrics_json)))
     funnel_payload: dict[str, Any] = json.loads(str(row["funnel_json"]))
     return TrialEvaluation(
         trial_id=str(row["trial_id"]),
         params=params,
-        metrics=ObjectiveMetrics(
-            expectancy_r=float(metrics_payload["expectancy_r"]),
-            profit_factor=float(metrics_payload["profit_factor"]),
-            max_drawdown_pct=float(metrics_payload["max_drawdown_pct"]),
-            trades_count=int(metrics_payload["trades_count"]),
-            sharpe_ratio=float(metrics_payload["sharpe_ratio"]),
-            pnl_abs=float(metrics_payload["pnl_abs"]),
-            win_rate=float(metrics_payload["win_rate"]),
-        ),
+        metrics=_parse_metrics_payload(metrics_payload),
         funnel=SignalFunnel(
             signals_generated=int(funnel_payload["signals_generated"]),
             signals_regime_blocked=int(funnel_payload["signals_regime_blocked"]),
@@ -218,6 +255,7 @@ def _parse_trial_row(row: sqlite3.Row) -> TrialEvaluation:
             signals_executed=int(funnel_payload["signals_executed"]),
         ),
         rejected_reason=str(row["rejected_reason"]) if row["rejected_reason"] is not None else None,
+        objective_metrics=objective_metrics,
         protocol_hash=str(row["protocol_hash"]) if row["protocol_hash"] is not None else None,
         search_space_signature=str(row["search_space_signature"]),
         regime_signature=str(row["regime_signature"]) if row["regime_signature"] is not None else None,
@@ -246,7 +284,8 @@ def load_trials(store_path: Path) -> list[TrialEvaluation]:
     with _connect(store_path) as conn:
         rows = conn.execute(
             """
-            SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash,
+            SELECT trial_id, params_json, metrics_json, raw_metrics_json, objective_metrics_json,
+                   funnel_json, rejected_reason, protocol_hash,
                    search_space_signature, regime_signature, trial_context_signature, baseline_version
             FROM trials
             ORDER BY created_at_utc ASC, trial_id ASC
@@ -265,7 +304,8 @@ def load_trials_filtered(
         return []
     init_store(store_path)
     query = (
-        "SELECT trial_id, params_json, metrics_json, funnel_json, rejected_reason, protocol_hash, "
+        "SELECT trial_id, params_json, metrics_json, raw_metrics_json, objective_metrics_json, "
+        "funnel_json, rejected_reason, protocol_hash, "
         "search_space_signature, regime_signature, trial_context_signature, baseline_version "
         "FROM trials "
         "WHERE protocol_hash = ? AND search_space_signature = ?"
@@ -278,6 +318,26 @@ def load_trials_filtered(
     with _connect(store_path) as conn:
         rows = conn.execute(query, tuple(params)).fetchall()
     return [_parse_trial_row(row) for row in rows]
+
+
+def load_walkforward_passed_candidate_ids(store_path: Path, protocol_hash: str | None = None) -> set[str]:
+    if not store_path.exists():
+        return set()
+    init_store(store_path)
+    query = "SELECT candidate_id, report_json FROM walkforward_reports"
+    params: list[Any] = []
+    if protocol_hash is not None:
+        query += " WHERE protocol_hash = ?"
+        params.append(protocol_hash)
+    with _connect(store_path) as conn:
+        rows = conn.execute(query, tuple(params)).fetchall()
+
+    passed: set[str] = set()
+    for row in rows:
+        payload: dict[str, Any] = json.loads(str(row["report_json"]))
+        if bool(payload.get("passed", False)):
+            passed.add(str(row["candidate_id"]))
+    return passed
 
 
 def load_recommendations(store_path: Path) -> list[RecommendationDraft]:

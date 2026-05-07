@@ -118,6 +118,12 @@ def _build_parser() -> argparse.ArgumentParser:
     optimize.add_argument("--optuna-storage-path", type=Path, default=None)
     optimize.add_argument("--warm-start-from-store", action="store_true", default=False)
     optimize.add_argument("--warm-start-ignore-protocol", action="store_true", default=False)
+    optimize.add_argument(
+        "--warm-start-mode",
+        choices=("all", "wf-winners-only"),
+        default="wf-winners-only",
+        help="Select historical trials for warm-start. Production default: wf-winners-only.",
+    )
     optimize.add_argument("--multivariate-tpe", action="store_true", default=False)
 
     replay = sub.add_parser("replay-candidate", help="Replay one candidate and rebuild walk-forward artifacts.")
@@ -193,6 +199,7 @@ def main(argv: list[str] | None = None) -> None:
             optuna_storage_path=args.optuna_storage_path,
             warm_start_from_store=bool(args.warm_start_from_store),
             warm_start_ignore_protocol=bool(args.warm_start_ignore_protocol),
+            warm_start_mode=str(args.warm_start_mode),
             multivariate_tpe=bool(args.multivariate_tpe),
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
