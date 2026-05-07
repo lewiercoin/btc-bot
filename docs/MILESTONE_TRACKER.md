@@ -1,10 +1,17 @@
 # Milestone Tracker
 
-## Current Active Milestone: OPTUNA-INFRASTRUCTURE-V3-HARDENING
+## Current Status: AWAITING_V3_DECISION
 
-**Status:** BUILDER IMPLEMENTATION IN PROGRESS - pending validation, commit, push, and Claude Code audit.  
+**Context:** OPTUNA-INFRASTRUCTURE-V3-HARDENING complete and audited DONE. No active milestone implementation. User decision pending: launch Campaign V3 or deploy trial-00000 to paper trading.
+
+---
+
+## Completed: OPTUNA-INFRASTRUCTURE-V3-HARDENING - DONE
+
+**Status:** DONE / **Audit:** `docs/audits/AUDIT_OPTUNA_INFRASTRUCTURE_V3_HARDENING_2026-05-07.md`  
 **Builder:** Codex  
 **Decision date:** 2026-05-07  
+**Commit:** 929b737  
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9`
 
 **Scope:** Harden Research Lab optimization infrastructure before Campaign V3:
@@ -12,27 +19,21 @@ multivariate TPE dynamic-bound policy, WF-winner-only warm-start, raw/objective
 metric persistence, richer Optuna trial attrs, conservative range tightening, and
 drawdown unit alignment.
 
-**Implementation direction:**
-- Multivariate policy: auto-disable `multivariate=True` when active dynamic-bound
-  params are present (`tp2_atr_mult`, `high_vol_leverage`, `ema_slow`) to avoid
-  Optuna RandomSampler fallback storms.
-- Warm-start mode: add `--warm-start-mode={all|wf-winners-only}` with production
-  default `wf-winners-only`.
-- Trial store: keep `metrics_json` backward-compatible as raw metrics and add
-  `raw_metrics_json` plus `objective_metrics_json`.
-- Range tightening evidence: `docs/analysis/OPTUNA_V3_RANGE_TIGHTENING_2026-05-07.md`.
-- Drawdown unit: default walk-forward threshold aligned to fraction units
-  (`0.5` = 50%).
+**Deliverables:**
+1. Raw vs objective metrics separation: `raw_metrics_json`, `objective_metrics_json` columns; audit trail for TPE transforms
+2. WF-winners-only warm-start: `--warm-start-mode={all|wf-winners-only}` with production default `wf-winners-only`
+3. Multivariate TPE auto-disable: prevents RandomSampler fallback for dynamic-bound params (ema_slow, tp2_atr_mult, high_vol_leverage)
+4. Richer trial metadata: 14 new Optuna trial attrs (protocol, search space, date range, sampler policy, objective metrics, wall time)
+5. V3 range tightening: 7 params tightened based on V2 accepted/rejected evidence (documented in `OPTUNA_V3_RANGE_TIGHTENING_2026-05-07.md`)
+6. Drawdown unit alignment: `max_drawdown_pct_per_window: 0.5` = 50% (fraction units)
 
-**Builder validation so far:**
-- Research Lab smoke: 40 passed, 2 skipped
-- Full suite with local coverage addopts disabled: 311 passed, 24 skipped
+**Validation:**
+- Research Lab smoke: 40/42 passed (2 intentional skips for 8f2c6f2 baseline)
+- Full suite: 311/335 passed, 24 skipped
 - `compileall research_lab tests/test_research_lab_smoke.py`: PASS
-- 10-trial synthetic Optuna smoke campaign: PASS
-  - `multivariate_tpe_effective=false`
-  - policy: `disabled_dynamic_bounds:high_vol_leverage,tp2_atr_mult`
-  - warm-start mode: `wf-winners-only`
-  - raw PF 6.5 persisted separately from objective PF 4.04
+- 10-trial synthetic Optuna smoke campaign: PASS (multivariate_tpe_effective=false, policy documented, raw/objective metrics persisted)
+
+**Audit verdict:** DONE (all axes PASS, tech debt LOW, no blockers for Campaign V3 launch)
 
 ---
 
