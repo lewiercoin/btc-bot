@@ -1,8 +1,10 @@
 # Milestone Tracker
 
-## Current Status: AWAITING_V3_DECISION
+## Current Status: HANDOFF_READY — OPTUNA-CAMPAIGN-V3
 
-**Context:** OPTUNA-INFRASTRUCTURE-V3-HARDENING complete and audited DONE. No active milestone implementation. User decision pending: launch Campaign V3 or deploy trial-00000 to paper trading.
+**Context:** V3 infrastructure audited DONE. User approved Campaign V3 launch (Option A). Handoff ready for Codex at `docs/handoffs/HANDOFF_OPTUNA_CAMPAIGN_V3_2026-05-07.md`.
+
+**Next step:** Codex launches Campaign V3 on server (350 trials, ~12-14h, WF-winners-only warm-start from trial-00000).
 
 ---
 
