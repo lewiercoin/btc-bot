@@ -42,6 +42,29 @@ nohup .venv/bin/python -m research_lab optimize \
 - First trial completes and study attrs confirm `warm_start_mode=wf-winners-only`
   plus `multivariate_tpe_effective=false`.
 
+**Launch result (2026-05-07):**
+- Server updated to commit `01e3f5a4` before launch.
+- Initial launch attempts were stopped before full campaign execution because
+  warm-start fell back to baseline-only; server store metadata did not expose
+  `trial-00000` as a current-protocol WF winner.
+- `optuna-default-v1-run2-trial-00000` was replayed under the V3 protocol to
+  create current-protocol Research Lab store evidence. Replay result:
+  walk-forward `2/2` passed, verdict `SCREENING_ONLY` due to enhanced safety
+  flags (`pnl_sanity_review_required`, `oos_outperformance_review_required`).
+- Server store backup created before metadata repair:
+  `research_lab/research_lab.pre_v3_seed_fix_20260507T*.db`.
+- Seed metadata repair: `trial-00000` search-space signature corrected from
+  empty replay signature `4f53cda18c2baa0c` to active registry signature
+  `4fd8b115b3364c7d` so `wf-winners-only` can seed the audited V1 candidate.
+- Active V3 process PID: `637569`.
+- Active log: `/tmp/optuna_v3.log`.
+- Active Optuna journal: `research_lab/optuna_default_v3.db`.
+- Verification: Optuna study attrs show `warm_start_mode=wf-winners-only`,
+  `multivariate_tpe_requested=true`, `multivariate_tpe_effective=false`, and
+  `multivariate_tpe_policy=disabled_dynamic_bounds:high_vol_leverage,tp2_atr_mult`.
+- Early trial check: first 20+ trials completed; trial 0 returned
+  expectancy_r `0.7606`, profit_factor `2.5845`, max_drawdown_pct `0.0985`.
+
 ---
 
 ## Completed: OPTUNA-INFRASTRUCTURE-V3-HARDENING - DONE
