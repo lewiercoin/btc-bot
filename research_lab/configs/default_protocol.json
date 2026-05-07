@@ -7,7 +7,7 @@
   "min_trades_per_window": 5,
   "min_expectancy_r_per_window": 0.0,
   "min_profit_factor_per_window": 1.0,
-  "max_drawdown_pct_per_window": 50.0,
+  "max_drawdown_pct_per_window": 0.5,
   "min_sharpe_ratio_per_window": 0.0,
   "min_trades_full_candidate": 100,
   "max_trades_full_candidate": 10000,

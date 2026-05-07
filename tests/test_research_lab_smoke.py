@@ -15,7 +15,15 @@ from research_lab.approval import write_approval_bundle
 from research_lab.cli import main as research_lab_main
 from research_lab.constants import PARAM_STATUS_ACTIVE, PARAM_STATUS_FROZEN, PARAM_STATUS_UNSUPPORTED
 from research_lab.constraints import validate_param_vector
-from research_lab.experiment_store import init_store, load_trials, load_trials_filtered, save_recommendation, save_trial, save_walkforward
+from research_lab.experiment_store import (
+    init_store,
+    load_trials,
+    load_trials_filtered,
+    load_walkforward_passed_candidate_ids,
+    save_recommendation,
+    save_trial,
+    save_walkforward,
+)
 from research_lab.objective import build_search_space_signature, build_trial_context_signature
 from research_lab.param_registry import build_param_registry, get_active_params
 from research_lab.pareto import compute_pareto_frontier
@@ -155,12 +163,16 @@ class _FakeOptunaTrial:
 class _FakeOptunaStudy:
     def __init__(self) -> None:
         self.metric_names: list[str] | None = None
+        self.user_attrs: dict[str, object] = {}
         self.trials: list[_FakeOptunaTrial] = []
         self.results: list[tuple[float, float, float]] = []
         self.enqueued_params: list[dict[str, object]] = []
 
     def set_metric_names(self, names: list[str]) -> None:
         self.metric_names = names
+
+    def set_user_attr(self, key: str, value: object) -> None:
+        self.user_attrs[key] = value
 
     def enqueue_trial(self, params: dict[str, object]) -> None:
         self.enqueued_params.append(dict(params))
@@ -210,6 +222,13 @@ def test_param_registry_frozen_params_are_correct() -> None:
     assert registry["weight_ema_trend_alignment"].high == 5.0
     assert registry["ema_trend_gap_pct"].default_value == 0.0063
     assert registry["compression_atr_norm_max"].default_value == 0.0023
+    assert registry["compression_atr_norm_max"].high == 0.02
+    assert registry["post_liq_tfi_abs_min"].high == 0.85
+    assert registry["min_sweep_depth_pct"].high == 0.01
+    assert registry["entry_offset_atr"].high == 0.8
+    assert registry["min_stop_distance_pct"].high == 0.01
+    assert registry["risk_per_trade_pct"].high == 0.02
+    assert registry["trailing_atr_mult"].high == 4.0
     assert registry["crowded_funding_extreme_pct"].default_value == 85.0
     assert registry["crowded_oi_zscore_min"].default_value == 1.5
     assert registry["force_order_history_points"].status == PARAM_STATUS_UNSUPPORTED
@@ -379,6 +398,10 @@ def test_run_optuna_study_hard_blocks_trials_below_80_trades(
         "MIN_TRADES_HARD_BLOCK: trades_count=79 < hard_min_trades=80"
     )
     assert saved_trials[0].metrics.trades_count == 79
+    assert saved_trials[0].objective_metrics is not None
+    assert saved_trials[0].objective_metrics.expectancy_r == -2.0
+    assert study.trials[0].user_attrs["trial_wall_time_sec"] >= 0
+    assert study.trials[0].user_attrs["search_space_signature"]
 
 
 def test_run_optuna_study_hard_blocks_artifact_metrics(
@@ -403,6 +426,8 @@ def test_run_optuna_study_hard_blocks_artifact_metrics(
         "ARTIFACT_BLOCK: win_rate=0.960, profit_factor=351000000000.00"
     )
     assert saved_trials[0].metrics.profit_factor == 351_000_000_000.0
+    assert saved_trials[0].objective_metrics is not None
+    assert saved_trials[0].objective_metrics.profit_factor == 0.1
 
 
 def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
@@ -427,6 +452,8 @@ def test_run_optuna_study_soft_penalizes_trials_between_80_and_min_trades(
         "MIN_TRADES_NOT_MET: trades_count=85 < min_trades=100"
     )
     assert saved_trials[0].metrics.trades_count == 85
+    assert saved_trials[0].objective_metrics is not None
+    assert saved_trials[0].objective_metrics.expectancy_r == pytest.approx(exp_r)
 
 
 def test_warm_start_filters_mismatched_protocol(
@@ -543,6 +570,7 @@ def test_warm_start_filters_mismatched_protocol(
             store_path=store_path,
             protocol_hash="run13-protocol-hash",
             warm_start_top_n=1,
+            warm_start_mode="all",
         )
 
     assert [trial.trial_id for trial in filtered_trials] == [matching_trial.trial_id]
@@ -603,11 +631,124 @@ def test_enqueue_warm_start_ignore_protocol_bypasses_filters(
             protocol_hash="run13-protocol-hash",
             warm_start_top_n=1,
             warm_start_ignore_protocol=True,
+            warm_start_mode="all",
         )
 
     assert study.enqueued_params[0] == historical_trial.params
     assert study.enqueued_params[1]["allow_long_in_uptrend"] is True
     assert "Unsafe warm-start enabled: ignoring protocol/search-space filters for historical trials." in caplog.text
+
+
+def test_warm_start_wf_winners_only_filters_to_passing_walkforward_trials(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    study = _FakeOptunaStudy()
+    store_path = tmp_path / "research_lab.db"
+    protocol_hash_value = "run13-protocol-hash"
+    active_param_names = tuple(get_active_params().keys())
+    search_space_signature = build_search_space_signature(active_param_names)
+    winner = dataclasses.replace(
+        _trial_with_params(
+            "wf-winner",
+            {"allow_long_in_uptrend": True, "tp1_atr_mult": 2.5, "tp2_atr_mult": 4.0},
+            expectancy_r=0.6,
+            profit_factor=1.7,
+            max_drawdown_pct=0.2,
+            trades_count=180,
+        ),
+        protocol_hash=protocol_hash_value,
+        search_space_signature=search_space_signature,
+    )
+    non_wf = dataclasses.replace(
+        _trial_with_params(
+            "no-wf-report",
+            {"allow_long_in_uptrend": True, "tp1_atr_mult": 2.6, "tp2_atr_mult": 4.1},
+            expectancy_r=0.7,
+            profit_factor=1.8,
+            max_drawdown_pct=0.2,
+            trades_count=180,
+        ),
+        protocol_hash=protocol_hash_value,
+        search_space_signature=search_space_signature,
+    )
+    save_trial(winner, store_path)
+    save_trial(non_wf, store_path)
+    save_walkforward(
+        winner.trial_id,
+        WalkForwardReport(
+            passed=True,
+            windows_total=2,
+            windows_passed=2,
+            is_degradation_pct=5.0,
+            fragile=False,
+            reasons=(),
+            protocol_hash=protocol_hash_value,
+        ),
+        store_path,
+    )
+
+    assert load_walkforward_passed_candidate_ids(store_path, protocol_hash_value) == {winner.trial_id}
+    monkeypatch.setattr(optuna_driver_module, "compute_pareto_frontier", lambda trials: trials)
+    monkeypatch.setattr(optuna_driver_module, "rank_pareto_candidates", lambda trials: trials)
+
+    optuna_driver_module._enqueue_warm_start_trials(
+        study,
+        base_settings=settings,
+        store_path=store_path,
+        protocol_hash=protocol_hash_value,
+        warm_start_top_n=2,
+        warm_start_mode="wf-winners-only",
+    )
+
+    assert study.enqueued_params[0] == winner.params
+    assert all(params != non_wf.params for params in study.enqueued_params)
+
+
+def test_multivariate_tpe_auto_disables_for_dynamic_bounds() -> None:
+    enabled, policy = optuna_driver_module._resolve_multivariate_tpe_policy(
+        requested=True,
+        active_param_names=("tp1_atr_mult", "tp2_atr_mult"),
+    )
+
+    assert enabled is False
+    assert policy == "disabled_dynamic_bounds:tp2_atr_mult"
+
+
+def test_walkforward_drawdown_gate_uses_fraction_units() -> None:
+    failures = walkforward_module._segment_failures(
+        evaluation=_trial("dd-fail", expectancy_r=0.2, profit_factor=1.5, max_drawdown_pct=0.55),
+        min_expectancy_r=0.0,
+        min_profit_factor=1.0,
+        max_drawdown_pct=0.5,
+        min_sharpe_ratio=0.0,
+    )
+
+    assert "max_drawdown_pct=0.5500 > max_drawdown_pct=0.5000" in failures
+
+
+def test_trial_store_persists_raw_and_objective_metrics(tmp_path: Path) -> None:
+    store_path = tmp_path / "research_lab.db"
+    trial = dataclasses.replace(
+        _trial("raw-objective", expectancy_r=1.8, profit_factor=12.0, max_drawdown_pct=0.2),
+        objective_metrics=ObjectiveMetrics(
+            expectancy_r=0.2,
+            profit_factor=5.0,
+            max_drawdown_pct=0.2,
+            trades_count=100,
+            sharpe_ratio=1.0,
+            pnl_abs=1000.0,
+            win_rate=0.5,
+        ),
+    )
+
+    save_trial(trial, store_path)
+    loaded = load_trials(store_path)[0]
+
+    assert loaded.metrics.profit_factor == 12.0
+    assert loaded.objective_metrics is not None
+    assert loaded.objective_metrics.profit_factor == 5.0
 
 
 def test_constraints_rejects_invalid_vectors() -> None:
@@ -832,6 +973,7 @@ def test_optimize_cli_passes_warm_start_ignore_protocol(
 
     assert captured_kwargs["warm_start_from_store"] is True
     assert captured_kwargs["warm_start_ignore_protocol"] is True
+    assert captured_kwargs["warm_start_mode"] == "wf-winners-only"
 
 
 def test_autoresearch_cli_loads_seed_vectors_from_pareto_json(

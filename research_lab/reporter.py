@@ -9,6 +9,18 @@ from research_lab.experiment_store import init_store, load_trials
 from research_lab.pareto import compute_pareto_frontier, rank_pareto_candidates
 
 
+def _metrics_dict(metrics: Any) -> dict[str, Any]:
+    return {
+        "expectancy_r": metrics.expectancy_r,
+        "profit_factor": metrics.profit_factor,
+        "max_drawdown_pct": metrics.max_drawdown_pct,
+        "trades_count": metrics.trades_count,
+        "sharpe_ratio": metrics.sharpe_ratio,
+        "pnl_abs": metrics.pnl_abs,
+        "win_rate": metrics.win_rate,
+    }
+
+
 def _connect(store_path: Path) -> sqlite3.Connection:
     conn = sqlite3.connect(store_path)
     conn.row_factory = sqlite3.Row
@@ -94,6 +106,10 @@ def build_experiment_report(store_path: Path) -> dict[str, Any]:
                 "profit_factor": trial.metrics.profit_factor,
                 "max_drawdown_pct": trial.metrics.max_drawdown_pct,
                 "trades_count": trial.metrics.trades_count,
+                "raw_metrics": _metrics_dict(trial.metrics),
+                "objective_metrics": _metrics_dict(trial.objective_metrics)
+                if trial.objective_metrics is not None
+                else None,
                 "rejected_reason": trial.rejected_reason,
                 "protocol_hash": trial.protocol_hash,
             }

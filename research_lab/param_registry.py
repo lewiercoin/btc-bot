@@ -42,6 +42,19 @@ _FROZEN_REASONS: dict[str, str] = {
 
 _DEFERRED_REASONS: dict[str, str] = {}
 
+# V2 accepted/rejected trial evidence from optuna_default_v2, queried 2026-05-07.
+# Tighten only high tails where accepted trials sat well below the old upper bound
+# and rejected trials concentrated in the same high-value region.
+_V3_RANGE_TIGHTENING_RATIONALE: dict[str, str] = {
+    "compression_atr_norm_max": "old high=0.05; V2 accepted p90=0.0170, rejected p90=0.0253; cap high tail at 0.0200",
+    "post_liq_tfi_abs_min": "old high=1.00; V2 accepted p90=0.77, rejected p90=0.83; cap high tail at 0.85",
+    "min_sweep_depth_pct": "old high=0.0200; V2 accepted p90=0.00825, rejected p75=0.01081; cap high tail at 0.0100",
+    "entry_offset_atr": "old high=2.00; V2 accepted p90=0.55, rejected p90=0.69; cap high tail at 0.80",
+    "min_stop_distance_pct": "old high=0.0200; V2 accepted p90=0.0059, rejected p90=0.0081; cap high tail at 0.0100",
+    "risk_per_trade_pct": "old high=0.0500; V2 accepted p90=0.0155, rejected p90=0.0180; cap high tail at 0.0200",
+    "trailing_atr_mult": "old high=5.0; V2 accepted p90=2.9, rejected p90=3.6; cap high tail at 4.0",
+}
+
 _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "atr_period": {"low": 8, "high": 50, "step": 1},
     "ema_fast": {"low": 5, "high": 200, "step": 1},
@@ -55,14 +68,14 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "oi_z_window_days": {"low": 7, "high": 180, "step": 1},
     "confluence_min": {"low": 2.5, "high": 4.5, "step": 0.1},
     "ema_trend_gap_pct": {"low": 0.0001, "high": 0.02, "step": 0.0001},
-    "compression_atr_norm_max": {"low": 0.0001, "high": 0.05, "step": 0.0001},
+    "compression_atr_norm_max": {"low": 0.0001, "high": 0.02, "step": 0.0001},
     "crowded_funding_extreme_pct": {"low": 50.0, "high": 99.9, "step": 0.1},
     "crowded_oi_zscore_min": {"low": 0.1, "high": 5.0, "step": 0.1},
-    "post_liq_tfi_abs_min": {"low": 0.01, "high": 1.0, "step": 0.01},
-    "min_sweep_depth_pct": {"low": 0.00001, "high": 0.02, "step": 0.00001},
-    "entry_offset_atr": {"low": 0.0, "high": 2.0, "step": 0.01},
+    "post_liq_tfi_abs_min": {"low": 0.01, "high": 0.85, "step": 0.01},
+    "min_sweep_depth_pct": {"low": 0.00001, "high": 0.01, "step": 0.00001},
+    "entry_offset_atr": {"low": 0.0, "high": 0.8, "step": 0.01},
     "invalidation_offset_atr": {"low": 0.01, "high": 3.0, "step": 0.01},
-    "min_stop_distance_pct": {"low": 0.0001, "high": 0.02, "step": 0.0001},
+    "min_stop_distance_pct": {"low": 0.0001, "high": 0.01, "step": 0.0001},
     "tp1_atr_mult": {"low": 0.5, "high": 5.0, "step": 0.1},
     "tp2_atr_mult": {"low": 1.0, "high": 8.0, "step": 0.1},
     "weight_sweep_detected": {"low": 0.0, "high": 5.0, "step": 0.05},
@@ -74,7 +87,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "weight_funding_supportive": {"low": 0.0, "high": 5.0, "step": 0.05},
     "direction_tfi_threshold": {"low": 0.01, "high": 0.5, "step": 0.01},
     "tfi_impulse_threshold": {"low": 0.05, "high": 0.5, "step": 0.01},
-    "risk_per_trade_pct": {"low": 0.001, "high": 0.05, "step": 0.0005},
+    "risk_per_trade_pct": {"low": 0.001, "high": 0.02, "step": 0.0005},
     "max_leverage": {"low": 2, "high": 9, "step": 1},
     "high_vol_leverage": {"low": 1, "high": 9, "step": 1},
     "min_rr": {"low": 1.5, "high": 4.0, "step": 0.05},
@@ -86,7 +99,7 @@ _RANGE_OVERRIDES: dict[str, dict[str, Any]] = {
     "max_hold_hours": {"low": 1, "high": 48, "step": 1},
     "high_vol_stop_distance_pct": {"low": 0.001, "high": 0.1, "step": 0.001},
     "partial_exit_pct": {"low": 0.01, "high": 0.99, "step": 0.01},
-    "trailing_atr_mult": {"low": 0.1, "high": 5.0, "step": 0.1},
+    "trailing_atr_mult": {"low": 0.1, "high": 4.0, "step": 0.1},
     "cooldown_minutes_after_loss": {"low": 0, "high": 240, "step": 5},
     "duplicate_level_tolerance_pct": {"low": 0.0001, "high": 0.01, "step": 0.0001},
     "duplicate_level_window_hours": {"low": 1, "high": 168, "step": 1},

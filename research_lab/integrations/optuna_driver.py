@@ -12,7 +12,13 @@ from settings import AppSettings
 from research_lab.constants import MAX_TRADES_DEFAULT, MIN_TRADES_DEFAULT
 from research_lab.constraints import validate_param_vector
 from research_lab.db_snapshot import create_trial_snapshot, open_snapshot_connection, verify_required_tables
-from research_lab.experiment_store import init_store, load_trials, load_trials_filtered, save_trial
+from research_lab.experiment_store import (
+    init_store,
+    load_trials,
+    load_trials_filtered,
+    load_walkforward_passed_candidate_ids,
+    save_trial,
+)
 from research_lab.objective import (
     build_search_space_signature,
     build_trial_context_signature,
@@ -28,6 +34,9 @@ if TYPE_CHECKING:
 
 
 _HARD_MIN_TRADES_FLOOR = 80
+_DYNAMIC_BOUND_PARAMS = frozenset(("ema_slow", "tp2_atr_mult", "high_vol_leverage"))
+WARM_START_MODE_ALL = "all"
+WARM_START_MODE_WF_WINNERS_ONLY = "wf-winners-only"
 logger = logging.getLogger(__name__)
 
 
@@ -111,6 +120,21 @@ def _filter_active_specs(active_param_names: tuple[str, ...] | None) -> dict[str
     return {name: active_specs[name] for name in active_param_names}
 
 
+def _resolve_multivariate_tpe_policy(
+    *, requested: bool, active_param_names: tuple[str, ...] | None
+) -> tuple[bool, str]:
+    active_names = set(_filter_active_specs(active_param_names))
+    dynamic_names = sorted(active_names.intersection(_DYNAMIC_BOUND_PARAMS))
+    if requested and dynamic_names:
+        return (
+            False,
+            "disabled_dynamic_bounds:" + ",".join(dynamic_names),
+        )
+    if requested:
+        return True, "enabled"
+    return False, "disabled_not_requested"
+
+
 def build_optuna_trial_params(
     trial: optuna.Trial,
     *,
@@ -183,6 +207,15 @@ def build_optuna_trial_params(
 
 
 def _rejected_trial(trial_id: str, params: dict[str, Any], reason: str) -> TrialEvaluation:
+    objective_metrics = ObjectiveMetrics(
+        expectancy_r=-2.0,
+        profit_factor=0.1,
+        max_drawdown_pct=1.0,
+        trades_count=0,
+        sharpe_ratio=0.0,
+        pnl_abs=0.0,
+        win_rate=0.0,
+    )
     return TrialEvaluation(
         trial_id=trial_id,
         params=params,
@@ -203,8 +236,70 @@ def _rejected_trial(trial_id: str, params: dict[str, Any], reason: str) -> Trial
             signals_executed=0,
         ),
         rejected_reason=reason,
+        objective_metrics=objective_metrics,
         protocol_hash=None,
     )
+
+
+def _objective_metrics_from_raw(
+    raw_metrics: ObjectiveMetrics,
+    *,
+    expectancy_r: float,
+    profit_factor: float,
+    max_drawdown_pct: float,
+) -> ObjectiveMetrics:
+    return ObjectiveMetrics(
+        expectancy_r=expectancy_r,
+        profit_factor=profit_factor,
+        max_drawdown_pct=max_drawdown_pct,
+        trades_count=raw_metrics.trades_count,
+        sharpe_ratio=raw_metrics.sharpe_ratio,
+        pnl_abs=raw_metrics.pnl_abs,
+        win_rate=raw_metrics.win_rate,
+    )
+
+
+def _set_trial_metadata(
+    trial: Any,
+    *,
+    protocol_hash: str | None,
+    baseline_version: str,
+    search_space_signature: str,
+    trial_context_signature: str,
+    backtest_config: BacktestConfig,
+    multivariate_tpe_requested: bool,
+    multivariate_tpe_effective: bool,
+    multivariate_tpe_policy: str,
+    warm_start_mode: str,
+) -> None:
+    trial.set_user_attr("protocol_hash", protocol_hash or "")
+    trial.set_user_attr("config_hash", baseline_version)
+    trial.set_user_attr("baseline_version", baseline_version)
+    trial.set_user_attr("search_space_signature", search_space_signature)
+    trial.set_user_attr("trial_context_signature", trial_context_signature)
+    trial.set_user_attr("date_range_start", str(backtest_config.start_date))
+    trial.set_user_attr("date_range_end", str(backtest_config.end_date))
+    trial.set_user_attr("multivariate_tpe_requested", bool(multivariate_tpe_requested))
+    trial.set_user_attr("multivariate_tpe_effective", bool(multivariate_tpe_effective))
+    trial.set_user_attr("multivariate_tpe_policy", multivariate_tpe_policy)
+    trial.set_user_attr("warm_start_mode", warm_start_mode)
+
+
+def _finish_trial_metadata(
+    trial: Any,
+    *,
+    wall_time_start: float,
+    rejection_reason: str | None,
+    objective_metrics: ObjectiveMetrics,
+) -> None:
+    if rejection_reason is not None:
+        trial.set_user_attr("rejection_reason", rejection_reason)
+    trial.set_user_attr("objective_expectancy_r", objective_metrics.expectancy_r)
+    trial.set_user_attr("objective_profit_factor", objective_metrics.profit_factor)
+    trial.set_user_attr("objective_max_drawdown_pct", objective_metrics.max_drawdown_pct)
+    wall_time = round(time.monotonic() - wall_time_start, 3)
+    trial.set_user_attr("trial_wall_time_sec", wall_time)
+    trial.set_user_attr("trial_wall_time_s", wall_time)
 
 
 def _enqueue_warm_start_trials(
@@ -216,9 +311,12 @@ def _enqueue_warm_start_trials(
     warm_start_top_n: int,
     active_param_names: tuple[str, ...] | None = None,
     warm_start_ignore_protocol: bool = False,
+    warm_start_mode: str = WARM_START_MODE_WF_WINNERS_ONLY,
     regime_signature: str | None = None,
 ) -> None:
     """Enqueue baseline config + top-N Pareto winners from store as warm-start trials."""
+    if warm_start_mode not in {WARM_START_MODE_ALL, WARM_START_MODE_WF_WINNERS_ONLY}:
+        raise ValueError(f"Unsupported warm_start_mode={warm_start_mode!r}")
     active_names = tuple(_filter_active_specs(active_param_names).keys())
     active_name_set = set(active_names)
     search_space_signature = build_search_space_signature(active_names)
@@ -252,7 +350,14 @@ def _enqueue_warm_start_trials(
                         "Warm-start filtered out more than 50%% of store history (%s/%s trials).",
                         filtered_out,
                         len(existing),
-                    )
+                )
+        if warm_start_mode == WARM_START_MODE_WF_WINNERS_ONLY:
+            passed_ids = load_walkforward_passed_candidate_ids(store_path, protocol_hash=protocol_hash)
+            context_trials = [trial for trial in context_trials if trial.trial_id in passed_ids]
+            if not context_trials:
+                logger.warning(
+                    "Warm-start mode wf-winners-only found no passing walk-forward trials; baseline only will be enqueued."
+                )
         candidates = [
             t
             for t in context_trials
@@ -305,6 +410,7 @@ def run_optuna_study(
     warm_start_top_n: int = 3,
     active_param_names: tuple[str, ...] | None = None,
     warm_start_ignore_protocol: bool = False,
+    warm_start_mode: str = WARM_START_MODE_WF_WINNERS_ONLY,
     regime_signature: str | None = None,
 ) -> list[TrialEvaluation]:
     optuna = _require_optuna()
@@ -331,9 +437,19 @@ def run_optuna_study(
     def _constraints_func(trial: Any) -> list[float]:
         return list(trial.user_attrs.get("constraint_violations", []))
 
+    effective_multivariate_tpe, multivariate_tpe_policy = _resolve_multivariate_tpe_policy(
+        requested=bool(multivariate_tpe),
+        active_param_names=active_param_names,
+    )
+    if multivariate_tpe and not effective_multivariate_tpe:
+        logger.warning(
+            "Multivariate TPE requested but disabled for this search space: %s",
+            multivariate_tpe_policy,
+        )
+
     sampler = optuna.samplers.TPESampler(
         seed=seed,
-        multivariate=multivariate_tpe,
+        multivariate=effective_multivariate_tpe,
         constraints_func=_constraints_func,
     )
 
@@ -345,6 +461,10 @@ def run_optuna_study(
         load_if_exists=optuna_storage_path is not None,
     )
     study.set_metric_names(["expectancy_r", "profit_factor", "max_drawdown_pct"])
+    study.set_user_attr("multivariate_tpe_requested", bool(multivariate_tpe))
+    study.set_user_attr("multivariate_tpe_effective", bool(effective_multivariate_tpe))
+    study.set_user_attr("multivariate_tpe_policy", multivariate_tpe_policy)
+    study.set_user_attr("warm_start_mode", warm_start_mode)
 
     if warm_start_from_store:
         _enqueue_warm_start_trials(
@@ -355,12 +475,24 @@ def run_optuna_study(
             warm_start_top_n=warm_start_top_n,
             active_param_names=active_param_names,
             warm_start_ignore_protocol=warm_start_ignore_protocol,
+            warm_start_mode=warm_start_mode,
             regime_signature=regime_signature,
         )
 
     def objective(trial: optuna.Trial) -> tuple[float, float, float]:
         wall_time_start = time.monotonic()
-        trial.set_user_attr("protocol_hash", protocol_hash or "")
+        _set_trial_metadata(
+            trial,
+            protocol_hash=protocol_hash,
+            baseline_version=base_settings.config_hash,
+            search_space_signature=search_space_signature,
+            trial_context_signature=trial_context_signature,
+            backtest_config=backtest_config,
+            multivariate_tpe_requested=bool(multivariate_tpe),
+            multivariate_tpe_effective=bool(effective_multivariate_tpe),
+            multivariate_tpe_policy=multivariate_tpe_policy,
+            warm_start_mode=warm_start_mode,
+        )
 
         trial_id = f"{study_name}-trial-{trial.number:05d}"
         sampled_params = build_optuna_trial_params(trial, active_param_names=active_param_names)
@@ -369,9 +501,19 @@ def run_optuna_study(
         violations = validate_param_vector(sampled_params)
         if violations:
             rejection_reason = "; ".join(violations)
+            objective_metrics = _objective_metrics_from_raw(
+                ObjectiveMetrics(0.0, 0.0, 1.0, 0, 0.0, 0.0, 0.0),
+                expectancy_r=-2.0,
+                profit_factor=0.1,
+                max_drawdown_pct=1.0,
+            )
             trial.set_user_attr("constraint_violations", [1.0] * len(violations))
-            trial.set_user_attr("rejection_reason", rejection_reason)
-            trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
+            _finish_trial_metadata(
+                trial,
+                wall_time_start=wall_time_start,
+                rejection_reason=rejection_reason,
+                objective_metrics=objective_metrics,
+            )
             evaluation = dataclasses.replace(
                 _rejected_trial(trial_id, sampled_params, rejection_reason),
                 protocol_hash=protocol_hash,
@@ -379,6 +521,7 @@ def run_optuna_study(
                 regime_signature=regime_signature,
                 trial_context_signature=trial_context_signature,
                 baseline_version=base_settings.config_hash,
+                objective_metrics=objective_metrics,
             )
             evaluations.append(evaluation)
             save_trial(evaluation, store_path)
@@ -417,11 +560,6 @@ def run_optuna_study(
             trial_context_signature=trial_context_signature,
             baseline_version=base_settings.config_hash,
         )
-        evaluations.append(evaluation)
-        save_trial(evaluation, store_path)
-        if evaluation.rejected_reason is not None:
-            trial.set_user_attr("rejection_reason", evaluation.rejected_reason)
-        trial.set_user_attr("trial_wall_time_s", round(time.monotonic() - wall_time_start, 3))
 
         trades = evaluation.metrics.trades_count
         exp_r = evaluation.metrics.expectancy_r
@@ -435,7 +573,25 @@ def run_optuna_study(
                 f"profit_factor={evaluation.metrics.profit_factor:.2f}"
             )
             trial.set_user_attr("constraint_violations", [1.0])
-            trial.set_user_attr("rejection_reason", artifact_reason)
+            objective_metrics = _objective_metrics_from_raw(
+                evaluation.metrics,
+                expectancy_r=-2.0,
+                profit_factor=0.1,
+                max_drawdown_pct=1.0,
+            )
+            evaluation = dataclasses.replace(
+                evaluation,
+                rejected_reason=artifact_reason,
+                objective_metrics=objective_metrics,
+            )
+            evaluations.append(evaluation)
+            save_trial(evaluation, store_path)
+            _finish_trial_metadata(
+                trial,
+                wall_time_start=wall_time_start,
+                rejection_reason=artifact_reason,
+                objective_metrics=objective_metrics,
+            )
             return (-2.0, 0.1, 1.0)
 
         hard_min_trades = min(_HARD_MIN_TRADES_FLOOR, int(min_trades))
@@ -444,7 +600,25 @@ def run_optuna_study(
                 f"MIN_TRADES_HARD_BLOCK: trades_count={trades} < hard_min_trades={hard_min_trades}"
             )
             trial.set_user_attr("constraint_violations", [1.0])
-            trial.set_user_attr("rejection_reason", rejection_reason)
+            objective_metrics = _objective_metrics_from_raw(
+                evaluation.metrics,
+                expectancy_r=-2.0,
+                profit_factor=0.1,
+                max_drawdown_pct=1.0,
+            )
+            evaluation = dataclasses.replace(
+                evaluation,
+                rejected_reason=rejection_reason,
+                objective_metrics=objective_metrics,
+            )
+            evaluations.append(evaluation)
+            save_trial(evaluation, store_path)
+            _finish_trial_metadata(
+                trial,
+                wall_time_start=wall_time_start,
+                rejection_reason=rejection_reason,
+                objective_metrics=objective_metrics,
+            )
             return (-2.0, 0.1, 1.0)
 
         # --- Soft Penalty: too few trades above the hard floor ---
@@ -468,6 +642,21 @@ def run_optuna_study(
         pf = max(0.1, min(5.0, pf))
         dd = max(0.0, min(1.0, dd))
 
+        objective_metrics = _objective_metrics_from_raw(
+            evaluation.metrics,
+            expectancy_r=exp_r,
+            profit_factor=pf,
+            max_drawdown_pct=dd,
+        )
+        evaluation = dataclasses.replace(evaluation, objective_metrics=objective_metrics)
+        evaluations.append(evaluation)
+        save_trial(evaluation, store_path)
+        _finish_trial_metadata(
+            trial,
+            wall_time_start=wall_time_start,
+            rejection_reason=evaluation.rejected_reason,
+            objective_metrics=objective_metrics,
+        )
         return (exp_r, pf, dd)
 
     study.optimize(objective, n_trials=int(n_trials))

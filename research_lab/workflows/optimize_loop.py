@@ -128,6 +128,7 @@ def run_optimize_loop(
     multivariate_tpe: bool = False,
     warm_start_from_store: bool = False,
     warm_start_ignore_protocol: bool = False,
+    warm_start_mode: str = "wf-winners-only",
 ) -> dict[str, Any]:
     protocol_file = protocol_path or (Path(__file__).resolve().parents[1] / "configs" / "default_protocol.json")
     protocol = load_protocol(protocol_file)
@@ -227,6 +228,7 @@ def run_optimize_loop(
         warm_start_from_store=warm_start_from_store,
         active_param_names=active_param_names,
         warm_start_ignore_protocol=warm_start_ignore_protocol,
+        warm_start_mode=warm_start_mode,
     )
     frontier = rank_pareto_candidates(compute_pareto_frontier(trials))
 

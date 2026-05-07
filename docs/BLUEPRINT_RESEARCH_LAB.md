@@ -89,7 +89,7 @@ Primary optimization flow:
 
 Two-phase staged workflow:
 
-1. Phase 1 discovery: `optimize` is the canonical broad search stage. Warm-start history is filtered by `protocol_hash` plus `search_space_signature` by default, with an explicit unsafe bypass for operators.
+1. Phase 1 discovery: `optimize` is the canonical broad search stage. Warm-start history is filtered by `protocol_hash` plus `search_space_signature` by default, and production campaigns default to `--warm-start-mode=wf-winners-only`. The explicit unsafe bypass exists for operators, but it does not make incompatible history decision-grade.
 2. Phase 2 refinement: `autoresearch` is the canonical refinement stage. It is not a peer alternative to Optuna discovery. It consumes prior store history and may be explicitly seeded from Phase 1 Pareto exports through `--seed-from-pareto`.
 3. Promotion artifacts remain human-reviewed outputs only. Phase 2 may refine candidates; it may not bypass approval policy.
 
@@ -155,6 +155,23 @@ Current methodology supports two explicit modes:
 
 The remaining methodology limitation is narrower: `post_hoc` mode is intentionally not nested, and nested mode still requires honest language about its exact aggregation and selection contract.
 
+## Optuna Infrastructure Policy
+
+Campaign V3 uses conservative infrastructure hardening from Campaign V2 lessons:
+
+- `TPESampler(multivariate=True)` is automatically disabled when the active search
+  space contains dynamic-bound parameters such as `tp2_atr_mult` or
+  `high_vol_leverage`. This avoids Optuna's RandomSampler fallback storm for
+  conditional distributions while preserving ordinary TPE behavior.
+- Trial persistence separates raw backtest metrics from objective metrics returned
+  to Optuna after caps, penalties, and hard rejection transforms.
+- Optuna trial user attributes include protocol, config, search-space, context,
+  date range, warm-start mode, rejection reason, and wall-clock duration.
+- Walk-forward drawdown gates use the same fraction unit as
+  `ObjectiveMetrics.max_drawdown_pct`; `0.5` means 50% drawdown.
+- V3 range tightening is evidence-based and documented in
+  `docs/analysis/OPTUNA_V3_RANGE_TIGHTENING_2026-05-07.md`.
+
 ## Promotion Policy
 
 Canonical blocking promotion risks in v1:
@@ -189,6 +206,7 @@ Current state:
 - source DB path and date range are provided to workflow entrypoints
 - `protocol_hash` is derived from canonical protocol JSON and persisted with trials, walk-forward reports, recommendations, and experiment reports
 - `search_space_signature`, optional `regime_signature`, `trial_context_signature`, and `baseline_version` are persisted with trials for context-safe warm-start and replay lineage
+- `raw_metrics_json` and `objective_metrics_json` are persisted for trial auditability
 - commit SHA is not yet persisted in the experiment store
 
 Protocol lineage is now explicit for the current blueprint version, but full reproducibility is still incomplete until commit SHA is persisted.
