@@ -1,10 +1,46 @@
 # Milestone Tracker
 
-## Current Status: HANDOFF_READY — OPTUNA-CAMPAIGN-V3
+## Current Active Milestone: OPTUNA-CAMPAIGN-V3
 
-**Context:** V3 infrastructure audited DONE. User approved Campaign V3 launch (Option A). Handoff ready for Codex at `docs/handoffs/HANDOFF_OPTUNA_CAMPAIGN_V3_2026-05-07.md`.
+**Status:** ACTIVE - server campaign launch in progress.  
+**Builder:** Codex  
+**Decision date:** 2026-05-07  
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9`
 
-**Next step:** Codex launches Campaign V3 on server (350 trials, ~12-14h, WF-winners-only warm-start from trial-00000).
+**Scope:** Launch 350-trial Optuna Campaign V3 on the production server using the
+audited V3 Research Lab infrastructure hardening. Paper trading for `trial-00000`
+is intentionally deferred until the post-V3 audit decision because server CPU/RAM
+cannot support both workloads concurrently.
+
+**Launch command (server: `root@204.168.146.253`):**
+```bash
+cd /home/btc-bot/btc-bot
+nohup .venv/bin/python -m research_lab optimize \
+  --start-date 2022-01-01 --end-date 2026-03-28 \
+  --study-name optuna-default-v3 --n-trials 350 --seed 44 \
+  --warm-start-from-store --warm-start-mode wf-winners-only \
+  --multivariate-tpe \
+  --max-sweep-rate 0.60 \
+  --optuna-storage-path /home/btc-bot/btc-bot/research_lab/optuna_default_v3.db \
+  > /tmp/optuna_v3.log 2>&1 &
+```
+
+**Expected V3 behavior:**
+- Warm-start uses WF winners only; `trial-00000` remains the reference clean
+  candidate from Campaign V1.
+- Multivariate TPE request is expected to auto-disable because dynamic-bound
+  parameters are active.
+- Trial persistence records raw and objective metrics separately.
+- Estimated runtime: 12-14 hours for 350 trials.
+
+**Launch verification checklist:**
+- SSH connection with `btc-bot-deploy-v2` key works.
+- Bot service remains running in PAPER mode and is not interrupted.
+- Launch command returns PID.
+- `/tmp/optuna_v3.log` is created.
+- `research_lab/optuna_default_v3.db` is created.
+- First trial completes and study attrs confirm `warm_start_mode=wf-winners-only`
+  plus `multivariate_tpe_effective=false`.
 
 ---
 
