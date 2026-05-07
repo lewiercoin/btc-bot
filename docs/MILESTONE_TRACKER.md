@@ -1,6 +1,57 @@
 # Milestone Tracker
 
-Last updated: 2026-05-01
+## Current Active Milestone: None - pending next user decision
+
+**Status:** No active implementation milestone after Campaign V2 revalidation.  
+**Recommended next milestone:** `OPTUNA-INFRASTRUCTURE-V3-HARDENING` before launching V3.
+
+---
+
+## Completed: CAMPAIGN-V2-REVALIDATION-ENHANCED-ARTIFACTS - DONE
+
+**Status:** DONE / **Audit:** Claude Code PASS (2026-05-07)  
+**Decision date:** 2026-05-07 / **Builder:** Codex  
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9`
+
+**Scope:** Add full per-window walk-forward artifacts, promotion safety flags, and
+single-candidate revalidation for `optuna-default-v2-trial-00152`.
+
+**Deliverables:**
+- `WalkForwardSegmentResult`, `WalkForwardWindowResult`, and `PromotionSafetyFlags`
+  contracts added.
+- `run_walkforward()` now persists train/validation metrics per window:
+  expectancy_r, profit_factor, trades_count, sharpe_ratio, max_drawdown_pct,
+  pnl_abs, win_rate, failures, pass/fail, and degradation.
+- Promotion safety flags added:
+  `pnl_sanity_review_required`, `pf_hard_review_required`,
+  `oos_outperformance_review_required`, `low_oos_trade_count_review_required`.
+- `replay-candidate --output-dir` writes revalidation evidence artifacts.
+- Revalidation artifacts: `research_lab/revalidation/trial-00152/`.
+
+**Revalidation result for `optuna-default-v2-trial-00152`:**
+- Verdict: `SCREENING_ONLY`
+- Walk-forward: 2/2 windows passed
+- Fragile: false
+- Mean degradation: +5.1410%
+- Safety flags:
+  - `pnl_sanity_review_required`: false
+  - `pf_hard_review_required`: false
+  - `oos_outperformance_review_required`: false
+  - `low_oos_trade_count_review_required`: true
+- Blocking reason: validation window 1 has 19 trades, below the 30-trade review
+  threshold.
+
+**Validation:**
+- Research Lab smoke: 36 passed, 2 skipped
+- Full suite with local coverage addopts disabled: 307 passed, 24 skipped
+- `compileall research_lab tests/test_research_lab_smoke.py`: PASS
+
+**Outcome:** No V2 candidate approved for paper trading. `trial-00152` remains useful
+screening evidence only. Next recommended step is infrastructure hardening before V3.
+
+---
+
+Last updated: 2026-05-07
 
 ---
 
@@ -21,9 +72,9 @@ Last updated: 2026-05-01
 
 ---
 
-## Current Active Milestone: OPTUNA-CAMPAIGN-V2 — ACTIVE (launch pending)
+## Completed: OPTUNA-CAMPAIGN-V2 - COMPLETE operational / NOT_READY promotion
 
-**Status:** ACTIVE
+**Status:** COMPLETE operational / NOT_READY promotion
 **Decision date:** 2026-05-04
 **Builder:** Codex
 **Auditor:** Claude Code
@@ -32,6 +83,11 @@ Last updated: 2026-05-01
 **Context:** Campaign 1 (optuna-default-v1-run2, 200 trials) completed. 32 PASSED,
 16 clean after hard filter, WF run on 16 candidates. trial-00000 passed WF cleanly
 (OOS ER=2.668, Sharpe=13.61). User chose to run improved campaign 2 first.
+
+**Campaign V2 result:** 350 trials executed, 85 accepted, 5 candidates passed formal
+WF. Claude Code post-campaign audit verdict: operational workflow PASS, promotion
+artifacts NOT_READY. Follow-up revalidation completed for `trial-00152`; verdict
+remained `SCREENING_ONLY`. ZERO V2 candidates approved for paper trading.
 
 **V2 architecture fixes (all committed, audited DONE at 6c8ec66):**
 1. Hard artifact block in objective(): WR>0.85 or PF>50 -> penalty + TPE infeasible signal
@@ -58,8 +114,8 @@ from 99.98% to 56.49%; 0.60 is more restrictive than Campaign 1 while accounting
 2022-2026 bear/bull regime variation. V2 objective-level gates still enforce artifact
 blocks and degenerate-weight rejection.
 
-**Time estimate:** ~13-15h (2h15min pre-flight + ~10-12h trials + ~30min WF on Pareto)
-**Next step after campaign:** Claude Code audit -> if PASS -> paper trading decision
+**Completed:** 2026-05-06  
+**Promotion decision:** No candidate approved for paper trading.
 
 ---
 

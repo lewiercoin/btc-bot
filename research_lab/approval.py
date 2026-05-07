@@ -34,6 +34,11 @@ def build_recommendation(
     if walkforward_report.fragile:
         risks.append("walkforward_fragile")
     risks.extend(walkforward_report.reasons)
+    safety_flags = getattr(walkforward_report, "safety_flags", None)
+    if safety_flags is not None:
+        for name, required in dataclasses.asdict(safety_flags).items():
+            if bool(required):
+                risks.append(str(name))
 
     summary = (
         f"Candidate {evaluation.trial_id}: expectancy_r={evaluation.metrics.expectancy_r:.4f}, "

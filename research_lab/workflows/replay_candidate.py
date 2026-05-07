@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import dataclasses
+import json
 from datetime import date, datetime
 from pathlib import Path
 from typing import Any
@@ -26,6 +27,51 @@ def _to_range_value(value: datetime | date | str) -> str:
     return str(value)
 
 
+def _promotion_verdict(recommendation_risks: tuple[str, ...]) -> str:
+    if recommendation_risks:
+        return "SCREENING_ONLY"
+    return "APPROVED_FOR_PAPER"
+
+
+def _write_revalidation_artifacts(
+    *,
+    output_dir: Path,
+    candidate_id: str,
+    evaluation: Any,
+    walkforward_report: Any,
+    recommendation: Any,
+) -> None:
+    output_dir.mkdir(parents=True, exist_ok=True)
+    verdict = _promotion_verdict(recommendation.risks)
+    summary = {
+        "candidate_id": candidate_id,
+        "verdict": verdict,
+        "approval_required": True,
+        "risks": list(recommendation.risks),
+        "walkforward_passed": bool(walkforward_report.passed),
+        "walkforward_fragile": bool(walkforward_report.fragile),
+        "walkforward_windows_total": int(walkforward_report.windows_total),
+        "walkforward_windows_passed": int(walkforward_report.windows_passed),
+        "safety_flags": dataclasses.asdict(walkforward_report.safety_flags),
+    }
+    (output_dir / "summary.json").write_text(
+        json.dumps(summary, indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    (output_dir / "evaluation.json").write_text(
+        json.dumps(dataclasses.asdict(evaluation), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    (output_dir / "walkforward_report.json").write_text(
+        json.dumps(dataclasses.asdict(walkforward_report), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+    (output_dir / "recommendation.json").write_text(
+        json.dumps(dataclasses.asdict(recommendation), indent=2, sort_keys=True),
+        encoding="utf-8",
+    )
+
+
 def replay_candidate(
     *,
     candidate_id: str,
@@ -35,6 +81,7 @@ def replay_candidate(
     store_path: Path,
     backtest_config: BacktestConfig,
     protocol_path: Path | None = None,
+    output_dir: Path | None = None,
 ) -> dict[str, Any]:
     trials = load_trials(store_path)
     matched = [trial for trial in trials if trial.trial_id == candidate_id]
@@ -98,9 +145,20 @@ def replay_candidate(
         walkforward_report=walkforward_report,
     )
     save_recommendation(recommendation, store_path)
+    if output_dir is not None:
+        _write_revalidation_artifacts(
+            output_dir=output_dir,
+            candidate_id=candidate_id,
+            evaluation=evaluation,
+            walkforward_report=walkforward_report,
+            recommendation=recommendation,
+        )
     return {
         "candidate_id": candidate_id,
         "protocol_hash": protocol_hash,
+        "verdict": _promotion_verdict(recommendation.risks),
+        "risks": list(recommendation.risks),
+        "safety_flags": dataclasses.asdict(walkforward_report.safety_flags),
         "walkforward_passed": walkforward_report.passed,
         "walkforward_fragile": walkforward_report.fragile,
         "walkforward_windows_total": walkforward_report.windows_total,

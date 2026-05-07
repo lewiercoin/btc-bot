@@ -34,6 +34,7 @@ from research_lab.types import (
     WalkForwardWindow,
 )
 from research_lab import baseline_gate as baseline_gate_module
+from research_lab import approval as approval_module
 from research_lab import autoresearch_loop as autoresearch_loop_module
 from research_lab import cli as cli_module
 from research_lab.integrations import optuna_driver as optuna_driver_module
@@ -1232,7 +1233,8 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
         ),
     )
 
-    replay_candidate_module.replay_candidate(
+    output_dir = tmp_path / "revalidation" / "candidate-001"
+    summary = replay_candidate_module.replay_candidate(
         candidate_id="candidate-001",
         base_settings=settings,
         source_db_path=tmp_path / "source.db",
@@ -1240,9 +1242,19 @@ def test_replay_candidate_uses_protocol_min_trades_full_candidate(
         store_path=tmp_path / "research_lab.db",
         backtest_config=config,
         protocol_path=protocol_path,
+        output_dir=output_dir,
     )
 
     assert captured_min_trades == [999]
+    assert summary["verdict"] == "SCREENING_ONLY"
+    assert summary["risks"] == ["walkforward_not_passed"]
+    assert (output_dir / "summary.json").exists()
+    assert (output_dir / "evaluation.json").exists()
+    assert (output_dir / "walkforward_report.json").exists()
+    assert (output_dir / "recommendation.json").exists()
+    persisted_summary = json.loads((output_dir / "summary.json").read_text(encoding="utf-8"))
+    assert persisted_summary["candidate_id"] == "candidate-001"
+    assert persisted_summary["verdict"] == "SCREENING_ONLY"
 
 
 def test_run_nested_walkforward_selects_aggregated_oos_winner(
@@ -1641,6 +1653,125 @@ def test_run_walkforward_applies_multicriteria_thresholds(
     assert "window_000_validation_failed: profit_factor=0.9000 < min_profit_factor=1.0000" in report.reasons
     assert "window_000_validation_failed: max_drawdown_pct=55.0000 > max_drawdown_pct=50.0000" in report.reasons
     assert "window_000_validation_failed: sharpe_ratio=-0.2000 < min_sharpe_ratio=0.0000" in report.reasons
+    assert len(report.window_results) == 1
+    assert report.window_results[0].train.metrics.expectancy_r == pytest.approx(0.30)
+    assert report.window_results[0].validation.metrics.profit_factor == pytest.approx(0.90)
+    assert report.window_results[0].validation.failures == (
+        "expectancy_r=-0.1000 < min_expectancy_r=0.0000",
+        "profit_factor=0.9000 < min_profit_factor=1.0000",
+        "max_drawdown_pct=55.0000 > max_drawdown_pct=50.0000",
+        "sharpe_ratio=-0.2000 < min_sharpe_ratio=0.0000",
+    )
+
+
+def test_run_walkforward_persists_safety_flags_in_report(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    settings = load_settings(project_root=tmp_path)
+    protocol = {
+        "train_days": 90,
+        "validation_days": 30,
+        "step_days": 30,
+        "min_trades_per_window": 5,
+        "min_expectancy_r_per_window": 0.0,
+        "min_profit_factor_per_window": 1.0,
+        "max_drawdown_pct_per_window": 50.0,
+        "min_sharpe_ratio_per_window": 0.0,
+        "fragility_degradation_threshold_pct": 30.0,
+        "promotion_requires_all_windows_pass": False,
+        "promotion_requires_median_pass": True,
+    }
+    segment_results = [
+        TrialEvaluation(
+            trial_id="wf-train-000",
+            params={},
+            metrics=ObjectiveMetrics(
+                expectancy_r=0.50,
+                profit_factor=5.20,
+                max_drawdown_pct=2.0,
+                trades_count=50,
+                sharpe_ratio=2.0,
+                pnl_abs=120_001.0,
+                win_rate=0.60,
+            ),
+            funnel=SignalFunnel(10, 1, 1, 1, 7),
+            rejected_reason=None,
+        ),
+        TrialEvaluation(
+            trial_id="wf-val-000",
+            params={},
+            metrics=ObjectiveMetrics(
+                expectancy_r=0.80,
+                profit_factor=1.50,
+                max_drawdown_pct=1.0,
+                trades_count=29,
+                sharpe_ratio=2.5,
+                pnl_abs=500.0,
+                win_rate=0.55,
+            ),
+            funnel=SignalFunnel(8, 1, 1, 1, 5),
+            rejected_reason=None,
+        ),
+    ]
+
+    monkeypatch.setattr(
+        walkforward_module,
+        "_evaluate_window_segment",
+        lambda **_: segment_results.pop(0),
+    )
+
+    report = walkforward_module.run_walkforward(
+        base_settings=settings,
+        candidate_params={},
+        windows=[
+            WalkForwardWindow(
+                train_start="2025-01-01T00:00:00+00:00",
+                train_end="2025-03-31T00:00:00+00:00",
+                validation_start="2025-03-31T00:00:00+00:00",
+                validation_end="2025-04-30T00:00:00+00:00",
+            )
+        ],
+        source_db_path=tmp_path / "source.db",
+        snapshots_dir=tmp_path / "snapshots",
+        protocol=protocol,
+    )
+
+    assert report.passed is True
+    assert report.window_results[0].degradation_pct == pytest.approx(-60.0)
+    assert report.safety_flags.pnl_sanity_review_required is True
+    assert report.safety_flags.pf_hard_review_required is True
+    assert report.safety_flags.oos_outperformance_review_required is True
+    assert report.safety_flags.low_oos_trade_count_review_required is True
+
+
+def test_recommendation_includes_true_safety_flags_as_risks(tmp_path: Path) -> None:
+    settings = load_settings(project_root=tmp_path)
+    report = WalkForwardReport(
+        passed=True,
+        windows_total=1,
+        windows_passed=1,
+        is_degradation_pct=-60.0,
+        fragile=False,
+        reasons=(),
+        safety_flags=walkforward_module.PromotionSafetyFlags(
+            pnl_sanity_review_required=True,
+            pf_hard_review_required=True,
+            oos_outperformance_review_required=True,
+            low_oos_trade_count_review_required=True,
+        ),
+    )
+    recommendation = approval_module.build_recommendation(
+        base_settings=settings,
+        candidate_settings=settings,
+        evaluation=_trial("candidate-001", 0.5, 1.5, 0.1),
+        walkforward_report=report,
+    )
+
+    assert "pnl_sanity_review_required" in recommendation.risks
+    assert "pf_hard_review_required" in recommendation.risks
+    assert "oos_outperformance_review_required" in recommendation.risks
+    assert "low_oos_trade_count_review_required" in recommendation.risks
 
 
 def test_protocol_hash_persists_through_store_and_report(tmp_path: Path) -> None:

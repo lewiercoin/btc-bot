@@ -20,10 +20,13 @@ from research_lab.types import (
     NestedWalkForwardReport,
     NestedWalkForwardWindowResult,
     ObjectiveMetrics,
+    PromotionSafetyFlags,
     SignalFunnel,
     TrialEvaluation,
     WalkForwardReport,
+    WalkForwardSegmentResult,
     WalkForwardWindow,
+    WalkForwardWindowResult,
 )
 
 
@@ -158,6 +161,46 @@ def _segment_failures(
     return failures
 
 
+def _segment_result(evaluation: TrialEvaluation, failures: list[str]) -> WalkForwardSegmentResult:
+    return WalkForwardSegmentResult(
+        metrics=evaluation.metrics,
+        failures=tuple(failures),
+    )
+
+
+def _promotion_safety_flags(
+    *,
+    window_results: list[WalkForwardWindowResult],
+    avg_degradation: float,
+    pnl_sanity_abs_threshold: float = 100_000.0,
+    pf_hard_review_threshold: float = 5.0,
+    oos_abs_degradation_threshold_pct: float = 30.0,
+    oos_negative_degradation_threshold_pct: float = -25.0,
+    min_validation_trades_review: int = 30,
+) -> PromotionSafetyFlags:
+    segment_metrics = [
+        segment.metrics
+        for result in window_results
+        for segment in (result.train, result.validation)
+    ]
+    return PromotionSafetyFlags(
+        pnl_sanity_review_required=any(
+            abs(float(metrics.pnl_abs)) > pnl_sanity_abs_threshold for metrics in segment_metrics
+        ),
+        pf_hard_review_required=any(
+            float(metrics.profit_factor) > pf_hard_review_threshold for metrics in segment_metrics
+        ),
+        oos_outperformance_review_required=(
+            abs(avg_degradation) > oos_abs_degradation_threshold_pct
+            or avg_degradation < oos_negative_degradation_threshold_pct
+        ),
+        low_oos_trade_count_review_required=any(
+            int(result.validation.metrics.trades_count) < int(min_validation_trades_review)
+            for result in window_results
+        ),
+    )
+
+
 def _window_seed(seed: int, index: int) -> int:
     return int(seed) + int(index)
 
@@ -238,6 +281,7 @@ def run_walkforward(
     windows_passed = 0
     degradations: list[float] = []
     reasons: list[str] = []
+    window_results: list[WalkForwardWindowResult] = []
 
     for index, window in enumerate(windows):
         train_segment_id = f"wf-train-{index:03d}"
@@ -278,11 +322,22 @@ def run_walkforward(
             min_sharpe_ratio=min_sharpe_ratio,
         )
 
-        if not train_failures and not val_failures:
-            windows_passed += 1
-            degradations.append(
-                _degradation_pct(train_evaluation.metrics.expectancy_r, val_evaluation.metrics.expectancy_r)
+        degradation = _degradation_pct(train_evaluation.metrics.expectancy_r, val_evaluation.metrics.expectancy_r)
+        window_passed = not train_failures and not val_failures
+        window_results.append(
+            WalkForwardWindowResult(
+                window_index=index,
+                window=window,
+                train=_segment_result(train_evaluation, train_failures),
+                validation=_segment_result(val_evaluation, val_failures),
+                passed=window_passed,
+                degradation_pct=degradation,
             )
+        )
+
+        if window_passed:
+            windows_passed += 1
+            degradations.append(degradation)
             continue
 
         for detail in train_failures:
@@ -314,6 +369,11 @@ def run_walkforward(
     if windows_total > 0 and windows_passed == 0:
         reasons.append("no_window_passed")
 
+    safety_flags = _promotion_safety_flags(
+        window_results=window_results,
+        avg_degradation=avg_degradation,
+    )
+
     return WalkForwardReport(
         passed=passed,
         windows_total=windows_total,
@@ -322,6 +382,8 @@ def run_walkforward(
         fragile=fragile,
         reasons=tuple(reasons),
         protocol_hash=protocol_hash,
+        window_results=tuple(window_results),
+        safety_flags=safety_flags,
     )
 
 
