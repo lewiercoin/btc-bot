@@ -1,0 +1,182 @@
+{
+  "approval_required": true,
+  "candidate_id": "optuna-default-v2-trial-00152",
+  "expected_improvement": {
+    "expectancy_r": 1.3337893335437732,
+    "max_drawdown_pct": -0.0065056909488257295,
+    "pnl_abs": 2458.823901675186,
+    "profit_factor": 3.6359948339776698,
+    "win_rate": 0.5838509316770186
+  },
+  "params_diff": {
+    "atr_period": {
+      "from": 14,
+      "to": 16
+    },
+    "compression_atr_norm_max": {
+      "from": 0.0023,
+      "to": 0.0106
+    },
+    "cooldown_minutes_after_loss": {
+      "from": 95,
+      "to": 135
+    },
+    "daily_dd_limit": {
+      "from": 0.2,
+      "to": 0.193
+    },
+    "direction_tfi_threshold": {
+      "from": 0.08,
+      "to": 0.02
+    },
+    "duplicate_level_tolerance_pct": {
+      "from": 0.0007,
+      "to": 0.0036
+    },
+    "duplicate_level_window_hours": {
+      "from": 114,
+      "to": 132
+    },
+    "ema_trend_gap_pct": {
+      "from": 0.0063,
+      "to": 0.0012000000000000001
+    },
+    "entry_offset_atr": {
+      "from": 0.01,
+      "to": 0.22
+    },
+    "equal_level_lookback": {
+      "from": 196,
+      "to": 274
+    },
+    "equal_level_tol_atr": {
+      "from": 0.02,
+      "to": 0.060000000000000005
+    },
+    "funding_window_days": {
+      "from": 82,
+      "to": 73
+    },
+    "high_vol_leverage": {
+      "from": 8,
+      "to": 7
+    },
+    "high_vol_stop_distance_pct": {
+      "from": 0.035,
+      "to": 0.049
+    },
+    "invalidation_offset_atr": {
+      "from": 0.01,
+      "to": 0.59
+    },
+    "max_consecutive_losses": {
+      "from": 15,
+      "to": 10
+    },
+    "max_hold_hours": {
+      "from": 3,
+      "to": 7
+    },
+    "max_leverage": {
+      "from": 8,
+      "to": 9
+    },
+    "max_trades_per_day": {
+      "from": 3,
+      "to": 4
+    },
+    "min_rr": {
+      "from": 2.1,
+      "to": 2.45
+    },
+    "min_stop_distance_pct": {
+      "from": 0.0032,
+      "to": 0.001
+    },
+    "min_sweep_depth_pct": {
+      "from": 0.00286,
+      "to": 0.00886
+    },
+    "oi_z_window_days": {
+      "from": 62,
+      "to": 15
+    },
+    "partial_exit_pct": {
+      "from": 0.26,
+      "to": 0.28
+    },
+    "post_liq_tfi_abs_min": {
+      "from": 0.53,
+      "to": 0.04
+    },
+    "reclaim_buf_atr": {
+      "from": 0.19,
+      "to": 0.15
+    },
+    "risk_per_trade_pct": {
+      "from": 0.007,
+      "to": 0.001
+    },
+    "sweep_buf_atr": {
+      "from": 0.17,
+      "to": 0.55
+    },
+    "tfi_impulse_threshold": {
+      "from": 0.13,
+      "to": 0.38
+    },
+    "tp1_atr_mult": {
+      "from": 1.9,
+      "to": 3.1
+    },
+    "tp2_atr_mult": {
+      "from": 3.9,
+      "to": 7.300000000000001
+    },
+    "trailing_atr_mult": {
+      "from": 2.9,
+      "to": 2.4000000000000004
+    },
+    "weekly_dd_limit": {
+      "from": 0.3,
+      "to": 0.23600000000000002
+    },
+    "weight_cvd_divergence": {
+      "from": 3.9,
+      "to": 1.35
+    },
+    "weight_ema_trend_alignment": {
+      "from": 5.0,
+      "to": 4.4
+    },
+    "weight_funding_supportive": {
+      "from": 4.45,
+      "to": 0.5
+    },
+    "weight_reclaim_confirmed": {
+      "from": 4.25,
+      "to": 3.85
+    },
+    "weight_regime_special": {
+      "from": 2.35,
+      "to": 0.65
+    },
+    "weight_sweep_detected": {
+      "from": 2.1,
+      "to": 2.4000000000000004
+    },
+    "weight_tfi_impulse": {
+      "from": 1.4,
+      "to": 3.35
+    },
+    "wick_min_atr": {
+      "from": 0.15,
+      "to": 0.05
+    }
+  },
+  "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f",
+  "risks": [
+    "low_oos_trade_count_review_required"
+  ],
+  "summary": "Candidate optuna-default-v2-trial-00152: expectancy_r=1.3338, profit_factor=3.6360, max_drawdown_pct=0.0065, walkforward_passed=True"
+}

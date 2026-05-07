@@ -1,0 +1,18 @@
+{
+  "approval_required": true,
+  "candidate_id": "optuna-default-v2-trial-00152",
+  "risks": [
+    "low_oos_trade_count_review_required"
+  ],
+  "safety_flags": {
+    "low_oos_trade_count_review_required": true,
+    "oos_outperformance_review_required": false,
+    "pf_hard_review_required": false,
+    "pnl_sanity_review_required": false
+  },
+  "verdict": "SCREENING_ONLY",
+  "walkforward_fragile": false,
+  "walkforward_passed": true,
+  "walkforward_windows_passed": 2,
+  "walkforward_windows_total": 2
+}

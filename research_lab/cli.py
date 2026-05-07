@@ -126,6 +126,7 @@ def _build_parser() -> argparse.ArgumentParser:
     replay.add_argument("--store-path", type=Path, default=None)
     replay.add_argument("--snapshots-dir", type=Path, default=None)
     replay.add_argument("--protocol-path", type=Path, default=None)
+    replay.add_argument("--output-dir", type=Path, default=None)
     replay.add_argument("--start-date", required=True, type=str)
     replay.add_argument("--end-date", required=True, type=str)
 
@@ -214,6 +215,7 @@ def main(argv: list[str] | None = None) -> None:
                 symbol=settings.strategy.symbol,
             ),
             protocol_path=args.protocol_path,
+            output_dir=args.output_dir,
         )
         print(json.dumps(summary, indent=2, sort_keys=True))
         return

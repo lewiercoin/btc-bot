@@ -63,6 +63,30 @@ class WalkForwardWindow:
 
 
 @dataclass(frozen=True)
+class WalkForwardSegmentResult:
+    metrics: ObjectiveMetrics
+    failures: tuple[str, ...]
+
+
+@dataclass(frozen=True)
+class WalkForwardWindowResult:
+    window_index: int
+    window: WalkForwardWindow
+    train: WalkForwardSegmentResult
+    validation: WalkForwardSegmentResult
+    passed: bool
+    degradation_pct: float
+
+
+@dataclass(frozen=True)
+class PromotionSafetyFlags:
+    pnl_sanity_review_required: bool = False
+    pf_hard_review_required: bool = False
+    oos_outperformance_review_required: bool = False
+    low_oos_trade_count_review_required: bool = False
+
+
+@dataclass(frozen=True)
 class WalkForwardReport:
     passed: bool
     windows_total: int
@@ -71,6 +95,8 @@ class WalkForwardReport:
     fragile: bool
     reasons: tuple[str, ...]
     protocol_hash: str | None = None
+    window_results: tuple[WalkForwardWindowResult, ...] = ()
+    safety_flags: PromotionSafetyFlags = PromotionSafetyFlags()
 
 
 @dataclass(frozen=True)

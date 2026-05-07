@@ -1,0 +1,87 @@
+{
+  "fragile": false,
+  "is_degradation_pct": 5.14100552577966,
+  "passed": true,
+  "protocol_hash": "af280ec9e9a36eaa8eef23eade9ed98ec15f2594cb5009d4f5dc826cba04eb1f",
+  "reasons": [],
+  "safety_flags": {
+    "low_oos_trade_count_review_required": true,
+    "oos_outperformance_review_required": false,
+    "pf_hard_review_required": false,
+    "pnl_sanity_review_required": false
+  },
+  "window_results": [
+    {
+      "degradation_pct": 21.36806240243716,
+      "passed": true,
+      "train": {
+        "failures": [],
+        "metrics": {
+          "expectancy_r": 1.5089264193786536,
+          "max_drawdown_pct": 0.0065056909488257295,
+          "pnl_abs": 1294.0208804436122,
+          "profit_factor": 3.8526800536947543,
+          "sharpe_ratio": 9.147338696588545,
+          "trades_count": 79,
+          "win_rate": 0.569620253164557
+        }
+      },
+      "validation": {
+        "failures": [],
+        "metrics": {
+          "expectancy_r": 1.1864980804789622,
+          "max_drawdown_pct": 0.005803231581876967,
+          "pnl_abs": 720.8701674922116,
+          "profit_factor": 3.73375309763243,
+          "sharpe_ratio": 10.622791982768376,
+          "trades_count": 57,
+          "win_rate": 0.6140350877192983
+        }
+      },
+      "window": {
+        "train_end": "2024-01-01T00:00:00+00:00",
+        "train_start": "2022-01-01T00:00:00+00:00",
+        "validation_end": "2024-12-31T00:00:00+00:00",
+        "validation_start": "2024-01-01T00:00:00+00:00"
+      },
+      "window_index": 0
+    },
+    {
+      "degradation_pct": -11.086051350877842,
+      "passed": true,
+      "train": {
+        "failures": [],
+        "metrics": {
+          "expectancy_r": 1.3726438645812957,
+          "max_drawdown_pct": 0.0065056909488257295,
+          "pnl_abs": 2123.3838385758354,
+          "profit_factor": 3.8243817697173323,
+          "sharpe_ratio": 9.533997887204439,
+          "trades_count": 137,
+          "win_rate": 0.5912408759124088
+        }
+      },
+      "validation": {
+        "failures": [],
+        "metrics": {
+          "expectancy_r": 1.5248158682734523,
+          "max_drawdown_pct": 0.002784484074358793,
+          "pnl_abs": 301.2130511556595,
+          "profit_factor": 4.17665265967079,
+          "sharpe_ratio": 13.271938708560137,
+          "trades_count": 19,
+          "win_rate": 0.631578947368421
+        }
+      },
+      "window": {
+        "train_end": "2024-12-31T00:00:00+00:00",
+        "train_start": "2022-01-01T00:00:00+00:00",
+        "validation_end": "2025-12-31T00:00:00+00:00",
+        "validation_start": "2024-12-31T00:00:00+00:00"
+      },
+      "window_index": 1
+    }
+  ],
+  "windows_passed": 2,
+  "windows_total": 2
+}
