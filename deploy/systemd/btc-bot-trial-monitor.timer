@@ -1,0 +1,11 @@
+[Unit]
+Description=Run BTC Bot trial-00095 paper monitoring guardrails hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+AccuracySec=1min
+Persistent=true
+
+[Install]
+WantedBy=timers.target
