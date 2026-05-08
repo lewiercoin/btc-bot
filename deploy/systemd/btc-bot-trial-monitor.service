@@ -1,0 +1,9 @@
+[Unit]
+Description=BTC Bot trial-00095 paper monitoring guardrails
+After=network.target
+
+[Service]
+Type=oneshot
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/python scripts/monitor_trial_00095.py --settings settings.json --db storage/btc_bot.db --output-json logs/trial_00095_monitoring.json --apply-safe-mode

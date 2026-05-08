@@ -384,6 +384,53 @@ def _serialize_settings(settings: AppSettings) -> dict[str, Any]:
     return payload
 
 
+def _load_runtime_overlay(root: Path) -> dict[str, Any]:
+    raw_path = os.getenv("BOT_SETTINGS_PATH")
+    overlay_path = Path(raw_path) if raw_path else root / "settings.json"
+    if not overlay_path.exists():
+        return {}
+    payload = json.loads(overlay_path.read_text(encoding="utf-8"))
+    if not isinstance(payload, dict):
+        raise ValueError(f"Runtime settings overlay must be a JSON object: {overlay_path}")
+    return payload
+
+
+def _section_overrides(payload: dict[str, Any], section: str, cfg_type: type[Any]) -> dict[str, Any]:
+    raw = payload.get(section, {})
+    if raw is None:
+        return {}
+    if not isinstance(raw, dict):
+        raise ValueError(f"Runtime settings overlay section {section!r} must be a JSON object.")
+
+    allowed = {field.name for field in dataclasses.fields(cfg_type)}
+    unknown = sorted(set(raw) - allowed)
+    if unknown:
+        names = ", ".join(unknown)
+        raise ValueError(f"Unknown {section} runtime setting(s): {names}")
+    return dict(raw)
+
+
+def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -> AppSettings:
+    if profile not in {"live", "experiment"}:
+        return settings
+
+    payload = _load_runtime_overlay(root)
+    if not payload:
+        return settings
+
+    if "schema_version" in payload and payload["schema_version"] != settings.schema_version:
+        raise ValueError(
+            f"Runtime settings overlay schema_version={payload['schema_version']!r} "
+            f"does not match settings schema_version={settings.schema_version!r}."
+        )
+
+    strategy_overrides = _section_overrides(payload, "strategy", StrategyConfig)
+    risk_overrides = _section_overrides(payload, "risk", RiskConfig)
+    strategy = dataclasses.replace(settings.strategy, **strategy_overrides)
+    risk = dataclasses.replace(settings.risk, **risk_overrides)
+    return dataclasses.replace(settings, strategy=strategy, risk=risk)
+
+
 def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:
     root = project_root or Path(__file__).resolve().parent
     mode = _parse_mode(os.getenv("BOT_MODE", "PAPER"))
@@ -413,7 +460,8 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         allow_uptrend_pullback=False,
     )
     if profile == "live":
-        return dataclasses.replace(settings, strategy=live_strategy)
+        live_settings = dataclasses.replace(settings, strategy=live_strategy)
+        return _apply_runtime_overlay(live_settings, root=root, profile=profile)
 
     experiment_whitelist = {
         regime: tuple(allowed_directions)
@@ -437,7 +485,8 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         duplicate_level_tolerance_pct=0.0004,
         duplicate_level_window_hours=24,
     )
-    return dataclasses.replace(settings, strategy=experiment_strategy, risk=experiment_risk)
+    experiment_settings = dataclasses.replace(settings, strategy=experiment_strategy, risk=experiment_risk)
+    return _apply_runtime_overlay(experiment_settings, root=root, profile=profile)
 
 
 SETTINGS = load_settings()
