@@ -2,10 +2,11 @@
 
 ## Current Active Milestone: V3-DETAILED-REPORT
 
-**Status:** V3_REPORT_READY - awaiting Claude Code audit.  
-**Builder:** Codex  
+**Status:** AUDIT_COMPLETE — awaiting user decision on next step  
+**Builder:** Codex (report), Claude Code (audit)  
 **Decision date:** 2026-05-08  
-**Branch:** `claude/audit-wf-light-protocol-ZXDA9`
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9`  
+**Audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V3_2026-05-08.md`
 
 **Scope:** Generate the post-completion detailed report for 350-trial Optuna
 Campaign V3 using server Research Lab artifacts. Paper trading for `trial-00000`
@@ -72,6 +73,20 @@ nohup .venv/bin/python -m research_lab optimize \
 - Detailed Codex report: `docs/analysis/OPTUNA_CAMPAIGN_V3_DETAILED_REPORT_2026-05-08.md`.
 - Report status: `V3_REPORT_READY`; Claude Code audit is pending for WF/safety
   review and any promotion verdict.
+
+**Audit verdict (2026-05-08):**
+- **Verdict:** MVP_DONE — V3 infrastructure worked correctly, architectural validation achieved (MAJOR), but 0 promotion-ready candidates from 4 WF-passed artifacts
+- **Promotion outcome:** 0/4 WF-passed candidates meet promotion gates (all have blocking safety flags: low OOS trade counts, extreme metrics, or severe OOS noise)
+- **Clean pre-audit candidates:** 3 candidates (trial-00095, trial-00063, trial-00348) passed pre-audit heuristics and await WF testing
+- **Key finding (MAJOR):** Gate vs premium architecture hypothesis CONFIRMED with strong evidence
+  - Sweep detection is structural gate (binary filter), not premium (scoring weight)
+  - Edge is in quality filters AFTER sweep: reclaim_confirmed (median=3.525), tfi_impulse (median=3.575), ema_trend_alignment (median=4.650)
+  - weight_sweep_detected acts as confounded intercept (median=0.525), not information weight
+- **Dead branch confirmed:** allow_uptrend_continuation has 0 usage in top 20, 31.71% reject rate (111/350 trials wasted)
+- **Recommended next step:** Run WF on trial-00095 (top priority: 271 trades, ER=2.129, PF=4.662, DD=6.51%, clean heuristics, follows gate vs premium pattern)
+  - If trial-00095 passes WF with no blocking flags → PROMOTION_READY for paper trading
+  - If trial-00095 fails → proceed to V4 with frozen params (freeze 5 uptrend_continuation params, reduces search space 35→30 params)
+- **Alternative:** Immediate V4 launch with frozen params (if user prioritizes search space optimization over testing remaining V3 candidates)
 
 ---
 
