@@ -2,12 +2,13 @@
 
 ## Current Active Milestone: PAPER-TRADING-TRIAL-00095
 
-**Status:** DEPLOYED_TO_PAPER - awaiting Claude Code deployment audit  
-**Builder:** Codex  
+**Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
+**Builder:** Codex (deployment), Claude Code (audit)  
 **Decision date:** 2026-05-08  
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9`  
 **Input audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V3_2026-05-08.md`  
-**Final audit:** `docs/audits/AUDIT_WF_TRIAL_00095_2026-05-08.md`
+**Promotion audit:** `docs/audits/AUDIT_WF_TRIAL_00095_2026-05-08.md`  
+**Deployment audit:** `docs/audits/AUDIT_DEPLOYMENT_TRIAL_00095_2026-05-08.md`
 
 **Scope:** Deploy `optuna-default-v3-trial-00095` to paper trading with mandatory
 monitoring guardrails and no real-money execution.
@@ -24,7 +25,22 @@ monitoring guardrails and no real-money execution.
 - Initial monitor run: `trade_count=0`, `alerts=[]`, `hard_stop=false`.
 - Deployment record:
   `docs/deployments/DEPLOYMENT_TRIAL_00095_PAPER_2026-05-08.md`.
-- Next step: Claude Code deployment audit.
+
+**Deployment audit verdict (2026-05-08):**
+- **Verdict:** PASS — deployment approved, all guardrails operational
+- **Guardrails verified:**
+  - Position sizing: 0.5% risk/trade ✅
+  - Monitoring timer: hourly, operational ✅
+  - Performance benchmarks: ER >1.5 (30 trades), PF >3.0, DD <10% ✅
+  - Hard stop: ER <1.0 after 30 trades triggers safe mode ✅
+  - Early review: 30-50 trades OR 3-4 months ✅
+  - Mode enforcement: PAPER only, alerts if mode changes ✅
+- **Backup:** deployment_backups/pre_trial_00095_20260508T205449Z/ (settings.py, btc_bot.db)
+- **Parameter lineage:** Production research_lab.db (authoritative source), audit narrative had estimated params
+- **Critical finding:** Audit narrative param estimates differed from actual DB params. Codex correctly used DB as source. Does NOT invalidate WF evidence (window 1: 106 trades, ER=2.46, PF=4.84).
+- **Architectural validation correction:** trial-00095 actual params (sweep=2.2, reclaim=2.15, tfi=2.5) do NOT perfectly match "gate vs premium" pattern from V3 audit (medians: sweep=0.525, reclaim=3.525, tfi=3.575). However, WF evidence is empirical and independent of architectural theory. Strategy works based on WF results, not theory fit.
+- **Expected timeline:** First review in 2-4 months (2-5 trades/month frequency)
+- **Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
 
 ---
 
