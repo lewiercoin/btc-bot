@@ -1,17 +1,46 @@
 # Milestone Tracker
 
-## Current Active Milestone: V3-DETAILED-REPORT
+## Current Active Milestone: WF-VALIDATION-TRIAL-00095
 
-**Status:** AUDIT_COMPLETE — awaiting user decision on next step  
-**Builder:** Codex (report), Claude Code (audit)  
+**Status:** SCREENING_ONLY - awaiting Claude Code audit of trial-00095 WF artifacts  
+**Builder:** Codex  
 **Decision date:** 2026-05-08  
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9`  
-**Audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V3_2026-05-08.md`
+**Input audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V3_2026-05-08.md`
 
-**Scope:** Generate the post-completion detailed report for 350-trial Optuna
-Campaign V3 using server Research Lab artifacts. Paper trading for `trial-00000`
-remains deferred until the post-V3 Claude Code audit decision because server
-CPU/RAM cannot support both workloads concurrently.
+**Scope:** Run single-candidate walk-forward validation for
+`optuna-default-v3-trial-00095`, the top clean pre-audit Campaign V3 candidate,
+before deciding whether to proceed to V4.
+
+**Validation command (server: `root@204.168.146.253`):**
+```bash
+cd /home/btc-bot/btc-bot
+.venv/bin/python -m research_lab replay-candidate \
+  --candidate-id optuna-default-v3-trial-00095 \
+  --start-date 2022-01-01 \
+  --end-date 2026-03-28 \
+  --output-dir research_lab/revalidation/trial-00095-v3
+```
+
+**Validation result (2026-05-08):**
+- Full-range metrics: ER `2.1294`, PF `4.6625`, max drawdown `6.51%`,
+  trades `271`, Sharpe `11.9326`, pnl_abs `92,324.81`.
+- Walk-forward passed `2/2` windows.
+- Validation trade counts: window 1 `106`, window 2 `33`.
+- Fragile flag: `false`.
+- Safety flags:
+  - `low_oos_trade_count_review_required=false`
+  - `pnl_sanity_review_required=false`
+  - `pf_hard_review_required=true`
+  - `oos_outperformance_review_required=true`
+- Builder verdict: `SCREENING_ONLY`.
+- Report: `docs/analysis/WF_VALIDATION_TRIAL_00095_2026-05-08.md`.
+- Next step: Claude Code audit of `trial-00095` WF/recommendation artifacts
+  before any paper trading decision.
+
+---
+
+## Completed: V3-DETAILED-REPORT / OPTUNA-CAMPAIGN-V3 AUDIT
 
 **Launch command (server: `root@204.168.146.253`):**
 ```bash
