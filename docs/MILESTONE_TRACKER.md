@@ -1,17 +1,34 @@
 # Milestone Tracker
 
-## Current Active Milestone: WF-VALIDATION-TRIAL-00095
+## Current Active Milestone: PAPER-TRADING-TRIAL-00095
 
-**Status:** PROMOTION_READY - trial-00095 approved for paper trading deployment  
-**Builder:** Codex (WF test), Claude Code (audit)  
+**Status:** DEPLOYED_TO_PAPER - awaiting Claude Code deployment audit  
+**Builder:** Codex  
 **Decision date:** 2026-05-08  
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9`  
 **Input audit:** `docs/audits/AUDIT_OPTUNA_CAMPAIGN_V3_2026-05-08.md`  
 **Final audit:** `docs/audits/AUDIT_WF_TRIAL_00095_2026-05-08.md`
 
-**Scope:** Run single-candidate walk-forward validation for
-`optuna-default-v3-trial-00095`, the top clean pre-audit Campaign V3 candidate,
-before deciding whether to proceed to V4.
+**Scope:** Deploy `optuna-default-v3-trial-00095` to paper trading with mandatory
+monitoring guardrails and no real-money execution.
+
+**Deployment result (2026-05-08):**
+- Deployment commit on server: `106c575b`.
+- Server: `root@204.168.146.253`.
+- Runtime mode/profile: `PAPER` / `experiment`.
+- Runtime config hash:
+  `afbd2eb052af3be748950d6b639880ef05c33a03380d8e6ba9fb243170b747d5`.
+- Position sizing guardrail active: `risk_per_trade_pct=0.005`.
+- Bot service: `btc-bot.service` active after restart.
+- Monitoring timer: `btc-bot-trial-monitor.timer` active, hourly.
+- Initial monitor run: `trade_count=0`, `alerts=[]`, `hard_stop=false`.
+- Deployment record:
+  `docs/deployments/DEPLOYMENT_TRIAL_00095_PAPER_2026-05-08.md`.
+- Next step: Claude Code deployment audit.
+
+---
+
+## Completed: WF-VALIDATION-TRIAL-00095
 
 **Validation command (server: `root@204.168.146.253`):**
 ```bash
