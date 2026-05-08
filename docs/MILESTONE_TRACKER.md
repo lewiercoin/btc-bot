@@ -1,16 +1,16 @@
 # Milestone Tracker
 
-## Current Active Milestone: OPTUNA-CAMPAIGN-V3
+## Current Active Milestone: V3-DETAILED-REPORT
 
-**Status:** ACTIVE - server campaign launch in progress.  
+**Status:** V3_REPORT_READY - awaiting Claude Code audit.  
 **Builder:** Codex  
-**Decision date:** 2026-05-07  
+**Decision date:** 2026-05-08  
 **Branch:** `claude/audit-wf-light-protocol-ZXDA9`
 
-**Scope:** Launch 350-trial Optuna Campaign V3 on the production server using the
-audited V3 Research Lab infrastructure hardening. Paper trading for `trial-00000`
-is intentionally deferred until the post-V3 audit decision because server CPU/RAM
-cannot support both workloads concurrently.
+**Scope:** Generate the post-completion detailed report for 350-trial Optuna
+Campaign V3 using server Research Lab artifacts. Paper trading for `trial-00000`
+remains deferred until the post-V3 Claude Code audit decision because server
+CPU/RAM cannot support both workloads concurrently.
 
 **Launch command (server: `root@204.168.146.253`):**
 ```bash
@@ -64,6 +64,14 @@ nohup .venv/bin/python -m research_lab optimize \
   `multivariate_tpe_policy=disabled_dynamic_bounds:high_vol_leverage,tp2_atr_mult`.
 - Early trial check: first 20+ trials completed; trial 0 returned
   expectancy_r `0.7606`, profit_factor `2.5845`, max_drawdown_pct `0.0985`.
+
+**Completion/report result (2026-05-08):**
+- Campaign completed with 350/350 Optuna trials and 0 failed Optuna trials.
+- Research Lab store contains 49 accepted trials, 301 rejected trials, 4 saved
+  recommendations, and 4 saved walk-forward reports for Campaign V3.
+- Detailed Codex report: `docs/analysis/OPTUNA_CAMPAIGN_V3_DETAILED_REPORT_2026-05-08.md`.
+- Report status: `V3_REPORT_READY`; Claude Code audit is pending for WF/safety
+  review and any promotion verdict.
 
 ---
 
