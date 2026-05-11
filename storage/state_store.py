@@ -514,7 +514,7 @@ class StateStore:
         schema_version: str,
         config_hash: str,
         filled_entry_price: float | None = None,
-    ) -> None:
+    ) -> float:
         position = get_latest_position_for_signal(self.connection, executable.signal_id)
         if not position:
             raise RuntimeError(f"No position found for signal_id={executable.signal_id}")
@@ -550,6 +550,7 @@ class StateStore:
         )
         self.save(updated_state)
         self.sync_daily_metrics(opened_at.astimezone(timezone.utc).date())
+        return entry_price
 
     def settle_trade_close(
         self,

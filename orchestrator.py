@@ -561,16 +561,14 @@ class BotOrchestrator:
                     ask_price=snapshot.ask if self.settings.mode == BotMode.PAPER else None,
                     snapshot_id=snapshot.snapshot_id if self.settings.mode == BotMode.PAPER else None,
                 )
-                self.state_store.record_trade_open(
+                filled_entry_price = self.state_store.record_trade_open(
                     candidate=candidate,
                     executable=executable,
                     schema_version=self.settings.schema_version,
                     config_hash=self.settings.config_hash,
-                    filled_entry_price=paper_fill_price,
                 )
                 self.state_store.mark_healthy()
                 self.metrics.inc(TRADES_OPENED)
-                filled_entry_price = paper_fill_price if paper_fill_price is not None else executable.entry_price
                 trade_payload = {
                     "symbol": self.settings.strategy.symbol,
                     "signal_id": executable.signal_id,

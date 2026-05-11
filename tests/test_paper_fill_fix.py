@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -146,6 +147,40 @@ def test_paper_execution_uses_snapshot_price_as_fill_and_writes_execution() -> N
     assert fill_event.filled_price == 101.0
     assert fill_event.qty == 0.5
     assert fill_event.slippage_bps == pytest.approx(100.0)
+
+
+def test_paper_execution_rejects_long_fill_above_take_profit() -> None:
+    persister = FakePositionPersister()
+    engine = PaperExecutionEngine(position_persister=persister)
+
+    with pytest.raises(ValueError, match="paper_fill_invalid_bracket"):
+        engine.execute_signal(_signal(), size=0.5, leverage=2, snapshot_price=111.0)
+
+    assert persister.positions == []
+    assert persister.executions == []
+    assert persister.commits == 0
+
+
+def test_paper_execution_rejects_short_fill_below_take_profit() -> None:
+    persister = FakePositionPersister()
+    engine = PaperExecutionEngine(position_persister=persister)
+    signal = _signal()
+    signal = replace(
+        signal,
+        direction="SHORT",
+        entry_price=100.0,
+        stop_loss=105.0,
+        take_profit_1=90.0,
+        take_profit_2=80.0,
+        rr_ratio=2.0,
+    )
+
+    with pytest.raises(ValueError, match="paper_fill_invalid_bracket"):
+        engine.execute_signal(signal, size=0.5, leverage=2, snapshot_price=89.0)
+
+    assert persister.positions == []
+    assert persister.executions == []
+    assert persister.commits == 0
 
 
 def test_record_trade_open_persists_filled_entry_price() -> None:
