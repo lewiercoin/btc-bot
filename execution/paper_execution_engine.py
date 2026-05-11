@@ -40,6 +40,7 @@ class PaperExecutionEngine(ExecutionEngine):
 
         if filled_price <= 0:
             raise ValueError(f"PaperExecutionEngine received invalid fill price={filled_price!r}.")
+        self._validate_bracket_after_fill(signal=signal, filled_price=filled_price)
 
         # Calculate fees: 0.04% taker rate (match backtest SimpleFillModel)
         fee_rate = 0.0004  # 0.04% = 4 basis points
@@ -86,3 +87,24 @@ class PaperExecutionEngine(ExecutionEngine):
             ),
         )
         self.position_persister.commit()
+
+    @staticmethod
+    def _validate_bracket_after_fill(*, signal: ExecutableSignal, filled_price: float) -> None:
+        stop_loss = float(signal.stop_loss)
+        take_profit_1 = float(signal.take_profit_1)
+        take_profit_2 = float(signal.take_profit_2)
+        if signal.direction == "LONG":
+            valid = stop_loss < filled_price < take_profit_1 <= take_profit_2
+        else:
+            valid = take_profit_2 <= take_profit_1 < filled_price < stop_loss
+        if valid:
+            return
+
+        raise ValueError(
+            "paper_fill_invalid_bracket:"
+            f"direction={signal.direction}:"
+            f"filled_price={filled_price:.8f}:"
+            f"stop_loss={stop_loss:.8f}:"
+            f"take_profit_1={take_profit_1:.8f}:"
+            f"take_profit_2={take_profit_2:.8f}"
+        )

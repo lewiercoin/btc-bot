@@ -23,14 +23,17 @@ def _make_conn() -> sqlite3.Connection:
 
 
 def _make_executable(direction: str = "LONG") -> ExecutableSignal:
+    stop_loss = 95.0 if direction == "LONG" else 105.0
+    take_profit_1 = 110.0 if direction == "LONG" else 90.0
+    take_profit_2 = 120.0 if direction == "LONG" else 80.0
     return ExecutableSignal(
         signal_id="sig-test",
         timestamp=datetime.now(timezone.utc),
         direction=direction,
         entry_price=100.0,
-        stop_loss=95.0,
-        take_profit_1=110.0,
-        take_profit_2=120.0,
+        stop_loss=stop_loss,
+        take_profit_1=take_profit_1,
+        take_profit_2=take_profit_2,
         rr_ratio=2.0,
         approved_by_governance=True,
         governance_notes=["approved"],
