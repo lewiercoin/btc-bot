@@ -1,0 +1,74 @@
+{
+  "gates": [
+    {
+      "actual": 0.34088,
+      "name": "uptrend_er",
+      "passed": false,
+      "required": "> 1.5"
+    },
+    {
+      "actual": 4,
+      "name": "uptrend_trade_coverage",
+      "passed": false,
+      "required": ">= max(20, sweep+1=1)"
+    },
+    {
+      "actual": null,
+      "name": "trend_day_capture",
+      "passed": false,
+      "required": ">= 0.50"
+    },
+    {
+      "actual": null,
+      "name": "overlap_control",
+      "passed": false,
+      "required": "< 0.30 hard gate; < 0.20 preferred"
+    },
+    {
+      "actual": null,
+      "name": "range_bleed",
+      "passed": true,
+      "required": "> -1.0 or no range trades"
+    },
+    {
+      "actual": null,
+      "name": "walkforward",
+      "passed": false,
+      "required": "2/2"
+    },
+    {
+      "actual": [],
+      "name": "safety_flags",
+      "passed": true,
+      "required": "[]"
+    },
+    {
+      "actual": "checked",
+      "name": "explainability",
+      "passed": true,
+      "required": "all signals include reasons[]"
+    },
+    {
+      "actual": 4,
+      "name": "minimum_total_trades",
+      "passed": false,
+      "required": ">= 20"
+    }
+  ],
+  "notes": [
+    "This evaluator does not rescue weak results by relaxing gates.",
+    "Missing overlap, trend-day capture, or walk-forward evidence blocks candidate status."
+  ],
+  "red_flags": [
+    {
+      "action": "REJECT",
+      "flag": "uptrend_er_below_edge_threshold"
+    },
+    {
+      "action": "REJECT",
+      "flag": "absorption_confirmation_not_predictive"
+    }
+  ],
+  "setup_type": "absorption_continuation_long",
+  "verdict": "REJECT"
+}
