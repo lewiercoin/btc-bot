@@ -1,6 +1,48 @@
 # Milestone Tracker
 
-## Current Active Milestone: PAPER-TRADING-TRIAL-00095
+## Current Active Milestones
+
+### Production: PAPER-TRADING-TRIAL-00095
+
+**Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
+**Builder:** Codex (deployment), Claude Code (audit)  
+**Decision date:** 2026-05-08  
+**Branch:** `claude/audit-wf-light-protocol-ZXDA9`  
+**Audit:** `docs/audits/AUDIT_DEPLOYMENT_TRIAL_00095_2026-05-08.md`
+
+**Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+### Research: COMPRESSION-BREAKOUT-RESEARCH-V1
+
+**Status:** RESEARCH_ACTIVE  
+**Builder:** Codex  
+**Decision date:** 2026-05-12  
+**Branch:** `research/compression-breakout-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_COMPRESSION_BREAKOUT_RESEARCH_V1_2026-05-12.md`
+
+**Scope:** Research-only validation of compression_breakout_long setup (volatility compression → explosive breakout).
+
+**Hypothesis:** ATR compression + range consolidation → decisive breakout with TFI/OI confirmation captures moves that sweep_reclaim (range specialist) cannot.
+
+**Target regimes:** `compression` (primary), `range` (secondary)
+
+**Timeline:** 1-2 weeks
+
+**Success criteria:**
+- Compression regime ER > 1.5
+- Breakout follow-through >= 50%
+- Overlap vs sweep_reclaim < 30%
+- Min trades >= 20
+- WF 2/2 pass
+- No blocking safety flags
+
+**Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
+
+---
+
+## Production Active: PAPER-TRADING-TRIAL-00095
 
 **Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
 **Builder:** Codex (deployment), Claude Code (audit)  
@@ -41,6 +83,43 @@ monitoring guardrails and no real-money execution.
 - **Architectural validation correction:** trial-00095 actual params (sweep=2.2, reclaim=2.15, tfi=2.5) do NOT perfectly match "gate vs premium" pattern from V3 audit (medians: sweep=0.525, reclaim=3.525, tfi=3.575). However, WF evidence is empirical and independent of architectural theory. Strategy works based on WF results, not theory fit.
 - **Expected timeline:** First review in 2-4 months (2-5 trades/month frequency)
 - **Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+## Completed: ABSORPTION-CONTINUATION-RESEARCH-V1
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-12  
+**Branch:** `research/trend-continuation-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_ABSORPTION_CONTINUATION_RESEARCH_V1_2026-05-12.md`  
+**Audit:** `docs/audits/AUDIT_ABSORPTION_CONTINUATION_ITERATION_A_2026-05-12.md`
+
+**Result:**
+- **Checkpoint 1:** Setup scaffold implemented, tests pass ✅
+- **Checkpoint 2:** 4 trades, ER 0.34 → REJECT (insufficient sample, weak edge)
+- **Iteration A:** Fixed CVD slope calculation + empirical volatility threshold (p95 = 0.02885372)
+- **Post-fix result:** 25 trades, **ER -0.48, PF 0.55, win rate 24%, absorption hit rate 24%**
+- **Verdict:** HYPOTHESIS FAILED (3/4 hard gates failed: ER, win rate, absorption hit rate)
+
+**Why it failed:**
+- CVD absorption not predictive in BTC perps (0% CVD divergence win rate, 24% overall absorption hit rate)
+- TFI slightly HIGHER in losers than winners (contradicts absorption thesis)
+- Setup actively loses money (negative ER, PF below 1.0)
+
+**Key finding:** Absorption thesis is fundamentally incompatible with BTC perpetual swap market microstructure. CVD divergence during pullbacks does not identify institutional accumulation.
+
+**Learning velocity:** Fast failure (5 days from Checkpoint 2 → conclusive verdict) prevented wasted effort on parameter tuning invalid hypothesis.
+
+**Timeline:**
+- 2026-05-09: Strategic consultation, hypothesis definition
+- 2026-05-10: Checkpoint 1 (scaffold) complete
+- 2026-05-11: Checkpoint 2 (validation) → REJECT
+- 2026-05-12: Iteration A (diagnostic fixes) → HYPOTHESIS FAILED
+- Total: 3 days from implementation to final verdict
+
+**Next:** Moved to COMPRESSION-BREAKOUT-RESEARCH-V1 (separate hypothesis, different structure)
 
 ---
 
