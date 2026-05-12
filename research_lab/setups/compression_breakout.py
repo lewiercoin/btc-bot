@@ -33,7 +33,15 @@ class CompressionBreakoutConfig:
 
 
 class CompressionBreakoutLong(BaseSetup):
-    """Research-only volatility compression to upside expansion setup."""
+    """Research-only volatility compression to upside expansion setup.
+
+    Regime usage:
+    - Primary setup activation comes from internal compression detection:
+      ATR percentile, range width, compression duration, and breakout trigger.
+    - Regime is a veto/context layer: block trend/crowded/liquidation regimes,
+      accept normal/compression states, and do not rely on RegimeEngine as the
+      sole compression detector.
+    """
 
     def __init__(self, setup_config: CompressionBreakoutConfig | None = None) -> None:
         self.setup_config = setup_config or CompressionBreakoutConfig()
@@ -42,7 +50,13 @@ class CompressionBreakoutLong(BaseSetup):
         return "compression_breakout_long"
 
     def check_regime_allowed(self, regime: RegimeState | str) -> bool:
-        return _regime_value(regime) in {RegimeState.COMPRESSION.value, RegimeState.NORMAL.value}
+        blocked_regimes = {
+            RegimeState.UPTREND.value,
+            RegimeState.DOWNTREND.value,
+            RegimeState.CROWDED_LEVERAGE.value,
+            RegimeState.POST_LIQUIDATION.value,
+        }
+        return _regime_value(regime) not in blocked_regimes
 
     def evaluate_structure(
         self,
@@ -89,6 +103,8 @@ class CompressionBreakoutLong(BaseSetup):
         reasons = [
             f"setup_type={self.get_setup_type()}",
             f"regime={_regime_value(regime)}",
+            "regime_veto=allowed",
+            f"internal_compression_detected={metrics['internal_compression_detected']}",
             f"atr_percentile={metrics['atr_percentile']:.3f}",
             f"range_width_atr={metrics['range_width_atr']:.3f}",
             f"compression_duration_bars={metrics['compression_duration_bars']}",
@@ -234,6 +250,10 @@ class CompressionBreakoutLong(BaseSetup):
                 atr_history=atr_history,
                 current_atr_norm=float(features.atr_4h_norm),
                 percentile_threshold=self.setup_config.atr_percentile_threshold,
+            ),
+            "internal_compression_detected": (
+                atr_percentile <= self.setup_config.atr_percentile_threshold
+                and range_width_atr <= self.setup_config.range_width_atr_max
             ),
         }
 

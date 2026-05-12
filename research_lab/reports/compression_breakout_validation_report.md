@@ -17,6 +17,7 @@ Date range: `2022-01-01` -> `2026-03-29`
 - Decision cycles: 148596
 - Candidates: 3
 - Closed trades: 3
+- Internal compression closed trades: 3
 - Breakout follow-through rate: 1.0
 - Avg compression duration bars: 98.0
 - Avg breakout size ATR: 1.471535

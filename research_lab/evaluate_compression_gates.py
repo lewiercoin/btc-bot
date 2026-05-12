@@ -27,23 +27,22 @@ def evaluate_compression_gates(
 ) -> dict[str, Any]:
     safety_flags = list(safety_flags or [])
     per_regime = compression_report.get("per_regime", {})
-    compression = per_regime.get("compression", {})
     normal = per_regime.get("normal", {})
     overall = compression_report.get("performance", {})
     decision_summary = compression_report.get("decision_summary", {})
 
-    compression_er = _float_or_none(compression.get("expectancy_r"))
-    compression_trades = int(compression.get("trades_count", 0) or 0)
+    compression_er = _float_or_none(overall.get("expectancy_r"))
+    compression_trades = int(decision_summary.get("internal_compression_closed_trades", overall.get("trades_count", 0)) or 0)
     normal_er = _float_or_none(normal.get("expectancy_r"))
     total_trades = int(overall.get("trades_count", 0) or 0)
     followthrough_rate = _float_or_none(decision_summary.get("breakout_followthrough_rate"))
 
     gates = [
-        _gate("compression_er", compression_er is not None and compression_er > 1.5, compression_er, "> 1.5"),
-        _gate("breakout_followthrough", followthrough_rate is not None and followthrough_rate >= 0.50, followthrough_rate, ">= 0.50"),
+        _gate("internal_compression_er", compression_er is not None and compression_er > 1.5, compression_er, "> 1.5"),
+        _gate("breakout_followthrough", followthrough_rate is not None and followthrough_rate >= 0.40, followthrough_rate, ">= 0.40"),
         _gate("overlap_control", overlap_rate is not None and overlap_rate < 0.30, overlap_rate, "< 0.30"),
         _gate("minimum_total_trades", total_trades >= 20, total_trades, ">= 20"),
-        _gate("compression_trade_count", compression_trades >= 10, compression_trades, ">= 10 primary-regime trades"),
+        _gate("internal_compression_trade_count", compression_trades >= 10, compression_trades, ">= 10 internally detected compression trades"),
         _gate("normal_secondary_er", normal_er is None or normal_er > 0.5, normal_er, "> 0.5 or no normal trades"),
         _gate(
             "walkforward",

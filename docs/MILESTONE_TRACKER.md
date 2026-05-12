@@ -48,6 +48,15 @@
 - Verdict prepared for Claude Code: `ITERATE_REQUIRED`, not candidate-ready.
 - Audit package: `research_lab/reports/COMPRESSION_BREAKOUT_AUDIT_PACKAGE.md`.
 
+**Iteration A â€” 2026-05-12 (Codex):**
+- Added empirical regime distribution analysis and compression rejection analysis.
+- Regime distribution found `2938 / 148596` cycles labeled `compression` (`1.977173%`), so compression labels are present but uncommon.
+- Compression-labeled cycles were mostly blocked by no executable breakout: `breakout_too_small=2862`, `no_breakout_detected=2856`.
+- Updated setup documentation/reasons to treat regime as veto/context and internal ATR/range compression as primary setup detection.
+- Full re-run still produced only `3` closed trades, internal compression ER `-0.298229`, PF `0.435318`.
+- Verdict prepared for Claude Code: `HYPOTHESIS FAILED`; no further parameter rescue recommended.
+- Audit package: `research_lab/reports/COMPRESSION_BREAKOUT_ITERATION_A_AUDIT_PACKAGE.md`.
+
 ---
 
 ## Production Active: PAPER-TRADING-TRIAL-00095

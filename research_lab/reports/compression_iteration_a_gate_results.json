@@ -1,0 +1,74 @@
+{
+  "gates": [
+    {
+      "actual": -0.298229,
+      "name": "internal_compression_er",
+      "passed": false,
+      "required": "> 1.5"
+    },
+    {
+      "actual": 1.0,
+      "name": "breakout_followthrough",
+      "passed": true,
+      "required": ">= 0.40"
+    },
+    {
+      "actual": null,
+      "name": "overlap_control",
+      "passed": false,
+      "required": "< 0.30"
+    },
+    {
+      "actual": 3,
+      "name": "minimum_total_trades",
+      "passed": false,
+      "required": ">= 20"
+    },
+    {
+      "actual": 3,
+      "name": "internal_compression_trade_count",
+      "passed": false,
+      "required": ">= 10 internally detected compression trades"
+    },
+    {
+      "actual": -0.298229,
+      "name": "normal_secondary_er",
+      "passed": false,
+      "required": "> 0.5 or no normal trades"
+    },
+    {
+      "actual": null,
+      "name": "walkforward",
+      "passed": false,
+      "required": "2/2"
+    },
+    {
+      "actual": [],
+      "name": "safety_flags",
+      "passed": true,
+      "required": "[]"
+    },
+    {
+      "actual": "checked",
+      "name": "explainability",
+      "passed": true,
+      "required": "all signals include reasons[]"
+    }
+  ],
+  "notes": [
+    "Missing overlap or walk-forward evidence blocks candidate status.",
+    "This evaluator does not rescue weak results by relaxing compression gates."
+  ],
+  "red_flags": [
+    {
+      "action": "REJECT",
+      "flag": "compression_er_below_edge_threshold"
+    },
+    {
+      "action": "REVIEW",
+      "flag": "win_rate_outside_expected_band"
+    }
+  ],
+  "setup_type": "compression_breakout_long",
+  "verdict": "REJECT"
+}

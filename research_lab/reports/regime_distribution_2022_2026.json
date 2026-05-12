@@ -1,0 +1,57 @@
+{
+  "atr_4h_norm_by_regime": {
+    "compression": {
+      "count": 2938,
+      "mean": 0.00467765,
+      "p50": 0.00485836,
+      "p95": 0.00545251
+    },
+    "crowded_leverage": {
+      "count": 13970,
+      "mean": 0.01661275,
+      "p50": 0.01543973,
+      "p95": 0.02957243
+    },
+    "downtrend": {
+      "count": 63598,
+      "mean": 0.0169078,
+      "p50": 0.01517801,
+      "p95": 0.03146028
+    },
+    "normal": {
+      "count": 4199,
+      "mean": 0.01344948,
+      "p50": 0.01247089,
+      "p95": 0.02337397
+    },
+    "uptrend": {
+      "count": 63891,
+      "mean": 0.01453626,
+      "p50": 0.01349997,
+      "p95": 0.02614845
+    }
+  },
+  "date_range": {
+    "end": "2026-03-29",
+    "start": "2022-01-01"
+  },
+  "interpretation": "COMPRESSION labels are present but uncommon (1-5%). Regime may remain useful as context, but setup-level compression detection should be compared against RegimeEngine labels.",
+  "regime_counts": {
+    "compression": 2938,
+    "crowded_leverage": 13970,
+    "downtrend": 63598,
+    "normal": 4199,
+    "post_liquidation": 0,
+    "uptrend": 63891
+  },
+  "regime_percentages": {
+    "compression": 0.01977173,
+    "crowded_leverage": 0.0940133,
+    "downtrend": 0.42799268,
+    "normal": 0.02825783,
+    "post_liquidation": 0.0,
+    "uptrend": 0.42996447
+  },
+  "source_db_path": "storage\\btc_bot.db",
+  "total_cycles": 148596
+}
