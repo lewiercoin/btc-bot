@@ -40,6 +40,14 @@
 
 **Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
 
+**Checkpoint 1 — 2026-05-12 (Codex):**
+- Implemented `compression_breakout_long` research-only scaffold and tests.
+- Added full-range backtest runner and hard gate evaluator.
+- Full local V3-range backtest (`2022-01-01` → `2026-03-29`) generated only `3` closed trades.
+- Current strict hypothesis result: ER `-0.298229`, PF `0.435318`, compression-regime trades `0`.
+- Verdict prepared for Claude Code: `ITERATE_REQUIRED`, not candidate-ready.
+- Audit package: `research_lab/reports/COMPRESSION_BREAKOUT_AUDIT_PACKAGE.md`.
+
 ---
 
 ## Production Active: PAPER-TRADING-TRIAL-00095
