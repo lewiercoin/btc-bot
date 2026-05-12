@@ -2245,17 +2245,17 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Analysis:** [docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md](docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md)
 **Strategic finding:** Parameter tuning cannot solve missing strategy problem. Sweep-reclaim is liquidity-response setup (fade stop-run + reclaim), not trend-continuation setup. Clean trend days require separate setup with different edge hypothesis.
 
-### Next Milestone: TREND-CONTINUATION-RESEARCH-V1
-**Status:** AWAITING_DECISION
-**Builder:** TBD (Codex or Cascade, user will select)
+### Active Milestone: ABSORPTION-CONTINUATION-RESEARCH-V1
+**Status:** IN_PROGRESS (2026-05-12)
+**Builder:** Codex
 **Scope:** Research-only, no production changes
-**Goal:** Determine whether `trend_continuation_long` setup has independent edge in uptrend regimes.
+**Goal:** Determine whether `absorption_continuation_long` setup has independent edge in uptrend regimes.
 **Context:** Phase 1 grid confirmed sweep-reclaim cannot capture trend days (2026-05-11: BTC +2k USD, 0 trades). Bot needs second setup for different market structure.
 **Target files:** research_lab/**, backtest/** (if needed), tests/test_research_lab*, docs/**
 **No-touch areas:** Live execution, orchestrator production path, active trial-00095 PAPER parameters, settings.py promotion
-**Hypothesis:** Setup for uptrend regime: price > trend baseline, positive slope, shallow pullback, TFI/CVD continuation confirmation, RR gate pass, no crowded-leverage veto.
+**Hypothesis:** Institutional-grade trend continuation via controlled pullback absorption: established uptrend, pullback to value/liquidity level, CVD/TFI absorption confirmation, stable OI/funding, structural invalidation, RR gate pass, no crowded-leverage veto.
 **Deliverables:**
-1. Offline research implementation for trend_continuation_long
+1. Offline research implementation for absorption_continuation_long
 2. Standalone backtest report (trend-only, not mixed with sweep-reclaim)
 3. Regime-segmented metrics (uptrend, range, crowded, compression, downtrend)
 4. Walk-forward validation (2/2 windows)
@@ -2265,13 +2265,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Acceptance criteria:**
 - ER > 1.5 in uptrend regime (minimum)
 - Materially more uptrend trades than sweep-reclaim
+- Trend-day capture >= 50%; below 30% is rejection
+- Overlap with sweep-reclaim target <20%, hard gate <30%, reject >50%
 - Acceptable DD, no uncontrolled range/chop bleed
 - Every signal has explicit reasons[]
 - WF 2/2 pass, not fragile
 - No blocking safety flags
 - No live-path side effects
 
-**After Phase 2:** If trend-continuation validates, proceed to Phase 2.5 (multi-setup contracts). Do NOT wire into production without contracts (setup_type, per-setup reasons[], candidate pool, arbiter, per-setup metrics).
+**After Phase 2:** If absorption-continuation validates, proceed to Phase 2.5 (multi-setup contracts). Do NOT wire into production without contracts (setup_type, per-setup reasons[], candidate pool, arbiter, per-setup metrics).
 
 **Roadmap:** [docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md](docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md)
 
@@ -2281,6 +2283,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
-- **Phase 2 (trend-continuation research):** READY — awaiting user milestone approval
-- **Next decision point:** User approves Phase 2 and selects builder (Codex or Cascade)
+- **Phase 2 (absorption-continuation research):** IN_PROGRESS — Codex builder, research-only
+- **Next decision point:** Claude Code audits Codex checkpoint and returns reject / iterate / candidate for Phase 2.5
 
