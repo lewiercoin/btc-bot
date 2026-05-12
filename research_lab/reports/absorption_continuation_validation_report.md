@@ -6,21 +6,21 @@ Date range: `2022-01-01` -> `2026-03-29`
 
 ## Overall
 
-- Trades: 4
-- Expectancy R: 0.34088
-- Profit factor: 1.247212
-- Max drawdown pct: 0.025811
-- Sharpe: 1.692225
+- Trades: 25
+- Expectancy R: -0.480095
+- Profit factor: 0.554871
+- Max drawdown pct: 0.106361
+- Sharpe: -4.588025
 
 ## Decision Funnel
 
 - Decision cycles: 148596
-- Candidates: 4
-- Closed trades: 4
-- Absorption confirmation hit rate: 0.25
+- Candidates: 29
+- Closed trades: 25
+- Absorption confirmation hit rate: 0.24
 
 ## Per Regime
 
 | Regime | Trades | ER | PF | DD |
 |---|---:|---:|---:|---:|
-| uptrend | 4 | 0.34088 | 1.247212 | 0.025811 |
+| uptrend | 25 | -0.480095 | 0.554871 | 0.106361 |

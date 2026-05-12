@@ -104,6 +104,8 @@ def test_absorption_continuation_generates_explained_long_candidate() -> None:
     assert "setup_type=absorption_continuation_long" in candidate.reasons
     assert any(reason.startswith("pullback_depth_pct=") for reason in candidate.reasons)
     assert any(reason.startswith("rr_ratio=") for reason in candidate.reasons)
+    assert any(reason.startswith("cvd_slope_pullback_window=") for reason in candidate.reasons)
+    assert any(reason.startswith("volatility_panic_threshold=") for reason in candidate.reasons)
     assert "entry_timing=pullback_absorption_before_breakout_confirmation" in candidate.reasons
 
 
@@ -121,6 +123,29 @@ def test_absorption_continuation_blocks_retail_ema_pullback_without_absorption()
     assert not evaluation.accepted
     assert "absorption_not_confirmed" in evaluation.reasons
     assert "tfi_below_absorption_threshold" in evaluation.reasons
+
+
+def test_absorption_continuation_uses_pullback_window_cvd_history() -> None:
+    setup = AbsorptionContinuationLong()
+    snapshot = _snapshot()
+    snapshot.source_meta["research_cvd_price_history"] = [
+        {"price": 101_000.0, "cvd": 120.0},
+        {"price": 100_800.0, "cvd": 90.0},
+        {"price": 100_500.0, "cvd": 60.0},
+        {"price": 100_200.0, "cvd": 30.0},
+    ]
+    features = _features(cvd_15m=30.0, cvd_bullish_divergence=True)
+
+    evaluation = setup.evaluate_structure(
+        features=features,
+        snapshot=snapshot,
+        regime=RegimeState.UPTREND,
+        config=StrategyConfig(),
+    )
+
+    assert not evaluation.accepted
+    assert "absorption_not_confirmed" in evaluation.reasons
+    assert evaluation.metrics["cvd_slope_pullback_window"] < 0
 
 
 def test_absorption_continuation_blocks_wrong_regime_and_crowded_leverage() -> None:

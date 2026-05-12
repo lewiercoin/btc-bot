@@ -60,6 +60,7 @@ class AbsorptionContinuationBacktestRunner(BacktestRunner):
         self.decision_records: list[AbsorptionDecisionRecord] = []
         self._records_by_object_id: dict[int, AbsorptionDecisionRecord] = {}
         self._records_by_signal_id: dict[str, AbsorptionDecisionRecord] = {}
+        self._cvd_price_history: list[dict[str, Any]] = []
 
     def run(self, config: BacktestConfig) -> BacktestResult:
         symbol = config.symbol.upper()
@@ -71,6 +72,7 @@ class AbsorptionContinuationBacktestRunner(BacktestRunner):
         self.decision_records = []
         self._records_by_object_id = {}
         self._records_by_signal_id = {}
+        self._cvd_price_history = []
 
         replay_loader = self._custom_replay_loader or self._build_default_replay_loader(config)
         fill_model = self._custom_fill_model or self._build_default_fill_model(config)
@@ -125,6 +127,7 @@ class AbsorptionContinuationBacktestRunner(BacktestRunner):
                 schema_version=self.settings.schema_version,
                 config_hash=self.settings.config_hash,
             )
+            self._attach_research_cvd_history(snapshot=snapshot, features=features)
             regime = regime_engine.classify(features)
             _context = context_engine.classify(features)
             candidate = self._generate_candidate(snapshot=snapshot, features=features, regime=regime)
@@ -236,6 +239,19 @@ class AbsorptionContinuationBacktestRunner(BacktestRunner):
         if candidate is not None:
             self._records_by_object_id[id(candidate)] = record
         return candidate
+
+    def _attach_research_cvd_history(self, *, snapshot: Any, features: Features) -> None:
+        self._cvd_price_history.append(
+            {
+                "timestamp": _to_utc(features.timestamp).isoformat(),
+                "price": float(snapshot.price),
+                "cvd": float(features.cvd_15m),
+            }
+        )
+        max_window = 500
+        if len(self._cvd_price_history) > max_window:
+            self._cvd_price_history = self._cvd_price_history[-max_window:]
+        snapshot.source_meta["research_cvd_price_history"] = list(self._cvd_price_history)
 
     def _record_decision(
         self,
@@ -382,15 +398,21 @@ def run_absorption_backtest(
     end_date: str,
     output_path: Path,
     initial_equity: float = 10_000.0,
+    volatility_panic_threshold: float | None = None,
 ) -> dict[str, Any]:
     conn = sqlite3.connect(source_db_path)
     conn.row_factory = sqlite3.Row
     try:
         settings = load_settings(project_root=PROJECT_ROOT, profile="research")
+        setup_config = AbsorptionContinuationConfig()
+        if volatility_panic_threshold is not None:
+            setup_config = AbsorptionContinuationConfig(
+                volatility_panic_atr_norm=float(volatility_panic_threshold)
+            )
         runner = AbsorptionContinuationBacktestRunner(
             conn,
             settings=settings,
-            setup=AbsorptionContinuationLong(AbsorptionContinuationConfig()),
+            setup=AbsorptionContinuationLong(setup_config),
         )
         result = runner.run(
             BacktestConfig(
@@ -496,6 +518,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--end-date", default="2026-03-29")
     parser.add_argument("--output", type=Path, default=DEFAULT_OUTPUT_PATH)
     parser.add_argument("--initial-equity", type=float, default=10_000.0)
+    parser.add_argument("--volatility-panic-threshold", type=float)
     return parser.parse_args()
 
 
@@ -507,6 +530,7 @@ def main() -> int:
         end_date=args.end_date,
         output_path=args.output,
         initial_equity=args.initial_equity,
+        volatility_panic_threshold=args.volatility_panic_threshold,
     )
     return 0
 

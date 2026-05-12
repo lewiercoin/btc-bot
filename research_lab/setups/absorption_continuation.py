@@ -24,6 +24,8 @@ class AbsorptionContinuationConfig:
     tfi_threshold: float = 0.30
     volatility_panic_atr_norm: float = 0.008
     liquidation_rate_threshold: float = 1.0
+    cvd_pullback_window_bars: int = 12
+    cvd_slope_threshold: float = 0.0
     entry_offset_atr: float = 0.05
     invalidation_offset_atr: float = 0.30
     tp1_atr_mult: float = 2.5
@@ -98,12 +100,15 @@ class AbsorptionContinuationLong(BaseSetup):
             f"price_near_equal_low={metrics['price_near_equal_low']}",
             f"maintains_higher_lows={metrics['maintains_higher_lows']}",
             f"cvd_bullish_divergence={features.cvd_bullish_divergence}",
-            f"cvd_15m_slope_proxy={metrics['cvd_slope_proxy']:.6f}",
+            f"cvd_slope_pullback_window={metrics['cvd_slope_pullback_window']:.6f}",
+            f"cvd_absorption_confirmed={metrics['cvd_absorption_confirmed']}",
             f"tfi_60s={features.tfi_60s:.3f}",
             f"oi_delta_pct={features.oi_delta_pct:.6f}",
             f"funding_8h={features.funding_8h:.6f}",
             f"oi_zscore_60d={features.oi_zscore_60d:.3f}",
             f"atr_4h_norm={features.atr_4h_norm:.6f}",
+            f"volatility_panic_threshold={self.setup_config.volatility_panic_atr_norm:.6f}",
+            f"volatility_panic={features.atr_4h_norm > self.setup_config.volatility_panic_atr_norm}",
             f"rr_ratio={rr_ratio:.3f}",
             "entry_timing=pullback_absorption_before_breakout_confirmation",
             "counterparty=pullback_sellers_early_shorts_late_breakout_buyers",
@@ -139,6 +144,8 @@ class AbsorptionContinuationLong(BaseSetup):
                 "oi_delta_pct": features.oi_delta_pct,
                 "cvd_15m": features.cvd_15m,
                 "cvd_bullish_divergence": features.cvd_bullish_divergence,
+                "cvd_slope_pullback_window": metrics["cvd_slope_pullback_window"],
+                "cvd_absorption_confirmed": metrics["cvd_absorption_confirmed"],
                 "tfi_60s": features.tfi_60s,
                 "force_order_rate_60s": features.force_order_rate_60s,
                 "force_order_spike": features.force_order_spike,
@@ -179,11 +186,7 @@ class AbsorptionContinuationLong(BaseSetup):
         if not metrics["maintains_higher_lows"]:
             reasons.append("higher_low_structure_broken")
 
-        absorption_ok = (
-            bool(features.cvd_bullish_divergence)
-            or metrics["cvd_slope_proxy"] > 0.0
-        )
-        if not absorption_ok:
+        if not bool(metrics["cvd_absorption_confirmed"]):
             reasons.append("absorption_not_confirmed")
         if float(features.tfi_60s) < self.setup_config.tfi_threshold:
             reasons.append("tfi_below_absorption_threshold")
@@ -226,6 +229,10 @@ class AbsorptionContinuationLong(BaseSetup):
             abs(price - float(level)) / atr_4h <= self.setup_config.equal_low_proximity_atr
             for level in features.equal_lows
         )
+        cvd_absorption_confirmed, cvd_slope = self._calculate_cvd_absorption(
+            snapshot=snapshot,
+            features=features,
+        )
         return {
             "recent_high": recent_high,
             "pullback_low": pullback_low,
@@ -237,18 +244,18 @@ class AbsorptionContinuationLong(BaseSetup):
             "maintains_higher_lows": price > prior_swing_low,
             "ema200_slope_pct": ema200_slope_pct,
             "extension_pct": (price - float(features.ema200_4h)) / max(float(features.ema200_4h), 1e-8),
-            "cvd_slope_proxy": float(features.cvd_15m),
+            "cvd_slope_pullback_window": cvd_slope,
+            "cvd_absorption_confirmed": cvd_absorption_confirmed,
         }
 
-    @staticmethod
-    def _confluence_score(*, features: Features, metrics: dict[str, Any], rr_ratio: float) -> float:
+    def _confluence_score(self, *, features: Features, metrics: dict[str, Any], rr_ratio: float) -> float:
         score = 0.0
         score += 2.0  # setup identity and trend regime
         if metrics["price_near_ema50"]:
             score += 1.0
         if metrics["price_near_equal_low"]:
             score += 1.0
-        if bool(features.cvd_bullish_divergence):
+        if bool(metrics["cvd_absorption_confirmed"]):
             score += 1.5
         if float(features.tfi_60s) >= 0.30:
             score += 1.0
@@ -257,6 +264,43 @@ class AbsorptionContinuationLong(BaseSetup):
         if rr_ratio >= 2.5:
             score += 1.0
         return score
+
+    def _calculate_cvd_absorption(
+        self,
+        *,
+        snapshot: MarketSnapshot,
+        features: Features,
+    ) -> tuple[bool, float]:
+        history = _cvd_history_from_snapshot(snapshot)
+        if len(history) < 2:
+            slope = float(features.cvd_15m)
+            return slope > self.setup_config.cvd_slope_threshold, slope
+
+        window = history[-max(int(self.setup_config.cvd_pullback_window_bars), 2) :]
+        cvd_start = float(window[0]["cvd"])
+        cvd_end = float(window[-1]["cvd"])
+        price_start = float(window[0]["price"])
+        price_end = float(window[-1]["price"])
+        bars = max(len(window) - 1, 1)
+        cvd_slope = (cvd_end - cvd_start) / bars
+        price_falling_or_retesting = price_end <= price_start or self._is_pullback_active(snapshot=snapshot)
+        absorption_confirmed = (
+            cvd_slope > self.setup_config.cvd_slope_threshold
+            and price_falling_or_retesting
+        )
+        return absorption_confirmed, cvd_slope
+
+    def _is_pullback_active(self, *, snapshot: MarketSnapshot) -> bool:
+        candles = list(snapshot.candles_15m or [])
+        if len(candles) < 2:
+            return False
+        recent_high = _recent_high(
+            candles,
+            default=float(snapshot.price),
+            lookback=self.setup_config.recent_high_lookback_15m,
+        )
+        pullback_depth_pct = (recent_high - float(snapshot.price)) / max(recent_high, 1e-8)
+        return pullback_depth_pct >= self.setup_config.pullback_min_pct
 
 
 def _regime_value(regime: RegimeState | str) -> str:
@@ -323,3 +367,18 @@ def _rr_long(*, entry: float, stop: float, target: float) -> float:
     if risk <= 0:
         return 0.0
     return (target - entry) / risk
+
+
+def _cvd_history_from_snapshot(snapshot: MarketSnapshot) -> list[dict[str, float]]:
+    raw = snapshot.source_meta.get("research_cvd_price_history", [])
+    if not isinstance(raw, list):
+        return []
+    history: list[dict[str, float]] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        try:
+            history.append({"price": float(item["price"]), "cvd": float(item["cvd"])})
+        except (KeyError, TypeError, ValueError):
+            continue
+    return history
