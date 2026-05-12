@@ -101,6 +101,8 @@ def test_compression_breakout_generates_explained_long_candidate() -> None:
     assert candidate.regime is RegimeState.COMPRESSION
     assert candidate.invalidation_level < candidate.entry_reference < candidate.tp_reference_1
     assert "setup_type=compression_breakout_long" in candidate.reasons
+    assert "regime_veto=allowed" in candidate.reasons
+    assert "internal_compression_detected=True" in candidate.reasons
     assert any(reason.startswith("atr_percentile=") for reason in candidate.reasons)
     assert any(reason.startswith("breakout_size_atr=") for reason in candidate.reasons)
     assert "entry_timing=breakout_confirmation_before_retail_extension" in candidate.reasons
@@ -118,6 +120,21 @@ def test_compression_breakout_blocks_wrong_regime_and_absorption_retry() -> None
 
     assert not evaluation.accepted
     assert "regime_blocked:uptrend" in evaluation.reasons
+
+
+def test_compression_breakout_accepts_normal_when_internally_compressed() -> None:
+    setup = CompressionBreakoutLong()
+
+    candidate = setup.generate_signal_candidate(
+        features=_features(),
+        snapshot=_snapshot(),
+        regime=RegimeState.NORMAL,
+        config=StrategyConfig(),
+    )
+
+    assert candidate is not None
+    assert candidate.regime is RegimeState.NORMAL
+    assert "internal_compression_detected=True" in candidate.reasons
 
 
 def test_compression_breakout_requires_objective_compression_history() -> None:
@@ -180,7 +197,7 @@ def test_compression_gate_evaluator_blocks_missing_validation_evidence() -> None
     report = {
         "performance": {"trades_count": 0, "profit_factor": None, "win_rate": None},
         "per_regime": {},
-        "decision_summary": {"breakout_followthrough_rate": None},
+        "decision_summary": {"breakout_followthrough_rate": None, "internal_compression_closed_trades": 0},
         "signals": [],
     }
 
@@ -188,7 +205,7 @@ def test_compression_gate_evaluator_blocks_missing_validation_evidence() -> None
 
     assert result["verdict"] == "ITERATE"
     failed = {gate["name"] for gate in result["gates"] if not gate["passed"]}
-    assert "compression_er" in failed
+    assert "internal_compression_er" in failed
     assert "breakout_followthrough" in failed
     assert "overlap_control" in failed
     assert "walkforward" in failed
@@ -197,9 +214,9 @@ def test_compression_gate_evaluator_blocks_missing_validation_evidence() -> None
 
 def test_compression_gate_evaluator_rejects_failed_breakout_thesis() -> None:
     report = {
-        "performance": {"trades_count": 25, "profit_factor": 0.8, "win_rate": 0.32},
+        "performance": {"trades_count": 25, "expectancy_r": 0.4, "profit_factor": 0.8, "win_rate": 0.32},
         "per_regime": {"compression": {"expectancy_r": 0.4, "trades_count": 18}},
-        "decision_summary": {"breakout_followthrough_rate": 0.25},
+        "decision_summary": {"breakout_followthrough_rate": 0.25, "internal_compression_closed_trades": 25},
         "signals": [{"candidate_reasons": ["setup_type=compression_breakout_long"]}],
     }
 

@@ -44,6 +44,7 @@ class CompressionDecisionRecord:
     atr_percentile: float | None = None
     range_width_atr: float | None = None
     compression_duration_bars: int | None = None
+    internal_compression_detected: bool | None = None
     breakout_size_atr: float | None = None
     tfi_60s: float | None = None
     oi_delta_pct: float | None = None
@@ -281,6 +282,7 @@ class CompressionBreakoutBacktestRunner(BacktestRunner):
             atr_percentile=_optional_float(metrics.get("atr_percentile")),
             range_width_atr=_optional_float(metrics.get("range_width_atr")),
             compression_duration_bars=_optional_int(metrics.get("compression_duration_bars")),
+            internal_compression_detected=_optional_bool(metrics.get("internal_compression_detected")),
             breakout_size_atr=_optional_float(metrics.get("breakout_size_atr")),
             tfi_60s=float(features.tfi_60s),
             oi_delta_pct=float(features.oi_delta_pct),
@@ -340,6 +342,7 @@ def build_compression_report(
     by_regime = _performance_by_regime(trades, initial_equity=initial_equity)
     generated = [record for record in records if record.candidate_generated]
     closed = [record for record in records if record.trade_closed]
+    internal_compression_closed = [record for record in closed if bool(record.internal_compression_detected)]
     followed_through = [record for record in closed if record.mfe is not None and record.mfe >= 1.0]
     return {
         "milestone": "COMPRESSION-BREAKOUT-RESEARCH-V1",
@@ -352,6 +355,7 @@ def build_compression_report(
             "cycles": len(records),
             "candidates": len(generated),
             "closed_trades": len(closed),
+            "internal_compression_closed_trades": len(internal_compression_closed),
             "top_rejection_reasons": _top_rejection_reasons(records),
             "breakout_followthrough_rate": _safe_div(len(followed_through), len(closed)),
             "avg_compression_duration_bars": _average(
@@ -389,6 +393,7 @@ def write_compression_markdown_report(report: dict[str, Any], output_path: Path)
         f"- Decision cycles: {summary['cycles']}",
         f"- Candidates: {summary['candidates']}",
         f"- Closed trades: {summary['closed_trades']}",
+        f"- Internal compression closed trades: {summary['internal_compression_closed_trades']}",
         f"- Breakout follow-through rate: {summary['breakout_followthrough_rate']}",
         f"- Avg compression duration bars: {summary['avg_compression_duration_bars']}",
         f"- Avg breakout size ATR: {summary['avg_breakout_size_atr']}",
@@ -523,6 +528,12 @@ def _optional_int(value: Any) -> int | None:
     if value is None:
         return None
     return int(value)
+
+
+def _optional_bool(value: Any) -> bool | None:
+    if value is None:
+        return None
+    return bool(value)
 
 
 def _parse_args() -> argparse.Namespace:

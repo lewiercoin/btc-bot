@@ -1,0 +1,125 @@
+{
+  "candidate_counts": {
+    "compression": 7,
+    "crowded_leverage": 0,
+    "downtrend": 0,
+    "normal": 0,
+    "uptrend": 0
+  },
+  "candidate_rates": {
+    "compression": 0.00238257,
+    "crowded_leverage": 0.0,
+    "downtrend": 0.0,
+    "normal": 0.0,
+    "uptrend": 0.0
+  },
+  "compression_metrics": {
+    "atr_percentile": {
+      "count": 2938,
+      "mean": 0.10906739,
+      "p50": 0.039,
+      "p95": 0.43
+    },
+    "breakout_size_atr": {
+      "count": 2938,
+      "mean": -3.76881907,
+      "p50": -3.3864141,
+      "p95": -0.33368697
+    },
+    "compression_duration_bars": {
+      "count": 2938,
+      "mean": 66.10142954,
+      "p50": 89.0,
+      "p95": 102.0
+    },
+    "range_width_atr": {
+      "count": 2938,
+      "mean": 11.25637112,
+      "p50": 9.47588634,
+      "p95": 24.12778716
+    }
+  },
+  "date_range": {
+    "end": "2026-03-29",
+    "start": "2022-01-01"
+  },
+  "interpretation": "Compression-labeled cycles are primarily blocked by: breakout_too_small=2862, no_breakout_detected=2856, tfi_below_breakout_threshold=2180",
+  "regime_counts": {
+    "compression": 2938,
+    "crowded_leverage": 13970,
+    "downtrend": 63598,
+    "normal": 4199,
+    "uptrend": 63891
+  },
+  "source_db_path": "storage\\btc_bot.db",
+  "top_rejection_reasons_by_regime": {
+    "compression": {
+      "atr_not_compressed": 559,
+      "breakout_too_small": 2862,
+      "compression_duration_too_short": 678,
+      "confluence_too_low": 1287,
+      "no_breakout_detected": 2856,
+      "oi_unwind_not_participation": 1032,
+      "range_width_not_compressed": 1907,
+      "rr_below_minimum": 33,
+      "tfi_below_breakout_threshold": 2180
+    },
+    "crowded_leverage": {
+      "atr_not_compressed": 10728,
+      "breakout_too_small": 13669,
+      "compression_duration_too_short": 11102,
+      "confluence_too_low": 12158,
+      "no_breakout_detected": 13652,
+      "oi_crowded": 1701,
+      "oi_unwind_not_participation": 6398,
+      "range_width_not_compressed": 11171,
+      "regime_blocked:crowded_leverage": 13970,
+      "rr_below_minimum": 159,
+      "tfi_below_breakout_threshold": 11579,
+      "volatility_panic": 794
+    },
+    "downtrend": {
+      "atr_history_insufficient": 79,
+      "atr_not_compressed": 45739,
+      "breakout_too_small": 62400,
+      "compression_duration_too_short": 47619,
+      "confluence_too_low": 53194,
+      "no_breakout_detected": 62303,
+      "oi_crowded": 886,
+      "oi_unwind_not_participation": 24341,
+      "range_width_not_compressed": 49419,
+      "regime_blocked:downtrend": 63598,
+      "rr_below_minimum": 1127,
+      "tfi_below_breakout_threshold": 52503,
+      "volatility_panic": 4705
+    },
+    "normal": {
+      "atr_not_compressed": 2998,
+      "breakout_too_small": 4130,
+      "compression_duration_too_short": 3164,
+      "confluence_too_low": 3591,
+      "no_breakout_detected": 4127,
+      "oi_crowded": 94,
+      "oi_unwind_not_participation": 1548,
+      "range_width_not_compressed": 3089,
+      "rr_below_minimum": 58,
+      "tfi_below_breakout_threshold": 3319,
+      "volatility_panic": 80
+    },
+    "uptrend": {
+      "atr_not_compressed": 46379,
+      "breakout_too_small": 62447,
+      "compression_duration_too_short": 48319,
+      "confluence_too_low": 53862,
+      "funding_crowded_long": 64,
+      "no_breakout_detected": 62339,
+      "oi_crowded": 801,
+      "oi_unwind_not_participation": 25846,
+      "range_width_not_compressed": 49051,
+      "regime_blocked:uptrend": 63891,
+      "rr_below_minimum": 969,
+      "tfi_below_breakout_threshold": 52223,
+      "volatility_panic": 1852
+    }
+  }
+}
