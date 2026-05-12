@@ -2246,7 +2246,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Strategic finding:** Parameter tuning cannot solve missing strategy problem. Sweep-reclaim is liquidity-response setup (fade stop-run + reclaim), not trend-continuation setup. Clean trend days require separate setup with different edge hypothesis.
 
 ### Active Milestone: ABSORPTION-CONTINUATION-RESEARCH-V1
-**Status:** CHECKPOINT_2_REJECT_READY_FOR_AUDIT (2026-05-12)
+**Status:** ITERATION_A_FAILED_READY_FOR_AUDIT (2026-05-12)
 **Builder:** Codex
 **Scope:** Research-only, no production changes
 **Goal:** Determine whether `absorption_continuation_long` setup has independent edge in uptrend regimes.
@@ -2277,6 +2277,8 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 **Checkpoint 2 result (2026-05-12):** Full local backtest on V3/grid-compatible data (`2022-01-01` -> `2026-03-29`) rejected the current hypothesis. The setup produced only 4 trades, uptrend ER `0.34088`, PF `1.247212`, and absorption confirmation hit rate `0.25`. WF and overlap were not run because primary hard gates failed before they became decision-useful. Audit package: `research_lab/reports/ABSORPTION_CONTINUATION_AUDIT_PACKAGE.md`.
 
+**Iteration A result (2026-05-12):** One diagnostic iteration fixed CVD measurement and volatility threshold only. Empirical `atr_4h_norm` p95 is `0.02885372` vs the original arbitrary `0.008`. Re-run produced 25 trades but failed edge gates: uptrend ER `-0.480095`, PF `0.554871`, win rate `0.24`, absorption hit rate `0.24`. Verdict: `HYPOTHESIS FAILED`; recommended next setup family is `compression_breakout`. Audit package: `research_lab/reports/ABSORPTION_CONTINUATION_ITERATION_A_AUDIT_PACKAGE.md`.
+
 **Roadmap:** [docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md](docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md)
 
 ---
@@ -2285,6 +2287,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
-- **Phase 2 (absorption-continuation research):** REJECT_READY_FOR_AUDIT — current hypothesis failed hard gates
-- **Next decision point:** Claude Code audits Codex checkpoint and confirms reject / iterate direction
+- **Phase 2 (absorption-continuation research):** ITERATION_A_FAILED_READY_FOR_AUDIT — measurement fixes failed to reveal edge
+- **Next decision point:** Claude Code audits Iteration A and confirms move to `compression_breakout` or another user-approved setup
 
