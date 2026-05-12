@@ -4,6 +4,12 @@ Research Lab is a staged offline system.
 
 It does not treat `optimize` and `autoresearch` as interchangeable modes.
 
+Terminology note: this document's "Phase 1/Phase 2" describes the
+Research Lab optimization workflow (`optimize` -> `autoresearch`). It is
+separate from the multi-setup portfolio roadmap phases in
+`docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md`, where "Phase 2" means
+`trend_continuation_long` research.
+
 The canonical order is:
 
 1. Phase 1 discovery with Optuna

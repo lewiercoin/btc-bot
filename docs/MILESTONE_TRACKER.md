@@ -2229,3 +2229,58 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 3. Anchored walk-forward: train 2022-2024, test 2024-2025, test 2025-2026
 4. If best candidate passes both OOS windows â†’ paper trading validation
 5. Run #13: add level_min_age_bars as tunable [2, 6] + simple regime meta-layer (volatility Ă— funding Ă— cvd_strength)
+
+---
+
+## Multi-Setup Portfolio Architecture (2026-05-11 onward)
+
+### PHASE-1-GRID-SEARCH
+**Status:** DONE (2026-05-12)
+**Builder:** Codex
+**What:** Constrained grid search on trial-00095 baseline (60 combinations: min_sweep_depth_pct [0.002, 0.00286, 0.004, 0.005, 0.00649] × reclaim_buf_atr [0.0, 0.05, 0.07, 0.10] × sweep_buf_atr [0.35, 0.46, 0.50]). Goal: increase trade frequency while maintaining quality.
+**Why:** Production bottleneck: 74% rejections from sweep_too_shallow, only 1 trade in 245 decision cycles. User needs bot to generate income.
+**Result:** 12 candidates passed full range, 0 qualified. Candidates with increased frequency (+70-83% trades) all had blocking safety flag `pnl_sanity_review_required: true`. Trade-offs were poor: grid-043 (+71% trades) cost -19% ER and -22% PF; grid-037 (+83% trades) cost -30% ER and -29% PF.
+**Verdict:** REJECT ALL. Keep baseline trial-00095 active. Grid confirmed sweep-reclaim is near-optimal within its natural regime (range/liquidity days). Cannot be forced to capture trend days without quality collapse.
+**Audit:** [docs/audits/AUDIT_GRID_SEARCH_TRIAL00095_2026-05-12.md](docs/audits/AUDIT_GRID_SEARCH_TRIAL00095_2026-05-12.md)
+**Analysis:** [docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md](docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md)
+**Strategic finding:** Parameter tuning cannot solve missing strategy problem. Sweep-reclaim is liquidity-response setup (fade stop-run + reclaim), not trend-continuation setup. Clean trend days require separate setup with different edge hypothesis.
+
+### Next Milestone: TREND-CONTINUATION-RESEARCH-V1
+**Status:** AWAITING_DECISION
+**Builder:** TBD (Codex or Cascade, user will select)
+**Scope:** Research-only, no production changes
+**Goal:** Determine whether `trend_continuation_long` setup has independent edge in uptrend regimes.
+**Context:** Phase 1 grid confirmed sweep-reclaim cannot capture trend days (2026-05-11: BTC +2k USD, 0 trades). Bot needs second setup for different market structure.
+**Target files:** research_lab/**, backtest/** (if needed), tests/test_research_lab*, docs/**
+**No-touch areas:** Live execution, orchestrator production path, active trial-00095 PAPER parameters, settings.py promotion
+**Hypothesis:** Setup for uptrend regime: price > trend baseline, positive slope, shallow pullback, TFI/CVD continuation confirmation, RR gate pass, no crowded-leverage veto.
+**Deliverables:**
+1. Offline research implementation for trend_continuation_long
+2. Standalone backtest report (trend-only, not mixed with sweep-reclaim)
+3. Regime-segmented metrics (uptrend, range, crowded, compression, downtrend)
+4. Walk-forward validation (2/2 windows)
+5. Comparison vs sweep-reclaim: overlap, coverage, regime ER/PF/DD, conflict analysis
+6. Claude Code audit verdict: reject / iterate / candidate for paper after Phase 2.5 contracts
+
+**Acceptance criteria:**
+- ER > 1.5 in uptrend regime (minimum)
+- Materially more uptrend trades than sweep-reclaim
+- Acceptable DD, no uncontrolled range/chop bleed
+- Every signal has explicit reasons[]
+- WF 2/2 pass, not fragile
+- No blocking safety flags
+- No live-path side effects
+
+**After Phase 2:** If trend-continuation validates, proceed to Phase 2.5 (multi-setup contracts). Do NOT wire into production without contracts (setup_type, per-setup reasons[], candidate pool, arbiter, per-setup metrics).
+
+**Roadmap:** [docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md](docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md)
+
+---
+
+## Current Status (2026-05-12)
+
+- **Active PAPER deployment:** trial-00095 (optuna-default-v3)
+- **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
+- **Phase 2 (trend-continuation research):** READY — awaiting user milestone approval
+- **Next decision point:** User approves Phase 2 and selects builder (Codex or Cascade)
+

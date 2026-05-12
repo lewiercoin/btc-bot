@@ -75,3 +75,12 @@ document. Runtime facts live in the production database and should be checked wi
 **Consequences:** Operators and agents should run `python scripts/db_status.py` on production for current facts. This log records why decisions were made, not whether the bot is currently healthy, which branch is deployed, or how many rows are in the database today.
 
 **Related:** `scripts/db_status.py`; `docs/DATA_SOURCES.md`; DOCS-FOUNDATION-V1. [wymaga weryfikacji operatora]
+
+## 2026-05-12 - Keep sweep-reclaim baseline and move to multi-setup research
+**Decision:** Keep `optuna-default-v3-trial-00095` as the active PAPER sweep-reclaim baseline. Do not promote any candidate from the constrained grid. Start the next work as research-only `TREND-CONTINUATION-RESEARCH-V1`, with no production behavior change.
+
+**Reason:** The constrained grid around trial-00095 tested 60 combinations and increased trade frequency in several candidates, but every meaningful frequency improvement degraded ER/PF and triggered blocking safety concerns, especially `pnl_sanity_review_required`. This confirms that sweep-reclaim is a bounded liquidity-reclaim / mean-reversion setup, not a clean-trend continuation setup.
+
+**Consequences:** Future work should not try to force sweep-reclaim to trade every market structure. The bot should evolve toward a portfolio of independent, context-specific setups. Each setup must prove edge independently through explicit market-structure hypothesis, deterministic logic, `reasons[]`, standalone backtest, walk-forward validation, safety gates, and audit before it can be integrated through a deterministic multi-setup arbiter.
+
+**Related:** `docs/audits/AUDIT_GRID_SEARCH_TRIAL00095_2026-05-12.md`; `docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md`; `docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md`; `docs/MILESTONE_TRACKER.md` Multi-Setup Portfolio Architecture section.
