@@ -1,0 +1,72 @@
+{
+  "gates": [
+    {
+      "actual": -0.352508,
+      "name": "crowded_leverage_er",
+      "passed": false,
+      "required": "> 1.5"
+    },
+    {
+      "actual": 0.323944,
+      "name": "liquidation_capture",
+      "passed": false,
+      "required": ">= 0.50"
+    },
+    {
+      "actual": null,
+      "name": "overlap_control",
+      "passed": false,
+      "required": "< 0.30"
+    },
+    {
+      "actual": 71,
+      "name": "minimum_total_trades",
+      "passed": true,
+      "required": ">= 20"
+    },
+    {
+      "actual": 71,
+      "name": "crowded_trade_count",
+      "passed": true,
+      "required": ">= 10 target-regime trades"
+    },
+    {
+      "actual": null,
+      "name": "walkforward",
+      "passed": false,
+      "required": "2/2"
+    },
+    {
+      "actual": [],
+      "name": "safety_flags",
+      "passed": true,
+      "required": "[]"
+    },
+    {
+      "actual": "checked",
+      "name": "explainability",
+      "passed": true,
+      "required": "all signals include reasons[]"
+    }
+  ],
+  "notes": [
+    "Missing overlap or walk-forward evidence blocks candidate status.",
+    "Initial hard stops reject if sample, crowded ER, or liquidation capture fail."
+  ],
+  "red_flags": [
+    {
+      "action": "REJECT",
+      "flag": "crowded_leverage_er_below_edge_threshold"
+    },
+    {
+      "action": "REJECT",
+      "flag": "liquidation_capture_not_predictive"
+    },
+    {
+      "action": "REVIEW",
+      "flag": "win_rate_outside_expected_band"
+    }
+  ],
+  "setup_type": "crowded_unwind",
+  "verdict": "REJECT"
+}
