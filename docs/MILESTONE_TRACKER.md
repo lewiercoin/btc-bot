@@ -37,6 +37,18 @@
 
 ---
 
+**Checkpoint 1 â€” 2026-05-13 (Codex):**
+- Implemented research-only `crowded_unwind_long` and `crowded_unwind_short`.
+- Added setup contract, backtest runner, hard gate evaluator, and focused tests.
+- Local `storage/btc_bot.db` had `0` force order rows, so initial replay produced no candidates.
+- Created untracked research-only DB copy with `146864` server force-order rows for the V3 range; original local DB unchanged.
+- Backfilled replay (`2022-01-01` â†’ `2026-03-29`) produced `71` closed trades, all in `crowded_leverage`.
+- Result: ER `-0.352508`, PF `0.40411`, liquidation capture `0.323944`.
+- Builder verdict prepared for Claude Code: `REJECT` for current formulation.
+- Audit package: `research_lab/reports/CROWDED_UNWIND_AUDIT_PACKAGE.md`.
+
+---
+
 ## Production Active: PAPER-TRADING-TRIAL-00095
 
 **Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
