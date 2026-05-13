@@ -9,29 +9,33 @@
 
 ---
 
-### Research: POST-CASCADE-MOMENTUM-RESEARCH-V1
+### Research: VOLATILITY-BREAKOUT-RESEARCH-V1
 
 **Status:** RESEARCH_ACTIVE  
 **Builder:** Codex  
 **Decision date:** 2026-05-13  
-**Branch:** `research/post-cascade-momentum-v1` (to be created from main)  
-**Handoff:** `docs/handoffs/HANDOFF_POST_CASCADE_MOMENTUM_RESEARCH_V1_2026-05-13.md`
+**Branch:** `research/volatility-breakout-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_VOLATILITY_BREAKOUT_RESEARCH_V1_2026-05-13.md`
 
-**Scope:** Research-only validation of post_cascade_momentum setup (aftermath state after liquidation cascade → momentum continuation).
+**Scope:** Research-only validation of volatility_breakout setup (ATR expansion state + structure break + momentum continuation).
 
-**Hypothesis:** After liquidation cascade clears overleveraged positions (detected via post_liquidation regime), market structure becomes cleaner and momentum continues in cascade direction. Entry AFTER cascade confirms, not during cascade event.
+**Hypothesis:** After volatility contracts (ATR low), expansion phase begins (ATR rising). Entry when expansion state confirmed AND structure breaking AND momentum aligns. NOT compression state entry (that failed in compression_breakout).
 
-**Target regimes:** `post_liquidation` (primary), with momentum validation
+**Target regimes:** Normal, uptrend, downtrend (expansion occurs across regimes)
 
 **Timeline:** 1-2 weeks
 
 **Success criteria:**
-- Post-liquidation regime ER > 1.5
-- Post-cascade continuation rate >= 60% (momentum follows cascade direction)
+- Expansion state ER > 1.5
+- Follow-through/continuation rate >= 60% (expansion continues after entry)
 - Overlap vs sweep_reclaim < 30%
 - Min trades >= 20
-- WF 2/2 pass
+- WF 2/2 pass (only if Checkpoint 1 gates pass)
 - No blocking safety flags
+
+**Critical distinction from compression_breakout:**
+- compression_breakout: Entry during compression, anticipating breakout (FAILED - sequential events)
+- volatility_breakout: Entry during expansion, riding momentum (different timing)
 
 **Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
 
@@ -113,6 +117,50 @@ monitoring guardrails and no real-money execution.
 - Total: 2 days to conclusive verdict
 
 **Next:** Moved to CROWDED-UNWIND-RESEARCH-V1 (funding/OI extremes → concurrent forced unwind)
+
+---
+
+## Completed: POST-CASCADE-MOMENTUM-RESEARCH-V1
+
+**Status:** BLOCKED_BY_INFRASTRUCTURE  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-13  
+**Branch:** `research/post-cascade-momentum-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_POST_CASCADE_MOMENTUM_RESEARCH_V1_2026-05-13.md`  
+**Audit:** `docs/audits/AUDIT_POST_CASCADE_MOMENTUM_CHECKPOINT_1_2026-05-13.md`
+
+**Result:**
+- **Checkpoint 1:** 0 post_liquidation cycles (out of 148,596), 0 trades → BLOCKED (infrastructure gap)
+- **No iteration:** Target regime absent, hypothesis not testable
+
+**Why blocked:**
+- **Blueprint-vs-reality mismatch** (infrastructure gap, not hypothesis failure)
+- Handoff assumed: `post_liquidation` = aftermath state (cascade ended, no active spike, entry window minutes-hours)
+- RegimeEngine reality: `post_liquidation` = cascade tail (active spike declining, entry window seconds-minutes)
+- RegimeEngine requires: `force_order_spike` (active) AND `force_order_decreasing` (3 cycles) AND `abs(tfi_60s) >= 0.2`
+- Triple condition extremely rare at 15m frequency → 0 out of 148,596 cycles
+
+**Key finding:** Infrastructure doesn't support aftermath state detection. Current `post_liquidation` detects cascade tail (still too fast for 15m), not post-cascade cleanup phase (slow enough for 15m).
+
+**Learning:** Cascade-based setups (catching cascade OR catching aftermath) require timing precision incompatible with 15m decision cycles. Both profitable windows occur on seconds-to-minutes scales, faster than 15m engine can detect and act.
+
+**Data quality:**
+- Force orders backfilled: 146,864 rows from production server
+- Research DB copy used (no production mutation)
+- Data adequate, regime absent
+
+**Implementation quality:**
+- Setup correctly implemented per handoff
+- Cascade direction detection from historical force orders (NOT real-time spike catching)
+- Post-event state logic (NOT late crowded_unwind)
+- Tests: 48 passed, 2 skipped
+
+**Timeline:**
+- 2026-05-13: Setup designed, handoff generated, Checkpoint 1 implemented → BLOCKED
+- Total: 1 day to conclusive verdict (fast failure discipline)
+
+**Next:** Defer all cascade-based setups; focus on 15m-compatible setups (volatility_breakout, regime_reversal)
 
 ---
 
