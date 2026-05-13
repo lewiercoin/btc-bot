@@ -11,10 +11,10 @@
 
 ### Research: REGIME-REVERSAL-RESEARCH-V1 (FINAL 15M PORTFOLIO TEST)
 
-**Status:** RESEARCH_ACTIVE  
+**Status:** CHECKPOINT_1_READY_FOR_AUDIT
 **Builder:** Codex  
 **Decision date:** 2026-05-13  
-**Branch:** `research/regime-reversal-v1` (to be created from main)  
+**Branch:** `research/regime-reversal-v1`
 **Handoff:** `docs/handoffs/HANDOFF_REGIME_REVERSAL_RESEARCH_V1_2026-05-13.md`
 
 **Scope:** Research-only validation of regime_reversal setup (regime exhaustion → RegimeEngine confirms shift → counter-trend entry after transition).
@@ -40,7 +40,29 @@
 - If fails: Conclusive evidence 15m insufficient for setup diversification beyond sweep_reclaim
 - Next milestone after this: Strategic assessment (NOT another setup)
 
-**Next:** Backtest validation → audit → decision (REJECT / CANDIDATE) → Strategic assessment regardless of outcome
+
+**Checkpoint 1 result (Codex, 2026-05-13):**
+- Full replay: 2022-01-01 -> 2026-03-29 on local V3 data.
+- Replay cycles: 148,596.
+- Regime transitions: 1,209 / 1,210 events (~0.81% cycle rate).
+- Candidates: 22.
+- Closed trades: 11.
+- Post-transition ER: 0.1131 (REJECT; hard stop because ER <1.0).
+- PF: 1.29, win rate: 36.36%, max DD: 1.39%.
+- Average entry delay: 5.82 cycles (FAIL/marginal; below >6 hard timing violation, but not early).
+- Median entry delay: 5 cycles; P95: 12 cycles.
+- False reversal rate: 0.00% (PASS).
+- Whipsaw rate: 23.82% (PASS).
+- Builder verdict: REJECT, reason `negative_or_weak_edge_hard_stop`.
+- WF and overlap were not run because Checkpoint 1 ER hard-stop failed.
+
+**Reports:**
+- `research_lab/reports/regime_reversal_validation_report.md`
+- `research_lab/reports/regime_transition_distribution.md`
+- `research_lab/reports/regime_gate_results.json`
+- `research_lab/reports/REGIME_REVERSAL_AUDIT_PACKAGE.md`
+
+**Audit next:** Claude Code audit -> strategic assessment (per final-test framing, not another setup)
 
 ---
 

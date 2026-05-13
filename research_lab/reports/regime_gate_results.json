@@ -1,0 +1,69 @@
+{
+  "gates": [
+    {
+      "gate": "minimum_total_trades",
+      "pass_threshold": ">= 20",
+      "reject_threshold": "< 10",
+      "status": "FAIL",
+      "value": 11
+    },
+    {
+      "gate": "post_transition_er",
+      "pass_threshold": "> 1.5",
+      "reject_threshold": "< 1.0",
+      "status": "REJECT",
+      "value": 0.11311526496891823
+    },
+    {
+      "gate": "false_reversal_rate",
+      "pass_threshold": "< 0.40",
+      "reject_threshold": ">= 0.50",
+      "status": "PASS",
+      "value": 0.0
+    },
+    {
+      "gate": "whipsaw_rate",
+      "pass_threshold": "< 0.30",
+      "reject_threshold": ">= 0.50",
+      "status": "PASS",
+      "value": 0.23821339950372208
+    },
+    {
+      "gate": "entry_delay_cycles",
+      "pass_threshold": "<= 3",
+      "reject_threshold": "> 6",
+      "status": "FAIL",
+      "value": 5.818181818181818
+    },
+    {
+      "gate": "transition_entry_rate",
+      "pass_threshold": ">= 0.70",
+      "reject_threshold": "< 0.50",
+      "status": "PASS",
+      "value": 1.0
+    },
+    {
+      "gate": "explainability",
+      "pass_threshold": "1.00",
+      "reject_threshold": "< 1.00",
+      "status": "PASS",
+      "value": 1.0
+    }
+  ],
+  "reason": "negative_or_weak_edge_hard_stop",
+  "red_flags": [
+    "minimum_total_trades_fail",
+    "post_transition_er_reject",
+    "entry_delay_cycles_fail"
+  ],
+  "summary": {
+    "avg_entry_delay_cycles": 5.818181818181818,
+    "explainability_rate": 1.0,
+    "false_reversal_rate": 0.0,
+    "post_transition_er": 0.11311526496891823,
+    "total_trades": 11,
+    "transition_entry_rate": 1.0,
+    "whipsaw_rate": 0.23821339950372208
+  },
+  "verdict": "REJECT"
+}
