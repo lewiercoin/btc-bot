@@ -9,35 +9,38 @@
 
 ---
 
-### Research: VOLATILITY-BREAKOUT-RESEARCH-V1
+### Research: REGIME-REVERSAL-RESEARCH-V1 (FINAL 15M PORTFOLIO TEST)
 
 **Status:** RESEARCH_ACTIVE  
 **Builder:** Codex  
 **Decision date:** 2026-05-13  
-**Branch:** `research/volatility-breakout-v1` (to be created from main)  
-**Handoff:** `docs/handoffs/HANDOFF_VOLATILITY_BREAKOUT_RESEARCH_V1_2026-05-13.md`
+**Branch:** `research/regime-reversal-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_REGIME_REVERSAL_RESEARCH_V1_2026-05-13.md`
 
-**Scope:** Research-only validation of volatility_breakout setup (ATR expansion state + structure break + momentum continuation).
+**Scope:** Research-only validation of regime_reversal setup (regime exhaustion → RegimeEngine confirms shift → counter-trend entry after transition).
 
-**Hypothesis:** After volatility contracts (ATR low), expansion phase begins (ATR rising). Entry when expansion state confirmed AND structure breaking AND momentum aligns. NOT compression state entry (that failed in compression_breakout).
+**Hypothesis:** When regime exhausts and RegimeEngine confirms structural shift (uptrend → downtrend or reverse), counter-trend entry after confirmation has edge. Entry AFTER shift confirms (not anticipating top/bottom).
 
-**Target regimes:** Normal, uptrend, downtrend (expansion occurs across regimes)
+**Target regimes:** Post-transition (enter uptrend after downtrend exhaustion, enter downtrend after uptrend exhaustion)
 
-**Timeline:** 1-2 weeks
+**Timeline:** 1 week
 
 **Success criteria:**
-- Expansion state ER > 1.5
-- Follow-through/continuation rate >= 60% (expansion continues after entry)
-- Overlap vs sweep_reclaim < 30%
+- Post-transition ER > 1.5
+- False reversal rate controlled (< 40%)
+- Whipsaw rate controlled (< 30%)
 - Min trades >= 20
+- Entry delay from regime shift measured explicitly
 - WF 2/2 pass (only if Checkpoint 1 gates pass)
 - No blocking safety flags
 
-**Critical distinction from compression_breakout:**
-- compression_breakout: Entry during compression, anticipating breakout (FAILED - sequential events)
-- volatility_breakout: Entry during expansion, riding momentum (different timing)
+**Critical framing: FINAL 15M PORTFOLIO TEST**
+- This is NOT another rescue attempt for portfolio approach
+- This tests whether slower structure transitions (hours-days) work at 15m
+- If fails: Conclusive evidence 15m insufficient for setup diversification beyond sweep_reclaim
+- Next milestone after this: Strategic assessment (NOT another setup)
 
-**Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
+**Next:** Backtest validation → audit → decision (REJECT / CANDIDATE) → Strategic assessment regardless of outcome
 
 ---
 
@@ -117,6 +120,57 @@ monitoring guardrails and no real-money execution.
 - Total: 2 days to conclusive verdict
 
 **Next:** Moved to CROWDED-UNWIND-RESEARCH-V1 (funding/OI extremes → concurrent forced unwind)
+
+---
+
+## Completed: VOLATILITY-BREAKOUT-RESEARCH-V1
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-13  
+**Branch:** `research/volatility-breakout-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_VOLATILITY_BREAKOUT_RESEARCH_V1_2026-05-13.md`  
+**Audit:** `docs/audits/AUDIT_VOLATILITY_BREAKOUT_CHECKPOINT_1_2026-05-13.md`
+
+**Result:**
+- **Checkpoint 1:** 63 trades, ER 0.52, expansion entry rate 100% → HYPOTHESIS FAILED (hard stop)
+- **No iteration:** ER < 1.0 hard stop triggered, fast failure discipline
+
+**What succeeded:**
+- **Timing distinction validated:** 100% expansion entry rate, 0% compression entry rate
+- **NOT compression_breakout 2.0:** Setup definitively enters during expansion (ATR rising), not compression (ATR low)
+- ATR expansion detection works: 4,060 cycles (2.73%), slope-based calculation correct
+- Implementation excellent: Followed handoff exactly, prevented timing leak
+
+**Why it failed:**
+- **Edge too weak:** ER 0.52 << 1.0 hard stop threshold (significantly below 1.5 target)
+- **Direction asymmetry:** LONG ER 0.99 (close but below 1.0), SHORT ER 0.32 (weak)
+- **Regime asymmetry:** uptrend ER 0.69 (best), downtrend ER 0.37 (worst)
+- **Continuation marginal:** 57% (below 60% target)
+- **Detection latency:** 15m frequency enters mid-phase of expansion (early high-profit phase already passed)
+
+**Key finding:** State classification correct (expansion vs compression), but detection latency within state causes mid-to-late phase entry. Expansion begins → 15m detects → enters mid-expansion → expansion exhausts before targets hit.
+
+**Learning:** Even correct state detection misses early profitable phases at 15m frequency. Similar pattern to crowded_unwind (cascade) - state-level timing correct, sub-state phase timing too late.
+
+**Data quality:**
+- Sample adequate: 63 trades prove thesis
+- ATR expansion frequency reasonable: 2.73% of cycles
+- Expansion state detection working as designed
+
+**Implementation quality:**
+- ATR slope calculation: min 0.10, median 0.17 (rising, not low)
+- Compression regime blocked (timing distinction enforced)
+- Config dataclass with sensible defaults
+- Tests: 9 passed
+
+**Timeline:**
+- 2026-05-13: Setup designed, handoff generated with critical compression_breakout distinction
+- 2026-05-13: Checkpoint 1 implemented → HYPOTHESIS FAILED (same day)
+- Total: 1 day to conclusive verdict (fast failure discipline)
+
+**Next:** Last setup family (regime_reversal) as final 15m portfolio test, then strategic assessment
 
 ---
 
