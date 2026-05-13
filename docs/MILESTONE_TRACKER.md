@@ -9,25 +9,25 @@
 
 ---
 
-### Research: CROWDED-UNWIND-RESEARCH-V1
+### Research: POST-CASCADE-MOMENTUM-RESEARCH-V1
 
 **Status:** RESEARCH_ACTIVE  
 **Builder:** Codex  
-**Decision date:** 2026-05-12  
-**Branch:** `research/crowded-unwind-v1` (to be created from main)  
-**Handoff:** `docs/handoffs/HANDOFF_CROWDED_UNWIND_RESEARCH_V1_2026-05-12.md`
+**Decision date:** 2026-05-13  
+**Branch:** `research/post-cascade-momentum-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_POST_CASCADE_MOMENTUM_RESEARCH_V1_2026-05-13.md`
 
-**Scope:** Research-only validation of crowded_unwind_long setup (funding/OI extremes → forced liquidation/unwind).
+**Scope:** Research-only validation of post_cascade_momentum setup (aftermath state after liquidation cascade → momentum continuation).
 
-**Hypothesis:** Funding rate extremes + OI peaks + force order spikes indicate unsustainable leverage → enter opposite direction to catch forced unwind/liquidation cascade.
+**Hypothesis:** After liquidation cascade clears overleveraged positions (detected via post_liquidation regime), market structure becomes cleaner and momentum continues in cascade direction. Entry AFTER cascade confirms, not during cascade event.
 
-**Target regimes:** `crowded_leverage` (primary), with veto for other extreme conditions
+**Target regimes:** `post_liquidation` (primary), with momentum validation
 
 **Timeline:** 1-2 weeks
 
 **Success criteria:**
-- Crowded regime ER > 1.5
-- Liquidation capture rate >= 50% (forced unwinds predicted correctly)
+- Post-liquidation regime ER > 1.5
+- Post-cascade continuation rate >= 60% (momentum follows cascade direction)
 - Overlap vs sweep_reclaim < 30%
 - Min trades >= 20
 - WF 2/2 pass
@@ -113,6 +113,46 @@ monitoring guardrails and no real-money execution.
 - Total: 2 days to conclusive verdict
 
 **Next:** Moved to CROWDED-UNWIND-RESEARCH-V1 (funding/OI extremes → concurrent forced unwind)
+
+---
+
+## Completed: CROWDED-UNWIND-RESEARCH-V1
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-12  
+**Branch:** `research/crowded-unwind-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_CROWDED_UNWIND_RESEARCH_V1_2026-05-12.md`  
+**Audit:** `docs/audits/AUDIT_CROWDED_UNWIND_CHECKPOINT_1_2026-05-13.md`
+
+**Result:**
+- **Checkpoint 1:** 71 trades (all in crowded_leverage), ER -0.35, PF 0.40, liquidation capture 32% → HYPOTHESIS FAILED
+- **No iteration:** Results not marginal, no measurement flaw identified
+
+**Why it failed:**
+- **Decision frequency incompatibility** (fundamental, not parametric)
+- Liquidation cascades occur on **seconds-to-minutes timescale**
+- 15m decision cycles arrive **structurally too late** to capture profitable unwind phase
+- By the time all entry conditions met (funding + OI + force spike + confirmation), cascade opportunity has passed
+- Liquidation capture rate **32% << 50% gate** confirms most entries miss the cascade
+
+**Key finding:** Force spike + crowding metrics require sub-minute reaction time. 15m decision architecture cannot close this latency gap. The setup catches the cascade END, not the tradeable middle.
+
+**Learning:** Avoid setups requiring split-second timing when decision engine operates on 15m cycles. Structural frequency mismatch cannot be fixed by parameter tuning.
+
+**Data quality:**
+- Local DB had 0 force orders
+- Codex backfilled 146,864 force order rows from production server
+- Research DB copy kept separate from production DB (no mutation)
+- Adequate sample size: 71 trades prove thesis
+
+**Timeline:**
+- 2026-05-12: Setup designed and handoff generated
+- 2026-05-13: Checkpoint 1 (implementation + backfill + validation) → HYPOTHESIS FAILED
+- Total: 1 day to conclusive verdict (fast failure discipline)
+
+**Next:** Moved to POST-CASCADE-MOMENTUM-RESEARCH-V1 (aftermath state, 15m-compatible)
 
 ---
 
