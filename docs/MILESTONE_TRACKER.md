@@ -9,38 +9,37 @@
 
 ---
 
-### Research: REGIME-REVERSAL-RESEARCH-V1 (FINAL 15M PORTFOLIO TEST)
+### Research: SWEEP-RECLAIM-FAMILY-EXPANSION-V1
 
-**Status:** RESEARCH_ACTIVE  
-**Builder:** Codex  
+**Status:** AWAITING_DECISION  
+**Builder:** Codex (pending handoff)  
 **Decision date:** 2026-05-13  
-**Branch:** `research/regime-reversal-v1` (to be created from main)  
-**Handoff:** `docs/handoffs/HANDOFF_REGIME_REVERSAL_RESEARCH_V1_2026-05-13.md`
+**Branch:** `research/sweep-family-expansion-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_SWEEP_RECLAIM_FAMILY_EXPANSION_V1_2026-05-13.md` (pending)
 
-**Scope:** Research-only validation of regime_reversal setup (regime exhaustion → RegimeEngine confirms shift → counter-trend entry after transition).
+**Scope:** Expand proven sweep_reclaim edge through structure context variations. Start with Range Sweep Specialist variant.
 
-**Hypothesis:** When regime exhausts and RegimeEngine confirms structural shift (uptrend → downtrend or reverse), counter-trend entry after confirmation has edge. Entry AFTER shift confirms (not anticipating top/bottom).
+**Strategic context:** After 15m multi-setup portfolio research conclusively failed (6 families tested, 0 candidates, 0% success), pivot to expanding proven edge (trial-00095 ER 2.1, PF 4.6) through structure-specific variants.
 
-**Target regimes:** Post-transition (enter uptrend after downtrend exhaustion, enter downtrend after uptrend exhaustion)
+**Hypothesis (Range Sweep Specialist):** Liquidity sweeps in range-bound markets (normal regime, horizontal structure context) have highest mean-reversion probability due to tighter structure boundaries and clearer invalidation levels.
 
-**Timeline:** 1 week
-
-**Success criteria:**
-- Post-transition ER > 1.5
-- False reversal rate controlled (< 40%)
-- Whipsaw rate controlled (< 30%)
-- Min trades >= 20
-- Entry delay from regime shift measured explicitly
-- WF 2/2 pass (only if Checkpoint 1 gates pass)
+**Success criteria (per variant):**
+- ER > 1.5 (hard gate)
+- Walk-forward 2/2 pass
+- Independence from trial-00095: overlap < 30%
 - No blocking safety flags
+- Min trades >= 20
 
-**Critical framing: FINAL 15M PORTFOLIO TEST**
-- This is NOT another rescue attempt for portfolio approach
-- This tests whether slower structure transitions (hours-days) work at 15m
-- If fails: Conclusive evidence 15m insufficient for setup diversification beyond sweep_reclaim
-- Next milestone after this: Strategic assessment (NOT another setup)
+**Planned variants:** Range Sweep Specialist, Trend Sweep Specialist, Post-Liquidation Sweep, Volume-Based Sweep
 
-**Next:** Backtest validation → audit → decision (REJECT / CANDIDATE) → Strategic assessment regardless of outcome
+**Exit criteria:**
+- After 3 variants: If 0-1 succeed OR overlap > 50% → pivot to 5m frequency assessment
+- After 6 months: If trial-00095 live ER < 1.0 → edge degrading, strategic reassessment
+- Each variant: 2-3 weeks timeline
+
+**Timeline:** 6-9 weeks for 3-variant cycle, then re-evaluate
+
+**Next:** Generate handoff → Checkpoint 1 backtest → audit → iterate or promote
 
 ---
 
@@ -85,6 +84,64 @@ monitoring guardrails and no real-money execution.
 - **Architectural validation correction:** trial-00095 actual params (sweep=2.2, reclaim=2.15, tfi=2.5) do NOT perfectly match "gate vs premium" pattern from V3 audit (medians: sweep=0.525, reclaim=3.525, tfi=3.575). However, WF evidence is empirical and independent of architectural theory. Strategy works based on WF results, not theory fit.
 - **Expected timeline:** First review in 2-4 months (2-5 trades/month frequency)
 - **Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+## Completed: REGIME-REVERSAL-RESEARCH-V1 (FINAL 15M PORTFOLIO TEST)
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-13  
+**Branch:** `research/regime-reversal-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_REGIME_REVERSAL_RESEARCH_V1_2026-05-13.md`  
+**Audit:** `docs/audits/AUDIT_REGIME_REVERSAL_CHECKPOINT_1_2026-05-13.md`
+
+**Result:**
+- **Checkpoint 1:** 11 trades, ER 0.11, entry delay 5.82 cycles → HYPOTHESIS FAILED (hard stop)
+- **No iteration:** ER << 1.0 hard stop triggered, edge absence conclusive
+- **Classification:** **15M PORTFOLIO VIABILITY DISPROVEN** (6/6 failures/blocks, 0% success)
+
+**What succeeded:**
+- **Regime transition detection validated:** 100% transition entry rate (all entries after confirmed shift)
+- **Timing adequate:** Entry delay 5.82 cycles (marginal, just below 6-cycle threshold)
+- **Regime stability good:** Whipsaw rate 23.8% (below 30% gate), false reversal 0%
+- Implementation clean: State transition logic correct, no top/bottom anticipation
+
+**Why it failed:**
+- **Edge absent:** ER 0.11 (essentially breakeven) << 1.0 hard stop threshold
+- **Counter-trend entries don't work:** LONG ER -0.02 (losing), SHORT ER 0.27 (weak)
+- **Not a timing violation:** Unlike volatility_breakout (detection latency), edge absent even with acceptable timing
+- Sample thin: 11 trades (below 20 minimum) but sufficient to prove absence of edge
+
+**Key finding:** This is NOT like volatility (timing issue) - edge is absent even with marginal-but-acceptable timing. Counter-trend entries at regime transitions lack tradeable edge at 15m frequency. Regime classification correct, timing marginal but not primary failure mode.
+
+**Learning:** Final 15m portfolio test completed. Pattern conclusive: 15m can classify states correctly, but EITHER:
+1. Enters profitable sub-phases too late (cascade/expansion setups), OR
+2. Profitable edges don't exist even with acceptable timing (counter-trend setups)
+
+Only sweep_reclaim works because: state-independent (no regime phase timing needed), mean-reversion (not counter-trend or momentum-following), edge persists 15-60 min.
+
+**15m Multi-Setup Portfolio Research Summary:**
+| Setup | Sample | ER | Verdict | Root Cause | Timing Category |
+|---|---|---|---|---|---|
+| absorption | 25 | -0.48 | FAILED | CVD not predictive | Signal quality |
+| compression | 3 | -0.30 | FAILED | Sequential events | Logic error |
+| crowded_unwind | 71 | -0.35 | FAILED | Cascade too fast | Event timescale |
+| post_cascade | 0 | N/A | BLOCKED | Infrastructure gap | Infrastructure |
+| volatility | 63 | 0.52 | FAILED | Mid-phase entry | Detection latency |
+| regime_reversal | 11 | 0.11 | FAILED | Counter-trend no edge | Edge absence |
+
+**Success rate:** 0/6 (0%)  
+**Conclusion:** 15m multi-setup portfolio NOT VIABLE (conclusive evidence)
+
+**Timeline:**
+- 2026-05-13: Final test setup designed with critical state transition requirement
+- 2026-05-13: Checkpoint 1 implemented → HYPOTHESIS FAILED (same day)
+- Total: 1 day to conclusive verdict (fast failure discipline)
+- Research cycle: 6 days (6 families tested)
+
+**Next:** Strategic pivot to SWEEP-RECLAIM-FAMILY-EXPANSION-V1 (proven edge, structure variations)
 
 ---
 
