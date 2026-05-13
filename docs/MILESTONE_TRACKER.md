@@ -50,9 +50,9 @@ Best single context: Asia + Uptrend LONG (90 trades, ER 0.89, PF 2.85, Win 62%) 
 
 **Audit reports:**
 - `docs/audits/AUDIT_RANGE_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
-- `docs/audits/AUDIT_TREND_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
-- `docs/audits/AUDIT_SPECIAL_REGIME_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
-- V4 Session Sweep: `research_lab/reports/SESSION_SWEEP_SPECIALIST_AUDIT_PACKAGE.md`
+- `docs/audits/AUDIT_TREND_SWEEP_SPECIALIST_CHECKPOINT_2_2026-05-13.md`
+- `docs/audits/AUDIT_SPECIAL_REGIME_SWEEP_CHECKPOINT_3_2026-05-13.md`
+- `docs/audits/AUDIT_SESSION_SWEEP_CHECKPOINT_4_FINAL_2026-05-13.md`
 
 **Strategic transition:** Accept trial-00095 as singular sweep_reclaim edge at 15m. Close context expansion research. Focus on live performance validation (30-50 trades, 6-10 months). Defer 5m upgrade until edge stability confirmed.
 
