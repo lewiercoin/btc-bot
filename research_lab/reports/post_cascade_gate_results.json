@@ -1,0 +1,64 @@
+{
+  "gates": [
+    {
+      "actual": null,
+      "name": "post_liquidation_er",
+      "passed": false,
+      "required": "> 1.5"
+    },
+    {
+      "actual": null,
+      "name": "cascade_continuation",
+      "passed": false,
+      "required": ">= 0.60"
+    },
+    {
+      "actual": 0,
+      "name": "minimum_total_trades",
+      "passed": false,
+      "required": ">= 20"
+    },
+    {
+      "actual": 0,
+      "name": "post_liquidation_trade_count",
+      "passed": false,
+      "required": ">= 10"
+    },
+    {
+      "actual": null,
+      "name": "overlap_control",
+      "passed": false,
+      "required": "< 0.30"
+    },
+    {
+      "actual": null,
+      "name": "walkforward",
+      "passed": false,
+      "required": "2/2"
+    },
+    {
+      "actual": [],
+      "name": "safety_flags",
+      "passed": true,
+      "required": "[]"
+    },
+    {
+      "actual": "checked",
+      "name": "explainability",
+      "passed": true,
+      "required": "all signals include reasons[]"
+    }
+  ],
+  "notes": [
+    "Overlap and walk-forward are required only after Checkpoint 1 avoids hard stops.",
+    "Hard stop triggers on <10 total trades, post-liquidation ER <1.0, continuation <0.50, or wrong-regime trades."
+  ],
+  "red_flags": [
+    {
+      "action": "REJECT",
+      "flag": "insufficient_sample_hard_stop"
+    }
+  ],
+  "setup_type": "post_cascade_momentum",
+  "verdict": "REJECT"
+}

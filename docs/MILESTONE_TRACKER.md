@@ -37,6 +37,16 @@
 
 ---
 
+**Checkpoint 1 â€” 2026-05-13 (Codex):**
+- Implemented research-only `post_cascade_momentum_long` and `post_cascade_momentum_short`.
+- Added setup contract, backtest runner with historical force-order lookback, hard gate evaluator, focused tests, hypothesis doc, and audit package.
+- Used untracked research-only DB copy with `146864` force-order rows; original local DB unchanged.
+- Full replay (`2022-01-01` â†’ `2026-03-29`) produced `0` `post_liquidation` cycles, `0` candidates, and `0` trades.
+- Builder verdict prepared for Claude Code: `REJECT_BLOCKED_BY_ABSENT_TARGET_REGIME`; the setup did not receive a valid target-regime edge test.
+- Audit package: `research_lab/reports/POST_CASCADE_AUDIT_PACKAGE.md`.
+
+---
+
 ## Production Active: PAPER-TRADING-TRIAL-00095
 
 **Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
