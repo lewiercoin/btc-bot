@@ -676,12 +676,13 @@ def determine_verdict(
 ) -> dict[str, str]:
     """Determine verdict based on analysis results.
 
-    Primary signal: cross-trial ER gradient across depth bins (746 trials).
-    Secondary signals: per-trade quartile ER, win/loss depth, feature importance.
+    Primary signals: per-trade quartile ER gradient, feature importance.
+    Weak signals: win/loss depth separation.
+    Context only: live market observation (no backtest rejected population).
+    Appendix only: cross-trial gradient (Optuna selection bias — not causal).
 
-    Note: per-trade bins below the threshold are empty by design (threshold
-    enforces a minimum), so cross-trial data is the only source for
-    below-vs-above threshold comparison.
+    Verdict reflects evidence limitations: per-trade analysis proves "deeper
+    is better" but does NOT prove "0.00649 is a natural boundary vs overfitted".
     """
     verdict = "INSUFFICIENT_DATA"
     reasoning = []
@@ -690,61 +691,9 @@ def determine_verdict(
     feature_imp = per_trade.get("feature_importance", [])
     quartiles = per_trade.get("quartile_analysis", [])
 
-    # ---- Check 1: Cross-trial ER gradient (primary signal) ----
-    ct_bins = cross_trial.get("bins", [])
-    ct_by_label = {b["bin"]: b for b in ct_bins if b.get("n_trials", 0) > 0}
-
-    below_labels = ["< 0.001", "0.001 - 0.003", "0.003 - 0.005"]
-    above_labels = ["0.005 - 0.007", "0.007 - 0.010", "0.010 - 0.015", "> 0.015"]
-
-    below_ers = [ct_by_label[l]["er_mean"] for l in below_labels if l in ct_by_label]
-    above_ers = [ct_by_label[l]["er_mean"] for l in above_labels if l in ct_by_label]
-
-    if below_ers and above_ers:
-        mean_below = _safe_mean(below_ers)
-        mean_above = _safe_mean(above_ers)
-        reasoning.append(
-            f"Cross-trial ER: below-threshold bins mean={mean_below:.3f} "
-            f"({len(below_ers)} bins), above-threshold bins mean={mean_above:.3f} "
-            f"({len(above_ers)} bins)"
-        )
-
-        # Check monotonicity across all bins
-        all_bin_ers = [
-            ct_by_label[l]["er_mean"]
-            for l in below_labels + above_labels
-            if l in ct_by_label
-        ]
-        monotonic_pairs = sum(
-            1 for i in range(len(all_bin_ers) - 1)
-            if all_bin_ers[i + 1] > all_bin_ers[i]
-        )
-        total_pairs = max(len(all_bin_ers) - 1, 1)
-        monotonic_ratio = monotonic_pairs / total_pairs
-        reasoning.append(
-            f"Cross-trial monotonicity: {monotonic_pairs}/{total_pairs} "
-            f"consecutive bins show increasing ER ({monotonic_ratio:.0%})"
-        )
-
-        if mean_above > 0.5 and mean_above > mean_below * 2:
-            verdict = "THRESHOLD_NATURAL"
-            reasoning.append(
-                "Strong gradient: above-threshold ER > 2x below-threshold ER"
-            )
-        elif mean_above > mean_below * 1.3 and monotonic_ratio >= 0.6:
-            verdict = "THRESHOLD_NATURAL"
-            reasoning.append(
-                "Moderate gradient with consistent monotonic trend"
-            )
-        elif monotonic_ratio < 0.4:
-            verdict = "THRESHOLD_OVERFITTED"
-            reasoning.append("No consistent monotonic ER trend across depth bins")
-        else:
-            verdict = "THRESHOLD_NATURAL"
-            reasoning.append("Gradient present but modest; threshold is defensible")
-
-    # ---- Check 2: Per-trade quartile ER within accepted trades ----
+    # ---- Check 1 (PRIMARY): Per-trade quartile ER gradient ----
     q_labels = [q for q in quartiles if q.get("label", "").startswith("Q") and q.get("n", 0) > 0]
+    has_gradient = False
     if len(q_labels) >= 4:
         q1_er = q_labels[0].get("er_mean", 0)
         q4_er = q_labels[-1].get("er_mean", 0)
@@ -753,12 +702,27 @@ def determine_verdict(
             f"Q4 (deepest) ER={q4_er:.3f}"
         )
         if q4_er > q1_er * 1.3:
+            has_gradient = True
             reasoning.append(
-                "Within accepted trades, deeper sweeps still produce higher ER — "
-                "depth is a continuous quality signal, not just a binary filter"
+                "Within accepted trades, deeper sweeps produce higher ER — "
+                "depth is a continuous quality signal"
             )
 
-    # ---- Check 3: Win/loss depth separation ----
+    # ---- Check 2 (PRIMARY): Feature importance ----
+    depth_is_top3 = False
+    if feature_imp:
+        depth_rank = next(
+            (i for i, f in enumerate(feature_imp) if f["feature"] == "sweep_depth_pct"),
+            len(feature_imp),
+        )
+        top_feature = feature_imp[0]["feature"] if feature_imp else "?"
+        reasoning.append(
+            f"Feature importance: sweep_depth_pct is #{depth_rank + 1} "
+            f"(top feature: {top_feature})"
+        )
+        depth_is_top3 = depth_rank < 3
+
+    # ---- Check 3 (WEAK): Win/loss depth separation ----
     win_depth_mean = win_loss.get("wins", {}).get("depth_mean", 0)
     loss_depth_mean = win_loss.get("losses", {}).get("depth_mean", 0)
     if win_depth_mean > 0 and loss_depth_mean > 0:
@@ -775,16 +739,31 @@ def determine_verdict(
                 f"(win {win_depth_mean:.5f} vs loss {loss_depth_mean:.5f}), p={p_val:.4f}"
             )
 
-    # ---- Check 4: Feature importance ----
-    if feature_imp:
-        depth_rank = next(
-            (i for i, f in enumerate(feature_imp) if f["feature"] == "sweep_depth_pct"),
-            len(feature_imp),
-        )
-        top_feature = feature_imp[0]["feature"] if feature_imp else "?"
+    # ---- Verdict determination ----
+    # Per-trade gradient + feature importance confirm "deeper is better"
+    # but do NOT prove threshold boundary is natural vs overfitted.
+    if has_gradient and depth_is_top3:
+        verdict = "DEEPER_IS_BETTER_BUT_THRESHOLD_UNCERTAIN"
         reasoning.append(
-            f"Feature importance: sweep_depth_pct is #{depth_rank + 1} "
-            f"(top feature: {top_feature})"
+            "Per-trade analysis confirms deeper sweeps produce better outcomes. "
+            "However, evidence does not prove 0.00649 is a natural boundary vs "
+            "overfitted optimum. OOS/WF threshold stability validation required."
+        )
+    elif has_gradient or depth_is_top3:
+        verdict = "DEEPER_IS_BETTER_BUT_THRESHOLD_UNCERTAIN"
+        reasoning.append(
+            "Partial evidence that depth improves outcomes, but insufficient to "
+            "determine threshold boundary validity."
+        )
+    else:
+        reasoning.append("No clear per-trade depth gradient detected.")
+
+    # ---- Appendix note: cross-trial (not used for verdict) ----
+    ct_bins = cross_trial.get("bins", [])
+    if ct_bins:
+        reasoning.append(
+            "Note: Cross-trial Optuna gradient available in appendix but excluded "
+            "from verdict due to selection bias (trials vary ~40 params simultaneously)."
         )
 
     return {
@@ -901,19 +880,19 @@ def print_report(
         depth_str = f"depth_mean={sd['depth_mean']:.5f}" if sd.get("depth_mean") else "depth=N/A"
         lines.append(f"  {sd['session']:<25} n={sd['n']:>4}  ER={sd['er']:.3f}  WR={sd['wr']:.1%}  {depth_str}")
 
-    # Live comparison
+    # Live market observation (not a distribution shift comparison)
     if live_comparison and "error" not in live_comparison:
         lines.append("")
         lines.append("=" * 70)
-        lines.append("LIVE vs BACKTEST DEPTH COMPARISON")
-        bt = live_comparison.get("backtest", {})
+        lines.append("LIVE MARKET OBSERVATION")
         lv = live_comparison.get("live_rejected", {})
-        lines.append(f"  Backtest accepted trades (n={bt.get('n', 0)}): mean={bt.get('mean', 0):.5f}, median={bt.get('median', 0):.5f}")
         lines.append(f"  Live rejected sweeps (n={lv.get('n', 0)}): mean={lv.get('mean', 0):.5f}, median={lv.get('median', 0):.5f}")
         for k, v in live_comparison.items():
             if k.startswith("live_pct_above_"):
                 threshold = k.replace("live_pct_above_", "")
                 lines.append(f"  Live sweeps >= {threshold}: {v}%")
+        lines.append("  Note: Backtest rejected population unavailable (BacktestRunner does not persist decision_outcomes).")
+        lines.append("  Cannot assess distribution shift. Above reflects live conditions only.")
 
     lines.append("")
     lines.append("=" * 70)
