@@ -11,10 +11,10 @@
 
 ### Research: VOLATILITY-BREAKOUT-RESEARCH-V1
 
-**Status:** RESEARCH_ACTIVE  
+**Status:** CHECKPOINT_1_READY_FOR_AUDIT
 **Builder:** Codex  
 **Decision date:** 2026-05-13  
-**Branch:** `research/volatility-breakout-v1` (to be created from main)  
+**Branch:** `research/volatility-breakout-v1`
 **Handoff:** `docs/handoffs/HANDOFF_VOLATILITY_BREAKOUT_RESEARCH_V1_2026-05-13.md`
 
 **Scope:** Research-only validation of volatility_breakout setup (ATR expansion state + structure break + momentum continuation).
@@ -37,7 +37,27 @@
 - compression_breakout: Entry during compression, anticipating breakout (FAILED - sequential events)
 - volatility_breakout: Entry during expansion, riding momentum (different timing)
 
-**Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
+**Checkpoint 1 result (Codex, 2026-05-13):**
+- Full replay: 2022-01-01 -> 2026-03-29 on local V3 data.
+- Replay cycles: 148,596.
+- Expansion cycles: 4,060 (2.73%).
+- Candidates: 73.
+- Closed trades: 63.
+- Expansion entry rate: 100.00% (PASS; not compression_breakout 2.0).
+- Compression entry rate: 0.00% (PASS).
+- Expansion continuation rate: 57.14% (FAIL; target >=60%, hard reject <50%).
+- Expectancy R: 0.5230 (REJECT; hard stop because ER <1.0).
+- PF: 3.31, win rate: 61.90%, max DD: 2.53%.
+- Builder verdict: REJECT, reason `negative_or_weak_edge_hard_stop`.
+- WF and overlap were not run because Checkpoint 1 ER hard-stop failed.
+
+**Reports:**
+- `research_lab/reports/volatility_breakout_validation_report.md`
+- `research_lab/reports/atr_expansion_distribution.md`
+- `research_lab/reports/volatility_gate_results.json`
+- `research_lab/reports/VOLATILITY_BREAKOUT_AUDIT_PACKAGE.md`
+
+**Next:** Claude Code audit -> final decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
 
 ---
 
@@ -2480,4 +2500,3 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
 - **Phase 2 (trend-continuation research):** READY — awaiting user milestone approval
 - **Next decision point:** User approves Phase 2 and selects builder (Codex or Cascade)
-
