@@ -112,3 +112,36 @@ Only sweep_reclaim works at 15m because: state-independent logic (no regime phas
 - Hybrid approach (mixing family expansion + new families): Violates scope discipline, dilutes focus, complicates audit trail
 
 **Related:** `docs/analysis/STRATEGIC_15M_PORTFOLIO_ASSESSMENT_2026-05-13.md` (comprehensive analysis); 6 research branches (absorption, compression, crowded_unwind, post_cascade, volatility, regime_reversal); 6 audit reports; `docs/MILESTONE_TRACKER.md` updated; next milestone `SWEEP-RECLAIM-FAMILY-EXPANSION-V1`.
+
+## 2026-05-13 — Context expansion NOT viable, accept singular sweep_reclaim edge
+**Decision:** Close SWEEP-RECLAIM-FAMILY-EXPANSION-V1 (verdict: NOT_VIABLE, 4/4 failures). Accept trial-00095 as the singular sweep_reclaim edge at 15m. Transition to live validation phase. Defer 5m frequency upgrade and parameter-based variants.
+
+**Context:** One-day research cycle tested 4 context expansion variants across 340 trades:
+- V1 Range Sweep (normal regime, LONG): 16 trades, ER 0.02 — zero edge
+- V2 Trend Sweep (downtrend LONG + uptrend SHORT): 159 trades, ER 0.63 — below threshold
+- V3 Special Regime (crowded_leverage, LONG): 34 trades, ER 0.30 — below threshold
+- V4 Session Sweep (Asia 00:00-08:00 UTC, LONG): 126 trades, ER 0.78 — best variant, still < 1.0
+- Best single micro-context: Asia + Uptrend LONG (90 trades, ER 0.89, PF 2.85) — still < 1.0
+
+**Reason:** Four independent mechanisms tested (3 regime-based + 1 microstructure-based). All failed ER 1.0 hard stop. Evidence conclusive:
+1. **Context filtering cannot create edge.** It can only subset trial-00095's trade set, degrading ER vs the full parameter-optimized set.
+2. **sweep_reclaim edge is parameter-dependent, not context-dependent.** ER 2.1 comes from Optuna-tuned confluence/TFI/risk thresholds across ALL regimes and ALL sessions.
+3. **SHORT universally destructive.** Normal SHORT ER -0.92, Uptrend SHORT ER 0.09. LONG-only bias is fundamental, not tunable.
+4. **No further 15m context variants justified.** 10 hypotheses tested (6 setup families + 4 context variants), 0% success rate.
+
+**Consequences:**
+- trial-00095 IS the edge — no further context specialization attempts
+- Live validation focus: collect 30-50 paper trades over 6-10 months
+- Decision points: After 30 trades (preliminary ER check), after 50 trades (final validation)
+- If live ER > 1.5 after 50 trades → promote to LIVE (with restored kill-switch limits)
+- If live ER < 1.0 after 30 trades → reassess edge viability
+- 5m frequency upgrade deferred until live ER stability confirmed (estimated 6-8 weeks cost if undertaken)
+- No new research milestones until live validation produces decision-grade evidence
+
+**Alternatives considered and rejected:**
+- More 15m context variants: 0/10 success rate proves this is not a sampling problem
+- Immediate 5m upgrade: High cost (6-8 weeks), uncertain benefit, premature without live validation
+- Parameter-based variants (re-optimize with context constraints): Context filtering degrades ER; Optuna already found global optimum
+- New edge families at 15m: 0/6 success rate in portfolio research; timing incompatibility proven
+
+**Related:** `research/sweep-family-expansion-v1` branch (commits efd9ef3..61a8aaa); `docs/MILESTONE_TRACKER.md`; `docs/analysis/SWEEP_RECLAIM_SINGULAR_EDGE_ASSESSMENT_2026-05-13.md`; 4 audit packages in `research_lab/reports/` and `docs/audits/`.
