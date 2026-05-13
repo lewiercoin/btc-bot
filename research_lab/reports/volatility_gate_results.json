@@ -1,0 +1,52 @@
+{
+  "gates": [
+    {
+      "gate": "minimum_total_trades",
+      "pass_threshold": ">= 20",
+      "reject_threshold": "< 10",
+      "status": "PASS",
+      "value": 63
+    },
+    {
+      "gate": "expansion_state_er",
+      "pass_threshold": "> 1.5",
+      "reject_threshold": "< 1.0",
+      "status": "REJECT",
+      "value": 0.5229710970134672
+    },
+    {
+      "gate": "expansion_continuation_rate",
+      "pass_threshold": ">= 0.60",
+      "reject_threshold": "< 0.50",
+      "status": "FAIL",
+      "value": 0.5714285714285714
+    },
+    {
+      "gate": "expansion_entry_rate",
+      "pass_threshold": ">= 0.80",
+      "reject_threshold": "< 0.50",
+      "status": "PASS",
+      "value": 1.0
+    },
+    {
+      "gate": "explainability",
+      "pass_threshold": "1.00",
+      "reject_threshold": "< 1.00",
+      "status": "PASS",
+      "value": 1.0
+    }
+  ],
+  "reason": "negative_or_weak_edge_hard_stop",
+  "red_flags": [
+    "expansion_state_er_reject",
+    "expansion_continuation_rate_fail"
+  ],
+  "summary": {
+    "expansion_continuation_rate": 0.5714285714285714,
+    "expansion_entry_rate": 1.0,
+    "expansion_er": 0.5229710970134672,
+    "explainability_rate": 1.0,
+    "total_trades": 63
+  },
+  "verdict": "REJECT"
+}
