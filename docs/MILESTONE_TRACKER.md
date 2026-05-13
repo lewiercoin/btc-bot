@@ -1,6 +1,43 @@
 # Milestone Tracker
 
-## Current Active Milestone: PAPER-TRADING-TRIAL-00095
+## Current Active Milestones
+
+### Production: PAPER-TRADING-TRIAL-00095
+
+**Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
+**Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+### Research: CROWDED-UNWIND-RESEARCH-V1
+
+**Status:** RESEARCH_ACTIVE  
+**Builder:** Codex  
+**Decision date:** 2026-05-12  
+**Branch:** `research/crowded-unwind-v1` (to be created from main)  
+**Handoff:** `docs/handoffs/HANDOFF_CROWDED_UNWIND_RESEARCH_V1_2026-05-12.md`
+
+**Scope:** Research-only validation of crowded_unwind_long setup (funding/OI extremes → forced liquidation/unwind).
+
+**Hypothesis:** Funding rate extremes + OI peaks + force order spikes indicate unsustainable leverage → enter opposite direction to catch forced unwind/liquidation cascade.
+
+**Target regimes:** `crowded_leverage` (primary), with veto for other extreme conditions
+
+**Timeline:** 1-2 weeks
+
+**Success criteria:**
+- Crowded regime ER > 1.5
+- Liquidation capture rate >= 50% (forced unwinds predicted correctly)
+- Overlap vs sweep_reclaim < 30%
+- Min trades >= 20
+- WF 2/2 pass
+- No blocking safety flags
+
+**Next:** Backtest validation → audit → decision (REJECT / ITERATE / CANDIDATE FOR PHASE 2.5)
+
+---
+
+## Production Active: PAPER-TRADING-TRIAL-00095
 
 **Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
 **Builder:** Codex (deployment), Claude Code (audit)  
@@ -41,6 +78,78 @@ monitoring guardrails and no real-money execution.
 - **Architectural validation correction:** trial-00095 actual params (sweep=2.2, reclaim=2.15, tfi=2.5) do NOT perfectly match "gate vs premium" pattern from V3 audit (medians: sweep=0.525, reclaim=3.525, tfi=3.575). However, WF evidence is empirical and independent of architectural theory. Strategy works based on WF results, not theory fit.
 - **Expected timeline:** First review in 2-4 months (2-5 trades/month frequency)
 - **Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+## Completed: COMPRESSION-BREAKOUT-RESEARCH-V1
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-12  
+**Branch:** `research/compression-breakout-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_COMPRESSION_BREAKOUT_RESEARCH_V1_2026-05-12.md`  
+**Audit:** `docs/audits/AUDIT_COMPRESSION_BREAKOUT_ITERATION_A_2026-05-12.md`
+
+**Result:**
+- **Checkpoint 1:** 3 trades, 0 in COMPRESSION regime → ITERATE (regime classification suspect)
+- **Iteration A:** Regime analysis (COMPRESSION labels exist: 2.0% of cycles, correctly assigned)
+- **Post-fix result:** 3 trades, **ER -0.30, PF 0.44** (unchanged from Checkpoint 1)
+- **Verdict:** HYPOTHESIS FAILED (timing incompatibility: compression/breakout are sequential)
+
+**Why it failed:**
+- Compression and breakout are **sequential events** (coiling → transition → expansion), not concurrent
+- During compression: mean breakout_size_atr = **-3.77** (NEGATIVE - price below recent high, not breaking out)
+- 97% of compression cycles blocked by `no_breakout_detected` or `breakout_too_small`
+- Breakouts occur AFTER compression ends (when regime transitions), not during compression state
+
+**Key finding:** Setup tried to catch compression + breakout simultaneously (impossible). Compression describes coiling state; breakouts happen after coiling ends.
+
+**Learning:** Avoid setups requiring simultaneity of naturally sequential events. Entry trigger and edge thesis must coincide temporally.
+
+**Timeline:**
+- 2026-05-12: Checkpoint 1 → ITERATE
+- 2026-05-12: Iteration A (regime analysis) → HYPOTHESIS FAILED
+- Total: 2 days to conclusive verdict
+
+**Next:** Moved to CROWDED-UNWIND-RESEARCH-V1 (funding/OI extremes → concurrent forced unwind)
+
+---
+
+## Completed: ABSORPTION-CONTINUATION-RESEARCH-V1
+
+**Status:** HYPOTHESIS FAILED  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-12  
+**Branch:** `research/trend-continuation-v1`  
+**Handoff:** `docs/handoffs/HANDOFF_ABSORPTION_CONTINUATION_RESEARCH_V1_2026-05-12.md`  
+**Audit:** `docs/audits/AUDIT_ABSORPTION_CONTINUATION_ITERATION_A_2026-05-12.md`
+
+**Result:**
+- **Checkpoint 1:** Setup scaffold implemented, tests pass ✅
+- **Checkpoint 2:** 4 trades, ER 0.34 → REJECT (insufficient sample, weak edge)
+- **Iteration A:** Fixed CVD slope calculation + empirical volatility threshold (p95 = 0.02885372)
+- **Post-fix result:** 25 trades, **ER -0.48, PF 0.55, win rate 24%, absorption hit rate 24%**
+- **Verdict:** HYPOTHESIS FAILED (3/4 hard gates failed: ER, win rate, absorption hit rate)
+
+**Why it failed:**
+- CVD absorption not predictive in BTC perps (0% CVD divergence win rate, 24% overall absorption hit rate)
+- TFI slightly HIGHER in losers than winners (contradicts absorption thesis)
+- Setup actively loses money (negative ER, PF below 1.0)
+
+**Key finding:** Absorption thesis is fundamentally incompatible with BTC perpetual swap market microstructure. CVD divergence during pullbacks does not identify institutional accumulation.
+
+**Learning:** Interpretive signals (CVD divergence) are unreliable in BTC perps. Need objective, measurable entry triggers.
+
+**Timeline:**
+- 2026-05-09: Strategic consultation, hypothesis definition
+- 2026-05-10: Checkpoint 1 (scaffold) complete
+- 2026-05-11: Checkpoint 2 (validation) → REJECT
+- 2026-05-12: Iteration A (diagnostic fixes) → HYPOTHESIS FAILED
+- Total: 3 days from implementation to final verdict
+
+**Next:** Moved to compression_breakout (different structure), which also failed
 
 ---
 
