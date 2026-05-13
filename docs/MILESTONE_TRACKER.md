@@ -112,7 +112,7 @@ monitoring guardrails and no real-money execution.
 **Decision date:** 2026-05-13  
 **Branch:** `research/regime-reversal-v1`  
 **Handoff:** `docs/handoffs/HANDOFF_REGIME_REVERSAL_RESEARCH_V1_2026-05-13.md`  
-**Audit:** `docs/audits/AUDIT_REGIME_REVERSAL_CHECKPOINT_1_2026-05-13.md`
+**Audit:** `docs/audits/AUDIT_REGIME_REVERSAL_CHECKPOINT_1_2026-05-13.md` (on branch `research/regime-reversal-v1`, commit 93fc0cc)
 
 **Result:**
 - **Checkpoint 1:** 11 trades, ER 0.11, entry delay 5.82 cycles → HYPOTHESIS FAILED (hard stop)
