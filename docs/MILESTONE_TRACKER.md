@@ -9,37 +9,54 @@
 
 ---
 
-### Research: SWEEP-RECLAIM-FAMILY-EXPANSION-V1
+## Completed: SWEEP-RECLAIM-FAMILY-EXPANSION-V1
 
-**Status:** AWAITING_DECISION  
-**Builder:** Codex (pending handoff)  
+**Status:** CLOSED — CONTEXT EXPANSION NOT VIABLE (4/4 failures, 0% success)  
+**Builder:** Cascade  
+**Auditor:** Claude Code  
 **Decision date:** 2026-05-13  
-**Branch:** `research/sweep-family-expansion-v1` (to be created from main)  
-**Handoff:** `docs/handoffs/HANDOFF_SWEEP_RECLAIM_FAMILY_EXPANSION_V1_2026-05-13.md` (pending)
+**Branch:** `research/sweep-family-expansion-v1`  
+**Final commit:** `61a8aaa`  
+**Duration:** 1 day (all 4 variants)
 
-**Scope:** Expand proven sweep_reclaim edge through structure context variations. Start with Range Sweep Specialist variant.
+**Scope:** Expand proven sweep_reclaim edge through structure context variations (3 regime + 1 microstructure).
 
-**Strategic context:** After 15m multi-setup portfolio research conclusively failed (6 families tested, 0 candidates, 0% success), pivot to expanding proven edge (trial-00095 ER 2.1, PF 4.6) through structure-specific variants.
+**Cross-Variant Results:**
 
-**Hypothesis (Range Sweep Specialist):** Liquidity sweeps in range-bound markets (normal regime, horizontal structure context) have highest mean-reversion probability due to tighter structure boundaries and clearer invalidation levels.
+| Variant | Mechanism | Context | Direction | Trades | ER | PF | Win% | Verdict |
+|---|---|---|---|---:|---:|---:|---:|---|
+| V1 | Regime | Normal | LONG | 16 | 0.02 | 1.00 | — | FAILED (zero edge) |
+| V1 | Regime | Normal | SHORT | 5 | -0.92 | 0.13 | — | FAILED (destructive) |
+| V2 | Regime | Downtrend | LONG | 127 | 0.76 | 2.10 | — | FAILED (moderate, overlaps) |
+| V2 | Regime | Uptrend | SHORT | 32 | 0.09 | 1.09 | — | FAILED (zero edge) |
+| V3 | Regime | Crowded_leverage | LONG | 34 | 0.30 | 1.33 | 38% | FAILED (below threshold) |
+| V4 | Microstructure | Asia session | LONG | 126 | 0.78 | 2.42 | 57% | FAILED (best, still < 1.0) |
+| **Total** | — | — | — | **340** | — | — | — | **0/4 succeed** |
 
-**Success criteria (per variant):**
-- ER > 1.5 (hard gate)
-- Walk-forward 2/2 pass
-- Independence from trial-00095: overlap < 30%
-- No blocking safety flags
-- Min trades >= 20
+Best single context: Asia + Uptrend LONG (90 trades, ER 0.89, PF 2.85, Win 62%) — still < 1.0
 
-**Planned variants:** Range Sweep Specialist, Trend Sweep Specialist, Post-Liquidation Sweep, Volume-Based Sweep
+**Definitive conclusions:**
+1. **Context expansion NOT viable at 15m.** 4/4 variants failed (3 regime + 1 microstructure). No context reaches ER 1.0 independently.
+2. **sweep_reclaim is singular, parameter-optimized edge.** trial-00095 ER 2.1 from Optuna optimization across ALL contexts, not from regime/session concentration.
+3. **SHORT universally unprofitable.** Normal SHORT ER -0.92, Uptrend SHORT ER 0.09. Pattern: sweep_reclaim is LONG-biased (fundamental asymmetry).
+4. **trial-00095 IS the edge.** Not a platform for context specialization. Optimal configuration already found.
 
-**Exit criteria:**
-- After 3 variants: If 0-1 succeed OR overlap > 50% → pivot to 5m frequency assessment
-- After 6 months: If trial-00095 live ER < 1.0 → edge degrading, strategic reassessment
-- Each variant: 2-3 weeks timeline
+**Deliverables:**
+- 4 variants tested (340 trades analyzed)
+- 81 unit tests across 4 test files (all pass)
+- 381 project-wide tests pass
+- 8 validation reports + audit packages
+- Comprehensive cross-variant analysis
 
-**Timeline:** 6-9 weeks for 3-variant cycle, then re-evaluate
+**Audit reports:**
+- `docs/audits/AUDIT_RANGE_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
+- `docs/audits/AUDIT_TREND_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
+- `docs/audits/AUDIT_SPECIAL_REGIME_SWEEP_SPECIALIST_CHECKPOINT_1_2026-05-13.md`
+- V4 Session Sweep: `research_lab/reports/SESSION_SWEEP_SPECIALIST_AUDIT_PACKAGE.md`
 
-**Next:** Generate handoff → Checkpoint 1 backtest → audit → iterate or promote
+**Strategic transition:** Accept trial-00095 as singular sweep_reclaim edge at 15m. Close context expansion research. Focus on live performance validation (30-50 trades, 6-10 months). Defer 5m upgrade until edge stability confirmed.
+
+**Next:** Live validation phase (monitor trial-00095 paper trading)
 
 ---
 
