@@ -84,3 +84,31 @@ document. Runtime facts live in the production database and should be checked wi
 **Consequences:** Future work should not try to force sweep-reclaim to trade every market structure. The bot should evolve toward a portfolio of independent, context-specific setups. Each setup must prove edge independently through explicit market-structure hypothesis, deterministic logic, `reasons[]`, standalone backtest, walk-forward validation, safety gates, and audit before it can be integrated through a deterministic multi-setup arbiter.
 
 **Related:** `docs/audits/AUDIT_GRID_SEARCH_TRIAL00095_2026-05-12.md`; `docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md`; `docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md`; `docs/MILESTONE_TRACKER.md` Multi-Setup Portfolio Architecture section.
+
+## 2026-05-13 - Close 15m multi-setup portfolio research, pivot to sweep-reclaim family expansion
+**Decision:** Close 15m multi-setup portfolio research as conclusively NOT VIABLE. Pivot to sweep-reclaim family expansion (structure context variations). No new independent setup families will be tested at 15m without separate architectural decision. Defer 5m/1m frequency upgrade for future evaluation.
+
+**Context:** Six-day research cycle tested 6 independent setup families: absorption_continuation (25 trades, ER -0.48), compression_breakout (3 trades, ER -0.30), crowded_unwind (71 trades, ER -0.35), post_cascade_momentum (0 trades, blocked by infrastructure), volatility_breakout (63 trades, ER 0.52), regime_reversal (11 trades, ER 0.11). Success rate: 0/6 (0%). No candidates reached ER > 1.5 gate (volatility_breakout came closest at ER 0.52, still below 1.0 hard stop).
+
+**Reason:** Three-layer timing incompatibility pattern proven across all 6 families:
+1. **Event timescale incompatibility** (crowded_unwind, post_cascade_momentum): Profitable events occur on seconds-to-minutes scale, too fast for 15m decision cycles
+2. **Detection latency within states** (volatility_breakout): State classification correct but 15m enters mid-phase, missing early high-profit phase
+3. **Edge absence** (absorption_continuation, compression_breakout, regime_reversal): Even with correct timing/state detection, no tradeable edge exists
+
+Only sweep_reclaim works at 15m because: state-independent logic (no regime phase timing needed), mean-reversion edge (not momentum-following), edge persists 15-60 min (compatible with 15m latency), objective measurable signals (sweep/reclaim detection).
+
+**Consequences:**
+- Proven edge expansion (sweep_reclaim family, ER 2.1 baseline) prioritized over new unknown edges (0% success rate in 6 families)
+- Family expansion validates structure context variations: range specialist, trend specialist, post-liquidation specialist, volume specialist
+- Each variant must prove independence (overlap < 30%), meet validation gates (ER > 1.5, WF 2/2), and preserve institutional character
+- First variant: Range Sweep Specialist (liquidity sweeps in normal regime, horizontal structure, highest mean-reversion probability hypothesis)
+- Exit criteria: After 3 variants, if 0-1 succeed OR overlap > 50% → pivot to 5m frequency assessment
+- After 6 months: If trial-00095 live ER < 1.0 → edge degrading, strategic reassessment
+- No new setup families rule: No independent setup families tested at 15m without explicit architectural decision
+
+**Alternatives considered and rejected:**
+- Continue testing more 15m setups: 0% success rate after 6 families proves 15m timing incompatibility, not sampling issue
+- Immediate 5m upgrade: High infrastructure cost (rebuild decision engine, data pipeline, state management, replay tooling) with uncertain benefit (may hit new timing constraints). Exhaust 15m proven edge first.
+- Hybrid approach (mixing family expansion + new families): Violates scope discipline, dilutes focus, complicates audit trail
+
+**Related:** `docs/analysis/STRATEGIC_15M_PORTFOLIO_ASSESSMENT_2026-05-13.md` (comprehensive analysis); 6 research branches (absorption, compression, crowded_unwind, post_cascade, volatility, regime_reversal); 6 audit reports; `docs/MILESTONE_TRACKER.md` updated; next milestone `SWEEP-RECLAIM-FAMILY-EXPANSION-V1`.
