@@ -42,6 +42,56 @@
 
 ---
 
+## Completed: BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1
+
+**Status:** CLOSED — `5M_FEASIBILITY_FAIL` (trade count gate failed)  
+**Builder:** Cascade  
+**Decision date:** 2026-05-14  
+**Branch:** `main`  
+**Report:** `docs/analysis/BTC_5M_SWEEP_RECLAIM_FEASIBILITY_2026-05-14.md`
+
+**Scope:** Feasibility study to determine if 5m bars improve sweep/reclaim signal frequency and edge quality vs 15m baseline. Offline backtest only, no production/PAPER/runtime changes.
+
+**Data:**
+- Backfilled 447,000 5m candles from Binance Futures API (2022-01-01 to 2026-03-28)
+- Data quality: PASS (0 duplicates, 0 OHLC violations, 100.33% coverage)
+- Storage: `research_lab/snapshots/btc_5m_2022_2026.db`
+
+**Results (2024-01-01 to 2026-03-28, same harness for both):**
+
+| Metric | 15m | 5m | Gate | Status |
+|---|---:|---:|---|---|
+| Trade count | 47 | 61 | 5m >= 2x 15m | FAIL (1.30x) |
+| Expectancy R | 2.110 | 2.351 | > 1.0 | PASS |
+| Profit Factor | 3.95 | 6.63 | > 1.5 | PASS |
+| Win Rate | 51.1% | 72.1% | — | — |
+| Max DD (R) | 4.49 | 4.50 | <= 15m | PASS |
+| Trades/month | 1.8 | 2.3 | — | — |
+
+**Verdict: `5M_FEASIBILITY_FAIL`** — Only 1 of 6 gates failed (trade count increase: 1.30x < 2.0x required). 5m edge quality is actually *better* (higher ER, higher PF, higher win rate, better MAE), but does not meaningfully increase signal frequency.
+
+**Key findings:**
+1. 5m detects 2.62x more sweeps but 98.9% are too shallow (depth < 0.649%)
+2. 5m reclaim detection is *lower* (23 vs 102) — smaller candles less likely to sweep AND reclaim in single bar
+3. Edge quality improves on 5m (ER +11%, PF +68%, win rate +21pp) but sample remains small
+4. Cost sensitivity acceptable: ER stays > 1.0 at 3x cost multiplier
+5. No overtrading concerns (max 4 trades/day, min gap 35min)
+
+**Why 5m doesn't increase frequency:** The sweep/reclaim pattern requires price to sweep a level AND reclaim in the same candle. 5m candles have smaller range, making single-bar sweep+reclaim less likely. The frequency gain from 3x more bars is offset by lower per-bar signal probability.
+
+**Parameter adaptation:** Bar-count params scaled 3x (atr_period 27->81, equal_level_lookback 276->828, level_min_age_bars 5->15). Dimensionless and ATR-relative params unchanged.
+
+**Infrastructure note:** Standalone research harness used (bypasses BacktestRunner). Both 5m and 15m used same harness for fair comparison. Results are NOT directly comparable to official BacktestRunner metrics.
+
+**Recommendation:** Stay on 15m. Defer 5m upgrade. The 5m edge quality improvement does not justify infrastructure investment given minimal frequency gain.
+
+**Deliverables:**
+- `research_lab/backfill_5m_candles.py` — Binance API backfill script
+- `research_lab/analysis_btc_5m_sweep_reclaim_feasibility.py` — analysis script
+- `docs/analysis/BTC_5M_SWEEP_RECLAIM_FEASIBILITY_2026-05-14.md` — full report
+
+---
+
 ## Completed: SWEEP-RECLAIM-FAMILY-EXPANSION-V1
 
 **Status:** CLOSED — CONTEXT EXPANSION NOT VIABLE (4/4 failures, 0% success)  
