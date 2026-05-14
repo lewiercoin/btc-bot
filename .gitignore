@@ -157,11 +157,17 @@ temp/
 research_lab_runs/
 research_lab/snapshots/
 research_lab/runs/
+research_lab/data/
+research_lab/analysis_output/
+research_lab/*.db.*
 *.tmp
 *.temp
 
 # Ad-hoc temporary scripts
 _tmp_*
+scripts/_db_check*.py
+scripts/_q_v2*.py
+scripts/_diag_signals.py
 
 # Deploy artifacts (SSH keys + git bundle)
 btc-bot-deploy
