@@ -108,6 +108,57 @@ Columns:
 - `entry_price`, `rr_ratio`
 - `block_reason` (NULL if promoted)
 
+#### `decision_outcomes`
+Decision cycle outcomes for diagnostics and funnel analysis.
+
+Columns:
+- `cycle_timestamp`, `outcome_group`, `outcome_reason`
+- `regime`, `config_hash`, `signal_id`
+- `snapshot_id`, `feature_snapshot_id`
+- `details_json` (JSONB - extensible for diagnostics)
+- `context_session_label`, `context_volatility_label`
+- `context_policy_version`, `context_eligible`
+- `context_block_reason`, `context_neutral_mode_active`
+
+**Near-Miss Diagnostics Extension (M4):**
+
+When `outcome_reason = 'sweep_too_shallow'` and `sweep_depth_pct >= 0.004`, `details_json` includes:
+
+```json
+{
+  "near_miss_diagnostics": {
+    "sweep_depth_pct": 0.00523,
+    "threshold": 0.00649,
+    "threshold_distance": -0.194,
+    "depth_bucket": "near_miss_low",
+    "direction": "LONG",
+    "regime": "normal",
+    "confluence_score": 0.75,
+    "min_tfi_strength": 0.42,
+    "atr_15m": 0.0234,
+    "funding_rate_60d": 0.0012,
+    "oi_change_pct": 2.3,
+    "session_hour": 14,
+    "rejection_reasons": ["sweep_too_shallow"]
+  }
+}
+```
+
+**Query pattern for near-miss analysis:**
+
+```sql
+SELECT 
+    cycle_timestamp,
+    outcome_reason,
+    json_extract(details_json, '$.near_miss_diagnostics.sweep_depth_pct') as sweep_depth_pct,
+    json_extract(details_json, '$.near_miss_diagnostics.depth_bucket') as depth_bucket,
+    json_extract(details_json, '$.near_miss_diagnostics.regime') as regime
+FROM decision_outcomes
+WHERE outcome_reason = 'sweep_too_shallow'
+  AND json_extract(details_json, '$.near_miss_diagnostics') IS NOT NULL
+ORDER BY cycle_timestamp DESC;
+```
+
 #### `positions`
 Open positions tracking.
 

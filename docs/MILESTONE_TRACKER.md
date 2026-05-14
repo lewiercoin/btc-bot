@@ -4,8 +4,41 @@
 
 ### Production: PAPER-TRADING-TRIAL-00095
 
-**Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails  
+**Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails
 **Next action:** Monitor live performance via logs/trial_00095_monitoring.json, review after 30-50 trades
+
+---
+
+### Research: PAPER_NEAR_MISS_MONITORING_V1
+
+**Status:** ACTIVE - runtime diagnostics only, no parameter changes
+**Builder:** Cascade
+**Start date:** 2026-05-14
+**Checkpoint date:** 2026-06-13 (30 days)
+**Branch:** `research/sweep-family-expansion-v1`
+
+**Scope:** Transform 30-day PAPER monitoring from passive waiting to active diagnostics. Baseline trial-00095 (min_sweep_depth_pct=0.00649) remains active unchanged, but system collects richer data on near-miss/shallow sweeps and compares diagnostically with hypothetical stricter threshold 0.007.
+
+**Deliverables:**
+- Extend decision_outcomes.details_json with near-miss fields (sweep depth, threshold distance, buckets)
+- Add deterministic logging in signal detection layer (after depth computed, before governance)
+- Create scripts/report_near_miss_diagnostics.py (read-only, safe for production)
+- Shadow comparison: baseline 0.00649 vs hypothetical 0.007 (diagnostic only, no orders)
+- Unit tests for bucket logic, depth distance computation
+- Documentation: NEAR_MISS_MONITORING_README.md
+
+**Acceptance Criteria:**
+- Baseline PAPER behavior unchanged (no execution path changes)
+- Near-miss records deterministic (query decision_outcomes WHERE outcome_reason = 'sweep_too_shallow')
+- Report can run against production (read-only queries only)
+- Script is read-only (SELECT only, no INSERT/UPDATE/DELETE)
+- Tests pass (pytest, no regressions)
+- compileall clean
+
+**What triggers reassessment:**
+- Near-miss count > baseline trades → threshold too strict
+- Sweep depth distribution shifts deeper → regime improving
+- Baseline ER turns negative → edge degradation
 
 ---
 
