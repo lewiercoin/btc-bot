@@ -1,16 +1,16 @@
 # OOS Walk-Forward Threshold Stability Analysis
 
-**Date:** 2026-05-13  
-**Author:** Cascade (builder)  
-**Milestone:** OOS_WF_THRESHOLD_STABILITY_ANALYSIS (M3)  
-**Status:** COMPLETE  
-**Verdict:** THRESHOLD_NATURAL
+**Date:** 2026-05-13
+**Author:** Cascade (builder)
+**Milestone:** OOS_WF_THRESHOLD_STABILITY_ANALYSIS (M3)
+**Status:** COMPLETE
+**Verdict:** THRESHOLD_CONSERVATIVE_BUT_NOT_OPTIMAL
 
 ## Executive Summary
 
 Walk-forward threshold stability test across 3 OOS windows with 6 threshold values (18 backtest runs). Testing whether `min_sweep_depth_pct = 0.00649` is stable across time windows or window-specific / overfitted.
 
-**Verdict: THRESHOLD_NATURAL**
+**Verdict: THRESHOLD_CONSERVATIVE_BUT_NOT_OPTIMAL**
 
 - Warning: ['WF3'] has insufficient data (< 20 trades). Verdict based on remaining windows.
 - WF1: best threshold=0.00700 (ER=2.798, trades=88)
@@ -18,7 +18,6 @@ Walk-forward threshold stability test across 3 OOS windows with 6 threshold valu
 - WF1: baseline 0.00649 ranks #4 of 6
 - WF2: baseline 0.00649 ranks #2 of 6
 - Best-threshold spread across valid windows: 0.00100
-- Baseline is top-3 in 1/2 valid windows. Threshold is reasonably stable.
 
 ## Walk-Forward Methodology
 
@@ -125,19 +124,48 @@ Walk-forward threshold stability test across 3 OOS windows with 6 threshold valu
 | 0.00700 | 2 |
 | 0.00800 | 0 |
 
+## What M3 Proves
+
+| Claim | Evidence Strength | Justification |
+|---|---|---|
+| **LOWER_THRESHOLD_REJECTED** | **STRONG** | 0.004-0.006 consistently worse in both valid windows; clear ER gradient |
+| **HIGHER_THRESHOLD_PREFERRED** | **MODERATE** | 0.007-0.008 outperform baseline in both valid windows (+13.6% WF1, +3.1% WF2); but trade counts marginal (22-88) |
+| **EXACT_THRESHOLD_UNCERTAIN** | **SUPPORTED** | Best varies (0.007 vs 0.008); only 2 valid windows; high-threshold trade counts limit statistical confidence |
+| **THRESHOLD_NATURAL** | **NOT SUPPORTED** | Baseline ranks #4 (WF1) and #2 (WF2); not "best or near-best across all windows" per taxonomy |
+
+## WF3 Risk Signal
+
+WF3 (2026 Q1) has insufficient trade count (< 20 across all thresholds), so it cannot contribute to threshold stability verdict. However, **all thresholds show weak or negative ER** in WF3:
+
+| Threshold | WF3 ER | WF3 Trades |
+|---:|---:|---:|
+| 0.004 | 0.403 | 15 |
+| 0.005 | 0.573 | 10 |
+| 0.006 | -0.818 | 7 |
+| 0.00649 | -0.535 | 5 |
+| 0.007 | -0.535 | 5 |
+| 0.008 | -1.432 | 2 |
+
+This pattern aligns with **M1 live diagnosis:** current market conditions (May 2026) generate shallow sweeps (mean 0.00154), qualifying conditions are rare. Treat WF3 as a **monitoring risk signal**, not decisive OOS evidence. If 30-day paper monitoring shows similar negative ER, edge may be degrading.
+
 ## Verdict
 
-**THRESHOLD_NATURAL**
+**THRESHOLD_CONSERVATIVE_BUT_NOT_OPTIMAL**
 
 ### Reasoning
 
-- Warning: ['WF3'] has insufficient data (< 20 trades). Verdict based on remaining windows.
-- WF1: best threshold=0.00700 (ER=2.798, trades=88)
-- WF2: best threshold=0.00800 (ER=2.951, trades=22)
-- WF1: baseline 0.00649 ranks #4 of 6
-- WF2: baseline 0.00649 ranks #2 of 6
-- Best-threshold spread across valid windows: 0.00100
-- Baseline is top-3 in 1/2 valid windows. Threshold is reasonably stable.
+**Evidence Summary:**
+
+| Finding | Strength | Data |
+|---|---|---|
+| Lower thresholds degrade ER | STRONG | 0.004-0.006 consistently worse in both windows |
+| Higher thresholds improve ER | MODERATE | 0.007-0.008 outperform baseline in both windows (+13.6% WF1, +3.1% WF2) |
+| Higher thresholds reduce frequency | EXPECTED | Trade counts: 88/30 (0.007), 69/22 (0.008) vs 106/36 (baseline) |
+| Exact optimum uncertain | WEAK | Best varies (0.007 WF1, 0.008 WF2), high-threshold trade counts marginal |
+
+**Verdict: THRESHOLD_CONSERVATIVE_BUT_NOT_OPTIMAL**
+
+Baseline 0.00649 is a conservative threshold that rejects low-quality shallow sweeps (lower thresholds consistently degrade ER). However, it is not optimal — higher thresholds (0.007-0.008) show better OOS ER in both valid windows, with cleaner safety profiles but lower trade frequency. The exact optimal threshold remains uncertain due to limited valid windows and marginal high-threshold sample sizes.
 
 ### Limitations
 
@@ -148,7 +176,27 @@ Walk-forward threshold stability test across 3 OOS windows with 6 threshold valu
 
 ## Recommendation
 
-Current threshold `0.00649` is stable across OOS windows. Do not adjust. Proceed to 30-day paper monitoring.
+Baseline 0.00649 is conservative but not optimal. Three paths forward:
+
+### Option A: Keep Conservative Baseline (Recommended)
+- **Action:** Maintain 0.00649 for 30-day paper monitoring
+- **Rationale:** Conservative threshold with proven downside protection; higher thresholds show improvement but with limited statistical confidence
+- **Risk:** May miss opportunities if higher thresholds are truly better
+- **Next milestone:** 30-day monitoring + live near-miss diagnostics
+
+### Option B: Test Higher Threshold Variant
+- **Action:** Deploy 0.007 as shadow/PAPER variant alongside baseline for 30 days
+- **Rationale:** OOS data shows +13.6% ER improvement (WF1); test hypothesis with live data
+- **Risk:** Lower trade frequency (88 vs 106 in WF1); may degrade ER if OOS pattern doesn't hold live
+- **Next milestone:** A/B comparison after 30 days
+
+### Option C: Defer Parameter Change
+- **Action:** Keep 0.00649, collect 30-day near-miss diagnostics (rejected sweep depth distribution, feature deltas)
+- **Rationale:** M1 shows current market generates shallow sweeps; wait for regime shift before parameter adjustment
+- **Risk:** Prolonged low-frequency period if regime persists
+- **Next milestone:** Regime-conditional parameter adjustment (future work)
+
+**User decision required.** Claude Code does not make production parameter choices.
 
 ## Methodology
 
