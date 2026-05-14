@@ -471,13 +471,13 @@ class BotOrchestrator:
                     regime=regime.value,
                     snapshot_id=snapshot_id,
                     feature_snapshot_id=feature_snapshot_id,
-                    details=self._signal_diagnostics_payload(diagnostics),
+                    details=self._signal_diagnostics_payload(diagnostics, features),
                     context=context,
                 )
                 self.bundle.audit_logger.log_decision(
                     "decision",
                     "No signal candidate.",
-                    payload=self._signal_diagnostics_payload(diagnostics),
+                    payload=self._signal_diagnostics_payload(diagnostics, features),
                 )
                 self.state_store.mark_healthy()
                 return
@@ -916,8 +916,8 @@ class BotOrchestrator:
         LOG.info(message, *values)
 
     @staticmethod
-    def _signal_diagnostics_payload(diagnostics: SignalDiagnostics) -> dict[str, object]:
-        return {
+    def _signal_diagnostics_payload(diagnostics: SignalDiagnostics, features: Features | None = None) -> dict[str, object]:
+        payload = {
             "timestamp": diagnostics.timestamp.isoformat(),
             "config_hash": diagnostics.config_hash,
             "blocked_by": diagnostics.blocked_by,
@@ -932,6 +932,51 @@ class BotOrchestrator:
             "confluence_preview": diagnostics.confluence_preview,
             "candidate_reasons_preview": diagnostics.candidate_reasons_preview,
         }
+        
+        # Add near-miss diagnostics for sweep_too_shallow rejections with depth >= 0.004
+        if (diagnostics.blocked_by == "sweep_too_shallow" 
+                and diagnostics.sweep_depth_pct is not None 
+                and diagnostics.sweep_depth_pct >= 0.004
+                and features is not None):
+            # Get current threshold from settings (default 0.00649 for trial-00095)
+            threshold = 0.00649  # Baseline threshold from trial-00095
+            depth = diagnostics.sweep_depth_pct
+            
+            # Compute threshold distance (negative for rejects)
+            threshold_distance = (depth - threshold) / threshold if threshold > 0 else 0.0
+            
+            # Compute depth bucket
+            if depth < 0.004:
+                depth_bucket = "far_below"
+            elif depth < threshold:
+                depth_bucket = "near_miss_low"
+            elif depth < 0.007:
+                depth_bucket = "baseline_pass"
+            else:
+                depth_bucket = "stricter_pass"
+            
+            # Get session hour
+            session_hour = diagnostics.timestamp.hour
+            
+            # Build near-miss payload
+            near_miss_data = {
+                "threshold": threshold,
+                "threshold_distance": round(threshold_distance, 3),
+                "depth_bucket": depth_bucket,
+                "direction": diagnostics.direction_inferred.value if diagnostics.direction_inferred else None,
+                "regime": diagnostics.regime.value,
+                "confluence_score": diagnostics.confluence_preview,
+                "min_tfi_strength": features.tfi_60s,
+                "atr_15m": features.atr_15m,
+                "funding_rate_60d": features.funding_pct_60d,
+                "oi_change_pct": features.oi_delta_pct,
+                "session_hour": session_hour,
+                "rejection_reasons": diagnostics.candidate_reasons_preview or ["sweep_too_shallow"],
+            }
+            
+            payload["near_miss_diagnostics"] = near_miss_data
+        
+        return payload
 
     def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> list[dict]:
         open_records = self.state_store.get_open_trade_records()
