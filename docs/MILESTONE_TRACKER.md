@@ -44,7 +44,7 @@
 
 ## Completed: BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1
 
-**Status:** CLOSED — `5M_FEASIBILITY_FAIL` (trade count gate failed)  
+**Status:** CLOSED — `5M_FREQUENCY_FAIL_QUALITY_PASS` (frequency gate failed, all quality gates passed)  
 **Builder:** Cascade  
 **Decision date:** 2026-05-14  
 **Branch:** `main`  
@@ -68,7 +68,7 @@
 | Max DD (R) | 4.49 | 4.50 | <= 15m | PASS |
 | Trades/month | 1.8 | 2.3 | — | — |
 
-**Verdict: `5M_FEASIBILITY_FAIL`** — Only 1 of 6 gates failed (trade count increase: 1.30x < 2.0x required). 5m edge quality is actually *better* (higher ER, higher PF, higher win rate, better MAE), but does not meaningfully increase signal frequency.
+**Verdict: `5M_FREQUENCY_FAIL_QUALITY_PASS`** — Frequency gate failed (1.30x < 2.0x required) but all quality gates passed. 5m edge quality is *better* across every metric (ER +11%, PF +68%, WR +21pp, MAE -40%), indicating the edge is sharper at 5m resolution.
 
 **Key findings:**
 1. 5m detects 2.62x more sweeps but 98.9% are too shallow (depth < 0.649%)
@@ -83,10 +83,10 @@
 
 **Infrastructure note:** Standalone research harness used (bypasses BacktestRunner). Both 5m and 15m used same harness for fair comparison. Results are NOT directly comparable to official BacktestRunner metrics.
 
-**Recommendation:** Stay on 15m. Defer 5m upgrade. The 5m edge quality improvement does not justify infrastructure investment given minimal frequency gain.
+**Recommendation:** Defer full 5m runtime upgrade. Consider hybrid architecture: 15m signal detection (proven frequency) + 5m execution timing layer (proven quality). Recommended next study: `15M_SIGNAL_5M_EXECUTION_OVERLAY_FEASIBILITY`.
 
 **Deliverables:**
-- `research_lab/backfill_5m_candles.py` — Binance API backfill script
+- `scripts/check_5m_data_quality.py` — 5m data quality audit script
 - `research_lab/analysis_btc_5m_sweep_reclaim_feasibility.py` — analysis script
 - `docs/analysis/BTC_5M_SWEEP_RECLAIM_FEASIBILITY_2026-05-14.md` — full report
 
