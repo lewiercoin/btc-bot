@@ -1193,11 +1193,16 @@ def _compute_verdict(
     all_pass = all(g[1] is True for g in gates)
     any_fail = any(g[1] is False for g in gates)
     any_marginal = any(g[1] == "marginal" for g in gates)
+    failed_gates = {g[0] for g in gates if g[1] is False}
+    quality_gates = {"expectancy_r", "profit_factor", "max_drawdown", "concentration", "overtrading"}
+    quality_all_pass = all(g[1] is True for g in gates if g[0] in quality_gates)
 
     gate_summary = "\n".join(f"- **{g[0]}**: {'PASS' if g[1] is True else 'MARGINAL' if g[1] == 'marginal' else 'FAIL'} — {g[2]}" for g in gates)
 
     if all_pass:
         return "5M_FEASIBILITY_PASS", f"All acceptance gates passed.\n\n{gate_summary}"
+    elif failed_gates == {"trade_count_increase"} and quality_all_pass:
+        return "5M_FREQUENCY_FAIL_QUALITY_PASS", f"Frequency gate failed; all quality gates passed.\n\n{gate_summary}"
     elif any_fail and not any_marginal:
         return "5M_FEASIBILITY_FAIL", f"One or more gates failed.\n\n{gate_summary}"
     elif any_fail:
