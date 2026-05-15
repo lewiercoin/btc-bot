@@ -1,0 +1,82 @@
+{
+  "hypothesis_id": "15m_signal_5m_energy_overlay_v1",
+  "name": "15m Signal + 5m Energy Overlay",
+  "class": "timing_overlay",
+  "edge_rationale": "5m energy confirmation may improve 15m signal entry timing by waiting for a high body/range candle with elevated volume.",
+  "counterparty_or_market_mechanism": "Late momentum chasers who enter after the move has already started.",
+  "required_data": [
+    "btc_15m_replay_run13",
+    "btc_5m_2022_2026"
+  ],
+  "timeframe": [
+    "15m",
+    "5m"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "body_range_min",
+      "values": [
+        0.5,
+        0.6,
+        0.7
+      ]
+    },
+    {
+      "name": "volume_zscore_min",
+      "values": [
+        0.5,
+        1.0,
+        1.5
+      ]
+    },
+    {
+      "name": "direction_required",
+      "values": [
+        true,
+        false
+      ]
+    },
+    {
+      "name": "timeout_mode",
+      "values": [
+        "SKIP",
+        "FALLBACK"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "15m signal detection uses trial-00095 exact parameters.",
+    "Exit logic remains unchanged.",
+    "No lookahead: 5m search starts at 15m candle close.",
+    "Maximum wait is 3 x 5m bars."
+  ],
+  "expected_observation": "If energy confirmation improves timing, MAE improves by at least 10 percent, ER is not degraded, and frequency remains at least 80 percent of baseline.",
+  "acceptance_criteria": {
+    "min_trades": 20,
+    "min_er": 1.0,
+    "min_pf": 1.5,
+    "min_frequency_ratio": 0.8,
+    "min_mae_improvement_pct": 10.0,
+    "max_entry_delta_pct": 0.0
+  },
+  "kill_criteria": {
+    "max_timeout_rate": 0.9,
+    "max_entry_delta_pct": 2.0,
+    "min_frequency_ratio": 0.6
+  },
+  "failure_modes": [
+    "Timeout rate too high.",
+    "Entry price delta positive because waiting costs entry quality.",
+    "MAE worsens because energy candles select bad timing."
+  ],
+  "out_of_scope": [
+    "Pre-signal confirmation.",
+    "5m exit logic.",
+    "Production or PAPER runtime changes.",
+    "LLM-generated strategy code."
+  ],
+  "author": "Cascade",
+  "created_at": "2026-05-15T00:00:00+00:00",
+  "status": "CLOSED"
+}

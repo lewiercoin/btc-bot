@@ -42,6 +42,36 @@
 
 ---
 
+### Research: RESEARCH_AUTOMATION_FOUNDATION_LITE_V1
+
+**Status:** READY_FOR_AUDIT - research-lab-only framework, no runtime changes
+**Builder:** Codex
+**Decision date:** 2026-05-15
+**Branch:** `research/sweep-family-expansion-v1`
+**Report:** `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`
+
+**Scope:** Standardize the research workflow after M1-M6 manual research scripts. This milestone adds a lightweight hypothesis, experiment, evaluator, manifest, and report framework for future offline research. It does not add LLM agents, automatic experiment execution, external repos, or production/PAPER integration.
+
+**Deliverables:**
+- Safe declarative hypothesis spec and research program contracts
+- SQLite experiment registry API
+- Data manifest and combined hash contract
+- Deterministic gate evaluator
+- Standard markdown report generator
+- Non-executing example hypothesis
+- Unit tests for validation, registry, evaluator, report, and end-to-end workflow
+- Design document
+
+**Acceptance Criteria:**
+- Existing tests still pass
+- New research lab framework tests pass
+- `research_lab/autoresearch_loop.py` unchanged
+- No production/PAPER/runtime files modified
+- Hypothesis specs cannot execute arbitrary code
+- Framework can create/register an experiment, evaluate dummy metrics, and generate a report
+
+---
+
 ## Completed: 15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY
 
 **Status:** CLOSED — `HYBRID_FAIL` (all 8 configurations failed or inconclusive)  
