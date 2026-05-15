@@ -1,0 +1,85 @@
+{
+  "hypothesis_id": "btc_5m_crowded_unwind_reversal_v1",
+  "name": "BTC 5m Crowded Unwind Reversal",
+  "class": "timeframe_feasibility",
+  "edge_rationale": "Crowding plus a large directional 5m move can represent forced unwind. If the move fails to continue and snaps back through the event midpoint, the exhausted forced flow may create mean-reversion edge.",
+  "counterparty_or_market_mechanism": "Leveraged traders liquidated or forced to chase the directional move lose when the unwind exhausts and price snaps back.",
+  "required_data": [
+    "btc_5m_2022_2026",
+    "btc_15m_baseline",
+    "btc_open_interest",
+    "btc_funding"
+  ],
+  "timeframe": [
+    "5m"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "crowding_lookback_bars",
+      "values": [
+        24,
+        48
+      ]
+    },
+    {
+      "name": "forced_move_atr_mult",
+      "values": [
+        1.5,
+        2.0
+      ]
+    },
+    {
+      "name": "snapback_window_bars",
+      "values": [
+        3,
+        4
+      ]
+    },
+    {
+      "name": "min_force_z",
+      "values": [
+        2.0,
+        2.5
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "BTC only.",
+    "5m candles define event and confirmation windows.",
+    "OI and funding are used only as past-known context when available.",
+    "Historical force orders are loaded from research_lab/data/crowded_unwind_backtest.db when available.",
+    "Candle range and volume remain required to confirm price displacement around the force-order spike.",
+    "No production, PAPER, runtime, core, execution, or settings changes.",
+    "No parameter rescue after seeing results."
+  ],
+  "expected_observation": "If the setup works, 5m forced unwind reversals generate materially more trades than 15m trial-00095 while preserving ER, PF, drawdown, and cost sensitivity.",
+  "acceptance_criteria": {
+    "min_trades": 20,
+    "min_er": 1.0,
+    "min_pf": 1.5,
+    "min_trade_count_ratio_vs_baseline": 1.5,
+    "max_dd_ratio_vs_baseline": 1.5,
+    "cost_sensitivity_er_at_2x": 0.5
+  },
+  "kill_criteria": {
+    "max_concentration_single_month": 0.6,
+    "max_concentration_single_day": 0.4,
+    "max_overlap_with_baseline": 0.8
+  },
+  "failure_modes": [
+    "Volume and candle range proxies do not represent true liquidation flow.",
+    "Reversal entries catch continuation rather than exhaustion.",
+    "SHORT-only results are fragile given prior short-side weakness.",
+    "Edge is concentrated in isolated market stress events."
+  ],
+  "out_of_scope": [
+    "Liquidation feed backfill.",
+    "Production or PAPER runtime deployment.",
+    "New risk engine logic.",
+    "Full 5m runtime migration."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-15T00:00:00+00:00",
+  "status": "ACTIVE"
+}
