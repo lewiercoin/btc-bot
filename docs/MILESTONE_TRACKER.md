@@ -42,6 +42,48 @@
 
 ---
 
+## Completed: 15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY
+
+**Status:** CLOSED — `HYBRID_FAIL` (all 8 configurations failed or inconclusive)  
+**Builder:** Cascade  
+**Decision date:** 2026-05-15  
+**Branch:** `research/sweep-family-expansion-v1`  
+**Report:** `docs/analysis/15M_SIGNAL_5M_ENERGY_OVERLAY_2026-05-15.md`
+
+**Scope:** Test whether 5m energy/impulse confirmation (body/range + volume z-score) improves 15m signal entry timing. 4 energy variants (E1-E4) × 2 timeout modes (SKIP/FALLBACK) = 8 configurations tested.
+
+**Hypothesis:** When a 15m sweep+reclaim signal fires, waiting for a 5m high-energy candle within the next 3 bars can reduce MAE by ~40% without reducing frequency below 80%.
+
+**Results:**
+
+| Variant | Mode | Trades | Freq% | ER | MAE(R) | Timeout% | Verdict |
+|---|---|---:|---:|---:|---:|---:|---|
+| E1 | SKIP | 6 | 13% | -0.354 | -0.627 | 87.2% | INCONCLUSIVE |
+| E1 | FALLBACK | 47 | 100% | 1.611 | -1.157 | 87.2% | FAIL |
+| E2 | SKIP | 8 | 17% | -0.607 | -0.814 | 83.0% | INCONCLUSIVE |
+| E2 | FALLBACK | 47 | 100% | 1.617 | -1.153 | 83.0% | FAIL |
+| E3 | SKIP | 4 | 9% | -0.257 | -0.588 | 91.5% | INCONCLUSIVE |
+| E3 | FALLBACK | 47 | 100% | 1.688 | -1.151 | 91.5% | FAIL |
+| E4 | SKIP | 10 | 21% | -0.544 | -1.521 | 78.7% | INCONCLUSIVE |
+| E4 | FALLBACK | 47 | 100% | 1.547 | -1.140 | 78.7% | FAIL |
+
+**Key findings:**
+1. Timeout rates 78-91%: 5m energy candles rarely appear within 3 bars after 15m signal
+2. SKIP mode produces < 20 trades in all variants → INCONCLUSIVE (insufficient sample)
+3. FALLBACK mode: ER degrades from 2.110 to 1.5-1.7, MAE slightly worse (-1.14 to -1.16 vs -1.11)
+4. Entry price delta +1.0% to +1.6% (WORSE — price moved adversely during wait)
+5. Confirmed entries have negative ER across all SKIP variants (energy candles select bad timing)
+
+**Why it failed:** The 15m signal fires at candle close T. By the time a high-energy 5m candle appears (if it does), price has already moved significantly in the signal direction. The energy confirmation is too late — it confirms the move AFTER the optimal entry point has passed. Waiting for energy costs entry quality.
+
+**Recommendation:** 5m energy confirmation does not improve 15m signal quality. Energy overlay adds complexity without benefit. Defer. The M5 quality improvement (MAE -40%) observed in the standalone 5m study was due to 5m detecting signals at different (better) timestamps, not from confirming 15m signals with 5m timing.
+
+**Deliverables:**
+- `research_lab/analysis_15m_signal_5m_energy_overlay.py` — analysis script
+- `docs/analysis/15M_SIGNAL_5M_ENERGY_OVERLAY_2026-05-15.md` — full report
+
+---
+
 ## Completed: BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1
 
 **Status:** CLOSED — `5M_FREQUENCY_FAIL_QUALITY_PASS` (frequency gate failed, all quality gates passed)  
