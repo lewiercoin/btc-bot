@@ -1,0 +1,76 @@
+{
+  "hypothesis_id": "btc_5m_compression_fakeout_reclaim_v1",
+  "name": "BTC 5m Compression Fakeout Reclaim",
+  "class": "timeframe_feasibility",
+  "edge_rationale": "A compressed 5m range can store volatility. A close outside that range that quickly reclaims the range indicates a failed breakout and liquidity grab, which may create mean-reversion edge.",
+  "counterparty_or_market_mechanism": "Breakout chasers and stop orders triggered outside a compressed range lose when the breakout fails and price reclaims the range.",
+  "required_data": [
+    "btc_5m_2022_2026",
+    "btc_15m_baseline"
+  ],
+  "timeframe": [
+    "5m"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "compression_lookback",
+      "values": [
+        96,
+        144
+      ]
+    },
+    {
+      "name": "range_lookback",
+      "values": [
+        24,
+        36,
+        48
+      ]
+    },
+    {
+      "name": "reclaim_window_bars",
+      "values": [
+        3,
+        4
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "BTC only.",
+    "5m candles only for event detection.",
+    "No production, PAPER, runtime, core, execution, or settings changes.",
+    "No parameter rescue after seeing results.",
+    "Entry occurs at first confirmation bar close.",
+    "Exit uses simplified TP/SL only, no trailing or partial exits."
+  ],
+  "expected_observation": "If the setup works, it generates materially more trades than 15m trial-00095 while keeping ER above 1.0, PF above 1.5, acceptable drawdown, and positive cost sensitivity.",
+  "acceptance_criteria": {
+    "min_trades": 20,
+    "min_er": 1.0,
+    "min_pf": 1.5,
+    "min_trade_count_ratio_vs_baseline": 1.5,
+    "max_dd_ratio_vs_baseline": 1.5,
+    "cost_sensitivity_er_at_2x": 0.5
+  },
+  "kill_criteria": {
+    "max_concentration_single_month": 0.6,
+    "max_concentration_single_day": 0.4,
+    "max_overlap_with_baseline": 0.8
+  },
+  "failure_modes": [
+    "Compression definition is too broad and catches noisy ranges.",
+    "Reclaim confirmation arrives after the mean-reversion move already happened.",
+    "Trade count increases but extra events have lower expectancy.",
+    "Profits concentrate in a small number of months."
+  ],
+  "out_of_scope": [
+    "15m trial-00095 threshold changes.",
+    "Production or PAPER runtime deployment.",
+    "LLM-generated signal logic.",
+    "Full 5m runtime migration."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-15T00:00:00+00:00",
+  "status": "ACTIVE"
+}

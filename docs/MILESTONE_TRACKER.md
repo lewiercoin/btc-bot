@@ -42,6 +42,38 @@
 
 ---
 
+### Research: BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1
+
+**Status:** READY_FOR_AUDIT - `MULTI_CANDLE_FAIL`
+**Builder:** Codex
+**Decision date:** 2026-05-15
+**Branch:** `research/sweep-family-expansion-v1`
+**Report:** `docs/analysis/BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-15.md`
+
+**Scope:** Test whether 5m multi-candle event-window setup classes can increase BTC trade count without quality degradation. Offline research only. No production/PAPER/runtime/settings/core/execution changes.
+
+**Setup classes tested:**
+- `btc_5m_compression_fakeout_reclaim_v1`: compression -> fakeout -> reclaim
+- `btc_5m_crowded_unwind_reversal_v1`: crowding -> forced move -> snapback
+
+**Results:**
+
+| Setup | Best Variant | Trades | ER | PF | Frequency Ratio | Verdict |
+|---|---|---:|---:|---:|---:|---|
+| Compression Fakeout Reclaim | CFR_V3 | 73 | -0.192 | 0.37 | 1.55x | FAIL |
+| Crowded Unwind Reversal | CUR_V1 | 174 | -0.415 | 0.22 | 3.70x | FAIL |
+
+**Key findings:**
+1. Both setup families increased event count but destroyed edge quality.
+2. Compression fakeout barely cleared the frequency gate but failed ER, PF, DD, and cost sensitivity.
+3. Crowded unwind used historical force orders (146,864 rows through 2024-12-01) plus OI/funding, but still produced severe negative ER and drawdown.
+4. True force-order filtering reduced noisy proxy trades but did not create edge.
+5. 5m multi-candle geometry alone does not solve the BTC frequency problem without quality degradation.
+
+**Recommendation:** Close this branch unless Claude identifies a methodology issue. Do not rescue failed variants by expanding the parameter grid.
+
+---
+
 ### Research: RESEARCH_AUTOMATION_FOUNDATION_LITE_V1
 
 **Status:** READY_FOR_AUDIT - research-lab-only framework, no runtime changes
