@@ -1,0 +1,127 @@
+# 15m Signal + 5m Energy Overlay Feasibility Study
+
+**Date:** 2026-05-15 04:14 UTC
+**Milestone:** 15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY
+**Analysis Period:** 2024-01-01 to 2026-03-28 (26.8 months)
+**Baseline:** trial-00095 exact parameters (15m)
+**Overlay:** 5m energy confirmation (body/range + volume z-score)
+
+> **IMPORTANT CAVEAT:** Uses standalone research harness (same as M5 study).
+> Results should NOT be compared with official BacktestRunner metrics.
+> Trade simulation uses simplified fills (no partial exits, no trailing stop).
+
+## Verdict: `HYBRID_FAIL`
+
+**Best configuration:** E1 + FALLBACK
+- Frequency: 100% of baseline (47/47 trades)
+- Hybrid ER: 1.611 vs baseline ER: 2.110
+- Matched-subset MAE: -1.157 vs -1.109
+- Timeout rate: 87.2%
+- Avg entry price delta: +1.3490%
+
+## Signal Funnel (15m Baseline)
+
+| Metric | Count |
+|---|---:|
+| Total bars | 78,433 |
+| sweep_detected | 48,606 |
+| sweep_too_shallow | 45,649 |
+| reclaim_detected | 102 |
+| signal_candidates | 206 |
+| governance_rejected | 32 |
+| risk_rejected | 127 |
+| **baseline_trades** | **47** |
+
+## 15m Baseline Performance
+
+| Metric | Value |
+|---|---:|
+| Trade count | 47 |
+| Expectancy R | 2.110 |
+| Profit Factor | 3.95 |
+| Win Rate | 51.1% |
+| Max DD (R) | 4.49 |
+| Avg MAE (R) | -1.109 |
+| Avg MFE (R) | 6.220 |
+| Trades/month | 1.8 |
+
+## Energy Variant Grid (E1-E4 x SKIP/FALLBACK)
+
+| Variant | Mode | Trades | Freq% | ER | PF | WR% | MAE(R) | Timeout% | Verdict |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| E1 | SKIP | 6 | 13% | -0.354 | 0.11 | 33.3 | -0.627 | 87.2 | `HYBRID_INCONCLUSIVE` |
+| E1 | FALLBACK | 47 | 100% | 1.611 | 3.19 | 44.7 | -1.157 | 87.2 | `HYBRID_FAIL` |
+| E2 | SKIP | 8 | 17% | -0.607 | 0.05 | 25.0 | -0.814 | 83.0 | `HYBRID_INCONCLUSIVE` |
+| E2 | FALLBACK | 47 | 100% | 1.617 | 3.22 | 44.7 | -1.153 | 83.0 | `HYBRID_FAIL` |
+| E3 | SKIP | 4 | 9% | -0.257 | 0.20 | 25.0 | -0.588 | 91.5 | `HYBRID_INCONCLUSIVE` |
+| E3 | FALLBACK | 47 | 100% | 1.688 | 3.27 | 44.7 | -1.151 | 91.5 | `HYBRID_FAIL` |
+| E4 | SKIP | 10 | 21% | -0.544 | 0.05 | 30.0 | -1.521 | 78.7 | `HYBRID_INCONCLUSIVE` |
+| E4 | FALLBACK | 47 | 100% | 1.547 | 3.17 | 44.7 | -1.140 | 78.7 | `HYBRID_FAIL` |
+
+## Entry Price Fairness Metrics
+
+| Variant | Mode | Entry Delta% | Missed Move (R) | Avg Wait (bars) | Timeout% |
+|---|---|---:|---:|---:|---:|
+| E1 | SKIP | +1.3490 | +6.132 | 1.2 | 87.2 |
+| E1 | FALLBACK | +1.3490 | +6.132 | 1.2 | 87.2 |
+| E2 | SKIP | +1.0394 | +4.725 | 1.2 | 83.0 |
+| E2 | FALLBACK | +1.0394 | +4.725 | 1.2 | 83.0 |
+| E3 | SKIP | +1.5914 | +7.234 | 1.2 | 91.5 |
+| E3 | FALLBACK | +1.5914 | +7.234 | 1.2 | 91.5 |
+| E4 | SKIP | +1.0580 | +4.557 | 1.2 | 78.7 |
+| E4 | FALLBACK | +1.0580 | +4.557 | 1.2 | 78.7 |
+
+## Matched-Subset Analysis
+
+For each configuration, hybrid trades are paired with their baseline counterparts by signal timestamp.
+This isolates timing effect from filtering effect.
+
+| Variant | Mode | Hybrid ER | Matched Base ER | Hybrid MAE | Matched Base MAE | MAE Improv% |
+|---|---|---:|---:|---:|---:|---:|
+| E1 | SKIP | -0.354 | 3.550 | -0.627 | -0.255 | -145.8% |
+| E1 | FALLBACK | 1.611 | 2.110 | -1.157 | -1.109 | -4.3% |
+| E2 | SKIP | -0.607 | 2.288 | -0.814 | -0.560 | -45.6% |
+| E2 | FALLBACK | 1.617 | 2.110 | -1.153 | -1.109 | -3.9% |
+| E3 | SKIP | -0.257 | 4.698 | -0.588 | -0.096 | -515.2% |
+| E3 | FALLBACK | 1.688 | 2.110 | -1.151 | -1.109 | -3.8% |
+| E4 | SKIP | -0.544 | 2.102 | -1.521 | -1.376 | -10.5% |
+| E4 | FALLBACK | 1.547 | 2.110 | -1.140 | -1.109 | -2.8% |
+
+## Verdict Taxonomy
+
+| Verdict | Definition |
+|---|---|
+| `HYBRID_TIMING_PASS` | Freq >= 80%, matched MAE improvement >= 10%, ER not degraded, entry favorable |
+| `HYBRID_FILTER_PASS` | Freq 60-79%, full ER improvement >= 20% (skips bad trades) |
+| `HYBRID_MARGINAL` | Freq >= 70%, MAE improvement < 10% |
+| `HYBRID_FAIL` | No meaningful improvement |
+| `HYBRID_INCONCLUSIVE` | < 20 trades |
+
+## Energy Variant Definitions
+
+| Variant | body/range min | vol_zscore min | direction required | max_wait (5m bars) |
+|---|---:|---:|---|---:|
+| E1 | 0.6 | 1.0 | yes | 3 |
+| E2 | 0.6 | 1.0 | no | 3 |
+| E3 | 0.7 | 1.5 | yes | 3 |
+| E4 | 0.5 | 0.5 | yes | 3 |
+
+## Methodology Notes
+
+- **15m signal:** trial-00095 exact parameters (same as M5 baseline)
+- **5m energy:** body/range + volume z-score (rolling 20-bar window)
+- **No-lookahead:** 5m search starts at 15m candle close T
+- **Exit logic:** 15m TP1/SL (no 5m exit logic)
+- **Fees:** 0.04% per side (taker)
+- **Slippage:** 3.0 bps per side
+- **Max hold:** 34h (136 bars @15m)
+- **SKIP mode:** Skip trade if no 5m confirmation
+- **FALLBACK mode:** Enter at baseline 15m price if no 5m confirmation
+- **Matched-subset:** Hybrid trades paired with baseline by signal timestamp
+
+## Recommendation
+
+5m energy confirmation does not meaningfully improve 15m signal quality. Energy overlay adds complexity without benefit. Defer.
+
+---
+*Generated by research_lab/analysis_15m_signal_5m_energy_overlay.py*
