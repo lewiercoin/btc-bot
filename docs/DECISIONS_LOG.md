@@ -218,3 +218,32 @@ Conclusion: **5m resolution does not solve BTC frequency problem.** Multi-candle
   - **Option C:** Accept current frequency, focus on live validation of trial-00095
 
 **Related:** `docs/audits/AUDIT_BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-16.md`; `docs/analysis/BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`; commit 2e0679b (implementation), commit 74ef7a8 (audit closure).
+
+## 2026-05-16 - Approve research automation foundation framework for production use
+**Decision:** Approve `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` for production use in research context (audit verdict: DONE). Framework is production-grade research infrastructure.
+
+**Reason:** Audit verified all safety boundaries, comprehensive test coverage (15/15 passed), and complete implementation:
+- **Zero production coupling:** No imports from core/, execution/, data/, orchestrator, settings. Framework is self-contained.
+- **Append-only registry:** No delete API (verified by test). Experiment records are permanent audit trail.
+- **Safe hypothesis specs:** Recursive validation rejects executable field names (python_code, code, module_path, function_name, import, eval, exec, shell_command). No code execution channel from JSON specs.
+- **Deterministic gate evaluator:** Pure function, no randomness, verdict logic (BLOCKED > INCONCLUSIVE > FAIL > MARGINAL > PASS) is explicit and testable.
+- **Reproducibility:** Experiment fingerprints, data manifest hashes, combined manifest hashing for multi-dataset experiments, full lineage capture (hypothesis_id, config_hash, data_manifest_hash, git_commit, runner_name, date_range, baseline_reference).
+- **Standard report contract:** All required sections generated, test validates presence.
+
+Framework standardizes the repeatable workflow: `hypothesis -> experiment -> evaluation -> report`. Designed for Karpathy-style loop patterns without vendoring external code, adding LLM agents, or touching production runtime.
+
+**Consequences:**
+- Use framework for all future offline research programs (ETH feasibility, exit studies, diagnostic analyses)
+- Hypothesis specs must be authored by builder, reviewed by Claude Code before experiment execution
+- Experiment registry is single source of truth for offline research results
+- Standard report generator replaces manual report formatting
+- Gate evaluator provides deterministic pass/fail evaluation (no subjective judgment)
+- Framework is complementary to existing Optuna integration (autoresearch_loop.py remains unchanged)
+- Framework does NOT execute backtests (by design) — backtest execution is separate concern
+
+**Usage scope:**
+- **In scope:** Offline research programs, hypothesis tracking, experiment registry, gate evaluation, report generation
+- **Out of scope:** Production runtime changes, PAPER deployment, automatic experiment execution, LLM code generation, parameter optimization (use Optuna for that)
+- **Not a promotion channel:** Framework stores results, does not auto-promote to production. Separate approval workflow required for live deployment.
+
+**Related:** `docs/audits/AUDIT_RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-16.md`; `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`; commit 35d78f2 (implementation), commit cbe4ad2 (audit closure).
