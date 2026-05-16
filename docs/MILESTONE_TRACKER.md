@@ -1,5 +1,43 @@
 # Milestone Tracker
 
+## Synchronization Checkpoint - 2026-05-16
+
+This section resolves status drift observed in external summaries after the
+2026-05-15 research activity. Treat the milestone entries below as source of
+truth; this checkpoint only clarifies their combined state.
+
+**Current research state:**
+- `SWEEP-RECLAIM-FAMILY-EXPANSION-V1` is CLOSED as `CONTEXT_EXPANSION_NOT_VIABLE`.
+  The Range Sweep Specialist was completed and audited on 2026-05-13; it is not
+  pending or skipped.
+- `BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1` is CLOSED as
+  `5M_FREQUENCY_FAIL_QUALITY_PASS`. Standalone 5m sweep/reclaim improved
+  quality but failed the >=2x frequency gate.
+- `15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY` is CLOSED as `HYBRID_FAIL`.
+  Waiting for 5m energy after a 15m signal degraded timing or reduced sample
+  size below decision-grade levels.
+- `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` is READY_FOR_AUDIT. This is a
+  research-lab-only workflow framework, not production/runtime integration.
+- `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1` is CLOSED as
+  `MULTI_CANDLE_FAIL`. Audit ACCEPT (2026-05-16): implementation correct,
+  hypothesis decisively falsified. Both setups failed quality gates (negative
+  ER, PF < 0.5, DD 3-16x baseline).
+
+**Builder attribution:**
+- Cascade built `PAPER_NEAR_MISS_MONITORING_V1`,
+  `BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1`, and
+  `15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY`.
+- Codex built `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` and
+  `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1`.
+
+**Operational implication:**
+- Next required action is Claude Code audit for RESEARCH_AUTOMATION_FOUNDATION_LITE_V1
+  (remaining READY_FOR_AUDIT milestone).
+- BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1 audit complete (2026-05-16).
+- Do not restart Range Sweep Specialist; it is already closed and failed.
+- Do not treat the 5m studies as approval for runtime migration. They are
+  offline research evidence only.
+
 ## Current Active Milestones
 
 ### Production: PAPER-TRADING-TRIAL-00095
@@ -44,11 +82,13 @@
 
 ### Research: BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1
 
-**Status:** READY_FOR_AUDIT - `MULTI_CANDLE_FAIL`
+**Status:** CLOSED - `MULTI_CANDLE_FAIL` - audit ACCEPT (2026-05-16)
 **Builder:** Codex
 **Decision date:** 2026-05-15
+**Audit date:** 2026-05-16
 **Branch:** `research/sweep-family-expansion-v1`
 **Report:** `docs/analysis/BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-15.md`
+**Audit:** `docs/audits/AUDIT_BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-16.md`
 
 **Scope:** Test whether 5m multi-candle event-window setup classes can increase BTC trade count without quality degradation. Offline research only. No production/PAPER/runtime/settings/core/execution changes.
 
@@ -70,7 +110,9 @@
 4. True force-order filtering reduced noisy proxy trades but did not create edge.
 5. 5m multi-candle geometry alone does not solve the BTC frequency problem without quality degradation.
 
-**Recommendation:** Close this branch unless Claude identifies a methodology issue. Do not rescue failed variants by expanding the parameter grid.
+**Audit verdict:** Implementation correct, hypothesis decisively falsified. No methodology issues. Both setups have negative edge (ER -0.192, -0.415; PF 0.37, 0.22; DD 3-16x baseline). Force-orders correction was material but did not create edge. 5m research path closed after three failed attempts (M5: frequency fail, M6: quality fail, M7: quality catastrophic fail).
+
+**Recommendation:** Do not rescue failed variants by expanding the parameter grid. Wait for M4 checkpoint (2026-06-13), then decide between ETH feasibility (Option B) or live validation (Option C).
 
 ---
 
