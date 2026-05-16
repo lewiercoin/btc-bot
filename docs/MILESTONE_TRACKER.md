@@ -16,8 +16,9 @@ truth; this checkpoint only clarifies their combined state.
 - `15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY` is CLOSED as `HYBRID_FAIL`.
   Waiting for 5m energy after a 15m signal degraded timing or reduced sample
   size below decision-grade levels.
-- `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` is READY_FOR_AUDIT. This is a
-  research-lab-only workflow framework, not production/runtime integration.
+- `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` is CLOSED. Audit DONE (2026-05-16):
+  production-grade research infrastructure, all safety boundaries respected,
+  comprehensive test coverage (15/15 passed).
 - `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1` is CLOSED as
   `MULTI_CANDLE_FAIL`. Audit ACCEPT (2026-05-16): implementation correct,
   hypothesis decisively falsified. Both setups failed quality gates (negative
@@ -31,9 +32,8 @@ truth; this checkpoint only clarifies their combined state.
   `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1`.
 
 **Operational implication:**
-- Next required action is Claude Code audit for RESEARCH_AUTOMATION_FOUNDATION_LITE_V1
-  (remaining READY_FOR_AUDIT milestone).
-- BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1 audit complete (2026-05-16).
+- All pending research milestones audited and closed (2026-05-16).
+- Research automation framework approved for production use in research context.
 - Do not restart Range Sweep Specialist; it is already closed and failed.
 - Do not treat the 5m studies as approval for runtime migration. They are
   offline research evidence only.
@@ -118,11 +118,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: RESEARCH_AUTOMATION_FOUNDATION_LITE_V1
 
-**Status:** READY_FOR_AUDIT - research-lab-only framework, no runtime changes
+**Status:** CLOSED - audit DONE (2026-05-16) - framework approved for research use
 **Builder:** Codex
 **Decision date:** 2026-05-15
+**Audit date:** 2026-05-16
 **Branch:** `research/sweep-family-expansion-v1`
 **Report:** `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`
+**Audit:** `docs/audits/AUDIT_RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-16.md`
 
 **Scope:** Standardize the research workflow after M1-M6 manual research scripts. This milestone adds a lightweight hypothesis, experiment, evaluator, manifest, and report framework for future offline research. It does not add LLM agents, automatic experiment execution, external repos, or production/PAPER integration.
 
@@ -137,12 +139,21 @@ truth; this checkpoint only clarifies their combined state.
 - Design document
 
 **Acceptance Criteria:**
-- Existing tests still pass
-- New research lab framework tests pass
-- `research_lab/autoresearch_loop.py` unchanged
-- No production/PAPER/runtime files modified
-- Hypothesis specs cannot execute arbitrary code
-- Framework can create/register an experiment, evaluate dummy metrics, and generate a report
+- Existing tests still pass ✓
+- New research lab framework tests pass ✓ (15/15 passed)
+- `research_lab/autoresearch_loop.py` unchanged ✓
+- No production/PAPER/runtime files modified ✓
+- Hypothesis specs cannot execute arbitrary code ✓ (recursive validation rejects executable field names)
+- Framework can create/register an experiment, evaluate dummy metrics, and generate a report ✓
+
+**Audit verdict (2026-05-16):**
+- All audit axes PASS (Layer Separation, Contract Compliance, Determinism, State Integrity, Error Handling, Smoke Coverage, Methodology Integrity, Promotion Safety, Reproducibility, Data Isolation, Search Space Governance, Artifact Consistency, Boundary Coupling)
+- Zero coupling to production code (no imports from core/, execution/, data/, orchestrator, settings)
+- Append-only experiment registry (no delete API, verified by test)
+- Safe hypothesis specs (executable field rejection validated)
+- Deterministic gate evaluator (PASS/MARGINAL/FAIL/INCONCLUSIVE/BLOCKED logic)
+- Production-grade for research infrastructure
+- Ready for ETH feasibility study or other future research programs
 
 ---
 
