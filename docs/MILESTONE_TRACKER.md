@@ -49,11 +49,12 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: PAPER_NEAR_MISS_MONITORING_V1
 
-**Status:** ACTIVE - runtime diagnostics only, no parameter changes
+**Status:** ACTIVE - early checkpoint complete 2026-05-16, runtime diagnostics only, no parameter changes
 **Builder:** Cascade
 **Start date:** 2026-05-14
 **Checkpoint date:** 2026-06-13 (30 days)
 **Branch:** `research/sweep-family-expansion-v1`
+**Early checkpoint:** `docs/diagnostics/M4_NEAR_MISS_MONITORING_CHECKPOINT_2026-05-16.md`
 
 **Scope:** Transform 30-day PAPER monitoring from passive waiting to active diagnostics. Baseline trial-00095 (min_sweep_depth_pct=0.00649) remains active unchanged, but system collects richer data on near-miss/shallow sweeps and compares diagnostically with hypothetical stricter threshold 0.007.
 
@@ -77,6 +78,14 @@ truth; this checkpoint only clarifies their combined state.
 - Near-miss count > baseline trades → threshold too strict
 - Sweep depth distribution shifts deeper → regime improving
 - Baseline ER turns negative → edge degradation
+
+**2026-05-16 early checkpoint:**
+- Production PAPER healthy, safe_mode=0, open_positions=0.
+- Last 3 days: 464 decision cycles, 260 `sweep_too_shallow` rejections, 0 generated signals.
+- 10 near-miss records (approximately 5 unique timestamps), all in `uptrend`.
+- Max observed near-miss depth 0.005795, still 10.7% below active 0.00649 threshold.
+- Finding: production payload omitted nested `near_miss_diagnostics.sweep_depth_pct`; local code/report parser patched for contract compliance and backward-compatible reporting.
+- Verdict: continue monitoring unchanged; no parameter or execution change.
 
 ---
 
@@ -2848,4 +2857,3 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
 - **Phase 2 (trend-continuation research):** READY — awaiting user milestone approval
 - **Next decision point:** User approves Phase 2 and selects builder (Codex or Cascade)
-

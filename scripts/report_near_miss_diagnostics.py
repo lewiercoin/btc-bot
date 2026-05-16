@@ -118,7 +118,7 @@ def analyze_near_misses(rows):
                     stricter_pass += 1
                 
                 # Threshold proximity
-                depth = near_miss.get("sweep_depth_pct", 0)
+                depth = near_miss.get("sweep_depth_pct", details.get("sweep_depth_pct", 0))
                 threshold = near_miss.get("threshold", 0.00649)
                 if threshold > 0:
                     distance_pct = (depth - threshold) / threshold * 100

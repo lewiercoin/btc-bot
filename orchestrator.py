@@ -960,6 +960,7 @@ class BotOrchestrator:
             
             # Build near-miss payload
             near_miss_data = {
+                "sweep_depth_pct": depth,
                 "threshold": threshold,
                 "threshold_distance": round(threshold_distance, 3),
                 "depth_bucket": depth_bucket,

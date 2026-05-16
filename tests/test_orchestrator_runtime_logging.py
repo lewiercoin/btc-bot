@@ -403,6 +403,46 @@ def test_health_check_persists_runtime_warning(paper_settings) -> None:
     assert runtime_metrics["last_runtime_warning"] == "websocket_alive=false"
 
 
+def test_near_miss_payload_includes_nested_sweep_depth_pct() -> None:
+    timestamp = datetime(2026, 5, 16, 11, 0, tzinfo=timezone.utc)
+    diagnostics = SignalDiagnostics(
+        timestamp=timestamp,
+        config_hash="test-config",
+        regime=RegimeState.UPTREND,
+        blocked_by="sweep_too_shallow",
+        sweep_detected=True,
+        reclaim_detected=False,
+        sweep_side="LOW",
+        sweep_level=80412.34,
+        sweep_depth_pct=0.0059,
+        direction_inferred=None,
+        direction_allowed=None,
+        confluence_preview=None,
+        candidate_reasons_preview=[],
+    )
+    features = Features(
+        schema_version="test",
+        config_hash="test-config",
+        timestamp=timestamp,
+        atr_15m=177.5,
+        atr_4h=1000.0,
+        atr_4h_norm=0.01,
+        ema50_4h=80000.0,
+        ema200_4h=79000.0,
+        funding_pct_60d=33.8,
+        oi_delta_pct=-0.004,
+        tfi_60s=0.6,
+    )
+
+    payload = BotOrchestrator._signal_diagnostics_payload(diagnostics, features)
+
+    near_miss = payload["near_miss_diagnostics"]
+    assert isinstance(near_miss, dict)
+    assert near_miss["sweep_depth_pct"] == 0.0059
+    assert near_miss["threshold"] == 0.00649
+    assert near_miss["depth_bucket"] == "near_miss_low"
+
+
 def test_start_persists_config_snapshot(paper_settings) -> None:
     assert paper_settings.storage is not None
     conn = make_conn(paper_settings.storage.schema_path)
