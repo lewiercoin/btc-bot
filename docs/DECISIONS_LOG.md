@@ -145,3 +145,76 @@ Only sweep_reclaim works at 15m because: state-independent logic (no regime phas
 - New edge families at 15m: 0/6 success rate in portfolio research; timing incompatibility proven
 
 **Related:** `research/sweep-family-expansion-v1` branch (commits efd9ef3..61a8aaa); `docs/MILESTONE_TRACKER.md`; `docs/analysis/SWEEP_RECLAIM_SINGULAR_EDGE_ASSESSMENT_2026-05-13.md`; 4 audit packages in `research_lab/reports/` and `docs/audits/`.
+
+## 2026-05-14 - Reject standalone 5m sweep/reclaim runtime migration
+**Decision:** Close `BTC_5M_SWEEP_RECLAIM_FEASIBILITY_V1` as `5M_FREQUENCY_FAIL_QUALITY_PASS`. Do not migrate the live decision runtime from 15m to standalone 5m sweep/reclaim based on this evidence.
+
+**Reason:** The standalone 5m harness improved quality metrics versus its matched 15m comparison (ER 2.351 vs 2.110, PF 6.63 vs 3.95, WR 72.1% vs 51.1%, MAE improved by roughly 40%), but it only increased trade count by 1.30x against a required >=2x gate. The structural bottleneck is reclaim detection: 5m bars detect more raw sweeps but are less likely to sweep and reclaim inside a single bar.
+
+**Consequences:**
+- Full 5m runtime migration remains unjustified.
+- 5m may be studied only as an offline timing/quality layer until separately validated.
+- Results are not directly comparable to official BacktestRunner metrics because the study used a standalone harness with simplified fills.
+
+**Related:** `docs/analysis/BTC_5M_SWEEP_RECLAIM_FEASIBILITY_2026-05-14.md`; `docs/MILESTONE_TRACKER.md`.
+
+## 2026-05-15 - Reject 15m signal plus 5m energy confirmation overlay
+**Decision:** Close `15M_SIGNAL_5M_ENERGY_OVERLAY_FEASIBILITY` as `HYBRID_FAIL`.
+
+**Reason:** Waiting for a 5m high-energy candle after a 15m signal produced timeout rates of 78-91%. SKIP mode left too few trades for decision-grade evidence, while FALLBACK mode preserved count but degraded ER from the 15m baseline and did not improve MAE. The evidence indicates 5m energy confirms the move too late rather than improving the entry.
+
+**Consequences:**
+- Do not add 5m energy confirmation to the 15m execution path.
+- The standalone 5m quality improvement should not be interpreted as proof that post-signal 5m confirmation improves 15m entries.
+
+**Related:** `docs/analysis/15M_SIGNAL_5M_ENERGY_OVERLAY_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`.
+
+## 2026-05-15 - Mark 5m multi-candle event setups ready for audit, not rescue
+**Decision:** `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1` is `READY_FOR_AUDIT` with builder verdict `MULTI_CANDLE_FAIL`. Do not rescue failed variants by expanding the grid unless Claude Code identifies a methodology issue.
+
+**Reason:** Both tested setup families increased event counts but failed required quality gates. Compression fakeout reclaim best variant produced 73 trades but negative ER and weak PF. Crowded unwind reversal produced 174 trades but also negative ER, weak PF, and severe drawdown.
+
+**Consequences:**
+- Claude Code audit is required before scheduling follow-up research.
+- The result does not approve any production, PAPER, settings, core, execution, or orchestrator change.
+- The failure supports the current stance that 5m geometry alone does not solve the BTC frequency problem without quality degradation.
+
+**Related:** `docs/analysis/BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`.
+
+## 2026-05-15 - Add research automation foundation as audit-pending infrastructure
+**Decision:** `RESEARCH_AUTOMATION_FOUNDATION_LITE_V1` is `READY_FOR_AUDIT`. Treat it as research-lab-only infrastructure, not an autonomous research agent and not a production integration.
+
+**Reason:** The milestone standardizes hypothesis specs, experiment registry records, data manifest hashes, deterministic gate evaluation, and markdown reporting after several manual research scripts. It intentionally avoids LLM-generated code execution, automatic experiment execution, external repositories, and runtime coupling.
+
+**Consequences:**
+- Claude Code audit must pass before relying on the framework as the standard research workflow.
+- `research_lab/autoresearch_loop.py` remains separate and unchanged.
+- Hypothesis specs must remain declarative data and must not become a code execution channel.
+
+**Related:** `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`.
+
+## 2026-05-16 - Close 5m multi-candle research path after three failures
+**Decision:** Close `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1` as `MULTI_CANDLE_FAIL` (audit verdict: ACCEPT). Implementation correct, hypothesis decisively falsified. 5m research path exhausted after three major attempts.
+
+**Reason:** Audit confirmed methodology integrity (no-lookahead discipline, one-position constraint, proper force-orders data integration) and verified that both tested setup families produced catastrophically negative results:
+- Compression Fakeout Reclaim (CFR_V3): 73 trades, ER -0.192, PF 0.371, DD 14.0R (3.1x baseline)
+- Crowded Unwind Reversal (CUR_V1): 174 trades, ER -0.415, PF 0.224, DD 72.4R (16.1x baseline)
+
+Both setups achieved frequency goals (1.55x, 3.70x vs baseline) but failed 4 of 6 required quality gates. Direction split shows both LONG and SHORT negative (not a direction bias issue). Force-orders correction was material (integrated 146,864 historical force-order rows from 2022-2024) but did not create edge.
+
+Combined 5m research evidence:
+1. **M5 (BTC_5M_SWEEP_RECLAIM_FEASIBILITY):** Frequency fail (1.30x < 2.0x gate) — sweep/reclaim detection less efficient at 5m
+2. **M6 (15M_SIGNAL_5M_ENERGY_OVERLAY):** Quality fail (ER degrades, 78-91% timeout) — 5m confirmation too late
+3. **M7 (BTC_5M_MULTI_CANDLE_EVENT_SETUP):** Quality catastrophic fail (negative ER, DD 3-16x baseline) — multi-candle patterns have no edge
+
+Conclusion: **5m resolution does not solve BTC frequency problem.** Multi-candle event windows increased detection frequency but destroyed edge quality.
+
+**Consequences:**
+- Do not attempt to rescue 5m multi-candle setups by expanding parameter grid
+- Three research paths now exhausted: threshold optimization (degrades quality), 5m resolution (all variants failed), context expansion (0% success rate)
+- Wait for M4 near-miss monitoring checkpoint (2026-06-13, 29 days), then decide strategic direction:
+  - **Option A:** Continue monitoring if M4 reveals actionable sweep-depth regime shift
+  - **Option B:** ETH multi-asset feasibility study (test if low-frequency issue is BTC-specific)
+  - **Option C:** Accept current frequency, focus on live validation of trial-00095
+
+**Related:** `docs/audits/AUDIT_BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-16.md`; `docs/analysis/BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`; commit 2e0679b (implementation), commit 74ef7a8 (audit closure).
