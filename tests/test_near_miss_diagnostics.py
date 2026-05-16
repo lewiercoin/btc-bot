@@ -1,6 +1,9 @@
 """Unit tests for near-miss diagnostics logic (bucket computation, threshold distance)."""
 
+import json
 import pytest
+
+from scripts.report_near_miss_diagnostics import analyze_near_misses
 
 
 def compute_depth_bucket(depth: float, threshold: float = 0.00649) -> str:
@@ -118,6 +121,62 @@ class TestNearMissConditions:
         
         assert not should_add
 
+
+class TestNearMissReportCompatibility:
+    """Test report parsing for current and legacy near-miss payload shapes."""
+
+    def test_report_uses_nested_sweep_depth_pct(self):
+        rows = [
+            (
+                "2026-05-16T00:00:00+00:00",
+                "no_signal",
+                "sweep_too_shallow",
+                json.dumps(
+                    {
+                        "near_miss_diagnostics": {
+                            "sweep_depth_pct": 0.0059,
+                            "threshold": 0.00649,
+                            "depth_bucket": "near_miss_low",
+                            "regime": "uptrend",
+                            "session_hour": 12,
+                            "rejection_reasons": ["sweep_too_shallow"],
+                        }
+                    }
+                ),
+            )
+        ]
+
+        analysis = analyze_near_misses(rows)
+
+        assert analysis["near_miss_count"] == 1
+        assert analysis["within_10pct"] == 1
+
+    def test_report_falls_back_to_top_level_sweep_depth_pct(self):
+        rows = [
+            (
+                "2026-05-16T00:00:00+00:00",
+                "no_signal",
+                "sweep_too_shallow",
+                json.dumps(
+                    {
+                        "sweep_depth_pct": 0.0059,
+                        "near_miss_diagnostics": {
+                            "threshold": 0.00649,
+                            "depth_bucket": "near_miss_low",
+                            "regime": "uptrend",
+                            "session_hour": 12,
+                            "rejection_reasons": ["sweep_too_shallow"],
+                        },
+                    }
+                ),
+            )
+        ]
+
+        analysis = analyze_near_misses(rows)
+
+        assert analysis["near_miss_count"] == 1
+        assert analysis["within_10pct"] == 1
+
     def test_near_miss_condition_depth_in_range(self):
         """Near-miss SHOULD be added for depth [0.004, threshold)."""
         depth = 0.005
@@ -148,4 +207,3 @@ class TestNearMissConditions:
                       and depth >= 0.004)
         
         assert not should_add
-
