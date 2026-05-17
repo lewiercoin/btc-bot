@@ -247,3 +247,40 @@ Framework standardizes the repeatable workflow: `hypothesis -> experiment -> eva
 - **Not a promotion channel:** Framework stores results, does not auto-promote to production. Separate approval workflow required for live deployment.
 
 **Related:** `docs/audits/AUDIT_RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-16.md`; `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`; commit 35d78f2 (implementation), commit cbe4ad2 (audit closure).
+
+## 2026-05-17 - M4 near-miss payload contract fix deployed, rogue process incident resolved
+**Decision:** Deploy M4 near-miss payload contract fix (commit 33a0df1) to PAPER production. Do not quarantine the 305 duplicate decision_outcomes created by rogue process during May 14-17 overlap period.
+
+**Reason:** Production database showed `sweep_depth_pct` only at top-level `details_json`, not inside nested `near_miss_diagnostics`. This conflicted with documented M4 query contract and required backward-compatible fix.
+
+During deploy verification, Codex discovered a second bot instance running via manual `nohup` launch (started 2026-05-14 15:15 UTC). This created 305 duplicate decision_outcomes with different config_hash across ~3 days overlap.
+
+**Payload fix details:**
+- Added nested `sweep_depth_pct` to `near_miss_diagnostics` payload in orchestrator.py
+- Report parser made backward-compatible (fallback to top-level if nested missing)
+- Nested payload only added for near-misses (depth >= 0.004), not all sweep_too_shallow rejections (by design)
+- Tests verify both old and new payload shapes work (24/24 passed)
+
+**Rogue process incident:**
+- **Scope:** 2026-05-14 15:15 to 2026-05-17 19:15 UTC (~3 days 4 hours)
+- **Impact:** 305 rogue records, only 4 exact timestamp duplicates (LOW severity)
+- **Root cause:** Manual `nohup .venv/bin/python main.py --mode PAPER` launched alongside systemd bot
+- **Detection:** Codex noticed two active config_hash values during deploy verification
+- **Resolution:** Rogue process killed, only systemd bot (PID 790301) remains
+- **Data integrity:** No execution conflicts (PAPER mode), both bots used same M4 parameters, most timestamps unique due to microsecond drift
+
+**Comparison to April 24-27 dual-runtime incident:**
+- April incident: 344 exact duplicates over 3.5 days
+- May incident: 305 total rogue records, only 4 exact duplicates
+- May incident less severe due to timing drift between processes
+
+**Consequences:**
+- M4 monitoring continues unchanged (no parameter changes)
+- Near-miss counts in May 14-17 period slightly inflated but usable
+- M4 checkpoint analysis should filter by `config_hash = 'afbd2eb...'` or use data after 2026-05-17 19:15 UTC for clean sample
+- No database cleanup required (diagnostics-only data, PAPER mode, historical record of incident useful)
+- **Hardening needed:** Single-instance runtime guard to prevent future manual bot launches
+
+**Next operational fix:** Implement file-lock-based single-instance guard in main.py to prevent both manual nohup launches and systemd race conditions. This should be separate hardening milestone, not mixed with research work.
+
+**Related:** `docs/audits/AUDIT_M4_NEAR_MISS_PAYLOAD_FIX_2026-05-16.md`; `docs/diagnostics/M4_NEAR_MISS_MONITORING_CHECKPOINT_2026-05-16.md`; commit 33a0df1 (implementation), commit d4ab073 (audit); incident detected and resolved by Codex on 2026-05-17.
