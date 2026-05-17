@@ -193,6 +193,19 @@ Only sweep_reclaim works at 15m because: state-independent logic (no regime phas
 
 **Related:** `docs/analysis/RESEARCH_AUTOMATION_FOUNDATION_LITE_2026-05-15.md`; `docs/MILESTONE_TRACKER.md`.
 
+## 2026-05-17 - Add runtime single-instance guard after duplicate PAPER bot incident
+**Decision:** Implement `M4-RUNTIME-SINGLE-INSTANCE-GUARD` immediately as operational hardening. The guard prevents a second `main.py --mode PAPER` or `main.py --mode LIVE` runtime from starting, regardless of whether it is launched by systemd or manually with `nohup`.
+
+**Reason:** A second manual PAPER runtime ran from 2026-05-14 to 2026-05-17 alongside the managed systemd bot, creating duplicate `decision_outcomes` rows and a second active config hash. This was the second duplicate-runtime incident in recent history. A systemd PIDFile alone would not prevent manual launches; an application-level file lock protects all launch paths.
+
+**Consequences:**
+- The guard applies only to `main.py` runtime startup.
+- One-shot scripts, diagnostics, dashboard, collectors, and research harnesses remain unaffected.
+- Lock path defaults to `/tmp/btc-bot-runtime.lock` and can be overridden with `BTC_BOT_RUNTIME_LOCK_PATH`.
+- Claude Code audit is required before deploying this guard to PAPER production.
+
+**Related:** `docs/operations/RUNTIME_INSTANCE_CONTROL.md`; `docs/MILESTONE_TRACKER.md`; M4 deploy verification on 2026-05-17.
+
 ## 2026-05-16 - Close 5m multi-candle research path after three failures
 **Decision:** Close `BTC_5M_MULTI_CANDLE_EVENT_SETUP_FEASIBILITY_V1` as `MULTI_CANDLE_FAIL` (audit verdict: ACCEPT). Implementation correct, hypothesis decisively falsified. 5m research path exhausted after three major attempts.
 
