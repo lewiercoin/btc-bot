@@ -73,9 +73,10 @@ def runtime_lock_path() -> Path:
 
 def acquire_runtime_lock(lock_path: Path | None = None) -> TextIO:
     path = lock_path or runtime_lock_path()
-    path.parent.mkdir(parents=True, exist_ok=True)
-    lock_fd = path.open("w", encoding="utf-8")
+    lock_fd: TextIO | None = None
     try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lock_fd = path.open("a+", encoding="utf-8")
         try:
             import fcntl
 
@@ -85,7 +86,8 @@ def acquire_runtime_lock(lock_path: Path | None = None) -> TextIO:
 
             msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
     except (ImportError, OSError):
-        lock_fd.close()
+        if lock_fd is not None:
+            lock_fd.close()
         LOG.error(
             "Another bot runtime instance is already running. "
             "Lock file: %s. If no other bot is running, remove the lock file manually.",
