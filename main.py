@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import logging
 import os
 import signal
 from logging.handlers import RotatingFileHandler
+from pathlib import Path
+from typing import TextIO
 
 from orchestrator import BotOrchestrator
 from settings import BotMode, load_settings
 from storage.db import connect, init_db
 
 LOG = logging.getLogger(__name__)
+DEFAULT_RUNTIME_LOCK_PATH = "/tmp/btc-bot-runtime.lock"
 
 
 def _parse_settings_profile(raw: str) -> str:
@@ -62,6 +66,39 @@ def configure_logging(*, logs_dir, level: str = "INFO") -> None:
     root_logger.addHandler(file_handler)
 
 
+def runtime_lock_path() -> Path:
+    raw_path = os.getenv("BTC_BOT_RUNTIME_LOCK_PATH", DEFAULT_RUNTIME_LOCK_PATH).strip()
+    return Path(raw_path or DEFAULT_RUNTIME_LOCK_PATH)
+
+
+def acquire_runtime_lock(lock_path: Path | None = None) -> TextIO:
+    path = lock_path or runtime_lock_path()
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lock_fd = path.open("w", encoding="utf-8")
+    try:
+        try:
+            import fcntl
+
+            fcntl.flock(lock_fd.fileno(), fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except ImportError:
+            import msvcrt
+
+            msvcrt.locking(lock_fd.fileno(), msvcrt.LK_NBLCK, 1)
+    except (ImportError, OSError):
+        lock_fd.close()
+        LOG.error(
+            "Another bot runtime instance is already running. "
+            "Lock file: %s. If no other bot is running, remove the lock file manually.",
+            path,
+        )
+        raise SystemExit(1)
+    lock_fd.seek(0)
+    lock_fd.truncate()
+    lock_fd.write(f"{os.getpid()}\n")
+    lock_fd.flush()
+    return lock_fd
+
+
 def install_signal_handlers(orchestrator: BotOrchestrator) -> None:
     def _handle_signal(signum, _frame) -> None:  # type: ignore[no-untyped-def]
         LOG.warning("Received signal %s. Initiating graceful shutdown.", signum)
@@ -84,6 +121,7 @@ def main(argv: list[str] | None = None) -> None:
     assert settings.storage is not None
 
     configure_logging(logs_dir=settings.storage.logs_dir, level=args.log_level)
+    runtime_lock: TextIO | None = acquire_runtime_lock() if settings.mode in {BotMode.PAPER, BotMode.LIVE} else None
     LOG.info(
         "Starting bot | mode=%s | profile=%s | symbol=%s | config_hash=%s",
         settings.mode.value,
@@ -118,6 +156,9 @@ def main(argv: list[str] | None = None) -> None:
             conn.close()
         except Exception:
             pass
+        if runtime_lock is not None:
+            with contextlib.suppress(Exception):
+                runtime_lock.close()
         LOG.info("Shutdown complete.")
 
 

@@ -40,6 +40,32 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Operational Hardening: M4-RUNTIME-SINGLE-INSTANCE-GUARD
+
+**Status:** READY_FOR_AUDIT - duplicate runtime prevention
+**Builder:** Codex
+**Decision date:** 2026-05-17
+**Branch:** `research/sweep-family-expansion-v1`
+**Docs:** `docs/operations/RUNTIME_INSTANCE_CONTROL.md`
+
+**Scope:** Prevent a second PAPER/LIVE bot runtime from starting through manual `nohup`, duplicate systemd launch, or operator race. This is operational hardening only: no strategy, governance, risk, execution, research, dashboard, collector, or diagnostic script behavior changes.
+
+**Deliverables:**
+- Application-level exclusive runtime lock in `main.py`
+- Configurable lock path via `BTC_BOT_RUNTIME_LOCK_PATH`
+- Tests for default path, env override, PID write, and duplicate-start rejection
+- Operations documentation for lock behavior and manual troubleshooting
+
+**Acceptance Criteria:**
+- Second PAPER/LIVE `main.py` instance exits non-zero with clear error
+- One-shot scripts, diagnostics, dashboard, collectors, and research harness remain unaffected
+- Lock releases automatically on process exit/crash
+- Focused tests pass
+- compileall clean
+- Claude Code audit required before PAPER deploy
+
+---
+
 ### Production: PAPER-TRADING-TRIAL-00095
 
 **Status:** LIVE_PAPER_TRADING - deployment audit PASS, trial-00095 active with guardrails
