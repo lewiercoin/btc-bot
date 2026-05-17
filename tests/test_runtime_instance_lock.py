@@ -45,3 +45,13 @@ def test_acquire_runtime_lock_writes_pid_and_blocks_second_instance(
         assert exc_info.value.code == 1
     finally:
         lock_fd.close()
+
+
+def test_acquire_runtime_lock_exits_when_lock_file_cannot_be_opened(tmp_path) -> None:
+    lock_dir = tmp_path / "not-a-directory"
+    lock_dir.write_text("blocks mkdir", encoding="utf-8")
+
+    with pytest.raises(SystemExit) as exc_info:
+        acquire_runtime_lock(lock_dir / "runtime.lock")
+
+    assert exc_info.value.code == 1
