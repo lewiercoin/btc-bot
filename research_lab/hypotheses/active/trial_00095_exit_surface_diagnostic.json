@@ -1,0 +1,107 @@
+{
+  "hypothesis_id": "trial_00095_exit_surface_diagnostic_v1",
+  "name": "Trial-00095 Exit Surface Diagnostic",
+  "class": "exit_filter",
+  "edge_rationale": "Trial-00095 already has a validated sweep/reclaim entry edge. This diagnostic tests whether the frozen baseline realized-R distribution is materially sensitive to simple winner or loser clipping, without changing entries, filters, governance, risk eligibility, or runtime behavior.",
+  "counterparty_or_market_mechanism": "If sweep/reclaim winners often continue after first profit and losers invalidate quickly, a simple exit policy may improve realized R distribution. If improvements are narrow, fold-unstable, or driven by a few outliers, the current edge is exit-sensitive only in-sample.",
+  "required_data": [
+    "trial_00095_params_from_research_store",
+    "btc_15m_replay_snapshot",
+    "frozen_trial_00095_entry_population"
+  ],
+  "timeframe": [
+    "15m"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "exit_family",
+      "values": [
+        "baseline_control",
+        "fixed_r",
+        "time_stop",
+        "breakeven_after_mfe",
+        "atr_trailing_after_mfe"
+      ]
+    },
+    {
+      "name": "target_r",
+      "values": [
+        1.5,
+        2.0,
+        2.5,
+        3.0
+      ]
+    },
+    {
+      "name": "max_hold_bars",
+      "values": [
+        16,
+        32,
+        48,
+        96
+      ]
+    },
+    {
+      "name": "breakeven_activation_r",
+      "values": [
+        1.0,
+        1.5
+      ]
+    },
+    {
+      "name": "trail_activation_r",
+      "values": [
+        1.5,
+        2.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab offline diagnostic only.",
+    "No production, PAPER, runtime, core, execution, orchestrator, or settings changes.",
+    "Entry population is frozen by replaying trial-00095 exact params.",
+    "No signal thresholds, entry filters, regime eligibility, governance, or risk gates may change.",
+    "Baseline control must be reported beside every diagnostic variant.",
+    "This V1 uses existing realized-R trade artifacts and is not a full intrabar exit replay.",
+    "Winner and loser clipping are diagnostic transformations, not executable exit policies.",
+    "MAE/MFE are diagnostics only and cannot approve a variant post hoc.",
+    "At most a hypothesis_for_future_validation verdict is allowed; no promotion-ready verdict."
+  ],
+  "expected_observation": "A useful diagnostic would show that a broad, simple transformation improves paired-trade ER by at least 10%, preserves or improves PF, reduces max DD or tail loss, survives 2x/3x cost stress, and is not driven by one outlier trade.",
+  "acceptance_criteria": {
+    "min_entry_count_match": 1.0,
+    "min_delta_er_pct": 0.1,
+    "min_pf_ratio_vs_baseline": 1.0,
+    "max_dd_ratio_vs_baseline": 1.0,
+    "min_median_delta_r": 0.0,
+    "min_folds_delta_er_positive": 3,
+    "max_top_trade_delta_share": 0.35,
+    "min_er_at_2x_cost": 1.0
+  },
+  "kill_criteria": {
+    "entry_count_mismatch": "Any variant that changes the entry population is invalid.",
+    "fold_instability": "Improvement in fewer than 2 chronological folds is not decision-grade.",
+    "sharp_surface": "A single isolated winning variant without neighboring support is treated as overfit.",
+    "cost_fragility": "If improvement disappears at 2x costs, no action is allowed.",
+    "methodology_bug": "Any changed entries, data leakage, treating realized-R clipping as executable exit proof, or post-hoc threshold rescue invalidates the run."
+  },
+  "failure_modes": [
+    "Small sample makes exit optimum look stronger than it is.",
+    "A few extreme winners dominate the delta.",
+    "Intrabar TP/SL ordering determines the apparent edge.",
+    "Time stops improve win rate cosmetically while reducing expectancy.",
+    "Trailing variants smooth equity but cut the positive tail."
+  ],
+  "out_of_scope": [
+    "Changing entry logic.",
+    "Changing trial-00095 params in settings.py.",
+    "Runtime, PAPER, or LIVE deployment.",
+    "Optuna or adaptive search.",
+    "New setup families.",
+    "Approval bundle generation."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}

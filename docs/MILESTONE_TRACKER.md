@@ -40,6 +40,40 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_V1
+
+**Status:** READY_FOR_AUDIT - diagnostic hypothesis for future validation
+**Builder:** Codex
+**Decision date:** 2026-05-18
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/trial_00095_exit_surface_diagnostic.json`
+**Report:** `docs/analysis/TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_2026-05-18.md`
+
+**Scope:** Research Lab-only diagnostic on frozen trial-00095 realized-R trade
+artifacts. This does not change entries, signal thresholds, governance, risk,
+runtime, PAPER/LIVE behavior, `settings.py`, `core/**`, `execution/**`, or
+`orchestrator.py`.
+
+**Methodology limit:** V1 is a distribution-clipping diagnostic using
+`research_lab/analysis_output/trial_00095_trades.json`, not a full intrabar exit
+replay. It can propose a future validation hypothesis, but it cannot approve an
+exit policy.
+
+**Result:**
+
+| Best Diagnostic | Trades | ER | Delta ER | PF | DD Ratio | Folds+ | 2x Cost ER | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---|
+| `LOSS_CAP_1.00R` | 274 | 2.346 | +0.225 (+10.6%) | 6.40 | 0.68 | 9 | 2.064 | `HYPOTHESIS_FOR_FUTURE_VALIDATION` |
+
+**Interpretation:** Trial-00095 appears sensitive to loss clipping: capping
+realized losers near -1R improves distribution metrics, while winner caps
+destroy expectancy. This is not deployable evidence because the current V1 does
+not replay executable intrabar exit mechanics. Next action, if pursued later, is
+a full frozen-entry intrabar replay milestone for tighter stop / early loss
+control only.
+
+---
+
 ### Research: TREND_PULLBACK_REACCEPT_FEASIBILITY_V1
 
 **Status:** READY_FOR_AUDIT - hypothesis failed quality gates

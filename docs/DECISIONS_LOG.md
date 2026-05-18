@@ -4,6 +4,17 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - Treat trial-00095 exit surface as diagnostic only
+**Decision:** Run `TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_V1` as an offline distribution diagnostic, not as an exit optimization or promotion candidate.
+
+**Reason:** Internal consultation flagged the small sample and intrabar-path limitations. The first safe step is to examine frozen trial-00095 realized-R outcomes for broad sensitivity, while preserving the entry population and leaving runtime untouched.
+
+**Result:** The diagnostic found that capping realized losses near -1R would improve ER by approximately +10.6%, PF to 6.40, and max DD ratio to 0.68 on the replay artifact. Winner caps degraded expectancy sharply. This supports only a future validation hypothesis around tighter loss control; it does not approve a runtime exit change.
+
+**Consequences:** Do not promote exit changes from this diagnostic. A future milestone would need full frozen-entry intrabar replay with adverse-first fills, exact entry/stop/TP reconstruction, cost stress, and audit.
+
+**Related:** `research_lab/analysis_trial_00095_exit_surface_diagnostic.py`; `docs/analysis/TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_2026-05-18.md`.
+
 ## 2026-05-18 - Test trend pullback reaccept only as offline research
 **Decision:** Approve `TREND_PULLBACK_REACCEPT_FEASIBILITY_V1` as a Research Lab-only feasibility milestone after external model consultation narrowed the broader Precision Flow Entry idea.
 
