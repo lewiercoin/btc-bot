@@ -4,6 +4,17 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - Test trend pullback reaccept only as offline research
+**Decision:** Approve `TREND_PULLBACK_REACCEPT_FEASIBILITY_V1` as a Research Lab-only feasibility milestone after external model consultation narrowed the broader Precision Flow Entry idea.
+
+**Reason:** Claude, Perplexity, DeepSeek, and internal sub-agent consultation converged on the same conclusion: the naive Precision Flow Entry score stack was not falsifiable and repeated prior failed CVD/flow/crowded paths. The narrowed test had a concrete trigger: BTC LONG-only 15m reacceptance of a pre-frozen equal-low support level inside a completed 4h EMA uptrend.
+
+**Consequences:** The milestone may write only Research Lab artifacts and reports. CVD, OI, funding, and force orders remain diagnostic-only. Runtime, `core/**`, `orchestrator.py`, `settings.py`, `execution/**`, and PAPER/LIVE behavior remain unchanged.
+
+**Result:** Offline feasibility failed quality gates decisively despite high frequency. Best variant produced 1257 trades with ER -0.392, PF 0.59, max DD 500.57R, and 0/4 WF folds with ER > 1. Do not rescue by widening or retuning thresholds.
+
+**Related:** `research_lab/hypotheses/active/trend_pullback_reaccept.json`; `docs/analysis/TREND_PULLBACK_REACCEPT_FEASIBILITY_2026-05-18.md`.
+
 ## 2026-04-09 — Preserve the restored signal-engine edge
 **Decision:** Keep the restored signal architecture as the baseline edge and do not casually rewrite `core/signal_engine.py`.
 
