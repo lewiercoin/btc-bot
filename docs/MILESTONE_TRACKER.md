@@ -40,6 +40,41 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Candidate Research Direction: PRECISION_FLOW_ENTRY_FEASIBILITY_V1
+
+**Status:** CANDIDATE - brainstorming / hypothesis-card consultation only
+**Builder:** TBD
+**Decision date:** TBD
+**Branch:** `research/sweep-family-expansion-v1`
+
+**Scope under consideration:** Research-only feasibility study for a non-sweep
+flow/structure setup that could complement trial-00095 in a future portfolio of
+setup families. The candidate direction is not approved for implementation yet.
+
+**Current framing:**
+- Keep trial-00095 sweep/reclaim as the active PAPER baseline.
+- Do not lower live/PAPER sweep thresholds based on this direction.
+- Do not touch `core/**`, `orchestrator.py`, `execution/**`, settings, or
+  paper/live runtime.
+- If approved later, the first step must be a Research Lab hypothesis card and
+  offline feasibility test only.
+
+**Open questions for hypothesis-card consultation:**
+- Can a structure-proximity plus order-flow setup avoid repeating the failed
+  absorption/CVD, crowded-unwind, compression-breakout, and 5m-overlay paths?
+- Should CVD be excluded, downgraded to diagnostic-only, or constrained to a
+  narrow secondary role?
+- What gates should prove this is a distinct setup rather than a lower-quality
+  variant of sweep/reclaim?
+- What overlap, concentration, cost-sensitivity, and walk-forward checks are
+  required before any future architecture discussion?
+
+**Do not infer:** This section does not open a milestone, approve a builder, or
+authorize code changes. It records the new strategic direction so future
+research planning stays separated from runtime work.
+
+---
+
 ### Operational Hardening: M4-RUNTIME-SINGLE-INSTANCE-GUARD
 
 **Status:** READY_FOR_AUDIT - duplicate runtime prevention
