@@ -40,6 +40,36 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: ETH_HISTORICAL_BACKFILL_PILOT_V1
+
+**Status:** READY_FOR_AUDIT - pilot backfill completed
+**Builder:** Codex
+**Decision date:** 2026-05-18
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/eth_historical_backfill_pilot.json`
+**Report:** `docs/analysis/ETH_HISTORICAL_BACKFILL_PILOT_2026-05-18.md`
+
+**Scope:** Research Lab data-engineering pilot only. The milestone writes ETHUSDT
+pilot data to a separate SQLite database under `research_lab/snapshots`, streams
+daily Binance Vision ZIPs day-by-day, discards raw archives after parsing, and
+checks a free-disk guard before writes. It does not write to production
+`storage/btc_bot.db`, change runtime, change `settings.py`, or touch
+`core/**`, `execution/**`, or `orchestrator.py`.
+
+**Result:**
+
+| Window | DB Size | Full 2022-2026 Estimate | 15m Missing | 4h Missing | OI Missing | Agg 60s Missing | Errors |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| 2026-05-15 to 2026-05-18 excl. | 0.77 MB | 0.39 GB | 0.00% | 0.00% | 0.00% | 0.00% | 0 |
+
+**Interpretation:** ETH full backfill looks operationally feasible if raw
+aggTrades archives are streamed and discarded. The storage footprint is small
+after aggregation, but a full 2022-2026 job still needs disk guards, resumable
+daily checkpoints, and a dataset audit before any ETH strategy transfer
+backtest.
+
+---
+
 ### Research: MULTI_ASSET_DATA_FEASIBILITY_V1
 
 **Status:** READY_FOR_AUDIT - ETH sample feasible, full backfill required

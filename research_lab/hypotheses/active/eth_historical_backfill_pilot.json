@@ -1,0 +1,85 @@
+{
+  "hypothesis_id": "eth_historical_backfill_pilot_v1",
+  "name": "ETH Historical Backfill Pilot",
+  "class": "diagnostic_only",
+  "edge_rationale": "ETH strategy transfer research requires a high-quality historical dataset. This pilot validates ingestion mechanics, disk usage slope, and quality metrics on a small ETHUSDT window before any full 2022-2026 backfill.",
+  "counterparty_or_market_mechanism": "No trading edge is tested. The diagnostic mechanism is data feasibility under operational constraints: separate research snapshot, daily ZIP streaming, disk guard, no raw archive persistence, and no runtime database writes.",
+  "required_data": [
+    "ETHUSDT daily 15m kline ZIP",
+    "ETHUSDT daily 4h kline ZIP",
+    "ETHUSDT daily metrics ZIP for open interest",
+    "ETHUSDT daily aggTrades ZIP aggregated into 60s and 15m buckets",
+    "ETHUSDT funding REST sample for pilot days"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "MULTI_ASSET_DATA_FEASIBILITY_V1",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "ETHUSDT"
+      ]
+    },
+    {
+      "name": "pilot_window",
+      "values": [
+        "2026-05-15_to_2026-05-18_exclusive"
+      ]
+    },
+    {
+      "name": "min_free_disk_gb",
+      "values": [
+        12.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab data-engineering pilot only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "Output must be a separate SQLite database under research_lab/snapshots.",
+    "The script must refuse runtime storage paths.",
+    "Disk guard must block if free space drops below the configured threshold.",
+    "Raw ZIP/CSV archives are not persisted.",
+    "ETH strategy backtest is out of scope until full backfill dataset is audited.",
+    "SOL remains out of scope."
+  ],
+  "expected_observation": "A successful pilot creates a small ETHUSDT research snapshot, reports row counts versus expected counts, measures DB size per day, estimates full 2022-2026 storage footprint, and leaves production runtime untouched.",
+  "acceptance_criteria": {
+    "output_path_under_research_lab_snapshots": true,
+    "min_free_disk_gb": 12.0,
+    "candles_15m_missing_rate_max": 0.01,
+    "candles_4h_missing_rate_max": 0.01,
+    "aggtrade_60s_missing_rate_max": 0.05,
+    "aggtrade_15m_missing_rate_max": 0.01,
+    "ohlc_errors": 0,
+    "duplicate_groups": 0
+  },
+  "kill_criteria": {
+    "disk_guard_triggered": "Abort rather than continue if free disk is below threshold.",
+    "runtime_db_path": "Any attempt to write to storage/btc_bot.db or runtime storage invalidates the milestone.",
+    "raw_archive_persistence": "Persisting raw ZIP/CSV archives invalidates the pilot.",
+    "quality_failure": "Material candle or aggtrade gaps block full backfill planning.",
+    "runtime_change": "Any runtime/core/settings change invalidates the milestone."
+  },
+  "failure_modes": [
+    "Daily aggTrades archives are too large for available disk/network if not streamed.",
+    "Pilot days are clean but older historical days may have archive schema drift.",
+    "Funding REST is available for recent pilot days but full historical funding needs separate pagination.",
+    "Linear DB size estimate understates peak temporary memory or download pressure."
+  ],
+  "out_of_scope": [
+    "Full 2022-2026 ETH backfill.",
+    "ETH strategy backtest.",
+    "SOL data work.",
+    "Writing to production runtime database.",
+    "Keeping raw ZIP or CSV archives.",
+    "Deployment recommendation."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}
