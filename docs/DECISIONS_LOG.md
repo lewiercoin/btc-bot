@@ -4,6 +4,15 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - Prepare ETH full dataset backfill as resumable guarded job
+**Decision:** Implement `ETH_HISTORICAL_BACKFILL_DATASET_V1` as a resumable daily-checkpoint runner before starting the full 2022-2026 ETH dataset job.
+
+**Reason:** The pilot proved storage footprint is small after aggregation, but full historical ingestion is still a long-running data job. Daily checkpoints, disk guards, separate research snapshot output, and explicit partial/final reports are required so the job can be run safely in chunks without touching the production runtime database.
+
+**Consequences:** ETH strategy transfer research remains blocked until the full dataset is materialized and audited. Running the dataset job should use `nice`/`ionice` on the server and can be resumed with `--max-days` chunks.
+
+**Related:** `research_lab/eth_historical_backfill_dataset.py`; `research_lab/hypotheses/active/eth_historical_backfill_dataset.json`.
+
 ## 2026-05-18 - ETH full backfill is operationally plausible with streaming archives
 **Decision:** Complete `ETH_HISTORICAL_BACKFILL_PILOT_V1` as a Research Lab data-engineering pilot, not an ETH strategy research approval.
 
