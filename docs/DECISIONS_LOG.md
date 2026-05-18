@@ -4,6 +4,15 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - Treat ETH multi-asset work as data-first, not strategy-first
+**Decision:** Run `MULTI_ASSET_DATA_FEASIBILITY_V1` before any ETH/SOL transfer backtest.
+
+**Reason:** The local research snapshot is BTC-only, so testing trial-00095 on ETH without first proving data availability would mix strategy research with data engineering risk. The ETH sample check found clean recent 15m/4h candles, funding, OI, and book ticker data, and confirmed Binance Vision archives for klines, metrics/OI, and aggTrades. ETHUSDT liquidation snapshots were not available at the probed archive path.
+
+**Consequences:** Do not start ETH strategy research yet. If this direction continues, the next milestone should be a full ETH historical backfill and dataset audit for 2022-2026 candles, funding, OI, and aggtrade-derived flow. Force-order/liquidation context should remain disabled or diagnostic unless a separate provider is validated.
+
+**Related:** `research_lab/analysis_multi_asset_data_feasibility.py`; `docs/analysis/MULTI_ASSET_DATA_FEASIBILITY_2026-05-18.md`.
+
 ## 2026-05-18 - Reject trial-00095 hard loss-control after intrabar validation
 **Decision:** Close `TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_V1` with builder verdict `FAIL_NO_ROBUST_IMPROVEMENT`, pending Claude Code audit.
 

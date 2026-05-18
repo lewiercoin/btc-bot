@@ -40,6 +40,48 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_DATA_FEASIBILITY_V1
+
+**Status:** READY_FOR_AUDIT - ETH sample feasible, full backfill required
+**Builder:** Codex
+**Decision date:** 2026-05-18
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/multi_asset_data_feasibility.json`
+**Report:** `docs/analysis/MULTI_ASSET_DATA_FEASIBILITY_2026-05-18.md`
+
+**Scope:** Research Lab data-quality diagnostic only. This milestone checks
+whether ETH multi-asset research is worth scheduling by inventorying the local
+BTC research snapshot and probing ETHUSDT public data sources. It does not
+persist market data, run ETH strategy research, change `settings.py`, or touch
+runtime, PAPER/LIVE, `core/**`, `execution/**`, or `orchestrator.py`.
+
+**Result:**
+
+| Symbol | Local Required Tables | API Families OK | Archive Families OK | Gate Verdict | Builder Verdict |
+|---|---:|---:|---:|---|---|
+| `ETHUSDT` | 0/5 | 100% | 75% | `MARGINAL` | `PASS_SAMPLE_SOURCE_FEASIBLE_FULL_BACKFILL_REQUIRED` |
+
+**Key findings:**
+- Existing research snapshot is BTC-only for candles, funding, OI, and
+  aggtrade buckets.
+- ETH 15m/4h candles, funding, OI, and book ticker samples are available and
+  clean in recent REST checks.
+- Binance Vision daily ZIP archives for ETH 15m klines, metrics/OI, and
+  aggTrades returned 200 for the probed day.
+- ETHUSDT liquidation snapshot archive returned 404, so force-order/liquidation
+  data should remain disabled or diagnostic unless a separate provider is
+  validated.
+- REST `aggTrades` is not adequate as a coverage proof because the 1000-trade
+  limit covers only a small slice of high-volume ETH activity; full TFI/CVD
+  reconstruction needs daily aggTrades archives.
+
+**Interpretation:** ETH data sourcing is plausible, but ETH strategy research is
+not ready yet. Next step, if approved, is an ETH historical backfill milestone
+for 2022-2026 candles, funding, OI, and aggtrade-derived 60s/15m buckets, plus
+an audit of the resulting dataset before any trial-00095 transfer backtest.
+
+---
+
 ### Research: TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_V1
 
 **Status:** READY_FOR_AUDIT - validation failed robust improvement gates
