@@ -4,6 +4,15 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - Reject trial-00095 hard loss-control after intrabar validation
+**Decision:** Close `TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_V1` with builder verdict `FAIL_NO_ROBUST_IMPROVEMENT`, pending Claude Code audit.
+
+**Reason:** The prior realized-R clipping diagnostic was promising but not executable evidence. The intrabar validation froze trial-00095 entries from exact replay, computed R from original entry/stop geometry, excluded the entry candle, and tested predeclared 15m post-entry hard stops around -1R. All tested hard-stop variants reduced expectancy by roughly 21-23%; the best (`HARD_STOP_0_90R`) stopped 19 eventual winners and improved no chronological fold.
+
+**Consequences:** Do not promote hard loss-control, tighter stop, or -1R clipping into runtime. Do not continue exit-policy design from this result unless Claude Code finds a methodology defect. Trial-00095 baseline exits remain unchanged while M4 monitoring continues.
+
+**Related:** `research_lab/analysis_trial_00095_loss_control_intrabar_validation.py`; `docs/analysis/TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_2026-05-18.md`.
+
 ## 2026-05-18 - Treat trial-00095 exit surface as diagnostic only
 **Decision:** Run `TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_V1` as an offline distribution diagnostic, not as an exit optimization or promotion candidate.
 

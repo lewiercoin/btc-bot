@@ -40,9 +40,46 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_V1
+
+**Status:** READY_FOR_AUDIT - validation failed robust improvement gates
+**Builder:** Codex
+**Decision date:** 2026-05-18
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/trial_00095_loss_control_intrabar_validation.json`
+**Report:** `docs/analysis/TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_2026-05-18.md`
+
+**Scope:** Research Lab-only validation of the prior `LOSS_CAP_1.00R`
+diagnostic. The milestone freezes trial-00095 entries from exact replay,
+computes R from original entry/stop geometry, and applies predeclared 15m
+post-entry hard loss-control thresholds. It does not change entries, signal
+thresholds, TP logic, governance, risk, runtime, PAPER/LIVE behavior,
+`settings.py`, `core/**`, `execution/**`, or `orchestrator.py`.
+
+**Methodology:** The entry candle itself is excluded because BacktestRunner
+opens positions after close checks for that snapshot. If a loss-control
+threshold is touched on a later 15m candle before the original baseline close,
+the variant exits there; otherwise the original baseline result is preserved.
+Winner caps, trailing stops, time stops, 5m overlays, and adaptive optimization
+are out of scope.
+
+**Result:**
+
+| Best Variant | Trades | ER | Delta ER | PF | DD Ratio | Triggered | Saved Losers | Stopped Winners | Folds+ | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---|
+| `HARD_STOP_0_90R` | 274 | 1.679 | -0.442 (-20.8%) | 3.14 | 1.01 | 128 | 13 | 19 | 0/9 | `FAIL_NO_ROBUST_IMPROVEMENT` |
+
+**Interpretation:** The prior distribution clipping result does not survive
+executable 15m intrabar validation. Hard loss controls around -1R cut too many
+eventual winners before the baseline exit and reduce ER by roughly 21-23%.
+Do not continue toward runtime exit-policy design from this evidence unless
+Claude Code identifies a methodology issue.
+
+---
+
 ### Research: TRIAL_00095_EXIT_SURFACE_DIAGNOSTIC_V1
 
-**Status:** READY_FOR_AUDIT - diagnostic hypothesis for future validation
+**Status:** CLOSED - audit PASS, diagnostic hypothesis for future validation
 **Builder:** Codex
 **Decision date:** 2026-05-18
 **Branch:** `research/sweep-family-expansion-v1`
@@ -65,12 +102,12 @@ exit policy.
 |---|---:|---:|---:|---:|---:|---:|---:|---|
 | `LOSS_CAP_1.00R` | 274 | 2.346 | +0.225 (+10.6%) | 6.40 | 0.68 | 9 | 2.064 | `HYPOTHESIS_FOR_FUTURE_VALIDATION` |
 
-**Interpretation:** Trial-00095 appears sensitive to loss clipping: capping
-realized losers near -1R improves distribution metrics, while winner caps
-destroy expectancy. This is not deployable evidence because the current V1 does
-not replay executable intrabar exit mechanics. Next action, if pursued later, is
-a full frozen-entry intrabar replay milestone for tighter stop / early loss
-control only.
+**Interpretation:** Trial-00095 appeared sensitive to realized-R loss clipping:
+capping realized losers near -1R improved distribution metrics, while winner
+caps destroyed expectancy. This was not deployable evidence because V1 did not
+replay executable intrabar exit mechanics. Follow-up
+`TRIAL_00095_LOSS_CONTROL_INTRABAR_VALIDATION_V1` tested that next step and
+failed robust improvement gates.
 
 ---
 
