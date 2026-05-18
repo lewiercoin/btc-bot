@@ -4,6 +4,15 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-18 - ETH full backfill is operationally plausible with streaming archives
+**Decision:** Complete `ETH_HISTORICAL_BACKFILL_PILOT_V1` as a Research Lab data-engineering pilot, not an ETH strategy research approval.
+
+**Reason:** The pilot wrote a separate ETHUSDT SQLite snapshot for 2026-05-15 to 2026-05-18, streamed daily Binance Vision ZIPs, discarded raw archives, and enforced a free-disk guard. The resulting aggregated DB was small (0.77 MB for 3 days, linear full-window estimate ~0.39 GB) with 0% missing 15m/4h candles, OI, and aggtrade buckets in the pilot window.
+
+**Consequences:** A full ETH 2022-2026 backfill is operationally plausible if implemented as a resumable daily streaming job with disk guards and no raw archive retention. ETH strategy transfer research remains blocked until the full dataset is materialized and audited.
+
+**Related:** `research_lab/eth_historical_backfill_pilot.py`; `docs/analysis/ETH_HISTORICAL_BACKFILL_PILOT_2026-05-18.md`.
+
 ## 2026-05-18 - Treat ETH multi-asset work as data-first, not strategy-first
 **Decision:** Run `MULTI_ASSET_DATA_FEASIBILITY_V1` before any ETH/SOL transfer backtest.
 
