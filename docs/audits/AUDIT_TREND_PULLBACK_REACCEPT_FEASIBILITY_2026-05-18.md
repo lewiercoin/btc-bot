@@ -7,54 +7,17 @@ Branch: research/sweep-family-expansion-v1
 Builder: Codex
 Milestone: TREND_PULLBACK_REACCEPT_FEASIBILITY_V1
 
-## Verdict: NEEDS_FIX
+## Verdict: PASS
 
-**Blocking issue:** Report file has uncommitted changes that alter results by ~4-5x (1257→5896 trades). Methodology integrity requires committed, final results before audit. Either commit corrected results with explanation, or revert uncommitted changes and re-audit.
+Milestone approved for closure with builder verdict **HYPOTHESIS_FAILED**. Do not promote to production. Do not rescue by threshold tuning.
 
-**If blocking issue is resolved:** Implementation is methodologically sound, lookahead-safe, and correctly implements hypothesis-failed research. See detailed assessment below.
-
----
-
-## Blocking Issue
-
-**Uncommitted changes to report:**
-
-```
-$ git status
- M docs/analysis/TREND_PULLBACK_REACCEPT_FEASIBILITY_2026-05-18.md
-
-$ git diff --stat docs/analysis/TREND_PULLBACK_REACCEPT_FEASIBILITY_2026-05-18.md
- 32 +++++++++++-----------
- 1 file changed, 16 insertions(+), 16 deletions(-)
-```
-
-**Committed (31884a0) vs Local Modified:**
-
-| Metric | Committed | Local | Delta |
-|---|---:|---:|---:|
-| Best variant trades | 1257 | 5896 | +4.7x |
-| Best variant ER | -0.392 | -0.382 | +2.6% |
-| Best variant PF | 0.587 | 0.598 | +1.9% |
-| Best variant Max DD | 500.57R | 2279.76R | +4.6x |
-| Ablation trades | 1605 | 14604 | +9.1x |
-
-**Impact:** Results differ materially. Trade count increased ~5x, drawdown increased ~5x. This suggests either:
-1. Analysis window changed (e.g., 2024-2026 subset → full 2022-2026)
-2. Bug was fixed and re-run performed
-3. Parameters changed post-commit
-
-**Methodology rule:** Results must be committed and final before audit. Post-commit changes without explanation violate reproducibility and anti-post-hoc-tuning principles.
-
-**Required fix:**
-1. **If local changes are corrections:** Commit them with explanation of what changed and why (bug fix? window extension?), then re-request audit
-2. **If committed version is correct:** Revert local changes, then proceed with audit of committed results
-3. **Do not audit** until committed file matches working tree
+**Resolution of initial blocking issue:** Report file has been restored to committed state. Uncommitted drift was from older pre-fix run without one-open-research-position guard. Committed version (31884a0) is correct: 1257 trades, 500.57R DD, 1605 ablation trades.
 
 ---
 
-## Conditional Assessment (if blocking issue resolved)
+## Assessment
 
-The assessment below is based on reading the committed code (31884a0) and assumes final results would follow the same methodology.
+Implementation is methodologically sound, lookahead-safe, and correctly concludes hypothesis failed quality gates.
 
 ### 1. Scope & Layer Separation: PASS
 
@@ -372,38 +335,61 @@ Documentation is complete and consistent with committed report.
 | Aspect | Status | Notes |
 |---|---|---|
 | Scope / layer separation | ✓ PASS | Research-only, no runtime/core/orchestrator/settings/execution changes |
-| Methodology integrity | ⚠ BLOCKED | Uncommitted report changes invalidate audit basis |
-| Lookahead / data leakage | ✓ PASS | Frozen level, 4h trend, entry timing, TFI timing all correct |
+| Methodology integrity | ✓ PASS | Gates pre-registered, coarse grid only, no post-hoc rescue, hypothesis card frozen |
+| Lookahead / data leakage | ✓ PASS | Frozen level ≥5 bars before trigger, 4h trend completed only, entry next 15m open, TFI current candle only |
 | Research harness correctness | ✓ PASS | One position at a time, metrics coherent, CVD/OI/funding diagnostic-only |
 | Result interpretation | ✓ PASS | HYPOTHESIS_FAILED is correct verdict, reject promotion is correct |
 | Tests | ✓ PASS | 27/27 passed, critical lookahead tests present, compileall clean |
 
-**Blocking issue:** Report file has 32 lines of uncommitted changes that alter results by ~4-5x. Cannot audit until committed file matches working tree.
+**Final result:**
+- Best variant: TPR_G0.010_B5_R0.08_TFI
+- Trades: 1257, ER: -0.392, PF: 0.59, Max DD: 500.57R
+- Gates failed: 5/9 (min_er, min_pf, max_dd, cost_sensitivity_2x, wf_folds_er_gt_1)
+- Overlap: 0.7% (distinct from trial-00095 but not profitable)
+- Verdict: HYPOTHESIS_FAILED
 
-**If blocking issue is resolved by committing corrected results:** Implementation is methodologically sound. Hypothesis failed quality gates decisively. Correct builder verdict is HYPOTHESIS_FAILED. Milestone can close with this verdict after audit PASS.
-
----
-
-## Required Action
-
-**Before re-audit:**
-
-1. **Commit final report** with explanation of changes (bug fix? window extension? parameter correction?)
-2. **Update MILESTONE_TRACKER** if numbers changed materially
-3. **Re-run tests** to verify corrected results
-4. **Re-request audit** with updated commit hash
-
-**Do not:**
-- Audit uncommitted work
-- Accept partial/draft reports
-- Mix committed and uncommitted results
-
-**Audit discipline:** Committed files are source of truth. Uncommitted changes mean milestone is not ready for final audit.
+**Implication:** Trend pullback reaccept setup does not have tradeable edge at 15m. Do not promote. Do not tune thresholds post-hoc. Hypothesis is falsified.
 
 ---
 
-**Audit status:** BLOCKED on methodology integrity
-**Required fix:** Commit final report or revert uncommitted changes
-**Re-audit:** After commit, re-request with new commit hash
+## Critical Issues
 
-Conditional verdict (if blocking issue resolved): **PASS for milestone closure with HYPOTHESIS_FAILED verdict**
+None.
+
+## Warnings
+
+None.
+
+## Observations
+
+### Uncommitted Drift Origin Explained
+
+Initial audit flagged uncommitted report changes (1257→5896 trades). Builder resolved by restoring committed version. Drift was from older pre-fix run without one-open-research-position guard, which allowed overlapping trades and inflated counts by ~4-5x. Committed version with guard is correct.
+
+### TFI Did Not Rescue Structure Thesis
+
+No-TFI ablation (1605 trades, ER -0.408) performed similarly to TFI-filtered variants (1257-1450 trades, ER -0.392 to -0.421). This confirms TFI confirmation added no incremental edge over structure + 4h trend alone.
+
+### Low Overlap Confirms Distinctness But Not Edge
+
+Overlap with trial-00095 was 0.7%, proving this setup captures different events than sweep/reclaim. However, distinctness does not imply edge. The setup trades different market structures, but those structures are not profitable to trade.
+
+---
+
+## Recommended Next Step
+
+**APPROVE milestone closure with HYPOTHESIS_FAILED verdict.**
+
+Trend pullback reaccept feasibility study is complete. Hypothesis failed quality gates decisively. Do not promote to production. Do not attempt threshold rescue. Close milestone and record result.
+
+**Strategic implication:** Two independent non-sweep setup attempts have now failed (5m multi-candle events, trend pullback reaccept). Frequency problem remains unsolved. Consider:
+- Wait for M4 checkpoint (2026-06-13) before next research direction
+- Evaluate ETH multi-asset feasibility as alternative frequency source
+- Accept trial-00095 sweep/reclaim as bounded-frequency baseline and focus on live validation
+
+---
+
+**Audit status:** DONE
+**Milestone verdict:** HYPOTHESIS_FAILED (builder verdict confirmed)
+**Deployment verdict:** N/A (research-only, no promotion)
+**Close milestone:** YES
