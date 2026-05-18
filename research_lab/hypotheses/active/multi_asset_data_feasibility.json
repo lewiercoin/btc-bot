@@ -1,0 +1,84 @@
+{
+  "hypothesis_id": "multi_asset_data_feasibility_v1",
+  "name": "Multi-Asset Data Feasibility",
+  "class": "diagnostic_only",
+  "edge_rationale": "Before testing whether trial-00095-style sweep/reclaim transfers from BTC to ETH or SOL, the project must verify that non-BTC historical data can be sourced with quality comparable to the existing BTC research snapshot.",
+  "counterparty_or_market_mechanism": "No trading edge is tested in this milestone. The mechanism under evaluation is data feasibility: whether candles, funding, open interest, aggtrade-derived flow, and optional liquidation context are available, timestamp-clean, and alignable for offline research.",
+  "required_data": [
+    "local_research_snapshot_inventory",
+    "ETHUSDT_15m_klines_sample",
+    "ETHUSDT_4h_klines_sample",
+    "ETHUSDT_funding_sample",
+    "ETHUSDT_open_interest_sample",
+    "ETHUSDT_aggtrade_bucket_sample",
+    "Binance_Vision_archive_probe"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "trial-00095 BTCUSDT research snapshot",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "ETHUSDT"
+      ]
+    },
+    {
+      "name": "sample_window",
+      "values": [
+        "recent_7d_for_candles_funding_oi",
+        "recent_1h_for_aggtrade_60s"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab data-quality diagnostic only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "No market data is persisted by this milestone.",
+    "ETH strategy research is not approved by a clean sample alone.",
+    "Full 2022-2026 backfill and separate data audit are required before any ETH transfer backtest.",
+    "Force-order/liquidation data remains optional and diagnostic unless archive coverage is separately proven.",
+    "SOL is deferred until ETH source feasibility is understood."
+  ],
+  "expected_observation": "A useful result identifies whether ETHUSDT source APIs and daily archives are available and whether recent samples pass basic timestamp, missingness, duplicate, OHLC, volume, funding, OI, and aggtrade checks.",
+  "acceptance_criteria": {
+    "api_families_ok": 1.0,
+    "max_candles_15m_missing_rate": 0.01,
+    "max_candles_4h_missing_rate": 0.01,
+    "candles_15m_quality_errors": 0,
+    "candles_15m_duplicates": 0,
+    "min_funding_rows": 10,
+    "min_open_interest_rows": 100,
+    "min_aggtrade_rows": 45,
+    "min_archive_families_ok": 0.75
+  },
+  "kill_criteria": {
+    "api_unavailable": "Any required recent sample family unavailable blocks data feasibility.",
+    "candle_quality_failure": "OHLC violations, duplicate candles, or more than 1% missing 15m/4h candles blocks the direction.",
+    "flow_unavailable": "No aggtrade-derived flow sample blocks trial-00095 transfer research because TFI/CVD features cannot be reconstructed.",
+    "archive_coverage_risk": "Archive family coverage below 75% makes full 2022-2026 backfill inconclusive until a provider plan exists.",
+    "runtime_change": "Any runtime/core/settings/data persistence change invalidates this milestone."
+  },
+  "failure_modes": [
+    "Public REST samples are clean but historical archives are missing or inconsistent.",
+    "Open interest history has lookback/API limitations that require data.binance.vision ZIP ingestion.",
+    "Aggtrade coverage is too expensive or incomplete for 2022-2026 TFI reconstruction.",
+    "Liquidation snapshots differ by symbol or venue and cannot be used as a primary feature.",
+    "Sample quality looks good only for recent days and does not represent historical backfill quality."
+  ],
+  "out_of_scope": [
+    "ETH or SOL strategy backtest.",
+    "Full historical backfill.",
+    "Writing sampled market data into SQLite.",
+    "Changing settings.py symbol.",
+    "Changing runtime, PAPER, LIVE, core, orchestrator, risk, or execution behavior.",
+    "Multi-asset portfolio risk design.",
+    "Deployment recommendation."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}
