@@ -1,0 +1,100 @@
+{
+  "hypothesis_id": "trend_pullback_reaccept_v1",
+  "name": "BTC 15m Trend Pullback Reaccept",
+  "class": "timeframe_feasibility",
+  "edge_rationale": "In a confirmed 4h uptrend, a controlled multi-bar pullback into a pre-existing 15m equal-low support level followed by a 15m close back above that frozen level may indicate trend-continuation reacceptance without requiring liquidity-sweep geometry.",
+  "counterparty_or_market_mechanism": "Weak longs and late counter-trend shorts transact into the pullback near visible support. A subsequent close back above the frozen level can trap late shorts and confirm that the pullback was absorbed without making CVD, force orders, or OI the primary edge.",
+  "required_data": [
+    "btc_15m_candles",
+    "btc_4h_candles",
+    "btc_aggtrade_60s",
+    "trial_00095_reference"
+  ],
+  "timeframe": [
+    "15m",
+    "4h"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "ema_gap_pct_threshold",
+      "values": [
+        0.006,
+        0.01
+      ]
+    },
+    {
+      "name": "pullback_max_bars",
+      "values": [
+        3,
+        5
+      ]
+    },
+    {
+      "name": "reclaim_buffer_atr",
+      "values": [
+        0.05,
+        0.08
+      ]
+    },
+    {
+      "name": "tfi_threshold",
+      "values": [
+        0.05
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "BTC LONG-only in V1.",
+    "Research Lab offline feasibility only.",
+    "No production, PAPER, runtime, core, execution, orchestrator, or settings changes.",
+    "15m trigger evaluation uses closed bars only; entry is the next 15m open.",
+    "4h EMA trend filter uses completed 4h candles only.",
+    "Equal-low support must be frozen at least 5 completed 15m bars before the trigger bar.",
+    "Pullback must occur before the trigger bar, not only as a wick on the trigger bar.",
+    "CVD, funding, OI, and force-order fields are diagnostic-only and cannot decide pass/fail.",
+    "No post-hoc threshold rescue after seeing OOS results.",
+    "Exit model is fixed before run: stop below frozen support, fixed-R target, and max-hold timeout."
+  ],
+  "expected_observation": "If the setup works, it should produce at least 60 OOS-equivalent trades, ER >= 1.5, PF >= 1.8, max drawdown <= 6R, acceptable cost sensitivity, and low overlap with trial-00095 while preserving a distinct trend-pullback mechanism.",
+  "acceptance_criteria": {
+    "min_oos_trades": 60,
+    "min_expectancy_r": 1.5,
+    "min_profit_factor": 1.8,
+    "max_drawdown_r": 6.0,
+    "min_er_at_2x_cost": 0.5,
+    "max_timeout_share": 0.4,
+    "max_month_trade_share": 0.5,
+    "min_wf_folds_er_gt_1": 3,
+    "max_overlap_vs_trial_00095": 0.3
+  },
+  "kill_criteria": {
+    "oos_trades_below": 40,
+    "expectancy_r_below": 1.0,
+    "max_drawdown_above": 8.0,
+    "er_at_15x_cost_below": 0.0,
+    "timeout_share_above": 0.6,
+    "single_month_trade_share_above": 0.6,
+    "overlap_vs_trial_00095_above": 0.5,
+    "methodology_bug": "Any lookahead, future structure confirmation, mutable OOS protocol, or data leakage invalidates the run."
+  },
+  "failure_modes": [
+    "Frozen equal-low levels are too broad and capture generic pullbacks instead of meaningful support.",
+    "Reacceptance close occurs too late and produces poor R/R at the next 15m open.",
+    "TFI confirmation adds no incremental value over structure plus 4h trend.",
+    "Trades concentrate in one month or volatility cluster.",
+    "Overlap with trial-00095 is high, meaning the setup is not a distinct portfolio candidate."
+  ],
+  "out_of_scope": [
+    "SHORT direction.",
+    "5m overlay or 5m runtime migration.",
+    "CVD as scoring or trigger.",
+    "OI, funding, or force orders as scoring or trigger.",
+    "Multi-setup runtime arbitration.",
+    "Production or PAPER deployment.",
+    "Adaptive optimization, Optuna search, or LLM-selected thresholds."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}

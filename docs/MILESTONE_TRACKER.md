@@ -40,38 +40,43 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
-### Candidate Research Direction: PRECISION_FLOW_ENTRY_FEASIBILITY_V1
+### Research: TREND_PULLBACK_REACCEPT_FEASIBILITY_V1
 
-**Status:** CANDIDATE - brainstorming / hypothesis-card consultation only
-**Builder:** TBD
-**Decision date:** TBD
+**Status:** READY_FOR_AUDIT - hypothesis failed quality gates
+**Builder:** Codex
+**Decision date:** 2026-05-18
 **Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/trend_pullback_reaccept.json`
+**Report:** `docs/analysis/TREND_PULLBACK_REACCEPT_FEASIBILITY_2026-05-18.md`
 
-**Scope under consideration:** Research-only feasibility study for a non-sweep
-flow/structure setup that could complement trial-00095 in a future portfolio of
-setup families. The candidate direction is not approved for implementation yet.
+**Scope:** Research-only feasibility study for a non-sweep BTC LONG trend
+pullback setup that could complement trial-00095 if it passed. The setup uses
+15m closed-bar reacceptance of a pre-frozen equal-low support level inside a
+completed 4h EMA uptrend. No production, PAPER, runtime, core, execution,
+orchestrator, or settings changes.
 
-**Current framing:**
-- Keep trial-00095 sweep/reclaim as the active PAPER baseline.
-- Do not lower live/PAPER sweep thresholds based on this direction.
-- Do not touch `core/**`, `orchestrator.py`, `execution/**`, settings, or
-  paper/live runtime.
-- If approved later, the first step must be a Research Lab hypothesis card and
-  offline feasibility test only.
+**Protocol:**
+- BTC LONG-only V1; SHORT out of scope.
+- Entry at next 15m open after reclaim close.
+- Equal-low level must be frozen at least 5 completed 15m bars before trigger.
+- 4h trend uses completed 4h candles only.
+- CVD, OI, funding, and force orders are diagnostic-only.
+- Coarse grid only: 8 candidate variants plus one no-TFI ablation.
+- One simulated research position at a time; overlapping signal spam blocked.
 
-**Open questions for hypothesis-card consultation:**
-- Can a structure-proximity plus order-flow setup avoid repeating the failed
-  absorption/CVD, crowded-unwind, compression-breakout, and 5m-overlay paths?
-- Should CVD be excluded, downgraded to diagnostic-only, or constrained to a
-  narrow secondary role?
-- What gates should prove this is a distinct setup rather than a lower-quality
-  variant of sweep/reclaim?
-- What overlap, concentration, cost-sensitivity, and walk-forward checks are
-  required before any future architecture discussion?
+**Results:**
 
-**Do not infer:** This section does not open a milestone, approve a builder, or
-authorize code changes. It records the new strategic direction so future
-research planning stays separated from runtime work.
+| Best Variant | Trades | ER | PF | Max DD R | 2x Cost ER | WF Folds ER > 1 | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| `TPR_G0.010_B5_R0.08_TFI` | 1257 | -0.392 | 0.59 | 500.57 | -0.810 | 0/4 | `FAIL` |
+
+**Gate outcome:** Frequency passed but quality failed decisively. The no-TFI
+ablation also failed, so TFI confirmation did not rescue the structure thesis.
+Overlap with trial-00095 was low, confirming distinctness but not edge.
+
+**Builder conclusion:** `TREND_PULLBACK_REACCEPT_FEASIBILITY_V1` is ready for
+Claude Code audit with builder verdict `HYPOTHESIS_FAILED`. Do not promote,
+do not tune thresholds post hoc, and do not move this setup toward runtime.
 
 ---
 
