@@ -1,0 +1,88 @@
+{
+  "hypothesis_id": "eth_historical_backfill_dataset_v1",
+  "name": "ETH Historical Backfill Dataset",
+  "class": "diagnostic_only",
+  "edge_rationale": "ETH strategy transfer research requires a complete, audited ETHUSDT historical dataset comparable to the BTC research snapshot. This milestone materializes that dataset with resumable daily checkpoints and quality gates.",
+  "counterparty_or_market_mechanism": "No trading edge is tested. The milestone validates whether ETHUSDT 2022-2026 market data can be built as a deterministic research snapshot without contaminating runtime storage.",
+  "required_data": [
+    "ETHUSDT 15m kline daily ZIPs",
+    "ETHUSDT 4h kline daily ZIPs",
+    "ETHUSDT metrics daily ZIPs for open interest",
+    "ETHUSDT aggTrades daily ZIPs aggregated to 60s and 15m buckets",
+    "ETHUSDT funding REST history"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "ETH_HISTORICAL_BACKFILL_PILOT_V1",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "ETHUSDT"
+      ]
+    },
+    {
+      "name": "date_range",
+      "values": [
+        "2022-01-01_to_2026-03-28_exclusive"
+      ]
+    },
+    {
+      "name": "min_free_disk_gb",
+      "values": [
+        12.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab dataset milestone only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "Output must be a separate SQLite database under research_lab/snapshots.",
+    "Daily checkpoints must make the job resumable.",
+    "Raw ZIP/CSV archives are not persisted.",
+    "Disk guard must remain active before each day is processed.",
+    "ETH strategy transfer backtest is out of scope until this dataset is complete and audited.",
+    "SOL remains out of scope."
+  ],
+  "expected_observation": "A successful run creates a complete ETHUSDT 2022-2026 research snapshot with explicit daily checkpoints, low missing rates, zero duplicate groups, zero OHLC errors, and no failed days.",
+  "acceptance_criteria": {
+    "done_days_match_expected_days": true,
+    "failed_days": 0,
+    "candles_15m_missing_rate_max": 0.01,
+    "candles_4h_missing_rate_max": 0.01,
+    "open_interest_missing_rate_max": 0.01,
+    "aggtrade_60s_missing_rate_max": 0.05,
+    "aggtrade_15m_missing_rate_max": 0.01,
+    "ohlc_errors": 0,
+    "duplicate_groups": 0,
+    "min_free_disk_gb": 12.0
+  },
+  "kill_criteria": {
+    "runtime_db_path": "Any write to storage/btc_bot.db or runtime storage invalidates the milestone.",
+    "disk_guard_triggered": "If disk guard blocks, stop and report partial progress rather than continue.",
+    "raw_archive_persistence": "Persisting raw ZIP/CSV archives invalidates the dataset milestone.",
+    "unresolved_failed_days": "Any failed day must be resolved before dataset can be audit-ready.",
+    "strategy_claim": "Any ETH strategy result or runtime approval claim is out of scope."
+  },
+  "failure_modes": [
+    "Historical archive schema changes on older days.",
+    "Funding REST historical pagination or availability differs from daily archive data.",
+    "A few high-volume days create temporary memory pressure during aggTrades aggregation.",
+    "Partial run is mistaken for complete dataset.",
+    "Quality report uses expected counts for the wrong date window."
+  ],
+  "out_of_scope": [
+    "ETH trial-00095 transfer backtest.",
+    "SOL data work.",
+    "Runtime multi-asset portfolio design.",
+    "Writing to production runtime database.",
+    "Keeping raw ZIP or CSV archives.",
+    "Deployment recommendation."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}

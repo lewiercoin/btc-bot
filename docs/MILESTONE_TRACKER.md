@@ -40,6 +40,35 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: ETH_HISTORICAL_BACKFILL_DATASET_V1
+
+**Status:** RUNNER_READY - awaiting full guarded server backfill
+**Builder:** Codex
+**Decision date:** 2026-05-18
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/eth_historical_backfill_dataset.json`
+**Runner:** `research_lab/eth_historical_backfill_dataset.py`
+
+**Scope:** Research Lab dataset milestone only. The runner creates a separate
+ETHUSDT SQLite dataset under `research_lab/snapshots`, streams daily Binance
+Vision ZIPs, discards raw archives, enforces a free-disk guard before each day,
+and records resumable per-day checkpoints. It does not write to production
+`storage/btc_bot.db`, change runtime, change `settings.py`, or touch `core/**`,
+`execution/**`, or `orchestrator.py`.
+
+**Current state:** Runner and tests are implemented. A local 1-day smoke run
+validated checkpoint creation, partial-report generation, and parser wiring.
+Full 2022-2026 dataset generation still needs to run on the server in guarded
+chunks, then produce a final dataset quality report for Claude Code audit.
+
+**Required before ETH strategy research:**
+- `DONE` checkpoint for every day from 2022-01-01 to 2026-03-28 exclusive.
+- 0 unresolved failed days.
+- Missing-rate and duplicate/OHLC quality report.
+- Separate Claude Code dataset audit.
+
+---
+
 ### Research: ETH_HISTORICAL_BACKFILL_PILOT_V1
 
 **Status:** READY_FOR_AUDIT - pilot backfill completed
