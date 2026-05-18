@@ -1,0 +1,82 @@
+{
+  "hypothesis_id": "trial_00095_loss_control_intrabar_validation_v1",
+  "name": "Trial-00095 Loss-Control Intrabar Validation",
+  "class": "exit_filter",
+  "edge_rationale": "The prior exit-surface diagnostic suggested trial-00095 benefits from clipping losses near -1R while preserving winner tails. This milestone validates whether that effect survives conservative 15m intrabar replay on frozen trial-00095 entries using original entry/stop geometry.",
+  "counterparty_or_market_mechanism": "Sweep/reclaim winners may need uncapped continuation, while failed reclaims may invalidate quickly. A tighter loss-side control could reduce left-tail damage without changing the entry edge if adverse movement to the predeclared threshold occurs before the original baseline close.",
+  "required_data": [
+    "trial_00095_params_from_research_store",
+    "btc_15m_replay_snapshot",
+    "frozen_trial_00095_entries",
+    "original_entry_price_and_stop_loss",
+    "15m_ohlc_path_between_entry_and_baseline_close"
+  ],
+  "timeframe": [
+    "15m"
+  ],
+  "baseline_reference": "trial-00095",
+  "variables": [
+    {
+      "name": "loss_control_variant",
+      "values": [
+        "BASELINE_REPLAY",
+        "HARD_STOP_0_75R",
+        "HARD_STOP_0_90R",
+        "HARD_STOP_1_00R",
+        "HARD_STOP_1_10R"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab offline validation only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "Entries are frozen from trial-00095 exact parameter replay before variants are applied.",
+    "R is computed from original entry_price and original stop_loss, not from realized pnl_r.",
+    "Variants only add hard loss-side thresholds and do not cap winners.",
+    "If a loss-control threshold is touched on a post-entry 15m candle before original baseline close, the variant exits there.",
+    "The entry candle itself is excluded because BacktestRunner opens positions after close checks for that snapshot.",
+    "If threshold is not touched, original baseline pnl_r and exit reason are preserved.",
+    "No entry filters, signal thresholds, governance, risk eligibility, TP ladder, or winner duration changes.",
+    "Same-candle recovery is not credited after loss threshold touch; loss control is adverse-first.",
+    "At most a future exit-research validation verdict is allowed; no promotion-ready verdict."
+  ],
+  "expected_observation": "A useful result would show that a broad loss-control band around -1R improves paired ER, PF, drawdown, left-tail losses, and cost-stressed ER across chronological folds while preserving the frozen entry count and winner tail.",
+  "acceptance_criteria": {
+    "entry_count_match": 1.0,
+    "baseline_artifact_count_match": 1.0,
+    "min_delta_er": 0.0,
+    "min_pf_ratio_vs_baseline": 1.0,
+    "max_dd_ratio_vs_baseline": 1.0,
+    "min_folds_delta_er_positive": 6,
+    "max_top_trade_delta_share": 0.35,
+    "min_er_at_2x_cost": 1.0,
+    "missing_candle_trade_count": 0
+  },
+  "kill_criteria": {
+    "entry_count_mismatch": "Any variant that changes the frozen entry population is invalid.",
+    "replay_mismatch": "If baseline replay does not match the prior diagnostic artifact count, the milestone is inconclusive until resolved.",
+    "winner_cap": "Any variant that caps winners without a prior loss-threshold touch is invalid.",
+    "methodology_bug": "Any R calculation from realized pnl_r, post-hoc threshold rescue, favorable intrabar ordering, or silent missing-candle drop invalidates the run.",
+    "deployment_claim": "Any promotion-ready or runtime deployment claim is invalid for this milestone."
+  },
+  "failure_modes": [
+    "The distribution clipping effect was caused by realized-R accounting and is not executable on 15m OHLC.",
+    "Hard loss thresholds trigger too often before eventual winners and reduce expectancy.",
+    "The original baseline stop is already the executable -1R boundary, leaving no meaningful loss-control improvement.",
+    "Results depend on baseline replay mismatch rather than exit behavior.",
+    "Improvement concentrates in one half-year fold or one large saved loser."
+  ],
+  "out_of_scope": [
+    "Changing entry logic.",
+    "Changing trial-00095 params in settings.py.",
+    "Changing runtime, PAPER, LIVE, core, orchestrator, risk, or execution behavior.",
+    "Adding trailing stops, breakeven moves, time stops, TP changes, partial-exit changes, or winner caps.",
+    "Running 5m or lower-timeframe confirmation.",
+    "Optuna or adaptive threshold search.",
+    "Approval bundle generation.",
+    "Deployment recommendation."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-18T00:00:00+00:00",
+  "status": "ACTIVE"
+}
