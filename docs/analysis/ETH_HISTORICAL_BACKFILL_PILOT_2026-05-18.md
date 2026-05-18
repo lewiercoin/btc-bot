@@ -6,11 +6,11 @@
 
 ## Guardrails
 
-- Hostname: `DESKTOP-OK55MBG`
-- Output DB: `research_lab\snapshots\ethusdt_backfill_pilot_2026-05-15_2026-05-18.db`
+- Hostname: `ubuntu-btc-bot`
+- Output DB: `research_lab/snapshots/ethusdt_backfill_pilot_2026-05-15_2026-05-18.db`
 - Disk guard minimum free space: 12.0 GB
-- Free disk before: 25.72 GB
-- Free disk after: 25.72 GB
+- Free disk before: 27.07 GB
+- Free disk after: 27.07 GB
 - Raw ZIP files are streamed in memory per day and discarded after parsing.
 - Production `storage/btc_bot.db` and PAPER bot runtime are untouched.
 
