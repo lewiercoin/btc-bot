@@ -42,12 +42,14 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: ETH_NEAR_MISS_MONITORING_DESIGN_V1
 
-**Status:** READY_FOR_AUDIT_DESIGN_ONLY
+**Status:** CLOSED - audit PASS, design ready to guide post-M4 ETH shadow implementation
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/eth_near_miss_monitoring_design.json`
 **Blueprint:** `docs/blueprints/ETH_NEAR_MISS_MONITORING_DESIGN_V1_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_ETH_NEAR_MISS_MONITORING_DESIGN_2026-05-19.md`
 
 **Scope:** Design-only contract for future ETH shadow/no-order near-miss
 monitoring. No runtime implementation, ETH PAPER, LIVE deployment, storage
@@ -71,7 +73,18 @@ considered.
 - BTC M4 and ETH shadow reports must remain symbol-separated and cannot be
   aggregated into one threshold conclusion.
 
-**Builder verdict:** `READY_FOR_AUDIT_DESIGN_ONLY`
+**Audit verdict:** PASS (design-only, implementation-ready)
+
+**Audit summary:**
+- Design-only scope: PASS (no runtime changes, explicit non-goals)
+- BTC M4 blocker: PASS (required deployment sequence, BTC M4 must complete first)
+- ETH/BTC separation: PASS (separate reports, no aggregation, Day 3/30 verification)
+- ETH near-miss payload: PASS (nested sweep_depth_pct mandatory, matches corrected BTC M4)
+- Checkpoints concrete: PASS (Day 3 operational, Day 14 shadow, Day 30 PAPER-readiness)
+- Threshold blocker: PASS (requires separate ETH_SWEEP_DEPTH_THRESHOLD_STABILITY_V1 + audit)
+- No ETH PAPER approval: PASS (Day 30 audit + user approval required)
+
+**Next:** Design ready to guide post-M4 ETH shadow implementation if user proceeds.
 
 ---
 
