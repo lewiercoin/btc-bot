@@ -4,6 +4,23 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Start BTC+ETH portfolio diagnostic before architecture design
+**Decision:** Start `MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1` after Claude Code
+passed the ETH transfer feasibility audit.
+
+**Reason:** ETH transfer evidence is strong, but runtime architecture should not
+be designed from standalone metrics alone. The next research-only step is to
+measure BTC+ETH interaction: daily PnL correlation, same-15m signal overlap,
+combined R drawdown, concentration, and simple conflict policies.
+
+**Consequences:** This milestone may recommend a later multi-asset architecture
+design if gates pass. It does not approve ETH runtime trading, multi-asset PAPER,
+portfolio execution, or any runtime code change.
+
+**Related:** `research_lab/multi_asset_portfolio_diagnostic.py`;
+`research_lab/hypotheses/active/multi_asset_portfolio_diagnostic.json`;
+`docs/analysis/MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_2026-05-19.md`.
+
 ## 2026-05-19 - Start ETH trial-00095 transfer feasibility
 **Decision:** Start `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1` after Claude Code
 passed the ETH historical dataset audit.

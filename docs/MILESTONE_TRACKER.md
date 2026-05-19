@@ -40,9 +40,38 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1
+
+**Status:** ACTIVE - implementation ready, awaiting server diagnostic run
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/multi_asset_portfolio_diagnostic.json`
+**Runner:** `research_lab/multi_asset_portfolio_diagnostic.py`
+**Report:** `docs/analysis/MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_2026-05-19.md`
+
+**Scope:** Research Lab offline portfolio diagnostic only. Combine frozen BTC
+trial-00095 full replay trades with audited ETH trial-00095 transfer trades to
+measure combined R metrics, daily PnL correlation, same-15m signal overlap,
+trade concentration, and simple conflict policies. No runtime architecture,
+PAPER deployment, `core/**`, `execution/**`, `orchestrator.py`, or `settings.py`
+change is in scope.
+
+**Internal consultation summary:** Measure portfolio interaction before runtime
+design. If gates pass, the next milestone should be architecture design for
+aggregate risk, sizing, symbol-level cooldowns, and conflict handling. If gates
+fail, do not proceed to runtime design.
+
+**Required before completion:**
+- Generate ETH transfer trade artifact on server from audited ETH snapshot.
+- Generate portfolio diagnostic report.
+- Commit/push report and request Claude Code audit.
+
+---
+
 ### Research: ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1
 
-**Status:** READY_FOR_AUDIT - transfer candidate passed preregistered gates
+**Status:** CLOSED - audit PASS, ETH transfer validated
 **Builder:** Codex
 **Decision date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
