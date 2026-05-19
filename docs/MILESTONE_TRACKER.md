@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_FULL_PIPELINE_REPLAY_V1
 
-**Status:** READY_FOR_AUDIT - offline full-pipeline regeneration complete
+**Status:** CLOSED - audit PASS, pipeline regeneration validated
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Runner:** `research_lab/multi_asset_full_pipeline_replay.py`
 **Tests:** `tests/test_multi_asset_full_pipeline_replay.py`
 **Report:** `docs/analysis/MULTI_ASSET_FULL_PIPELINE_REPLAY_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_FULL_PIPELINE_REPLAY_2026-05-19.md`
 
 **Scope:** Research Lab offline validation only. Regenerate BTC and ETH
 trial-00095 trades through the existing single-symbol backtest pipeline on
@@ -78,9 +80,22 @@ artifacts before any post-M4 runtime decision.
 - Runtime integration remains blocked until M4 checkpoint and later audited
   runtime milestones.
 
-**Audit request:** Claude Code should audit methodology, layer isolation,
-temporary DB safety, frozen trial-00095 parameter handling, and whether the
-builder verdict `PASS_FULL_PIPELINE_REPLAY_FOR_RUNTIME_SCOPING` is supported.
+**Audit verdict:** PASS (pipeline regeneration validated)
+
+**Audit summary:**
+- Layer separation: PASS (research_lab/ only, no runtime changes, BTC PAPER unchanged)
+- Contract compliance: PASS (frozen trial-00095, only symbol changes, pipeline reuse correct)
+- Determinism: PASS (temp DB safety, source datasets protected, cleanup in finally block)
+- State integrity: PASS (EXACT MATCH with Phase 2: 696 trades, ER 1.955, PF 3.60, max DD 13.74R)
+- Error handling: PASS (trade validation, gate evaluation, temp cleanup)
+- Test coverage: PASS (3 tests: trade conversion, gate evaluation, verdict logic)
+
+**Key validation:** Pipeline regeneration produced exact match with Phase 2 artifact
+replay. Proves Phase 2 artifacts weren't accidental. Source datasets + frozen params
+reproduce same portfolio result.
+
+**Next milestone decision:** User decides after M4 checkpoint (2026-06-13, 25 days).
+Path A (runtime integration) still recommended.
 
 ---
 
