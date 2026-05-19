@@ -42,9 +42,10 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1
 
-**Status:** PHASE_2_READY_FOR_AUDIT - artifact-driven stateful replay complete
+**Status:** CLOSED - audit PASS, offline state/gate validation complete
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/multi_asset_state_and_backtest_implementation.json`
 **Implementation:** `research_lab/models/portfolio_state.py`;
@@ -52,6 +53,7 @@ truth; this checkpoint only clarifies their combined state.
 **Tests:** `tests/test_portfolio_state.py`;
 `tests/test_portfolio_replay_harness.py`
 **Report:** `docs/analysis/PORTFOLIO_REPLAY_V1_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_PHASE_2_2026-05-19.md`
 
 **Scope:** Offline/research implementation only while BTC PAPER and M4
 monitoring continue unchanged. Phase 1 implements `SymbolRiskState`,
@@ -89,9 +91,23 @@ storage migration changes are in scope.
   replay while preserving the safety pause behavior.
 - Tests: `15 passed`; compileall clean.
 
-**Audit request:** Claude Code should audit this as an offline-only Phase 2
-checkpoint. Still no runtime implementation, ETH PAPER, or BTC+ETH PAPER before
-M4 checkpoint and later audited runtime milestones.
+**Audit verdict:** PASS (offline validation complete)
+
+**Audit summary:**
+- Layer separation: PASS (research_lab/ only, no runtime changes, BTC PAPER unchanged)
+- Contract compliance: PASS (Phase 1 contracts preserved, timed loss-streak pause added)
+- Determinism: PASS (replay is deterministic, same inputs → same outputs)
+- State integrity: PASS (stateful tracking: positions, caps, cooldowns, DD stops)
+- Error handling: PASS (122 vetoes with machine-readable reasons)
+- Test coverage: PASS (15 tests: determinism, caps, cooldowns, loss streaks, metrics)
+- Methodology integrity: PASS (artifact-driven validation, limitations explicit)
+- Promotion safety: PASS (no runtime approval, deployment blocked until M4 + audits)
+
+**Key refinement:** Timed loss-streak pauses (125-minute window) prevent permanent
+lockout while preserving safety behavior. Methodologically sound.
+
+**Next milestone decision:** User decides after M4 checkpoint (2026-06-13, 25 days).
+Three paths: (A) runtime integration, (B) full pipeline replay, or (C) defer.
 
 ---
 
