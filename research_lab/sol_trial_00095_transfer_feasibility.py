@@ -26,6 +26,7 @@ from research_lab.eth_trial_00095_transfer_feasibility import (
     builder_verdict as transfer_builder_verdict,
     evaluate_gates as evaluate_transfer_gates,
     fold_windows,
+    resolve_trial_store_path,
 )
 from research_lab.multi_asset_full_pipeline_replay import (
     DEFAULT_BTC_DB,
@@ -208,18 +209,19 @@ def run_analysis(
     start: str,
     end: str,
 ) -> dict[str, Any]:
-    btc = run_symbol_pipeline(symbol="BTCUSDT", source_db=btc_db, store_path=store_path, start=start, end=end)
-    eth = run_symbol_pipeline(symbol="ETHUSDT", source_db=eth_db, store_path=store_path, start=start, end=end)
-    sol = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=store_path, start=start, end=end)
-    sol_cost_15 = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=store_path, start=start, end=end, fee_multiplier=1.5)
-    sol_cost_2 = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=store_path, start=start, end=end, fee_multiplier=2.0)
+    resolved_store = resolve_trial_store_path(store_path, trial_id=TRIAL_00095_ID)
+    btc = run_symbol_pipeline(symbol="BTCUSDT", source_db=btc_db, store_path=resolved_store, start=start, end=end)
+    eth = run_symbol_pipeline(symbol="ETHUSDT", source_db=eth_db, store_path=resolved_store, start=start, end=end)
+    sol = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=resolved_store, start=start, end=end)
+    sol_cost_15 = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=resolved_store, start=start, end=end, fee_multiplier=1.5)
+    sol_cost_2 = run_symbol_pipeline(symbol="SOLUSDT", source_db=sol_db, store_path=resolved_store, start=start, end=end, fee_multiplier=2.0)
 
     fold_results: list[dict[str, Any]] = []
     for label, fold_start, fold_end in fold_windows():
         fold_replay = run_symbol_pipeline(
             symbol="SOLUSDT",
             source_db=sol_db,
-            store_path=store_path,
+            store_path=resolved_store,
             start=fold_start,
             end=fold_end,
         )
@@ -255,7 +257,8 @@ def run_analysis(
         "btc_db": str(btc_db),
         "eth_db": str(eth_db),
         "sol_db": str(sol_db),
-        "store_path": str(store_path),
+        "store_path": str(resolved_store),
+        "requested_store_path": str(store_path),
         "trial_id": TRIAL_00095_ID,
         "config_hashes": {"BTCUSDT": btc.config_hash, "ETHUSDT": eth.config_hash, "SOLUSDT": sol.config_hash},
         "pipeline_trade_counts": {"BTCUSDT": len(btc.trades), "ETHUSDT": len(eth.trades), "SOLUSDT": len(sol.trades)},
