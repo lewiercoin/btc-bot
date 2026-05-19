@@ -40,9 +40,35 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1
+
+**Status:** READY_FOR_AUDIT - design only, no runtime implementation
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/blueprints/MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1_2026-05-19.md`
+
+**Scope:** Design-only architecture milestone for future BTC+ETH portfolio
+runtime. It defines layer boundaries, portfolio vs symbol state, initial risk
+caps, same-bar conflict handling, persistence/recovery contracts, backtest
+parity requirements, and deployment sequencing. It does not modify runtime,
+PAPER/LIVE behavior, `core/**`, `execution/**`, `orchestrator.py`, `main.py`,
+`settings.py`, `storage/**`, or `backtest/**`.
+
+**Key decisions:**
+- Future topology is per-symbol deterministic pipelines plus a portfolio gate.
+- Future state must split into `SymbolRiskState` and `PortfolioRiskState`.
+- Initial design defaults: 0.35% risk per trade per symbol, 0.70% total open
+  risk cap, max 2 open positions globally, max 1 per symbol.
+- `allow_both` is the default same-bar policy only if portfolio caps pass.
+- No ETH or multi-asset PAPER deployment before audit, future implementation
+  milestone, portfolio replay parity, and M4 checkpoint decision.
+
+---
+
 ### Research: MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1
 
-**Status:** READY_FOR_AUDIT - portfolio diagnostic passed preregistered gates
+**Status:** CLOSED - audit PASS, architecture design unlocked
 **Builder:** Codex
 **Decision date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`

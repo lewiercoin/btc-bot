@@ -4,6 +4,26 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Define multi-asset portfolio architecture before implementation
+**Decision:** Complete `MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1` as a design-only
+milestone after internal consultation and the audited portfolio diagnostic.
+
+**Reason:** BTC+ETH trial-00095 has validated portfolio evidence, but the
+current runtime was built as a single-symbol system. Implementation requires
+explicit contracts for per-symbol pipelines, portfolio risk, persistent
+symbol/portfolio state, recovery, same-bar conflict handling, and backtest
+parity. Skipping design would risk hidden global-state coupling or layer leaks.
+
+**Consequences:** No runtime code is changed. No ETH PAPER or multi-asset PAPER
+is approved. The design sets conservative defaults for a future implementation:
+0.35% risk per trade per symbol, 0.70% total open risk, max 2 open positions
+globally, max 1 per symbol, and `allow_both` only when portfolio caps pass.
+Future implementation remains blocked until Claude Code audit and the M4
+checkpoint decision.
+
+**Related:** `docs/blueprints/MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1_2026-05-19.md`;
+`docs/analysis/MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_2026-05-19.md`.
+
 ## 2026-05-19 - Start BTC+ETH portfolio diagnostic before architecture design
 **Decision:** Start `MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1` after Claude Code
 passed the ETH transfer feasibility audit.
