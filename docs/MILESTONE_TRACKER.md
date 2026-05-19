@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_HISTORICAL_BACKFILL_PILOT_V1
 
-**Status:** READY_FOR_AUDIT
+**Status:** CLOSED - audit PASS, ingestion mechanics validated, full backfill ready
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_historical_backfill_pilot.json`
 **Runner:** `research_lab/backfill_sol_historical_data.py`
 **Report:** `docs/analysis/SOL_HISTORICAL_BACKFILL_PILOT_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_SOL_HISTORICAL_BACKFILL_PILOT_2026-05-19.md`
 **Snapshot:** `research_lab/snapshots/replay-run-sol-backfill-pilot-2026-05-15_2026-05-18.db` (not committed)
 
 **Scope:** Research Lab data-engineering pilot only. Creates a separate SOLUSDT
@@ -71,9 +73,17 @@ SOL shadow, SOL strategy backtest, or threshold change is in scope.
 
 **Builder verdict:** `PASS_SOL_BACKFILL_PILOT_FULL_BACKFILL_READY`
 
-**Next if audit PASS:** Schedule `SOL_HISTORICAL_BACKFILL_DATASET_V1` for the
-full SOL research snapshot with resumable daily checkpoints, disk guard, and
-separate audit before SOL trial-00095 transfer research.
+**Audit verdict:** PASS
+
+**Audit summary:**
+- Data isolation: PASS (writes only to research_lab/snapshots, no production DB writes, BTC PAPER still running)
+- Streaming and discarding: PASS (blob = b"" pattern verified, archives processed in memory, no raw file persistence)
+- Disk guard: PASS (12 GB minimum enforced before writes, 25.58 GB free maintained)
+- Quality metrics: PASS (0.00% missingness, 0 duplicates, 0 OHLC errors, 3 DONE checkpoints)
+- Strategy readiness claim: PASS (report correctly states no SOL strategy/shadow/PAPER approval)
+- Tests: PASS (14 tests adequate for pilot checkpoint)
+
+**Next:** `SOL_HISTORICAL_BACKFILL_DATASET_V1` - full SOL 2022-2026 historical backfill with resumable checkpoints, disk guard, and quality validation before SOL trial-00095 transfer research.
 
 ---
 
