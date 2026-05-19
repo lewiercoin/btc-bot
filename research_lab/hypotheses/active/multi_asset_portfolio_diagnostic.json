@@ -1,0 +1,72 @@
+{
+  "hypothesis_id": "multi_asset_portfolio_diagnostic_v1",
+  "name": "BTC + ETH Trial-00095 Portfolio Diagnostic",
+  "class": "multi_asset_transfer",
+  "edge_rationale": "BTC trial-00095 is high quality but frequency constrained, while the audited ETH transfer produced materially higher trade count with positive expectancy. Before runtime architecture work, the combined BTC+ETH artifact must show acceptable portfolio interaction: low enough daily PnL correlation, low same-bar overlap, controlled concentration, and strong combined R metrics.",
+  "counterparty_or_market_mechanism": "The same sweep/reclaim liquidity response may exist across large-cap crypto perpetuals. Portfolio value comes from applying one validated mechanism to separate instruments, not from adding a new setup family.",
+  "required_data": [
+    "Frozen BTC trial-00095 full replay trade artifact",
+    "Audited ETH trial-00095 transfer replay trades",
+    "Trade open timestamps",
+    "Trade direction, regime, and pnl_r"
+  ],
+  "timeframe": [
+    "15m signal timing",
+    "daily PnL correlation buckets"
+  ],
+  "baseline_reference": "BTC trial-00095 and ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1",
+  "variables": [
+    {
+      "name": "portfolio_policy",
+      "values": [
+        "allow_both",
+        "first_signal_only",
+        "btc_priority"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab diagnostic only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "No parameter optimization and no ETH retuning.",
+    "Use frozen BTC trial-00095 full replay artifact.",
+    "Use audited ETH transfer replay generated from frozen trial-00095 parameters.",
+    "Correlation uses daily pnl_r buckets based on trade open timestamps.",
+    "Same-bar overlap is a signal timing proxy, not full exposure overlap.",
+    "This milestone can recommend architecture design, not runtime deployment."
+  ],
+  "expected_observation": "If BTC+ETH is a viable portfolio direction, the combined allow-both artifact should maintain ER >= 1.5, PF >= 2.0, controlled R drawdown, daily PnL correlation <= 0.70, same-bar overlap <= 10%, and no single month concentration above 20%.",
+  "acceptance_criteria": {
+    "min_combined_trades": 300,
+    "min_combined_er": 1.5,
+    "min_combined_profit_factor": 2.0,
+    "max_drawdown_r": 45.0,
+    "max_daily_pnl_corr": 0.70,
+    "max_same_bar_overlap_share": 0.10,
+    "max_single_month_trade_share": 0.20
+  },
+  "kill_criteria": {
+    "runtime_change": "Any runtime/core/settings/execution/orchestrator change invalidates this milestone.",
+    "unfrozen_inputs": "Changing BTC or ETH entry logic invalidates the diagnostic.",
+    "high_correlation": "Daily PnL correlation above 0.70 blocks architecture work without explicit risk redesign.",
+    "high_same_bar_overlap": "Same-bar overlap above 10% requires conflict policy design before proceeding.",
+    "deployment_claim": "Any PAPER/LIVE approval claim invalidates the report."
+  },
+  "failure_modes": [
+    "ETH and BTC profits are highly correlated, making frequency look better while portfolio drawdown risk is concentrated.",
+    "Same-bar signals cluster around market-wide crypto shocks and require portfolio-level exposure caps.",
+    "BTC artifact lacks close timestamps, so exposure overlap is under-specified.",
+    "Combined result is dominated by one month or quarter."
+  ],
+  "out_of_scope": [
+    "Runtime multi-asset implementation.",
+    "PAPER deployment.",
+    "LIVE deployment.",
+    "ETH parameter optimization.",
+    "SOL research.",
+    "Broker/exchange adapter changes."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00",
+  "status": "ACTIVE"
+}
