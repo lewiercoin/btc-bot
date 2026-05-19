@@ -1,0 +1,88 @@
+{
+  "hypothesis_id": "eth_trial_00095_transfer_feasibility_v1",
+  "name": "ETH Trial-00095 Transfer Feasibility",
+  "class": "multi_asset_transfer",
+  "edge_rationale": "If the BTC trial-00095 sweep/reclaim edge is a broader large-cap perpetual liquidity response rather than BTC-specific microstructure, the exact frozen BTC parameters should retain positive expectancy on an audited ETHUSDT dataset without parameter search.",
+  "counterparty_or_market_mechanism": "Visible ETH liquidity levels may create stop-run and reclaim behavior similar to BTC. The transfer test checks whether the same deterministic sweep/reclaim geometry and confluence contract captures that mechanism on ETH.",
+  "required_data": [
+    "Audited ETHUSDT 2022-2026 research snapshot",
+    "15m candles",
+    "4h candles",
+    "1h candles derived from complete 15m candles inside replay temp DB",
+    "funding history",
+    "open interest samples",
+    "aggtrade 60s and 15m buckets"
+  ],
+  "timeframe": [
+    "15m entry",
+    "4h bias",
+    "60s flow bucket"
+  ],
+  "baseline_reference": "BTC trial-00095: ER 2.110, PF 3.95, 47 validated WF trades / 271 full replay campaign trades depending artifact context",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "ETHUSDT"
+      ]
+    },
+    {
+      "name": "trial_params",
+      "values": [
+        "optuna-default-v3-trial-00095 frozen"
+      ]
+    },
+    {
+      "name": "cost_multipliers",
+      "values": [
+        1.0,
+        1.5,
+        2.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab strategy transfer only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, or settings changes.",
+    "No parameter search, no threshold tuning, no post-hoc rescue.",
+    "Only symbol changes from BTCUSDT to ETHUSDT, in research-only settings object.",
+    "Use the audited ETH_HISTORICAL_BACKFILL_DATASET_V1 snapshot as source.",
+    "Source ETH dataset is copied to a temporary replay DB before BacktestRunner writes trade artifacts.",
+    "1h candles may be derived from complete 15m candles only for replay compatibility.",
+    "Force-order/liquidation context is unavailable and remains empty optional context."
+  ],
+  "expected_observation": "If transfer is real, frozen trial-00095 should produce at least 20 ETH trades, positive ER above 1.0, PF above 1.5, tolerable drawdown, and at least two positive chronological validation folds.",
+  "acceptance_criteria": {
+    "min_trades": 20,
+    "min_expectancy_r": 1.0,
+    "min_profit_factor": 1.5,
+    "max_drawdown_pct": 0.12,
+    "min_positive_folds_er_gt_1": 2,
+    "min_2x_cost_expectancy_r": 0.75
+  },
+  "kill_criteria": {
+    "runtime_change": "Any change to runtime/core/settings/execution invalidates the milestone.",
+    "parameter_tuning": "Any ETH-specific threshold tuning invalidates transfer evidence.",
+    "source_db_mutation": "Mutating the audited ETH source snapshot invalidates the milestone.",
+    "lookahead_or_alignment_bug": "Any timeframe alignment bug invalidates results.",
+    "insufficient_data": "If audited ETH dataset is unavailable, stop rather than substitute unaudited data."
+  },
+  "failure_modes": [
+    "BTC trial-00095 geometry is BTC-specific and does not transfer to ETH.",
+    "ETH volatility scale differs enough that exact BTC thresholds are too strict or too loose.",
+    "No force-order data slightly changes confluence behavior versus BTC historical runs.",
+    "Low signal count makes transfer inconclusive rather than failed.",
+    "ETH gaps cluster around important market events and distort fold-level stability."
+  ],
+  "out_of_scope": [
+    "ETH parameter optimization.",
+    "ETH runtime deployment.",
+    "Multi-asset execution design.",
+    "Portfolio allocation.",
+    "SOL research.",
+    "Any change to BTC PAPER bot or M4 monitoring."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00",
+  "status": "ACTIVE"
+}

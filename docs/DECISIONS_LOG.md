@@ -4,6 +4,25 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Start ETH trial-00095 transfer feasibility
+**Decision:** Start `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1` after Claude Code
+passed the ETH historical dataset audit.
+
+**Reason:** ETHUSDT now has an audited 2022-2026 research snapshot with complete
+15m/4h candles, funding, OI, and aggregated flow. The safest next question is
+whether the already-known BTC sweep/reclaim edge transfers to ETH using frozen
+`optuna-default-v3-trial-00095` parameters, before considering any ETH-specific
+optimization or multi-asset runtime design.
+
+**Consequences:** This milestone is research-only. It changes only the
+research-only symbol setting to `ETHUSDT`, derives 1h replay candles from 15m
+inside a temporary DB, and does not touch BTC PAPER, M4 monitoring, runtime,
+`core/**`, `execution/**`, `orchestrator.py`, or `settings.py`.
+
+**Related:** `research_lab/eth_trial_00095_transfer_feasibility.py`;
+`research_lab/hypotheses/active/eth_trial_00095_transfer_feasibility.json`;
+`docs/analysis/ETH_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-19.md`.
+
 ## 2026-05-19 - Complete ETH historical dataset backfill
 **Decision:** Mark `ETH_HISTORICAL_BACKFILL_DATASET_V1` as complete and ready for Claude Code dataset audit.
 
