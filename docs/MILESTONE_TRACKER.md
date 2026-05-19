@@ -42,11 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1
 
-**Status:** READY_FOR_AUDIT - design only, no runtime implementation
+**Status:** CLOSED - audit PASS, implementation-ready design
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/blueprints/MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_PORTFOLIO_ARCHITECTURE_2026-05-19.md`
 
 **Scope:** Design-only architecture milestone for future BTC+ETH portfolio
 runtime. It defines layer boundaries, portfolio vs symbol state, initial risk
@@ -63,6 +65,22 @@ PAPER/LIVE behavior, `core/**`, `execution/**`, `orchestrator.py`, `main.py`,
 - `allow_both` is the default same-bar policy only if portfolio caps pass.
 - No ETH or multi-asset PAPER deployment before audit, future implementation
   milestone, portfolio replay parity, and M4 checkpoint decision.
+
+**Audit verdict:** PASS (design complete and implementation-ready)
+
+**Audit summary:**
+- Layer separation: PASS (per-symbol pipelines + portfolio gate topology)
+- State contracts: PASS (SymbolRiskState, PortfolioRiskState explicit and recoverable)
+- Risk defaults: PASS (conservative: 0.35% per trade, -8R emergency stop vs 19.22R observed DD)
+- Conflict policy: PASS (allow_both justified by 2.8% overlap, bounded by caps)
+- Recovery: PASS (7-step idempotent procedure with failure handling)
+- Backtest parity: PASS (no artifact stitching, must implement contracts)
+- Deployment gates: PASS (7 gates before BTC+ETH PAPER)
+
+**Next actions:**
+1. M4 checkpoint (2026-06-13, 25 days) - decide BTC baseline stability
+2. User decision - commit to multi-asset implementation path or defer
+3. If proceed: `MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1` after M4
 
 ---
 
