@@ -4,6 +4,15 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Complete ETH historical dataset backfill
+**Decision:** Mark `ETH_HISTORICAL_BACKFILL_DATASET_V1` as complete and ready for Claude Code dataset audit.
+
+**Reason:** The guarded server backfill completed all 1547 daily checkpoints from 2022-01-01 through 2026-03-27 with 0 failed days. The final separate research snapshot is 374.81 MB, disk remained safely above the 12 GB guard, duplicate groups are 0, candle missingness is 0.00%, OI missingness is 0.03%, and aggtrade 60s missingness is 0.01%.
+
+**Consequences:** ETH strategy transfer research is still not approved. The next step is Claude Code audit of the dataset. If audit passes, schedule a separate `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1` milestone.
+
+**Related:** `docs/analysis/ETH_HISTORICAL_BACKFILL_DATASET_2026-05-18.md`; `research_lab/snapshots/ethusdt_2022_2026_dataset_v1.db` on the production server.
+
 ## 2026-05-18 - Prepare ETH full dataset backfill as resumable guarded job
 **Decision:** Implement `ETH_HISTORICAL_BACKFILL_DATASET_V1` as a resumable daily-checkpoint runner before starting the full 2022-2026 ETH dataset job.
 

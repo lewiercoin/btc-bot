@@ -42,12 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: ETH_HISTORICAL_BACKFILL_DATASET_V1
 
-**Status:** RUNNER_READY - awaiting full guarded server backfill
+**Status:** DATASET_COMPLETE_READY_FOR_AUDIT
 **Builder:** Codex
 **Decision date:** 2026-05-18
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/eth_historical_backfill_dataset.json`
 **Runner:** `research_lab/eth_historical_backfill_dataset.py`
+**Report:** `docs/analysis/ETH_HISTORICAL_BACKFILL_DATASET_2026-05-18.md`
 
 **Scope:** Research Lab dataset milestone only. The runner creates a separate
 ETHUSDT SQLite dataset under `research_lab/snapshots`, streams daily Binance
@@ -56,16 +57,22 @@ and records resumable per-day checkpoints. It does not write to production
 `storage/btc_bot.db`, change runtime, change `settings.py`, or touch `core/**`,
 `execution/**`, or `orchestrator.py`.
 
-**Current state:** Runner and tests are implemented. A local 1-day smoke run
-validated checkpoint creation, partial-report generation, and parser wiring.
-Full 2022-2026 dataset generation still needs to run on the server in guarded
-chunks, then produce a final dataset quality report for Claude Code audit.
+**Result:**
+
+| Expected Days | Done | Failed | DB Size | Free Disk | 15m Missing | OI Missing | Agg 60s Missing | Duplicates |
+|---:|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1547 | 1547 | 0 | 374.81 MB | 26.49 GB | 0.00% | 0.03% | 0.01% | 0 |
+
+**Quality notes:** The 7 candle quality flags are zero-volume 15m bars with
+valid price geometry (`open=high=low=close`), not OHLC ordering violations.
+Aggtrade and OI missingness are far below the preregistered limits, but Claude
+Code should audit the concentrated gap days before approving ETH transfer
+research.
 
 **Required before ETH strategy research:**
-- `DONE` checkpoint for every day from 2022-01-01 to 2026-03-28 exclusive.
-- 0 unresolved failed days.
-- Missing-rate and duplicate/OHLC quality report.
-- Separate Claude Code dataset audit.
+- Claude Code dataset audit PASS.
+- Explicit approval for a separate `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1`
+  research milestone.
 
 ---
 
