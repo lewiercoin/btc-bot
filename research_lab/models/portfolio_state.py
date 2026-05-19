@@ -7,7 +7,7 @@ promotion moves an equivalent contract into the runtime layers.
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field, replace
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from enum import StrEnum
 from typing import Iterable
@@ -55,6 +55,7 @@ class PortfolioRiskConfig:
     symbol_rolling_pause_r: float = -6.0
     symbol_loss_streak_pause: int = 4
     global_loss_streak_pause: int = 6
+    loss_streak_pause_minutes: int = 125
     cooldown_after_loss_minutes: int = 125
     symbol_order: tuple[str, ...] = SYMBOL_ORDER
 
@@ -254,7 +255,11 @@ class ResearchPortfolioGate:
             return PortfolioVetoReason.SYMBOL_WEEKLY_HARD_STOP
         if state.rolling_drawdown_r <= self.config.symbol_rolling_pause_r:
             return PortfolioVetoReason.SYMBOL_ROLLING_PAUSE
-        if state.consecutive_losses >= self.config.symbol_loss_streak_pause:
+        if state.consecutive_losses >= self.config.symbol_loss_streak_pause and _loss_streak_pause_active(
+            state.last_loss_at,
+            now,
+            pause_minutes=self.config.loss_streak_pause_minutes,
+        ):
             return PortfolioVetoReason.SYMBOL_LOSS_STREAK_PAUSE
         if state.last_loss_at is not None:
             cooldown_until = _to_utc(state.last_loss_at) + timedelta(minutes=self.config.cooldown_after_loss_minutes)
@@ -271,7 +276,11 @@ class ResearchPortfolioGate:
             return PortfolioVetoReason.PORTFOLIO_DAILY_HARD_STOP
         if state.weekly_pnl_r <= self.config.portfolio_weekly_hard_stop_r:
             return PortfolioVetoReason.PORTFOLIO_WEEKLY_HARD_STOP
-        if state.global_consecutive_losses >= self.config.global_loss_streak_pause:
+        if state.global_consecutive_losses >= self.config.global_loss_streak_pause and _loss_streak_pause_active(
+            state.last_portfolio_loss_at,
+            now,
+            pause_minutes=self.config.loss_streak_pause_minutes,
+        ):
             return PortfolioVetoReason.PORTFOLIO_LOSS_STREAK_PAUSE
         return None
 
@@ -393,6 +402,12 @@ def _within_rolling_days(left: datetime, right: datetime, *, days: int) -> bool:
     left_utc = _to_utc(left)
     right_utc = _to_utc(right)
     return right_utc - timedelta(days=days) < left_utc <= right_utc
+
+
+def _loss_streak_pause_active(last_loss_at: datetime | None, now: datetime, *, pause_minutes: int) -> bool:
+    if last_loss_at is None:
+        return True
+    return _to_utc(last_loss_at) + timedelta(minutes=pause_minutes) > _to_utc(now)
 
 
 def _to_utc(value: datetime) -> datetime:

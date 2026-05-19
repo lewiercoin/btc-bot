@@ -28,6 +28,37 @@ harness only.
 `tests/test_portfolio_state.py`;
 `research_lab/hypotheses/active/multi_asset_state_and_backtest_implementation.json`.
 
+## 2026-05-19 - Complete offline portfolio replay Phase 2 checkpoint
+**Decision:** Mark the artifact-driven `PORTFOLIO_REPLAY_V1` harness as ready
+for Claude Code audit under `MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1`.
+
+**Reason:** Phase 2 validates the offline `SymbolRiskState`,
+`PortfolioRiskState`, and `ResearchPortfolioGate` contracts against frozen BTC
+and ETH trial-00095 trade artifacts with stateful cap, cooldown, loss-streak,
+and drawdown veto behavior. This is the required bridge between simple artifact
+stitching and any later full pipeline replay or runtime implementation.
+
+**Result:** Stateful replay approved 696 trades with ER 1.955, PF 3.60, max DD
+13.74R, and 50.7% win rate. It vetoed 122 signals through machine-readable
+reasons, mostly symbol weekly hard stops, position caps, daily hard stops, and
+cooldowns. Compared with the prior stitching diagnostic, the replay has fewer
+trades but slightly higher ER/PF and materially lower max DD.
+
+**Important refinement:** Initial replay showed that permanent loss-streak
+vetoes could lock the portfolio indefinitely. The research contract now treats
+loss-streak pauses as timed pauses using the configured 125-minute pause window,
+matching the intended cooldown-style safety behavior.
+
+**Consequences:** No production behavior changes. No ETH PAPER approval. No
+runtime implementation approval. Full feature/regime/signal replay and any
+runtime integration remain future milestones after audit and M4 checkpoint
+decision.
+
+**Related:** `research_lab/portfolio_replay_harness.py`;
+`research_lab/models/portfolio_state.py`;
+`tests/test_portfolio_replay_harness.py`;
+`docs/analysis/PORTFOLIO_REPLAY_V1_2026-05-19.md`.
+
 ## 2026-05-19 - Define multi-asset portfolio architecture before implementation
 **Decision:** Complete `MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1` as a design-only
 milestone after internal consultation and the audited portfolio diagnostic.

@@ -97,7 +97,7 @@ def test_directional_notional_cap_overrides_allow_both() -> None:
 def test_symbol_state_isolation_does_not_block_other_symbol_loss_streak() -> None:
     gate = ResearchPortfolioGate()
     symbol_states = {
-        "BTCUSDT": SymbolRiskState(symbol="BTCUSDT", consecutive_losses=4),
+        "BTCUSDT": SymbolRiskState(symbol="BTCUSDT", consecutive_losses=4, last_loss_at=NOW - timedelta(minutes=30)),
         "ETHUSDT": SymbolRiskState(symbol="ETHUSDT", consecutive_losses=0),
     }
     decisions = gate.evaluate_batch(
@@ -110,6 +110,22 @@ def test_symbol_state_isolation_does_not_block_other_symbol_loss_streak() -> Non
     assert decisions[0].approved is False
     assert decisions[0].veto_reason == PortfolioVetoReason.SYMBOL_LOSS_STREAK_PAUSE.value
     assert decisions[1].approved is True
+
+
+def test_symbol_loss_streak_pause_expires_after_pause_window() -> None:
+    gate = ResearchPortfolioGate()
+    symbol_states = {
+        "BTCUSDT": SymbolRiskState(symbol="BTCUSDT", consecutive_losses=4, last_loss_at=NOW - timedelta(minutes=130)),
+    }
+
+    decisions = gate.evaluate_batch(
+        [_signal("BTCUSDT", minute=0)],
+        symbol_states=symbol_states,
+        portfolio_state=PortfolioRiskState(),
+        now=NOW,
+    )
+
+    assert decisions[0].approved is True
 
 
 def test_symbol_cooldown_blocks_only_that_symbol() -> None:
@@ -141,6 +157,18 @@ def test_portfolio_emergency_stop_blocks_all_symbols() -> None:
 
     assert all(not decision.approved for decision in decisions)
     assert {decision.veto_reason for decision in decisions} == {PortfolioVetoReason.PORTFOLIO_EMERGENCY_STOP.value}
+
+
+def test_global_loss_streak_pause_expires_after_pause_window() -> None:
+    gate = ResearchPortfolioGate()
+    decisions = gate.evaluate_batch(
+        [_signal("BTCUSDT")],
+        symbol_states={},
+        portfolio_state=PortfolioRiskState(global_consecutive_losses=6, last_portfolio_loss_at=NOW - timedelta(minutes=130)),
+        now=NOW,
+    )
+
+    assert decisions[0].approved is True
 
 
 def test_recover_portfolio_state_rebuilds_symbol_and_portfolio_views() -> None:
