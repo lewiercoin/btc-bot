@@ -12,6 +12,7 @@ from research_lab.backfill_sol_historical_data import (
     expected_days,
     init_sol_pilot_db,
     mark_checkpoint,
+    quality_metrics,
 )
 from research_lab.eth_historical_backfill_pilot import DayStats
 from research_lab.hypotheses.spec import load_hypothesis_spec
@@ -115,6 +116,25 @@ def test_dataset_verdict_requires_complete_dataset() -> None:
 
     assert dataset_verdict(quality, {"DONE": 1, "failed_days": []}, complete=False) == "PARTIAL_SOL_BACKFILL_IN_PROGRESS"
     assert dataset_verdict(quality, {"DONE": 3, "failed_days": []}, complete=True) == "DATASET_COMPLETE_READY_FOR_AUDIT"
+
+
+def test_quality_metrics_treats_flat_zero_volume_candles_as_valid() -> None:
+    conn = sqlite3.connect(":memory:")
+    init_sol_pilot_db(conn)
+    conn.execute(
+        """
+        INSERT INTO candles(symbol, timeframe, open_time, open, high, low, close, volume)
+        VALUES ('SOLUSDT', '15m', '2024-10-28T20:00:00+00:00', 176.17, 176.17, 176.17, 176.17, 0.0)
+        """
+    )
+
+    metrics = quality_metrics(conn, "SOLUSDT", date(2024, 10, 28), date(2024, 10, 29))
+
+    assert metrics["price_violations"] == 0
+    assert metrics["zero_volume_flat_candles"] == 1
+    assert metrics["zero_volume_nonflat_candles"] == 0
+    assert metrics["ohlc_errors"] == 0
+    conn.close()
 
 
 def test_sol_backfill_pilot_hypothesis_spec_is_valid() -> None:

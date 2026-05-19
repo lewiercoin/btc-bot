@@ -26,7 +26,7 @@ from research_lab.eth_historical_backfill_pilot import (
     ensure_disk_available,
     init_pilot_db,
     process_day,
-    quality_metrics,
+    quality_metrics as base_quality_metrics,
 )
 from settings import load_settings
 
@@ -105,6 +105,36 @@ def checkpoint_summary(conn: sqlite3.Connection) -> dict[str, Any]:
     ).fetchall()
     summary["failed_days"] = [{"day": row[0], "errors": json.loads(row[1])} for row in failed]
     return summary
+
+
+def quality_metrics(conn: sqlite3.Connection, symbol: str, start: date, end: date) -> dict[str, Any]:
+    metrics = base_quality_metrics(conn, symbol, start, end)
+    price_violations = conn.execute(
+        """
+        SELECT COUNT(*) FROM candles
+        WHERE symbol=? AND (low > open OR open > high OR low > close OR close > high OR low > high)
+        """,
+        (symbol,),
+    ).fetchone()[0]
+    zero_volume_flat = conn.execute(
+        """
+        SELECT COUNT(*) FROM candles
+        WHERE symbol=? AND volume <= 0 AND open = high AND high = low AND low = close
+        """,
+        (symbol,),
+    ).fetchone()[0]
+    zero_volume_nonflat = conn.execute(
+        """
+        SELECT COUNT(*) FROM candles
+        WHERE symbol=? AND volume <= 0 AND NOT (open = high AND high = low AND low = close)
+        """,
+        (symbol,),
+    ).fetchone()[0]
+    metrics["price_violations"] = int(price_violations)
+    metrics["zero_volume_flat_candles"] = int(zero_volume_flat)
+    metrics["zero_volume_nonflat_candles"] = int(zero_volume_nonflat)
+    metrics["ohlc_errors"] = int(price_violations) + int(zero_volume_nonflat)
+    return metrics
 
 
 def expected_days(start: date, end: date) -> int:
@@ -351,7 +381,10 @@ def generate_report(payload: dict[str, Any], report_path: Path) -> str:
         lines.append(f"| `{key}` | {count} | {q['expected'][key]} | {q['missing_rates'][key]:.2%} |")
     lines += [
         "",
-        f"- OHLC/zero-volume errors: {q['ohlc_errors']}",
+        f"- OHLC corruptions: {q['ohlc_errors']}",
+        f"- Price violations: {q.get('price_violations', 0)}",
+        f"- Valid zero-volume flat candles: {q.get('zero_volume_flat_candles', 0)}",
+        f"- Zero-volume non-flat candles: {q.get('zero_volume_nonflat_candles', 0)}",
         f"- Duplicate groups: {q['duplicates']}",
         f"- Checkpoints: `{json.dumps(payload['checkpoints'], sort_keys=True)}`",
         "",
@@ -421,7 +454,10 @@ def generate_dataset_report(payload: dict[str, Any], report_path: Path) -> str:
         lines.append(f"| `{key}` | {count} | {q['expected'][key]} | {q['missing_rates'][key]:.2%} |")
     lines += [
         "",
-        f"- OHLC/zero-volume errors: {q.get('ohlc_errors', 0)}",
+        f"- OHLC corruptions: {q.get('ohlc_errors', 0)}",
+        f"- Price violations: {q.get('price_violations', 0)}",
+        f"- Valid zero-volume flat candles: {q.get('zero_volume_flat_candles', 0)}",
+        f"- Zero-volume non-flat candles: {q.get('zero_volume_nonflat_candles', 0)}",
         f"- Duplicate groups: {q.get('duplicates', {})}",
         f"- Checkpoints: `{json.dumps(payload['checkpoints'], sort_keys=True)}`",
         "",
