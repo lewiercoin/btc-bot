@@ -42,7 +42,7 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1
 
-**Status:** ACTIVE - implementation ready, awaiting ETH replay run
+**Status:** READY_FOR_AUDIT - transfer candidate passed preregistered gates
 **Builder:** Codex
 **Decision date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
@@ -61,11 +61,17 @@ change, or M4 change is in scope.
 least 2 chronological folds with ER > 1.0 and >= 3 trades, and ER >= 0.75 at
 2x cost.
 
-**Required before completion:**
-- Run replay on server because the audited ETH snapshot lives under
-  `research_lab/snapshots/ethusdt_2022_2026_dataset_v1.db` there.
-- Generate report.
-- Commit/push report and request Claude Code audit.
+**Result:**
+
+| Trades | ER | PF | Win Rate | Max DD | 2x Cost ER | WF Positive Folds | Verdict |
+|---:|---:|---:|---:|---:|---:|---:|---|
+| 544 | 1.804 | 2.81 | 46.0% | 6.72% | 1.422 | 4/4 | `PASS_TRANSFER_CANDIDATE_FOR_AUDIT` |
+
+**Interpretation:** Frozen BTC trial-00095 parameters show decision-grade ETH
+transfer evidence under the preregistered research gates. This is not runtime
+approval and does not approve multi-asset execution. Next step is Claude Code
+audit of methodology, layer separation, source-store resolution, temporary DB
+preparation, and result interpretation.
 
 ---
 
