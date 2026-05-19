@@ -40,6 +40,57 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_HISTORICAL_BACKFILL_DATASET_V1
+
+**Status:** READY_FOR_AUDIT - full SOL dataset materialized, awaiting Claude Code audit
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_historical_backfill_dataset.json`
+**Runner:** `research_lab/backfill_sol_historical_data.py`
+**Report:** `docs/analysis/SOL_HISTORICAL_BACKFILL_DATASET_2026-05-19.md`
+**Snapshot:** `research_lab/snapshots/replay-run-sol-historical-2022-2026.db` (not committed)
+
+**Scope:** Research Lab data-engineering dataset only. Creates a separate
+SOLUSDT historical snapshot under `research_lab/snapshots`, streams Binance
+Vision daily ZIPs day by day, aggregates aggTrades into 60s and 15m buckets,
+uses resumable daily checkpoints, enforces a 12 GB disk guard, and writes a
+markdown coverage report. No runtime, PAPER/LIVE, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, SOL shadow,
+SOL strategy backtest, or threshold change is in scope.
+
+**Result:**
+- Dataset range: 2022-01-01 to 2026-03-28 exclusive (1,547 days).
+- Checkpoints: 1,547 DONE, 0 failed.
+- DB size: 340.27 MB.
+- Rows: 148,512 15m candles, 9,282 4h candles, 4,716 funding rows,
+  445,386 open-interest rows, 2,227,553 aggtrade 60s buckets, and
+  148,509 aggtrade 15m buckets.
+- Missing rates: 0.00% 15m candles, 0.00% 4h candles, 0.00% funding,
+  0.03% open interest, 0.01% aggtrade 60s, 0.00% aggtrade 15m.
+- Duplicate groups: 0 across candles, funding, open_interest, and
+  aggtrade_buckets.
+- OHLC corruptions: 0; price violations: 0; zero-volume non-flat candles: 0.
+- Valid zero-volume flat candles: 7, documented separately as low-liquidity
+  archive observations.
+- Disk guard: 12 GB minimum; server retained about 26 GB free after completion.
+- BTC PAPER bot remained active during backfill.
+
+**Builder verdict:** `DATASET_COMPLETE_READY_FOR_AUDIT`
+
+**Validation:**
+- Local tests: `19 passed`.
+- Local compileall: PASS.
+- Server compileall: PASS for the backfill runner.
+- Server pytest unavailable in runtime venv; local pytest was used for test
+  validation.
+
+**Next:** Claude Code audit. If PASS, a later milestone may test frozen
+`trial-00095` transfer on SOL; this dataset milestone does not approve SOL
+strategy, shadow, PAPER, or runtime work.
+
+---
+
 ### Research: SOL_HISTORICAL_BACKFILL_PILOT_V1
 
 **Status:** CLOSED - audit PASS, ingestion mechanics validated, full backfill ready
