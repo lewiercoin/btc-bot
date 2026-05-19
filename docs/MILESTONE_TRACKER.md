@@ -40,9 +40,38 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1
+
+**Status:** ACTIVE - implementation ready, awaiting ETH replay run
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/eth_trial_00095_transfer_feasibility.json`
+**Runner:** `research_lab/eth_trial_00095_transfer_feasibility.py`
+**Report:** `docs/analysis/ETH_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-19.md`
+
+**Scope:** Research Lab strategy transfer feasibility only. Replay frozen BTC
+`optuna-default-v3-trial-00095` parameters on the audited ETHUSDT 2022-2026
+dataset. Only the research-only symbol setting changes to `ETHUSDT`. No
+parameter search, threshold tuning, runtime deployment, core change,
+`settings.py` change, `orchestrator.py` change, execution change, BTC PAPER
+change, or M4 change is in scope.
+
+**Acceptance gates:** trades >= 20, ER >= 1.0, PF >= 1.5, max DD <= 12%, at
+least 2 chronological folds with ER > 1.0 and >= 3 trades, and ER >= 0.75 at
+2x cost.
+
+**Required before completion:**
+- Run replay on server because the audited ETH snapshot lives under
+  `research_lab/snapshots/ethusdt_2022_2026_dataset_v1.db` there.
+- Generate report.
+- Commit/push report and request Claude Code audit.
+
+---
+
 ### Research: ETH_HISTORICAL_BACKFILL_DATASET_V1
 
-**Status:** DATASET_COMPLETE_READY_FOR_AUDIT
+**Status:** CLOSED - audit PASS, dataset ready for ETH strategy research
 **Builder:** Codex
 **Decision date:** 2026-05-18
 **Branch:** `research/sweep-family-expansion-v1`
@@ -70,9 +99,8 @@ Code should audit the concentrated gap days before approving ETH transfer
 research.
 
 **Required before ETH strategy research:**
-- Claude Code dataset audit PASS.
-- Explicit approval for a separate `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1`
-  research milestone.
+- Done. Claude Code dataset audit PASS on 2026-05-19.
+- Explicit approval received for `ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1`.
 
 ---
 
