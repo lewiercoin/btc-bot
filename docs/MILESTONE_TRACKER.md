@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1
 
-**Status:** READY_FOR_AUDIT - offline replay complete, awaiting Claude Code audit
+**Status:** CLOSED - audit PASS (methodology), HYPOTHESIS_FAILED (verdict), edge confirmed but DD exceeds gate
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_trial_00095_transfer_feasibility.json`
 **Runner:** `research_lab/sol_trial_00095_transfer_feasibility.py`
 **Report:** `docs/analysis/SOL_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-20.md`
+**Audit:** `docs/audits/AUDIT_SOL_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-20.md`
 
 **Scope:** Research Lab strategy transfer only. Replays frozen
 `optuna-default-v3-trial-00095` on the audited SOLUSDT dataset, regenerates BTC
@@ -71,21 +73,19 @@ threshold change, or parameter tuning is in scope.
 
 **Builder verdict:** `SOL_TRANSFER_HYPOTHESIS_FAILED`
 
-**Interpretation:** SOL shows strong transfer-like expectancy and improves the
-three-asset portfolio under portfolio gates, but the standalone transfer
-protocol failed the predeclared max drawdown gate. Do not relax gates or tune
-SOL thresholds inside this milestone. Audit should decide whether the correct
-closure is failed, inconclusive/promising, or requires a follow-up with a
-separate predeclared risk framing.
+**Audit verdict:** PASS (methodology clean, verdict correct)
 
-**Validation:**
-- Local tests: `20 passed`.
-- Local compileall: PASS.
-- Server compileall: PASS.
-- BTC PAPER bot remained active during server replay.
+**Audit summary:**
+- Methodology integrity: PASS (frozen trial-00095 params, no SOL tuning, read-only datasets, temporary DB workflow)
+- Data isolation: PASS (no runtime changes, no production DB writes, BTC PAPER still running)
+- Predeclared gates: PASS (standalone DD gate 12% enforced, portfolio DD gate 20 R enforced)
+- Builder verdict: CORRECT (standalone DD 15.46% > 12% blocks full PASS despite portfolio passing)
+- Walk-forward stability: PASS (4/4 folds positive ER, 2022 crash accounts for majority DD)
+- Edge confirmation: PASS (SOL has real edge: ER 2.141, PF 3.42, robust to 2x cost)
 
-**Next:** Claude Code audit. No SOL shadow/PAPER/runtime step is approved by
-this result.
+**Interpretation:** SOL edge confirmed but DD failure is localized to 2022 crash regime (DD 28.44 R in 2022 vs 9.18-17.48 R in 2023-2025). Portfolio BTC+ETH+SOL passes all gates, suggesting DD may be controllable via portfolio risk policy. Classification: FORMAL_FAIL_BUT_PROMISING_PORTFOLIO_CANDIDATE.
+
+**Next:** `SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1` - offline DD source analysis to determine if SOL DD is controllable via portfolio risk policy, requires SOL-specific risk cap, or is structurally too high for multi-asset integration.
 
 ---
 
