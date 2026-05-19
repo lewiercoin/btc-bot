@@ -1,0 +1,89 @@
+{
+  "hypothesis_id": "SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1",
+  "name": "SOL Trial-00095 Transfer Feasibility",
+  "class": "multi_asset_transfer",
+  "status": "ACTIVE",
+  "scope": "Research Lab offline strategy transfer only. Replay frozen BTC trial-00095 sweep/reclaim parameters on the audited SOLUSDT dataset, then compare BTC+ETH baseline portfolio against BTC+ETH+SOL through the offline portfolio gate. No runtime, shadow, PAPER, LIVE, or threshold changes.",
+  "edge_rationale": "BTC trial-00095 sweep/reclaim transferred strongly to ETH. SOL is liquid and volatile enough to plausibly share the same stop-run and reclaim microstructure, but transfer must be proven with frozen parameters before any SOL monitoring or runtime design.",
+  "counterparty_or_market_mechanism": "The tested mechanism is the existing sweep/reclaim edge: aggressive stop-run below/above visible structure followed by reclaim. The milestone tests whether this existing mechanism transfers to SOLUSDT, not whether SOL needs custom parameters.",
+  "required_data": [
+    "Audited BTC trial-00095 source replay DB",
+    "Audited ETH 2022-2026 research dataset",
+    "Audited SOL 2022-2026 research dataset",
+    "Frozen optuna-default-v3-trial-00095 parameter record",
+    "Offline portfolio gate contracts"
+  ],
+  "timeframe": [
+    "15m",
+    "1h derived from complete 15m groups",
+    "4h"
+  ],
+  "baseline_reference": "BTC+ETH full pipeline replay baseline: 696 approved trades, ER 1.955, PF 3.60, max DD 13.74R",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "SOLUSDT"
+      ]
+    },
+    {
+      "name": "trial_params",
+      "values": [
+        "optuna-default-v3-trial-00095 frozen"
+      ]
+    },
+    {
+      "name": "portfolio_symbols",
+      "values": [
+        "BTCUSDT+ETHUSDT+SOLUSDT"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "No SOL parameter tuning.",
+    "No sweep-depth threshold change.",
+    "Only the research symbol changes to SOLUSDT for standalone transfer.",
+    "SOL source dataset is read-only; temporary replay DB receives compatibility tables and derived 1h candles.",
+    "BTC+ETH baseline is the audited full-pipeline portfolio replay.",
+    "Portfolio gate remains offline and cannot approve runtime behavior."
+  ],
+  "expected_observation": "If the edge transfers, SOL standalone should pass transfer gates and BTC+ETH+SOL should preserve decision-grade portfolio quality while increasing opportunity count without excessive drawdown.",
+  "acceptance_criteria": {
+    "sol_min_trades": 20,
+    "sol_min_er": 1.0,
+    "sol_min_pf": 1.5,
+    "sol_max_drawdown_pct": 0.12,
+    "sol_min_positive_folds": 2,
+    "sol_min_2x_cost_er": 0.75,
+    "portfolio_min_trades": 696,
+    "portfolio_min_er": 1.5,
+    "portfolio_min_pf": 2.0,
+    "portfolio_max_dd_r": 20.0,
+    "portfolio_min_sol_approved_trades": 20
+  },
+  "kill_criteria": {
+    "runtime_change": "Any core/orchestrator/settings/execution/storage production change invalidates the milestone.",
+    "sol_tuning": "Any SOL-specific threshold tuning invalidates the transfer claim.",
+    "source_db_mutation": "Mutating audited BTC/ETH/SOL source datasets invalidates the milestone.",
+    "standalone_fail": "SOL standalone transfer fails if any hard transfer gate fails.",
+    "portfolio_fail": "BTC+ETH+SOL portfolio fails if predeclared portfolio gates fail."
+  },
+  "failure_modes": [
+    "SOL has more noise and sweep/reclaim does not retain quality.",
+    "SOL passes standalone but portfolio caps veto most SOL signals.",
+    "SOL signals overlap with BTC/ETH drawdown periods and increase portfolio DD.",
+    "Transfer quality depends on one period or one regime.",
+    "Source replay compatibility differs between SOL and ETH."
+  ],
+  "out_of_scope": [
+    "SOL shadow design",
+    "SOL PAPER deployment",
+    "SOL runtime integration",
+    "SOL threshold stability research",
+    "Parameter optimization",
+    "Changing BTC or ETH portfolio runtime plans",
+    "Changing core, orchestrator, settings, execution, risk, or production storage"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-20T00:00:00+00:00"
+}
