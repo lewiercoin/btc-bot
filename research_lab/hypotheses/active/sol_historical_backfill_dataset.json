@@ -1,0 +1,83 @@
+{
+  "hypothesis_id": "SOL_HISTORICAL_BACKFILL_DATASET_V1",
+  "name": "SOL Historical Backfill Dataset",
+  "class": "diagnostic_only",
+  "status": "ACTIVE",
+  "scope": "Research Lab data-engineering dataset only. Creates a separate SOLUSDT historical snapshot under research_lab/snapshots. No strategy test, runtime change, PAPER deployment, LIVE deployment, or production DB write.",
+  "edge_rationale": "SOL_HISTORICAL_BACKFILL_PILOT_V1 proved ingestion mechanics and storage slope. Before testing frozen trial-00095 transfer on SOL, the project needs a complete audited SOLUSDT historical dataset comparable to BTC and ETH research snapshots.",
+  "counterparty_or_market_mechanism": "No trading edge is tested. The milestone validates whether SOLUSDT 2022-2026 historical archives can be materialized into deterministic research tables with resumable checkpoints.",
+  "required_data": [
+    "SOLUSDT daily 15m kline ZIPs",
+    "SOLUSDT daily 4h kline ZIPs",
+    "SOLUSDT daily metrics ZIPs for open interest",
+    "SOLUSDT daily aggTrades ZIPs aggregated to 60s and 15m buckets",
+    "SOLUSDT funding REST history"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "SOL_HISTORICAL_BACKFILL_PILOT_V1",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "SOLUSDT"
+      ]
+    },
+    {
+      "name": "dataset_window",
+      "values": [
+        "2022-01-01_to_2026-03-28_exclusive"
+      ]
+    },
+    {
+      "name": "min_free_disk_gb",
+      "values": [
+        12.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Write only to research_lab/snapshots.",
+    "Do not mutate BTC, ETH, production, PAPER, LIVE, runtime, or storage databases.",
+    "Raw ZIP archives are streamed per day and discarded after parsing.",
+    "Daily checkpoints must allow resumable restart without redownloading DONE days.",
+    "SOL strategy transfer backtest is out of scope until this dataset is complete and audited.",
+    "SOL shadow or PAPER runtime is out of scope."
+  ],
+  "expected_observation": "A successful run creates a complete SOLUSDT 2022-2026 research snapshot with explicit daily checkpoints, low missing rates, zero duplicate groups, zero OHLC errors, and no failed days.",
+  "acceptance_criteria": {
+    "expected_days_done": true,
+    "failed_days": 0,
+    "max_missing_rate_required_tables": 0.01,
+    "duplicate_groups": 0,
+    "ohlc_errors": 0,
+    "disk_guard_min_free_gb": 12.0
+  },
+  "kill_criteria": {
+    "unsafe_path": "Writing outside research_lab/snapshots invalidates the milestone.",
+    "production_db_write": "Any write to storage/btc_bot.db or production database invalidates the milestone.",
+    "missingness": "More than 1% missingness in required dataset tables blocks SOL transfer research.",
+    "quality_errors": "OHLC violations, duplicates, or failed archive days require fix before transfer research.",
+    "runtime_change": "Any runtime/core/settings/execution change invalidates the milestone."
+  },
+  "failure_modes": [
+    "SOL aggTrades archives have unexpected missing days despite pilot success.",
+    "Funding REST history has older range gaps.",
+    "Metrics archive schema changes across years.",
+    "Interrupted run leaves RUNNING checkpoints that must be retried safely.",
+    "Dataset quality passes overall but specific event periods have concentrated gaps."
+  ],
+  "out_of_scope": [
+    "SOL trial-00095 transfer backtest",
+    "SOL portfolio diagnostic",
+    "SOL shadow mode",
+    "SOL PAPER deployment",
+    "Changing settings.py symbol",
+    "Changing runtime, PAPER, LIVE, core, orchestrator, risk, or execution behavior"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00"
+}
