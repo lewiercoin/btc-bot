@@ -4,6 +4,30 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Run offline full-pipeline BTC+ETH replay before M4
+**Decision:** Continue with `MULTI_ASSET_FULL_PIPELINE_REPLAY_V1` as an
+offline-only Path B checkpoint while M4 monitoring and BTC PAPER continue
+unchanged.
+
+**Reason:** Phase 2 artifact-driven portfolio replay passed audit, but a
+source-pipeline regeneration checkpoint further reduces dependency on frozen
+trade artifacts. This validates that the current single-symbol replay pipeline
+can regenerate BTC and ETH trial-00095 trade lists, then feed them into the
+same audited offline portfolio gate.
+
+**Result:** The pipeline regenerated 274 BTC trades and 544 ETH trades. The
+portfolio gate approved 696 trades with ER 1.955, PF 3.60, max DD 13.74R, and
+50.7% win rate. This matches the Phase 2 stateful replay result and supports
+the builder verdict `PASS_FULL_PIPELINE_REPLAY_FOR_RUNTIME_SCOPING`.
+
+**Consequences:** No production behavior changes. No ETH PAPER approval. No
+runtime implementation approval. Runtime integration remains blocked until M4
+checkpoint and later audited runtime milestones.
+
+**Related:** `research_lab/multi_asset_full_pipeline_replay.py`;
+`docs/analysis/MULTI_ASSET_FULL_PIPELINE_REPLAY_2026-05-19.md`;
+`tests/test_multi_asset_full_pipeline_replay.py`.
+
 ## 2026-05-19 - Start offline multi-asset state and backtest implementation
 **Decision:** Start `MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1` in
 offline-only mode while BTC PAPER and M4 monitoring continue unchanged.

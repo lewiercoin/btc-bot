@@ -40,6 +40,50 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_FULL_PIPELINE_REPLAY_V1
+
+**Status:** READY_FOR_AUDIT - offline full-pipeline regeneration complete
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Runner:** `research_lab/multi_asset_full_pipeline_replay.py`
+**Tests:** `tests/test_multi_asset_full_pipeline_replay.py`
+**Report:** `docs/analysis/MULTI_ASSET_FULL_PIPELINE_REPLAY_2026-05-19.md`
+
+**Scope:** Research Lab offline validation only. Regenerate BTC and ETH
+trial-00095 trades through the existing single-symbol backtest pipeline on
+temporary copied replay databases, then apply the audited offline portfolio
+gate from Phase 2. No runtime, PAPER/LIVE, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, or M4 behavior
+changes are in scope.
+
+**Reason:** The Phase 2 artifact-driven replay passed audit. This checkpoint
+tests whether the current source replay pipeline regenerates the same
+decision-grade BTC+ETH portfolio result, reducing dependency on stale trade
+artifacts before any post-M4 runtime decision.
+
+**Result:**
+- Pipeline regenerated trade counts: BTC 274, ETH 544.
+- Portfolio gate approved 696 trades and vetoed 122 signals.
+- Portfolio metrics: ER 1.955, PF 3.60, max DD 13.74R, win rate 50.7%.
+- Per-symbol after portfolio gate: BTC 242 trades, ER 2.160, PF 4.37; ETH
+  454 trades, ER 1.845, PF 3.28.
+- Gates passed: min portfolio trades, ER, PF, max DD, min BTC trades, min ETH
+  trades.
+
+**Limitations:**
+- Portfolio gate is applied to regenerated closed trades, not live intrabar
+  exposures.
+- This does not approve ETH PAPER or BTC+ETH PAPER.
+- Runtime integration remains blocked until M4 checkpoint and later audited
+  runtime milestones.
+
+**Audit request:** Claude Code should audit methodology, layer isolation,
+temporary DB safety, frozen trial-00095 parameter handling, and whether the
+builder verdict `PASS_FULL_PIPELINE_REPLAY_FOR_RUNTIME_SCOPING` is supported.
+
+---
+
 ### Research: MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1
 
 **Status:** CLOSED - audit PASS, offline state/gate validation complete
