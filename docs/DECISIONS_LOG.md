@@ -4,6 +4,34 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Run SOL trial-00095 transfer feasibility
+**Decision:** Mark `SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1` ready for Claude
+Code audit after offline replay with frozen `optuna-default-v3-trial-00095`
+parameters.
+
+**Reason:** SOL data feasibility, pilot backfill, and full dataset audit all
+passed. The next safe question is whether the existing BTC/ETH sweep-reclaim
+edge transfers to SOL and whether SOL improves the existing BTC+ETH offline
+portfolio, before any SOL shadow or runtime design is considered.
+
+**Result:** SOL standalone produced 1,201 trades with ER 2.141, PF 3.42, and
+4/4 positive walk-forward folds. However, the predeclared standalone max
+drawdown gate failed at 15.46% versus the 12% threshold. BTC+ETH+SOL portfolio
+replay passed portfolio gates with 1,545 approved trades, ER 2.056, PF 3.49,
+max DD 19.47R, and 905 approved SOL trades.
+
+**Consequences:** Builder verdict is `SOL_TRANSFER_HYPOTHESIS_FAILED` because
+the standalone transfer protocol failed one hard gate. Do not tune SOL
+thresholds or relax drawdown gates inside this milestone. Claude Code audit
+should decide whether to close as failed, classify as promising/inconclusive
+for a separate risk-framed follow-up, or request fixes. No SOL shadow, SOL
+PAPER, runtime integration, production DB change, or threshold change is
+approved.
+
+**Related:** `research_lab/sol_trial_00095_transfer_feasibility.py`;
+`research_lab/hypotheses/active/sol_trial_00095_transfer_feasibility.json`;
+`docs/analysis/SOL_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-20.md`.
+
 ## 2026-05-19 - Complete SOL historical backfill pilot
 **Decision:** Mark `SOL_HISTORICAL_BACKFILL_PILOT_V1` ready for Claude Code
 audit.

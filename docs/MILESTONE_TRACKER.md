@@ -40,6 +40,55 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1
+
+**Status:** READY_FOR_AUDIT - offline replay complete, awaiting Claude Code audit
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_trial_00095_transfer_feasibility.json`
+**Runner:** `research_lab/sol_trial_00095_transfer_feasibility.py`
+**Report:** `docs/analysis/SOL_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-20.md`
+
+**Scope:** Research Lab strategy transfer only. Replays frozen
+`optuna-default-v3-trial-00095` on the audited SOLUSDT dataset, regenerates BTC
+and ETH pipeline trades for comparison, and applies the offline portfolio gate
+to BTC+ETH+SOL candidates. No runtime, SOL shadow, SOL PAPER, `core/**`,
+`execution/**`, `orchestrator.py`, `main.py`, `settings.py`, production storage,
+threshold change, or parameter tuning is in scope.
+
+**Result:**
+- Pipeline trade counts: BTC 271, ETH 544, SOL 1,201.
+- SOL standalone: ER 2.141, PF 3.42, 1,201 trades, win rate 40.2%,
+  max DD 32.72R.
+- SOL transfer gates: 5/6 PASS; blocking fail is max drawdown percentage
+  15.46% vs 12% threshold.
+- SOL walk-forward: 4/4 positive folds with ER 1.523 to 2.583.
+- SOL 2x cost ER: 1.787.
+- BTC+ETH baseline portfolio: 696 trades, ER 1.955, PF 3.60, max DD 13.74R.
+- BTC+ETH+SOL portfolio: 1,545 trades, ER 2.056, PF 3.49, max DD 19.47R.
+- Portfolio gates: 5/5 PASS; SOL approved trades after portfolio gate: 905.
+
+**Builder verdict:** `SOL_TRANSFER_HYPOTHESIS_FAILED`
+
+**Interpretation:** SOL shows strong transfer-like expectancy and improves the
+three-asset portfolio under portfolio gates, but the standalone transfer
+protocol failed the predeclared max drawdown gate. Do not relax gates or tune
+SOL thresholds inside this milestone. Audit should decide whether the correct
+closure is failed, inconclusive/promising, or requires a follow-up with a
+separate predeclared risk framing.
+
+**Validation:**
+- Local tests: `20 passed`.
+- Local compileall: PASS.
+- Server compileall: PASS.
+- BTC PAPER bot remained active during server replay.
+
+**Next:** Claude Code audit. No SOL shadow/PAPER/runtime step is approved by
+this result.
+
+---
+
 ### Research: SOL_HISTORICAL_BACKFILL_DATASET_V1
 
 **Status:** CLOSED - audit PASS, full SOL dataset complete and validated, ready for strategy transfer research
