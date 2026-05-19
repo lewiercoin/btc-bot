@@ -139,8 +139,10 @@ def run_artifact_portfolio_replay(
     *,
     config: PortfolioRiskConfig | None = None,
     hold_minutes: int = 180,
+    symbols: tuple[str, ...] | None = None,
 ) -> ReplayResult:
-    cfg = config or PortfolioRiskConfig()
+    replay_symbols = tuple(symbol.upper() for symbol in (symbols or SYMBOLS))
+    cfg = config or PortfolioRiskConfig(symbol_order=replay_symbols)
     gate = ResearchPortfolioGate(cfg)
     by_timestamp: dict[datetime, list[ArtifactTrade]] = defaultdict(list)
     for trade in trades:
@@ -163,7 +165,7 @@ def run_artifact_portfolio_replay(
             open_positions = [pos for pos in open_positions if pos.close_at > timestamp]
 
         recovered = recover_portfolio_state(
-            symbols=SYMBOLS,
+            symbols=replay_symbols,
             open_positions=[pos.open_position for pos in open_positions],
             recent_trades=closed_events,
             now=timestamp,
@@ -211,7 +213,7 @@ def run_artifact_portfolio_replay(
                 )
 
         post_state = recover_portfolio_state(
-            symbols=SYMBOLS,
+            symbols=replay_symbols,
             open_positions=[pos.open_position for pos in open_positions],
             recent_trades=closed_events,
             now=timestamp,

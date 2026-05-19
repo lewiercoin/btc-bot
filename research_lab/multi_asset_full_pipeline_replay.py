@@ -26,9 +26,9 @@ from research_lab.eth_trial_00095_transfer_feasibility import (
     DEFAULT_STORE,
     END,
     START,
+    _derive_1h_candles,
     _ensure_runtime_tables,
     load_trial_params,
-    prepare_replay_db,
     resolve_trial_store_path,
 )
 from research_lab.portfolio_replay_harness import (
@@ -52,6 +52,7 @@ class PipelineReplayResult:
     symbol: str
     trades: tuple[ArtifactTrade, ...]
     config_hash: str
+    performance: Any
 
 
 @dataclass(frozen=True, slots=True)
@@ -85,11 +86,11 @@ def run_symbol_pipeline(
     with tempfile.NamedTemporaryFile(suffix=".db", delete=False) as tmp:
         tmp_path = Path(tmp.name)
     try:
-        if symbol == "ETHUSDT":
-            prepare_replay_db(source_db, tmp_path)
-        else:
+        if symbol == "BTCUSDT":
             shutil.copy2(str(source_db), str(tmp_path))
             ensure_replay_compatibility_tables(tmp_path)
+        else:
+            prepare_alt_replay_db(source_db=source_db, target_db=tmp_path, symbol=symbol)
 
         conn = sqlite3.connect(str(tmp_path))
         conn.row_factory = sqlite3.Row
@@ -116,6 +117,7 @@ def run_symbol_pipeline(
         symbol=symbol,
         trades=tuple(trade_log_to_artifact(trade, symbol=symbol) for trade in result.trades),
         config_hash=settings.config_hash,
+        performance=result.performance,
     )
 
 
@@ -125,6 +127,23 @@ def ensure_replay_compatibility_tables(db_path: Path) -> None:
     conn = sqlite3.connect(str(db_path))
     try:
         _ensure_runtime_tables(conn)
+        conn.commit()
+    finally:
+        conn.close()
+
+
+def prepare_alt_replay_db(*, source_db: Path, target_db: Path, symbol: str) -> None:
+    """Copy an alt-asset research dataset and add replay-only compatibility.
+
+    The source dataset remains read-only. The temporary target receives derived
+    1h candles from complete 15m groups plus empty optional-context tables.
+    """
+
+    shutil.copy2(str(source_db), str(target_db))
+    conn = sqlite3.connect(str(target_db))
+    try:
+        _ensure_runtime_tables(conn)
+        _derive_1h_candles(conn, symbol=symbol.upper())
         conn.commit()
     finally:
         conn.close()
