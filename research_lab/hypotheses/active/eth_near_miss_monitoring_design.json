@@ -1,0 +1,61 @@
+{
+  "hypothesis_id": "ETH_NEAR_MISS_MONITORING_DESIGN_V1",
+  "name": "ETH Near-Miss Monitoring Design",
+  "status": "PROPOSED_DESIGN_ONLY",
+  "scope": "Design-only checkpoint for future ETH shadow/no-order monitoring. No runtime implementation, PAPER deployment, LIVE deployment, threshold change, or production DB change.",
+  "edge_rationale": "ETH trial-00095 transfer and BTC+ETH portfolio replay are decision-grade offline evidence, but ETH requires symbol-specific live shadow diagnostics before any PAPER orders. The design defines how to observe ETH sweep-depth near-misses without contaminating BTC M4 conclusions.",
+  "counterparty_or_market_mechanism": "No new trading mechanism is tested. Monitoring observes whether ETH live sweep/reclaim geometry and threshold proximity resemble the audited offline transfer behavior.",
+  "required_data": [
+    "ETHUSDT symbol-explicit decision outcomes",
+    "ETHUSDT sweep/reclaim diagnostics",
+    "ETHUSDT near_miss_diagnostics nested payload",
+    "ETHUSDT governance/risk/portfolio shadow decisions",
+    "BTCUSDT M4 data kept separate for comparison only"
+  ],
+  "timeframe": "15m decision cycle, future shadow_no_orders runtime mode",
+  "baseline_reference": "ETH_TRIAL_00095_TRANSFER_FEASIBILITY_V1 and BTC PAPER M4 near-miss monitoring",
+  "variables": {
+    "min_sweep_depth_pct": "frozen at trial-00095 unless later audited stability milestone changes it",
+    "near_miss_floor": 0.004,
+    "checkpoints": [
+      "day_3_operational",
+      "day_14_shadow",
+      "day_30_shadow"
+    ]
+  },
+  "frozen_assumptions": [
+    "No ETH PAPER orders during shadow_no_orders mode.",
+    "No ETH threshold change from shadow monitoring alone.",
+    "BTC M4 remains independent and must not aggregate ETH near-miss data.",
+    "Nested near_miss_diagnostics.sweep_depth_pct is mandatory for near-miss records.",
+    "ETH PAPER requires a later audited shadow checkpoint and user approval."
+  ],
+  "expected_observation": "A useful future ETH shadow phase records symbol-explicit sweep-depth, blocker, near-miss, governance, and portfolio diagnostics while placing zero ETH orders.",
+  "acceptance_criteria": [
+    "Design clearly blocks runtime changes and ETH PAPER approval.",
+    "Design defines ETH-specific payload fields and near-miss buckets.",
+    "Design defines Day 3, Day 14, and Day 30 shadow checkpoints.",
+    "Design separates ETH shadow conclusions from BTC M4 conclusions.",
+    "Design requires separate threshold stability research before ETH threshold changes."
+  ],
+  "kill_criteria": [
+    "Any runtime implementation is included in this milestone.",
+    "Any ETH PAPER approval is implied.",
+    "Any ETH threshold lowering is authorized directly from monitoring design.",
+    "BTC and ETH near-miss data are combined into one threshold conclusion."
+  ],
+  "failure_modes": [
+    "Shadow payload shape diverges from BTC M4 corrected contract.",
+    "ETH shadow diagnostics become a hidden trading approval path.",
+    "ETH monitoring contaminates BTC M4 interpretation.",
+    "Threshold changes are inferred from live near-misses without offline ceteris-paribus replay."
+  ],
+  "out_of_scope": [
+    "Runtime code changes",
+    "ETH PAPER deployment",
+    "BTC M4 parameter changes",
+    "ETH-specific parameter optimization",
+    "SOL or other asset research",
+    "Storage migration"
+  ]
+}
