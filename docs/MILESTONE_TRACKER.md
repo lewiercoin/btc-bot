@@ -42,13 +42,16 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1
 
-**Status:** PHASE_1_COMPLETE - state and gate contracts implemented offline
+**Status:** PHASE_2_READY_FOR_AUDIT - artifact-driven stateful replay complete
 **Builder:** Codex
 **Decision date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/multi_asset_state_and_backtest_implementation.json`
-**Implementation:** `research_lab/models/portfolio_state.py`
-**Tests:** `tests/test_portfolio_state.py`
+**Implementation:** `research_lab/models/portfolio_state.py`;
+`research_lab/portfolio_replay_harness.py`
+**Tests:** `tests/test_portfolio_state.py`;
+`tests/test_portfolio_replay_harness.py`
+**Report:** `docs/analysis/PORTFOLIO_REPLAY_V1_2026-05-19.md`
 
 **Scope:** Offline/research implementation only while BTC PAPER and M4
 monitoring continue unchanged. Phase 1 implements `SymbolRiskState`,
@@ -70,8 +73,25 @@ storage migration changes are in scope.
   and recent trades.
 - Tests: `8 passed`; compileall clean.
 
-**Next implementation phase:** Add offline portfolio replay harness using the
-state/gate contracts. Still no runtime implementation before M4 checkpoint.
+**Phase 2 result:**
+- Added artifact-driven portfolio replay harness for frozen BTC and ETH
+  trial-00095 trade artifacts.
+- Replay is stateful: it rebuilds symbol and portfolio state on each decision
+  timestamp, applies portfolio gate decisions, opens deterministic synthetic
+  positions, closes them after a fixed hold window, records veto reasons, and
+  tracks cap utilization.
+- Replay result: 696 approved trades, ER 1.955, PF 3.60, max DD 13.74R, win
+  rate 50.7%, 122 vetoed signals.
+- Compared with prior artifact stitching diagnostic: -122 trades, ER +2.3%,
+  PF +3.2%, max DD -28.5%.
+- Loss-streak pauses are now timed pauses using the same 125-minute window as
+  post-loss cooldowns; this prevents unrecoverable permanent lockout in offline
+  replay while preserving the safety pause behavior.
+- Tests: `15 passed`; compileall clean.
+
+**Audit request:** Claude Code should audit this as an offline-only Phase 2
+checkpoint. Still no runtime implementation, ETH PAPER, or BTC+ETH PAPER before
+M4 checkpoint and later audited runtime milestones.
 
 ---
 
