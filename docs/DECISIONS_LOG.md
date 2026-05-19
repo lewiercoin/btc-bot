@@ -17,6 +17,16 @@ combined R drawdown, concentration, and simple conflict policies.
 design if gates pass. It does not approve ETH runtime trading, multi-asset PAPER,
 portfolio execution, or any runtime code change.
 
+**Result:** The `allow_both` offline portfolio combined 274 BTC full-replay
+trades with 544 ETH transfer trades for 818 total trades, ER 1.910, PF 3.49,
+max DD 19.22R, daily PnL correlation 0.051, same-15m overlap 2.8%, and top
+month concentration 7.0%. Builder verdict:
+`PASS_PORTFOLIO_DIAGNOSTIC_FOR_ARCHITECTURE_DESIGN`.
+
+**Next:** Request Claude Code audit. If audit passes, schedule architecture
+design for aggregate portfolio risk and conflict handling, not runtime
+deployment.
+
 **Related:** `research_lab/multi_asset_portfolio_diagnostic.py`;
 `research_lab/hypotheses/active/multi_asset_portfolio_diagnostic.json`;
 `docs/analysis/MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_2026-05-19.md`.

@@ -42,7 +42,7 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1
 
-**Status:** ACTIVE - implementation ready, awaiting server diagnostic run
+**Status:** READY_FOR_AUDIT - portfolio diagnostic passed preregistered gates
 **Builder:** Codex
 **Decision date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
@@ -62,10 +62,16 @@ design. If gates pass, the next milestone should be architecture design for
 aggregate risk, sizing, symbol-level cooldowns, and conflict handling. If gates
 fail, do not proceed to runtime design.
 
-**Required before completion:**
-- Generate ETH transfer trade artifact on server from audited ETH snapshot.
-- Generate portfolio diagnostic report.
-- Commit/push report and request Claude Code audit.
+**Result:**
+
+| Policy | Trades | ER | PF | Max DD R | Daily PnL Corr | Same-Bar Overlap | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| allow_both | 818 | 1.910 | 3.49 | 19.22R | 0.051 | 2.8% | `PASS_PORTFOLIO_DIAGNOSTIC_FOR_ARCHITECTURE_DESIGN` |
+
+**Interpretation:** BTC+ETH trial-00095 artifacts support proceeding to
+multi-asset architecture design. This is not runtime approval. The next
+milestone should define aggregate risk, sizing, symbol-level cooldowns,
+portfolio drawdown limits, and conflict handling before any implementation.
 
 ---
 
