@@ -4,6 +4,30 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Start offline multi-asset state and backtest implementation
+**Decision:** Start `MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1` in
+offline-only mode while BTC PAPER and M4 monitoring continue unchanged.
+
+**Reason:** Claude Code confirmed that parallel offline implementation is safe
+if state models stay under `research_lab/models` and no runtime path is touched.
+The first implementation checkpoint should prove state isolation and portfolio
+gate behavior before building a full replay harness.
+
+**Phase 1 result:** Added research-only `SymbolRiskState`,
+`PortfolioRiskState`, `PortfolioRiskConfig`, `ResearchPortfolioGate`,
+deterministic same-bar ordering, cap/veto logic, and recovery-state simulation.
+Tests cover same-bar `allow_both`, risk cap veto, directional notional veto,
+symbol loss-streak isolation, symbol cooldown isolation, portfolio emergency
+stop, and recovery reconstruction.
+
+**Consequences:** No production behavior changes. No ETH PAPER approval. No
+runtime implementation approval. Next work may add an offline portfolio replay
+harness only.
+
+**Related:** `research_lab/models/portfolio_state.py`;
+`tests/test_portfolio_state.py`;
+`research_lab/hypotheses/active/multi_asset_state_and_backtest_implementation.json`.
+
 ## 2026-05-19 - Define multi-asset portfolio architecture before implementation
 **Decision:** Complete `MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1` as a design-only
 milestone after internal consultation and the audited portfolio diagnostic.
