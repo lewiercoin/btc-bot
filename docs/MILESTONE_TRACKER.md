@@ -40,6 +40,41 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: ETH_NEAR_MISS_MONITORING_DESIGN_V1
+
+**Status:** READY_FOR_AUDIT_DESIGN_ONLY
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/eth_near_miss_monitoring_design.json`
+**Blueprint:** `docs/blueprints/ETH_NEAR_MISS_MONITORING_DESIGN_V1_2026-05-19.md`
+
+**Scope:** Design-only contract for future ETH shadow/no-order near-miss
+monitoring. No runtime implementation, ETH PAPER, LIVE deployment, storage
+migration, BTC M4 change, threshold change, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, or `settings.py` modification is in scope.
+
+**Reason:** BTC M4 is BTC-specific and remains the deployment blocker for
+multi-asset runtime changes. ETH has strong audited offline transfer evidence,
+but ETH needs separate symbol-local shadow diagnostics before ETH PAPER can be
+considered.
+
+**Design decisions:**
+- Future ETH runtime starts in `shadow_no_orders`, not PAPER.
+- ETH near-miss payload must include nested
+  `near_miss_diagnostics.sweep_depth_pct`, matching the corrected BTC M4
+  contract.
+- ETH shadow checkpoints are Day 3 operational, Day 14 shadow behavior, and
+  Day 30 PAPER-readiness review.
+- ETH threshold changes are blocked behind a separate
+  `ETH_SWEEP_DEPTH_THRESHOLD_STABILITY_V1` offline milestone.
+- BTC M4 and ETH shadow reports must remain symbol-separated and cannot be
+  aggregated into one threshold conclusion.
+
+**Builder verdict:** `READY_FOR_AUDIT_DESIGN_ONLY`
+
+---
+
 ### Research: MULTI_ASSET_FULL_PIPELINE_REPLAY_V1
 
 **Status:** CLOSED - audit PASS, pipeline regeneration validated

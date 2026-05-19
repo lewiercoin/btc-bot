@@ -4,6 +4,30 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Define ETH near-miss monitoring before ETH PAPER
+**Decision:** Create `ETH_NEAR_MISS_MONITORING_DESIGN_V1` as a design-only
+contract for future ETH shadow/no-order monitoring.
+
+**Reason:** BTC M4 answers a BTC-specific threshold stability question. ETH has
+audited offline transfer and portfolio evidence, but its live sweep-depth
+distribution and near-miss behavior must be observed separately before ETH
+PAPER orders are considered. ETH monitoring must not contaminate BTC M4
+conclusions.
+
+**Design result:** Future ETH runtime starts as `shadow_no_orders`; it collects
+symbol-explicit ETH decision outcomes, near-miss diagnostics, governance shadow
+decisions, and portfolio shadow decisions while placing zero ETH orders. The
+design requires Day 3, Day 14, and Day 30 checkpoints and blocks ETH threshold
+changes behind a separate offline `ETH_SWEEP_DEPTH_THRESHOLD_STABILITY_V1`
+milestone.
+
+**Consequences:** No runtime behavior changes. No ETH PAPER approval. No
+threshold change. BTC M4 remains the deployment blocker for multi-asset runtime
+changes through the 2026-06-13 checkpoint.
+
+**Related:** `docs/blueprints/ETH_NEAR_MISS_MONITORING_DESIGN_V1_2026-05-19.md`;
+`research_lab/hypotheses/active/eth_near_miss_monitoring_design.json`.
+
 ## 2026-05-19 - Run offline full-pipeline BTC+ETH replay before M4
 **Decision:** Continue with `MULTI_ASSET_FULL_PIPELINE_REPLAY_V1` as an
 offline-only Path B checkpoint while M4 monitoring and BTC PAPER continue
