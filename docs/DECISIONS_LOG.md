@@ -4,6 +4,31 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Start SOL data feasibility
+**Decision:** Start `SOL_DATA_FEASIBILITY_V1` as a Research Lab data-quality
+diagnostic while BTC PAPER, BTC M4, and ETH design remain unchanged.
+
+**Reason:** SOLUSDT is the strongest next candidate after ETH for testing
+trial-00095 transfer because it is liquid, volatile, and likely to produce
+meaningful sweep/reclaim behavior. Before any backfill or strategy test, the
+project must verify SOL source availability and sample quality.
+
+**Result:** Recent SOL candles, funding, open interest, book ticker, and archive
+probes are available and clean enough to justify a guarded backfill pilot.
+Historical archive probes for 2022-2025 pass for klines, metrics, and
+aggTrades. REST aggTrades recent sampling is limited for SOL activity, so the
+future backfill must rely on daily aggTrades archives rather than REST window
+sampling.
+
+**Consequences:** No SOL strategy research is approved yet. No market data was
+persisted. No runtime, SOL shadow, SOL PAPER, threshold change, or production DB
+change is approved. If Claude Code audit passes, the next step can be
+`SOL_HISTORICAL_BACKFILL_PILOT_V1`.
+
+**Related:** `research_lab/analysis_sol_data_feasibility.py`;
+`research_lab/hypotheses/active/sol_data_feasibility.json`;
+`docs/analysis/SOL_DATA_FEASIBILITY_2026-05-19.md`.
+
 ## 2026-05-19 - Define ETH near-miss monitoring before ETH PAPER
 **Decision:** Create `ETH_NEAR_MISS_MONITORING_DESIGN_V1` as a design-only
 contract for future ETH shadow/no-order monitoring.

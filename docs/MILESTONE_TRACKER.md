@@ -40,6 +40,43 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_DATA_FEASIBILITY_V1
+
+**Status:** READY_FOR_AUDIT
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_data_feasibility.json`
+**Runner:** `research_lab/analysis_sol_data_feasibility.py`
+**Report:** `docs/analysis/SOL_DATA_FEASIBILITY_2026-05-19.md`
+
+**Scope:** Research Lab data-quality diagnostic only. Reads public REST/API and
+Binance Vision archive metadata, writes one markdown report, and does not
+persist market data. No runtime, PAPER/LIVE, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, SOL shadow,
+or threshold change is in scope.
+
+**Result:**
+- Local inventory: SOLUSDT rows are absent from the current BTC research
+  snapshot, so full backfill is required before strategy research.
+- Recent candles/funding/OI/book sample: PASS quality gates.
+- Recent archive probes: 15m klines, metrics, and aggTrades available; liquidation
+  snapshot 404.
+- Historical archive probes for 2022-01-01, 2023-01-01, 2024-01-01, and
+  2025-01-01: 100% available for klines, metrics, and aggTrades.
+- REST aggTrades recent sample is limited for SOL activity: 5/60 expected 60s
+  buckets with default REST limit. This is a REST sampling limitation, not an
+  archive blocker; full backfill must use daily aggTrades archives.
+
+**Builder verdict:**
+`PASS_SOL_ARCHIVE_SOURCE_FEASIBLE_REST_AGGTRADE_SAMPLE_LIMIT_FULL_BACKFILL_REQUIRED`
+
+**Next if audit PASS:** Schedule `SOL_HISTORICAL_BACKFILL_PILOT_V1` with disk
+guard, streaming archive aggregation, separate research snapshot, and no
+production DB writes.
+
+---
+
 ### Research: ETH_NEAR_MISS_MONITORING_DESIGN_V1
 
 **Status:** CLOSED - audit PASS, design ready to guide post-M4 ETH shadow implementation

@@ -1,0 +1,84 @@
+{
+  "hypothesis_id": "SOL_DATA_FEASIBILITY_V1",
+  "name": "SOL Data Feasibility",
+  "class": "diagnostic_only",
+  "status": "ACTIVE",
+  "scope": "Research Lab data-quality diagnostic only. No market data persistence, strategy backtest, runtime implementation, PAPER deployment, LIVE deployment, or threshold change.",
+  "edge_rationale": "Before testing whether frozen trial-00095 sweep/reclaim transfers to SOLUSDT, the project must verify that SOL market data sources are available with quality comparable to BTC and ETH research snapshots.",
+  "counterparty_or_market_mechanism": "No trading edge is tested. The milestone validates data feasibility for candles, funding, open interest, aggtrade-derived flow, and archive availability.",
+  "required_data": [
+    "local_research_snapshot_inventory",
+    "SOLUSDT_15m_klines_recent_sample",
+    "SOLUSDT_4h_klines_recent_sample",
+    "SOLUSDT_funding_recent_sample",
+    "SOLUSDT_open_interest_recent_sample",
+    "SOLUSDT_aggtrade_bucket_recent_sample",
+    "SOLUSDT_Binance_Vision_recent_archive_probe",
+    "SOLUSDT_Binance_Vision_historical_archive_probe"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "BTC trial-00095 and ETH transfer feasibility data path",
+  "variables": {
+    "symbol": "SOLUSDT",
+    "sample_window": [
+      "recent_7d_for_candles_funding_oi",
+      "recent_1h_for_aggtrade_60s"
+    ],
+    "historical_probe_days": [
+      "2022-01-01",
+      "2023-01-01",
+      "2024-01-01",
+      "2025-01-01"
+    ]
+  },
+  "frozen_assumptions": [
+    "No market data is written by this milestone.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, settings, or storage changes.",
+    "A clean SOL sample does not approve SOL strategy transfer research.",
+    "Full SOL historical backfill and data audit are required before any SOL trial-00095 transfer replay.",
+    "SOL shadow or PAPER runtime is out of scope."
+  ],
+  "expected_observation": "A useful result determines whether SOLUSDT source APIs and archives are available and whether recent samples pass timestamp, missingness, duplicate, OHLC, funding, OI, and aggtrade checks.",
+  "acceptance_criteria": {
+    "api_families_ok": 1.0,
+    "max_candles_15m_missing_rate": 0.01,
+    "max_candles_4h_missing_rate": 0.01,
+    "candles_15m_quality_errors": 0,
+    "candles_15m_duplicates": 0,
+    "min_funding_rows": 10,
+    "min_open_interest_rows": 100,
+    "min_aggtrade_rows": 45,
+    "min_recent_archive_families_ok": 0.75,
+    "min_historical_archive_families_ok": 0.75
+  },
+  "kill_criteria": {
+    "api_unavailable": "Any required recent sample family unavailable blocks SOL data feasibility.",
+    "candle_quality_failure": "OHLC violations, duplicate candles, or more than 1% missing 15m/4h candles blocks the direction.",
+    "flow_unavailable": "No aggtrade-derived flow sample blocks trial-00095 transfer research because TFI/CVD features cannot be reconstructed.",
+    "historical_archive_coverage_risk": "Historical archive coverage below 75% makes full SOL backfill inconclusive until a provider plan exists.",
+    "runtime_change": "Any runtime/core/settings/data persistence change invalidates this milestone."
+  },
+  "failure_modes": [
+    "Recent public REST samples are clean but historical archives are incomplete.",
+    "SOL open interest history has API or archive limitations.",
+    "SOL aggtrade archives are too large or incomplete for 2022-2026 TFI reconstruction.",
+    "SOL has materially different launch-date coverage than BTC/ETH and requires adjusted backfill window.",
+    "Recent sample quality looks good but historical backfill quality fails."
+  ],
+  "out_of_scope": [
+    "SOL strategy backtest",
+    "SOL historical backfill",
+    "Writing sampled market data into SQLite",
+    "Changing settings.py symbol",
+    "Changing runtime, PAPER, LIVE, core, orchestrator, risk, or execution behavior",
+    "SOL shadow mode",
+    "SOL PAPER deployment",
+    "Portfolio diagnostics including SOL"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00"
+}
