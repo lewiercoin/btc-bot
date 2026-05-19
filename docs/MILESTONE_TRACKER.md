@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_DATA_FEASIBILITY_V1
 
-**Status:** READY_FOR_AUDIT
+**Status:** CLOSED - audit PASS, SOL source availability confirmed, full backfill required
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_data_feasibility.json`
 **Runner:** `research_lab/analysis_sol_data_feasibility.py`
 **Report:** `docs/analysis/SOL_DATA_FEASIBILITY_2026-05-19.md`
+**Audit:** `docs/audits/AUDIT_SOL_DATA_FEASIBILITY_2026-05-19.md`
 
 **Scope:** Research Lab data-quality diagnostic only. Reads public REST/API and
 Binance Vision archive metadata, writes one markdown report, and does not
@@ -71,9 +73,17 @@ or threshold change is in scope.
 **Builder verdict:**
 `PASS_SOL_ARCHIVE_SOURCE_FEASIBLE_REST_AGGTRADE_SAMPLE_LIMIT_FULL_BACKFILL_REQUIRED`
 
-**Next if audit PASS:** Schedule `SOL_HISTORICAL_BACKFILL_PILOT_V1` with disk
-guard, streaming archive aggregation, separate research snapshot, and no
-production DB writes.
+**Audit verdict:** PASS
+
+**Audit summary:**
+- Data isolation: PASS (no market data written, no runtime changes, BTC PAPER still running)
+- Local inventory vs external checks: PASS (clearly separated in report)
+- Quality gates: PASS (explicit numeric thresholds, reproducible)
+- Historical archive probes: PASS (2022-2025 100% OK for klines, metrics, aggTrades)
+- REST aggTrades limitation: PASS (clearly documented, fallback to daily archive explicit)
+- Strategy readiness claim: PASS (report correctly states full backfill required before SOL trial-00095 test)
+
+**Next:** `SOL_HISTORICAL_BACKFILL_PILOT_V1` - offline backfill of SOLUSDT historical data using Binance Vision daily archives into separate research snapshot, with quality validation and coverage report.
 
 ---
 
