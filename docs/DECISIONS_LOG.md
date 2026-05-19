@@ -19,6 +19,14 @@ research-only symbol setting to `ETHUSDT`, derives 1h replay candles from 15m
 inside a temporary DB, and does not touch BTC PAPER, M4 monitoring, runtime,
 `core/**`, `execution/**`, `orchestrator.py`, or `settings.py`.
 
+**Result:** Server replay produced 544 ETH trades from 2022-01-01 through
+2026-03-28 with ER 1.804, PF 2.81, max DD 6.72%, 4/4 positive chronological
+folds, and ER 1.422 at 2x cost. Builder verdict:
+`PASS_TRANSFER_CANDIDATE_FOR_AUDIT`.
+
+**Next:** Request Claude Code audit before treating this as decision-grade
+evidence for any follow-up multi-asset research or architecture work.
+
 **Related:** `research_lab/eth_trial_00095_transfer_feasibility.py`;
 `research_lab/hypotheses/active/eth_trial_00095_transfer_feasibility.json`;
 `docs/analysis/ETH_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-19.md`.
