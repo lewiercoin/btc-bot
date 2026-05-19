@@ -72,6 +72,12 @@ def test_builder_verdict_passes_when_all_gates_pass() -> None:
     assert builder_verdict(gates) == "PASS_PORTFOLIO_DIAGNOSTIC_FOR_ARCHITECTURE_DESIGN"
 
 
+def test_diagnostic_harness_uses_store_resolver() -> None:
+    import research_lab.multi_asset_portfolio_diagnostic as module
+
+    assert module.resolve_trial_store_path is not None
+
+
 def test_multi_asset_portfolio_hypothesis_spec_is_valid() -> None:
     spec = load_hypothesis_spec(Path("research_lab/hypotheses/active/multi_asset_portfolio_diagnostic.json"))
 

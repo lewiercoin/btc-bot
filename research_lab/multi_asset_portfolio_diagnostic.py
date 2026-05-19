@@ -18,6 +18,7 @@ from research_lab.eth_trial_00095_transfer_feasibility import (
     DEFAULT_STORE,
     END,
     START,
+    resolve_trial_store_path,
     run_replay,
 )
 
@@ -301,15 +302,18 @@ def run_diagnostic(
     force_eth_replay: bool,
 ) -> dict[str, Any]:
     btc = load_btc_trades(btc_trades_path)
+    resolved_store_path = resolve_trial_store_path(store_path)
     if eth_trades_path.exists() and not force_eth_replay:
         eth = load_eth_trades(eth_trades_path)
     else:
-        eth = generate_eth_trades(source_db=eth_source_db, store_path=store_path, output_path=eth_trades_path)
+        eth = generate_eth_trades(source_db=eth_source_db, store_path=resolved_store_path, output_path=eth_trades_path)
 
     payload: dict[str, Any] = {
         "milestone": "MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1",
         "btc_artifact": str(btc_trades_path),
         "eth_artifact": str(eth_trades_path),
+        "requested_store_path": str(store_path),
+        "resolved_store_path": str(resolved_store_path),
         "btc": compute_metrics(btc),
         "eth": compute_metrics(eth),
         "daily_correlation": daily_correlation(btc, eth),
@@ -349,8 +353,11 @@ def generate_report(payload: dict[str, Any], report_path: Path) -> str:
         "",
         f"- BTC trades: `{payload['btc_artifact']}`",
         f"- ETH trades: `{payload['eth_artifact']}`",
+        f"- Trial store: `{payload['resolved_store_path']}`",
         "",
         "## Standalone Metrics",
+        "",
+        "Metrics in this report are R-based portfolio diagnostics. They may differ from per-asset backtest PF values that use absolute PnL.",
         "",
         "| Asset | Trades | ER | PF | Win Rate | PnL R Sum | Max DD R | Max Loss Streak |",
         "|---|---:|---:|---:|---:|---:|---:|---:|",
