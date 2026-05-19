@@ -42,14 +42,16 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_HISTORICAL_BACKFILL_DATASET_V1
 
-**Status:** READY_FOR_AUDIT - full SOL dataset materialized, awaiting Claude Code audit
+**Status:** CLOSED - audit PASS, full SOL dataset complete and validated, ready for strategy transfer research
 **Builder:** Codex
 **Decision date:** 2026-05-19
+**Audit date:** 2026-05-19
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_historical_backfill_dataset.json`
 **Runner:** `research_lab/backfill_sol_historical_data.py`
 **Report:** `docs/analysis/SOL_HISTORICAL_BACKFILL_DATASET_2026-05-19.md`
-**Snapshot:** `research_lab/snapshots/replay-run-sol-historical-2022-2026.db` (not committed)
+**Audit:** `docs/audits/AUDIT_SOL_HISTORICAL_BACKFILL_DATASET_2026-05-19.md`
+**Snapshot:** `research_lab/snapshots/replay-run-sol-historical-2022-2026.db` (340.27 MB, not committed)
 
 **Scope:** Research Lab data-engineering dataset only. Creates a separate
 SOLUSDT historical snapshot under `research_lab/snapshots`, streams Binance
@@ -78,16 +80,18 @@ SOL strategy backtest, or threshold change is in scope.
 
 **Builder verdict:** `DATASET_COMPLETE_READY_FOR_AUDIT`
 
-**Validation:**
-- Local tests: `19 passed`.
-- Local compileall: PASS.
-- Server compileall: PASS for the backfill runner.
-- Server pytest unavailable in runtime venv; local pytest was used for test
-  validation.
+**Audit verdict:** PASS
 
-**Next:** Claude Code audit. If PASS, a later milestone may test frozen
-`trial-00095` transfer on SOL; this dataset milestone does not approve SOL
-strategy, shadow, PAPER, or runtime work.
+**Audit summary:**
+- Data isolation: PASS (writes only to research_lab/snapshots, no production DB writes, BTC PAPER still running)
+- Resumable checkpoints: PASS (47 days processed this run, 1500 already-DONE days skipped)
+- Disk guard: PASS (12 GB minimum enforced, 25.71 GB free maintained)
+- Dataset completion: PASS (1547/1547 days DONE, 0 failed)
+- Quality metrics: PASS (0.00-0.03% missingness within 1% gate, 0 duplicates, 0 OHLC corruptions)
+- Zero-volume classification: PASS (7 valid flat candles, 0 invalid non-flat)
+- Strategy readiness claim: PASS (report correctly states no SOL strategy/shadow/PAPER approval)
+
+**Next:** `SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1` - offline strategy backtest comparing BTC+ETH vs BTC+ETH+SOL portfolio with frozen trial-00095 sweep/reclaim logic, using audited dataset DB as read-only input.
 
 ---
 
