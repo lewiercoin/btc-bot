@@ -10,6 +10,7 @@ from research_lab.eth_trial_00095_transfer_feasibility import (
     builder_verdict,
     evaluate_gates,
     fold_windows,
+    resolve_trial_store_path,
 )
 from research_lab.hypotheses.spec import load_hypothesis_spec
 
@@ -113,6 +114,29 @@ def test_fold_windows_cover_expected_chronology() -> None:
     labels = [item[0] for item in fold_windows()]
 
     assert labels == ["2022", "2023", "2024", "2025_to_2026Q1"]
+
+
+def test_resolve_trial_store_path_uses_fallback_when_preferred_has_no_trials(tmp_path: Path) -> None:
+    preferred = tmp_path / "empty.db"
+    sqlite3.connect(preferred).close()
+    fallback = tmp_path / "research_lab.db"
+    conn = sqlite3.connect(fallback)
+    conn.execute("CREATE TABLE trials (trial_id TEXT PRIMARY KEY, params_json TEXT)")
+    conn.execute(
+        "INSERT INTO trials(trial_id, params_json) VALUES (?, ?)",
+        ("optuna-default-v3-trial-00095", "{}"),
+    )
+    conn.commit()
+    conn.close()
+
+    from research_lab import eth_trial_00095_transfer_feasibility as module
+
+    original = module.STORE_FALLBACKS
+    try:
+        module.STORE_FALLBACKS = (fallback,)
+        assert resolve_trial_store_path(preferred) == fallback
+    finally:
+        module.STORE_FALLBACKS = original
 
 
 def test_eth_transfer_hypothesis_spec_is_valid() -> None:
