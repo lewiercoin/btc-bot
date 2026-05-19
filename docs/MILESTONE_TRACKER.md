@@ -40,6 +40,43 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_HISTORICAL_BACKFILL_PILOT_V1
+
+**Status:** READY_FOR_AUDIT
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_historical_backfill_pilot.json`
+**Runner:** `research_lab/backfill_sol_historical_data.py`
+**Report:** `docs/analysis/SOL_HISTORICAL_BACKFILL_PILOT_2026-05-19.md`
+**Snapshot:** `research_lab/snapshots/replay-run-sol-backfill-pilot-2026-05-15_2026-05-18.db` (not committed)
+
+**Scope:** Research Lab data-engineering pilot only. Creates a separate SOLUSDT
+pilot snapshot under `research_lab/snapshots`, streams Binance Vision daily ZIPs
+day by day, aggregates aggTrades into 60s and 15m buckets, fetches funding for
+pilot days, and writes a markdown report. No runtime, PAPER/LIVE, `core/**`,
+`execution/**`, `orchestrator.py`, `main.py`, `settings.py`, production storage,
+SOL shadow, SOL strategy backtest, or threshold change is in scope.
+
+**Result:**
+- Pilot range: 2026-05-15 to 2026-05-18 exclusive (3 days).
+- Rows: 288 15m candles, 18 4h candles, 9 funding rows, 864 OI rows,
+  4,320 aggtrade 60s buckets, 288 aggtrade 15m buckets.
+- Missing rates: 0.00% across all required datasets.
+- Duplicate groups: 0 across candles, funding, open_interest, aggtrade_buckets.
+- OHLC/zero-volume errors: 0.
+- Checkpoints: 3 DONE, 0 failed.
+- Pilot DB size: 0.77 MB; linear full 2022-2026 estimate: 0.39 GB.
+- Disk guard: 12 GB minimum, 25.58 GB free before/after.
+
+**Builder verdict:** `PASS_SOL_BACKFILL_PILOT_FULL_BACKFILL_READY`
+
+**Next if audit PASS:** Schedule `SOL_HISTORICAL_BACKFILL_DATASET_V1` for the
+full SOL research snapshot with resumable daily checkpoints, disk guard, and
+separate audit before SOL trial-00095 transfer research.
+
+---
+
 ### Research: SOL_DATA_FEASIBILITY_V1
 
 **Status:** CLOSED - audit PASS, SOL source availability confirmed, full backfill required

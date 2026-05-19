@@ -4,6 +4,29 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-19 - Complete SOL historical backfill pilot
+**Decision:** Mark `SOL_HISTORICAL_BACKFILL_PILOT_V1` ready for Claude Code
+audit.
+
+**Reason:** SOL data feasibility passed, but a full SOL backfill should not be
+scheduled until archive ingestion mechanics, disk slope, aggTrade streaming,
+and quality checks are validated on a short separate research snapshot.
+
+**Result:** The 3-day SOL pilot completed with 0.00% missingness across 15m
+candles, 4h candles, funding, open interest, aggtrade 60s buckets, and aggtrade
+15m buckets. Duplicate groups were 0, OHLC/zero-volume errors were 0, failed
+days were 0, and disk guard stayed above the 12 GB minimum. Pilot DB size was
+0.77 MB, implying a linear full 2022-2026 estimate of about 0.39 GB.
+
+**Consequences:** SOL strategy transfer research is still not approved. The
+next step, if audit passes, is a full `SOL_HISTORICAL_BACKFILL_DATASET_V1`
+milestone with resumable checkpoints and a separate audit. No runtime, SOL
+shadow, SOL PAPER, production DB, or threshold change is approved.
+
+**Related:** `research_lab/backfill_sol_historical_data.py`;
+`research_lab/hypotheses/active/sol_historical_backfill_pilot.json`;
+`docs/analysis/SOL_HISTORICAL_BACKFILL_PILOT_2026-05-19.md`.
+
 ## 2026-05-19 - Start SOL data feasibility
 **Decision:** Start `SOL_DATA_FEASIBILITY_V1` as a Research Lab data-quality
 diagnostic while BTC PAPER, BTC M4, and ETH design remain unchanged.

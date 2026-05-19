@@ -1,0 +1,83 @@
+{
+  "hypothesis_id": "SOL_HISTORICAL_BACKFILL_PILOT_V1",
+  "name": "SOL Historical Backfill Pilot",
+  "class": "diagnostic_only",
+  "status": "ACTIVE",
+  "scope": "Research Lab data-engineering pilot only. Creates a separate SOLUSDT pilot snapshot under research_lab/snapshots and writes a markdown report. No strategy test, runtime change, PAPER deployment, LIVE deployment, or production DB write.",
+  "edge_rationale": "SOL_DATA_FEASIBILITY_V1 confirmed SOL archive source availability. Before scheduling a full SOL 2022-2026 backfill and trial-00095 transfer test, the project must validate ingestion mechanics, disk slope, streaming aggTrades aggregation, and quality gates on a short SOL window.",
+  "counterparty_or_market_mechanism": "No trading edge is tested. The milestone validates whether SOLUSDT historical archives can be materialized into the same deterministic research schema used by BTC/ETH.",
+  "required_data": [
+    "SOLUSDT daily 15m kline ZIP",
+    "SOLUSDT daily 4h kline ZIP",
+    "SOLUSDT daily metrics ZIP for open interest",
+    "SOLUSDT daily aggTrades ZIP aggregated to 60s and 15m buckets",
+    "SOLUSDT funding REST history for pilot days"
+  ],
+  "timeframe": [
+    "15m",
+    "4h",
+    "60s"
+  ],
+  "baseline_reference": "SOL_DATA_FEASIBILITY_V1 and ETH_HISTORICAL_BACKFILL_PILOT_V1",
+  "variables": [
+    {
+      "name": "symbol",
+      "values": [
+        "SOLUSDT"
+      ]
+    },
+    {
+      "name": "pilot_window",
+      "values": [
+        "2026-05-15_to_2026-05-18_exclusive"
+      ]
+    },
+    {
+      "name": "min_free_disk_gb",
+      "values": [
+        12.0
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Write only to research_lab/snapshots.",
+    "Do not mutate BTC, ETH, production, PAPER, LIVE, runtime, or storage databases.",
+    "Raw ZIP archives are streamed per day and discarded after parsing.",
+    "SOL strategy transfer backtest is out of scope until a full SOL dataset is complete and audited.",
+    "SOL shadow or PAPER runtime is out of scope."
+  ],
+  "expected_observation": "A successful pilot creates a small SOLUSDT research snapshot, reports row counts versus expected counts, measures DB size per day, estimates full 2022-2026 storage footprint, and leaves production runtime untouched.",
+  "acceptance_criteria": {
+    "db_path_under_research_lab_snapshots": true,
+    "max_missing_rate_required_tables": 0.01,
+    "duplicate_groups": 0,
+    "ohlc_errors": 0,
+    "failed_days": 0,
+    "disk_guard_min_free_gb": 12.0
+  },
+  "kill_criteria": {
+    "unsafe_path": "Writing outside research_lab/snapshots invalidates the milestone.",
+    "production_db_write": "Any write to storage/btc_bot.db or production database invalidates the milestone.",
+    "missingness": "More than 1% missingness in required pilot tables blocks full backfill scheduling.",
+    "quality_errors": "OHLC violations, duplicates, or failed archive days require fix before full backfill.",
+    "runtime_change": "Any runtime/core/settings/execution change invalidates the milestone."
+  },
+  "failure_modes": [
+    "SOL aggTrades archives are much larger than ETH and threaten disk budget.",
+    "SOL metrics archive schema differs from ETH parser assumptions.",
+    "SOL historical archives pass HEAD probes but fail CSV parsing.",
+    "Funding REST history diverges from archive day boundaries.",
+    "Pilot succeeds but storage slope implies full backfill must run only on server."
+  ],
+  "out_of_scope": [
+    "Full SOL 2022-2026 backfill",
+    "SOL trial-00095 transfer backtest",
+    "SOL portfolio diagnostic",
+    "SOL shadow mode",
+    "SOL PAPER deployment",
+    "Changing settings.py symbol",
+    "Changing runtime, PAPER, LIVE, core, orchestrator, risk, or execution behavior"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00"
+}
