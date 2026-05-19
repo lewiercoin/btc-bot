@@ -27,6 +27,10 @@ START = "2022-01-01"
 END = "2026-03-28"
 DEFAULT_ETH_DB = Path("research_lab/snapshots/ethusdt_2022_2026_dataset_v1.db")
 DEFAULT_STORE = Path("research_lab/research_lab.db.v3")
+STORE_FALLBACKS = (
+    Path("research_lab/research_lab.db"),
+    Path("research_lab/research_lab.pre_trial_00095_wf_.db"),
+)
 DEFAULT_REPORT = Path("docs/analysis/ETH_TRIAL_00095_TRANSFER_FEASIBILITY_2026-05-19.md")
 
 
@@ -50,6 +54,18 @@ class FoldResult:
     profit_factor: float
     max_drawdown_pct: float
     win_rate: float
+
+
+def resolve_trial_store_path(preferred: Path, trial_id: str = TRIAL_00095_ID) -> Path:
+    candidates = [preferred, *(path for path in STORE_FALLBACKS if path != preferred)]
+    for candidate in candidates:
+        try:
+            load_trial_params(candidate, trial_id=trial_id)
+        except (RuntimeError, sqlite3.Error, OSError):
+            continue
+        return candidate
+    searched = ", ".join(str(path) for path in candidates)
+    raise RuntimeError(f"Trial {trial_id!r} not found in any store: {searched}")
 
 
 def load_trial_params(store_path: Path, trial_id: str = TRIAL_00095_ID) -> dict[str, Any]:
@@ -452,23 +468,24 @@ def run_analysis(
     start: str,
     end: str,
 ) -> dict[str, Any]:
+    resolved_store_path = resolve_trial_store_path(store_path)
     full_perf, full_trades, config_hash = run_replay(
         source_db=source_db,
-        store_path=store_path,
+        store_path=resolved_store_path,
         start=start,
         end=end,
         fee_multiplier=1.0,
     )
     cost_15_perf, _cost_15_trades, _ = run_replay(
         source_db=source_db,
-        store_path=store_path,
+        store_path=resolved_store_path,
         start=start,
         end=end,
         fee_multiplier=1.5,
     )
     cost_2_perf, _cost_2_trades, _ = run_replay(
         source_db=source_db,
-        store_path=store_path,
+        store_path=resolved_store_path,
         start=start,
         end=end,
         fee_multiplier=2.0,
@@ -478,7 +495,7 @@ def run_analysis(
     for label, fold_start, fold_end in fold_windows():
         perf, _trades, _ = run_replay(
             source_db=source_db,
-            store_path=store_path,
+            store_path=resolved_store_path,
             start=fold_start,
             end=fold_end,
             fee_multiplier=1.0,
@@ -493,7 +510,8 @@ def run_analysis(
         "builder_verdict": verdict,
         "symbol": SYMBOL,
         "source_db": str(source_db),
-        "store_path": str(store_path),
+        "store_path": str(resolved_store_path),
+        "requested_store_path": str(store_path),
         "trial_id": TRIAL_00095_ID,
         "config_hash": config_hash,
         "start": start,
