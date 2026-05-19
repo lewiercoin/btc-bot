@@ -40,6 +40,41 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_STATE_AND_BACKTEST_IMPLEMENTATION_V1
+
+**Status:** PHASE_1_COMPLETE - state and gate contracts implemented offline
+**Builder:** Codex
+**Decision date:** 2026-05-19
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/multi_asset_state_and_backtest_implementation.json`
+**Implementation:** `research_lab/models/portfolio_state.py`
+**Tests:** `tests/test_portfolio_state.py`
+
+**Scope:** Offline/research implementation only while BTC PAPER and M4
+monitoring continue unchanged. Phase 1 implements `SymbolRiskState`,
+`PortfolioRiskState`, `PortfolioRiskConfig`, deterministic same-bar ordering,
+portfolio cap checks, machine-readable veto reasons, and recovery-state
+simulation under `research_lab/models`. No runtime, PAPER/LIVE, `core/**`,
+`execution/**`, `orchestrator.py`, `main.py`, `settings.py`, or production
+storage migration changes are in scope.
+
+**Phase 1 result:**
+- `ResearchPortfolioGate` enforces 0.70% total risk cap, 1.0x gross notional
+  cap, 0.75x directional notional cap, max 2 open positions total, max 1 per
+  symbol.
+- Same-bar ordering is deterministic: timestamp, then symbol order
+  `BTCUSDT`, `ETHUSDT`.
+- Per-symbol loss streak/cooldown pauses do not block the other symbol.
+- Portfolio emergency stop blocks all symbols.
+- Recovery simulation rebuilds portfolio and symbol state from open positions
+  and recent trades.
+- Tests: `8 passed`; compileall clean.
+
+**Next implementation phase:** Add offline portfolio replay harness using the
+state/gate contracts. Still no runtime implementation before M4 checkpoint.
+
+---
+
 ### Research: MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1
 
 **Status:** CLOSED - audit PASS, implementation-ready design

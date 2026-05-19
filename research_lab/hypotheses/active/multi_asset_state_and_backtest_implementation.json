@@ -1,0 +1,71 @@
+{
+  "hypothesis_id": "multi_asset_state_and_backtest_implementation_v1",
+  "name": "Multi-Asset State and Backtest Implementation",
+  "class": "multi_asset_transfer",
+  "edge_rationale": "BTC+ETH trial-00095 portfolio evidence is strong enough to build offline state and backtest contracts while BTC PAPER and M4 monitoring continue unchanged.",
+  "counterparty_or_market_mechanism": "No new market edge is tested in the first implementation phase. The milestone implements offline portfolio state and gate contracts required to replay the already validated BTC+ETH sweep/reclaim edge.",
+  "required_data": [
+    "BTC trial-00095 replay artifacts",
+    "ETH audited transfer replay artifacts",
+    "Portfolio architecture blueprint",
+    "Synthetic state/gate unit-test fixtures"
+  ],
+  "timeframe": [
+    "15m decision cycle",
+    "offline replay only"
+  ],
+  "baseline_reference": "MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1 and MULTI_ASSET_PORTFOLIO_DIAGNOSTIC_V1",
+  "variables": [
+    {
+      "name": "implementation_phase",
+      "values": [
+        "phase_1_state_and_gate_contracts",
+        "phase_2_portfolio_replay_harness"
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Offline/research implementation only before M4 checkpoint.",
+    "State models live under research_lab/models, not core.",
+    "No production, PAPER, LIVE, runtime, orchestrator, execution, storage migration, or settings changes.",
+    "BTC trial-00095 parameters remain frozen.",
+    "M4 monitoring continues unchanged through 2026-06-13.",
+    "No ETH PAPER or BTC+ETH PAPER approval from this milestone."
+  ],
+  "expected_observation": "A correct implementation provides deterministic SymbolRiskState, PortfolioRiskState, portfolio cap checks, same-bar ordering, veto reasons, and recovery simulations matching the audited architecture blueprint.",
+  "acceptance_criteria": {
+    "compileall_clean": true,
+    "state_isolation_tests": true,
+    "portfolio_cap_tests": true,
+    "same_bar_conflict_tests": true,
+    "cooldown_tests": true,
+    "drawdown_stop_tests": true,
+    "recovery_simulation_tests": true,
+    "no_runtime_files_changed": true
+  },
+  "kill_criteria": {
+    "runtime_change": "Any change to runtime/core/settings/execution/orchestrator/storage migration invalidates the offline-only milestone.",
+    "production_db_write": "Any write to production storage/btc_bot.db invalidates the milestone.",
+    "parameter_change": "Any change to active BTC trial-00095 parameters invalidates the milestone.",
+    "deployment_claim": "Any PAPER/LIVE approval claim invalidates the milestone."
+  },
+  "failure_modes": [
+    "Portfolio state accidentally mirrors current global runtime state instead of splitting symbol and portfolio views.",
+    "Same-bar ordering is not deterministic.",
+    "Per-symbol cooldown blocks the wrong symbol.",
+    "Portfolio caps fail to account for already accepted same-bar signals.",
+    "Offline implementation drifts from the audited architecture blueprint."
+  ],
+  "out_of_scope": [
+    "Runtime orchestrator changes.",
+    "Execution engine changes.",
+    "Production storage migration.",
+    "settings.py promotion.",
+    "ETH PAPER deployment.",
+    "BTC+ETH PAPER deployment.",
+    "SOL or ETHBTC research."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-19T00:00:00+00:00",
+  "status": "ACTIVE"
+}
