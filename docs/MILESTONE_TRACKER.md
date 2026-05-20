@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_RISK_POLICY_DIAGNOSTIC_V1
 
-**Status:** READY_FOR_AUDIT - risk frontier complete, awaiting Claude Code audit
+**Status:** CLOSED - audit PASS (risk frontier validates SOL at 0.15% cap, offline only)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_risk_policy_diagnostic.json`
 **Runner:** `research_lab/sol_risk_policy_diagnostic.py`
 **Report:** `docs/analysis/SOL_RISK_POLICY_DIAGNOSTIC_2026-05-20.md`
+**Audit:** `docs/audits/AUDIT_SOL_RISK_POLICY_DIAGNOSTIC_2026-05-20.md`
 
 **Scope:** Research Lab offline risk-policy diagnostic only. Tests SOL risk caps
 after the frozen trial-00095 entry population is fixed. BTC and ETH risk remain
