@@ -39,6 +39,8 @@ class ArtifactTrade:
     direction: str
     pnl_r: float
     regime: str = ""
+    risk_pct: float | None = None
+    gross_notional_pct: float = 0.30
 
     @property
     def signal(self) -> PortfolioSignal:
@@ -47,8 +49,8 @@ class ArtifactTrade:
             timestamp=self.opened_at,
             direction=self.direction,
             signal_id=self.trade_id,
-            risk_pct=PortfolioRiskConfig().risk_per_trade_pct_per_symbol,
-            gross_notional_pct=0.30,
+            risk_pct=self.risk_pct if self.risk_pct is not None else PortfolioRiskConfig().risk_per_trade_pct_per_symbol,
+            gross_notional_pct=self.gross_notional_pct,
         )
 
 

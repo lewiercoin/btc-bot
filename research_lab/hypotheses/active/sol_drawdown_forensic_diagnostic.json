@@ -1,0 +1,73 @@
+{
+  "hypothesis_id": "SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1",
+  "name": "SOL Drawdown Forensic Diagnostic",
+  "class": "diagnostic_only",
+  "status": "ACTIVE",
+  "scope": "Research Lab diagnostic only. Analyze why frozen trial-00095 SOL transfer failed the standalone drawdown gate despite strong ER/PF/frequency and passing BTC+ETH+SOL portfolio gates. No entry tuning, threshold change, shadow design, PAPER deployment, or runtime change.",
+  "edge_rationale": "SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1 showed strong transfer-like edge but failed the predeclared standalone max drawdown gate. The next safe step is to understand drawdown concentration and portfolio risk controls before deciding whether any SOL-specific risk-policy research is justified.",
+  "counterparty_or_market_mechanism": "No new trading mechanism is tested. The milestone investigates the risk profile of the existing sweep/reclaim transfer mechanism on SOL.",
+  "required_data": [
+    "Frozen BTC trial-00095 replay trades",
+    "Frozen ETH trial-00095 transfer trades",
+    "Frozen SOL trial-00095 transfer trades",
+    "Offline portfolio gate contracts",
+    "Audited BTC, ETH, and SOL research datasets"
+  ],
+  "timeframe": [
+    "15m",
+    "daily diagnostic aggregation",
+    "calendar year/regime grouping"
+  ],
+  "baseline_reference": "SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1",
+  "variables": [
+    {
+      "name": "sol_risk_cap_sensitivity",
+      "values": [
+        0.002,
+        0.0025,
+        0.003,
+        0.0035
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "Trial-00095 entries, exits, sweep depth threshold, and non-risk parameters remain frozen.",
+    "Risk-cap sensitivity changes only offline portfolio signal risk sizing, not entry selection.",
+    "No SOL threshold tuning is allowed.",
+    "No runtime, shadow, PAPER, LIVE, core, orchestrator, settings, execution, or production storage changes are allowed.",
+    "Diagnostic outputs cannot approve SOL trading."
+  ],
+  "expected_observation": "The diagnostic should identify whether SOL drawdown is concentrated in crash regimes, driven by long loss streaks, already mitigated by portfolio vetoes, or reducible by a smaller SOL risk cap without changing entries.",
+  "acceptance_criteria": {
+    "year_breakdown_present": true,
+    "regime_breakdown_present": true,
+    "loss_streak_distribution_present": true,
+    "portfolio_veto_analysis_present": true,
+    "risk_cap_sensitivity_present": true,
+    "daily_correlation_matrix_present": true
+  },
+  "kill_criteria": {
+    "runtime_change": "Any runtime/core/settings/execution/storage production change invalidates the milestone.",
+    "entry_tuning": "Any SOL-specific entry, threshold, or exit tuning invalidates the diagnostic.",
+    "source_db_mutation": "Mutating audited BTC/ETH/SOL source datasets invalidates the milestone.",
+    "promotion_claim": "Any SOL shadow/PAPER/runtime approval claim invalidates the milestone."
+  },
+  "failure_modes": [
+    "Drawdown is distributed across all regimes rather than concentrated.",
+    "Smaller SOL risk caps do not reduce capital drawdown materially.",
+    "SOL signals overlap with BTC/ETH drawdown periods more than expected.",
+    "Portfolio vetoes improve headline metrics but do not control SOL-specific loss streaks.",
+    "Risk-cap sensitivity is misread as permission to tune entries."
+  ],
+  "out_of_scope": [
+    "SOL shadow design",
+    "SOL PAPER deployment",
+    "SOL runtime integration",
+    "SOL threshold stability research",
+    "Entry or exit optimization",
+    "Changing trial-00095 parameters",
+    "Changing core, orchestrator, settings, execution, risk, or production storage"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-20T00:00:00+00:00"
+}
