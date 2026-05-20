@@ -28,6 +28,7 @@ from research_lab.models.portfolio_state import (
 
 
 MIN_SWEEP_DEPTH_PCT = 0.00649
+ETH_SHADOW_MIN_SWEEP_DEPTH_PCT = 0.0075
 NEAR_MISS_FLOOR_MULT = 0.80
 STRATEGY_PROFILE = "trial_00095_transfer"
 
@@ -116,6 +117,7 @@ def default_symbol_configs() -> tuple[ShadowSymbolConfig, ...]:
             risk_policy_profile="eth_035_shadow_candidate",
             shadow_mode="shadow_no_orders",
             candidate_risk_pct=0.0035,
+            min_sweep_depth_pct=ETH_SHADOW_MIN_SWEEP_DEPTH_PCT,
         ),
         ShadowSymbolConfig(
             symbol="SOLUSDT",

@@ -98,13 +98,23 @@ def test_evaluate_shadow_symbol_detects_signal_near_miss_and_no_sweep() -> None:
     assert full_signal.candidate_direction_preview == "LONG"
 
 
+def test_default_shadow_symbol_configs_use_audited_eth_depth_only_override() -> None:
+    configs = {config.symbol: config for config in default_symbol_configs()}
+
+    assert configs["BTCUSDT"].min_sweep_depth_pct == 0.00649
+    assert configs["ETHUSDT"].min_sweep_depth_pct == 0.0075
+    assert configs["SOLUSDT"].min_sweep_depth_pct == 0.00649
+    assert configs["ETHUSDT"].shadow_mode == "shadow_no_orders"
+    assert configs["ETHUSDT"].candidate_risk_pct == 0.0035
+
+
 def test_run_real_shadow_cycle_persists_symbol_rows_candidates_and_near_miss(tmp_path: Path) -> None:
     db_path = tmp_path / "research_lab" / "shadow" / "multi_asset_shadow.db"
     db_path.parent.mkdir(parents=True)
     provider = FakeProvider(
         {
             "BTCUSDT": snapshot("BTCUSDT", trigger_low=100.2, trigger_close=101.0),
-            "ETHUSDT": snapshot("ETHUSDT", trigger_low=99.45, trigger_close=100.2),
+            "ETHUSDT": snapshot("ETHUSDT", trigger_low=99.35, trigger_close=100.2),
             "SOLUSDT": snapshot("SOLUSDT", trigger_low=99.2, trigger_close=100.2),
         }
     )
@@ -258,7 +268,7 @@ def test_real_cycle_once_cli_preserves_production_db_and_writes_real_rows(
             if symbol == "BTCUSDT":
                 return snapshot(symbol, trigger_low=100.2, trigger_close=101.0)
             if symbol == "ETHUSDT":
-                return snapshot(symbol, trigger_low=99.45, trigger_close=100.2)
+                return snapshot(symbol, trigger_low=99.35, trigger_close=100.2)
             return snapshot(symbol, trigger_low=99.2, trigger_close=100.2)
 
     import research_lab.shadow_signal_cycle as signal_cycle

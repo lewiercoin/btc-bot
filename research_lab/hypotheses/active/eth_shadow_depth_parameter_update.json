@@ -1,0 +1,27 @@
+{
+  "hypothesis_id": "ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1",
+  "status": "READY_FOR_AUDIT",
+  "builder": "Codex",
+  "decision_date": "2026-05-20",
+  "scope": "Update ETH shadow-only sweep depth threshold from frozen BTC trial-00095 baseline to audited ETH asset-specific candidate.",
+  "source_evidence": {
+    "milestone": "ETH_ASSET_SPECIFIC_OPTIMIZATION_V1",
+    "audit_status": "PASS",
+    "selected_variant": "ETH_OPT_D0.00750",
+    "baseline_min_sweep_depth_pct": 0.00649,
+    "eth_shadow_min_sweep_depth_pct": 0.0075
+  },
+  "constraints": [
+    "BTC trial-00095 threshold remains unchanged.",
+    "SOL trial-00095 threshold remains unchanged.",
+    "ETH remains shadow_no_orders.",
+    "No PAPER or LIVE approval.",
+    "No execution, core, orchestrator, main.py, settings.py, production DB, or M4 changes.",
+    "Server deployment requires separate audit pass and operator pull."
+  ],
+  "validation": [
+    "tests/test_shadow_real_signal_cycle.py verifies ETH uses 0.0075 while BTC/SOL remain 0.00649.",
+    "Real shadow cycle tests verify production DB remains untouched."
+  ],
+  "builder_verdict": "ETH_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT"
+}

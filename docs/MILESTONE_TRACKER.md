@@ -40,9 +40,39 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1
+
+**Status:** READY_FOR_AUDIT - `ETH_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis spec:** `research_lab/hypotheses/active/eth_shadow_depth_parameter_update.json`
+
+**Scope:** Shadow-sidecar-only ETH threshold update. ETH `min_sweep_depth_pct`
+changes from the frozen BTC transfer value `0.00649` to the audited ETH
+asset-specific candidate `0.0075`.
+
+**Boundaries:**
+- BTC remains at frozen `trial-00095` threshold `0.00649`.
+- SOL remains at frozen `trial-00095` threshold `0.00649`.
+- ETH remains `shadow_no_orders`; this does not approve PAPER or LIVE.
+- No changes to runtime execution, `core/`, `execution/`, `orchestrator.py`,
+  `main.py`, `settings.py`, production storage, sidecar systemd files, or M4.
+- Deployment requires Claude Code audit PASS and a later operator pull.
+
+**Validation:**
+- `tests/test_shadow_real_signal_cycle.py` verifies ETH uses `0.0075` while
+  BTC/SOL remain `0.00649`.
+- Real shadow cycle tests still verify production DB is untouched.
+
+**Builder verdict:** `ETH_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+
+**Next:** Claude Code audit. This does not change the production sidecar until
+the audited commit is pulled on the server.
+
 ### Research: ETH_ASSET_SPECIFIC_OPTIMIZATION_V1
 
-**Status:** READY_FOR_AUDIT - `ETH_ASSET_SPECIFIC_CANDIDATE_FOR_AUDIT`
+**Status:** CLOSED - audit PASS
 **Builder:** Codex
 **Decision date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
