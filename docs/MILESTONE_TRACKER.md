@@ -40,6 +40,48 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Deployment: MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1
+
+**Status:** ACTIVE (Phase 1: Operational Heartbeat)
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+
+**Scope:** Deploy isolated systemd timer/service with operational heartbeat cycle only. No real market data, no signal generation. Prove timer/service isolation and stability before M4 (2026-06-13).
+
+**Phase 1 deliverables:**
+- Extend `shadow_orchestrator.py` with `--cycle-once` operational heartbeat mode
+- Create `multi-asset-shadow.timer` (OnUnitActiveSec=15min)
+- Create `multi-asset-shadow.service` (Type=oneshot, Nice=10, MemoryMax=512M, CPUQuota=50%)
+- Create `scripts/deploy_shadow_sidecar.sh` (Day 0 pre-start checks + install)
+- Create `scripts/shadow_sidecar_status.sh` (monitoring helper)
+- Update runbook with timer commands
+- Tests for cycle-once operational mode
+
+**--cycle-once operational mode:**
+- Acquire sidecar lock
+- Resource guard (disk >= 12GB)
+- Production DB touch check (before/after)
+- Write one `shadow_run` row + stub decisions + resource sample to sidecar DB
+- No market data collection
+- No signal generation
+- Exit 0 if clean, exit 1 if guard failed or production touched
+
+**Success criteria (Day 3 checkpoint):**
+- ≥ 288 cycles completed (3 days × 96 cycles/day)
+- Zero production DB touches
+- BTC M4 config hash unchanged
+- BTC PAPER process count = 1
+- Verdict: `OPERATIONAL_HEARTBEAT_PASS` → enables Phase 2
+
+**Phase 2 (deferred):**
+Real signal generation milestone (`MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1`) after Phase 1 Day 3 PASS. Will add: market snapshots, real features, sweep/reclaim diagnostics, near-miss, portfolio shadow decisions.
+
+**Next:** Codex implements Phase 1. Claude Code audits before server deployment.
+
+---
+
 ### Implementation: MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_V1
 
 **Status:** CLOSED - audit PASS (isolation boundaries enforced, dry-run infrastructure ready)
