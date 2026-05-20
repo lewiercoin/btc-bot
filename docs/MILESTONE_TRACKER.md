@@ -42,11 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: MULTI_ASSET_SHADOW_SIDECAR_DESIGN_V1
 
-**Status:** READY_FOR_AUDIT - design only, no runtime approval
+**Status:** CLOSED - audit PASS (design sound, user decision required on sidecar vs post-M4 route)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_SHADOW_SIDECAR_DESIGN_2026-05-20.md`
 
 **Scope:** Design-only contract for an isolated multi-asset shadow sidecar that
 can collect BTC/ETH/SOL forward diagnostics before the BTC M4 checkpoint
