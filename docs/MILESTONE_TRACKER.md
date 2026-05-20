@@ -40,6 +40,40 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_V1
+
+**Status:** ACTIVE
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+
+**Scope:** Implement isolated sidecar infrastructure only. No deployment, no systemd enable/start, no PAPER/LIVE orders, no runtime integration. Create auditable implementation ready for a separate deployment milestone.
+
+**Deliverables:**
+- Separate entrypoint (not `main.py`)
+- Separate runtime lock (not `/tmp/btc-bot-runtime.lock`)
+- Separate DB under `research_lab/shadow/`
+- Safe path guard rejecting paths outside `research_lab/shadow/`
+- Schema: `shadow_runs`, `shadow_decision_outcomes`, `shadow_signal_candidates`, `shadow_portfolio_decisions`, `shadow_near_miss_diagnostics`, `shadow_resource_samples`
+- Order-path import guard
+- Resource guard: disk >= 12GB, memory/CPU sample logging
+- Dry-run command proving no order path and no production DB writes
+- Tests: isolation, schema, nested near-miss payload, path guard, lock separation, no production DB writes
+
+**Out of scope:**
+- systemd deployment
+- starting long-running server process
+- touching `btc-bot.service`
+- writing to `storage/btc_bot.db`
+- modifying `core/`, `execution/`, `orchestrator.py`, `main.py`, `settings.py`
+- ETH/SOL PAPER approval
+- threshold changes
+
+**Next:** Codex implements. Claude Code audits before any deployment milestone.
+
+---
+
 ### Research: MULTI_ASSET_SHADOW_SIDECAR_DESIGN_V1
 
 **Status:** CLOSED - audit PASS (design sound, user decision required on sidecar vs post-M4 route)
