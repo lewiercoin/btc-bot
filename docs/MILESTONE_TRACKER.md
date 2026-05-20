@@ -40,6 +40,42 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_SHADOW_CONTRACT_DESIGN_V1
+
+**Status:** READY_FOR_AUDIT_DESIGN_ONLY
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_SOL_SHADOW_CONTRACT.md`
+
+**Scope:** Design only. Defines the future SOL shadow/no-order observation
+contract after audited SOL transfer, forensic, and risk-policy evidence. No
+runtime implementation, SOL shadow deployment, SOL PAPER, `core/**`,
+`execution/**`, `orchestrator.py`, `main.py`, `settings.py`, production storage,
+BTC PAPER config change, threshold change, entry tuning, or exit tuning is in
+scope.
+
+**Design result:**
+- SOL must start as `shadow_no_orders`; no SOL orders or positions are allowed.
+- SOL remains setup-isolated with `symbol = SOLUSDT`,
+  `strategy_profile = trial_00095_transfer`, and
+  `risk_policy_profile = sol_015_shadow_candidate`.
+- Candidate SOL risk policy is 0.15% equity per trade, based on
+  `SOL_RISK_POLICY_DIAGNOSTIC_V1`; this is not runtime approval.
+- BTC/ETH candidate risk remains 0.35% in the documented multi-asset design.
+- SOL diagnostics must persist symbol-explicit decisions, portfolio vetoes,
+  candidate risk, and nested `near_miss_diagnostics.sweep_depth_pct`.
+- Day 3, Day 14, and Day 30 shadow checkpoints are specified.
+- SOL PAPER remains blocked until future shadow evidence, audit, and user
+  approval.
+
+**Builder verdict:** `READY_FOR_AUDIT_DESIGN_ONLY`
+
+**Next:** Claude Code audit. If PASS, a later milestone may implement SOL
+shadow metrics/no-order support, still without PAPER approval.
+
+---
+
 ### Research: SOL_RISK_POLICY_DIAGNOSTIC_V1
 
 **Status:** CLOSED - audit PASS (risk frontier validates SOL at 0.15% cap, offline only)

@@ -4,6 +4,28 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Design SOL shadow contract before any implementation
+**Decision:** Mark `SOL_SHADOW_CONTRACT_DESIGN_V1` ready for Claude Code audit
+as a design-only milestone.
+
+**Reason:** SOL transfer, forensic, and risk-policy diagnostics now support SOL
+as a promising but smaller risk sleeve. Before any implementation or shadow
+deployment, the project needs a contract that defines SOL setup isolation,
+candidate risk cap, diagnostics, checkpoints, and promotion blocks.
+
+**Design result:** The blueprint requires SOL to start as `shadow_no_orders`,
+keeps SOL setup-isolated with `strategy_profile = trial_00095_transfer`, sets
+the candidate risk policy to 0.15% equity per trade, requires symbol-explicit
+diagnostics and nested near-miss depth, and defines Day 3, Day 14, and Day 30
+shadow checkpoints. SOL PAPER remains blocked until future shadow evidence,
+audit, and user approval.
+
+**Consequences:** No runtime behavior changes. No SOL shadow deployment. No SOL
+PAPER approval. No threshold change. A future implementation milestone may use
+this blueprint only after audit and user approval.
+
+**Related:** `docs/BLUEPRINT_SOL_SHADOW_CONTRACT.md`.
+
 ## 2026-05-20 - Test SOL risk-policy frontier before any shadow design
 **Decision:** Mark `SOL_RISK_POLICY_DIAGNOSTIC_V1` ready for Claude Code audit.
 
