@@ -50,7 +50,7 @@ day0_checks() {
   echo "${dry_json}" | grep -q '"production_db_touched": false' || fail "dry-run touched production DB"
 
   git rev-parse --short HEAD
-  sqlite3 "${PROD_DB}" ".dbinfo" >/dev/null
+  sqlite3 "${PROD_DB}" "SELECT COUNT(*) FROM sqlite_master;" >/dev/null || fail "production DB is not readable"
 }
 
 install_units() {
