@@ -42,11 +42,14 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1
 
-**Status:** IN_PROGRESS - code-only preparation before 24h heartbeat checkpoint
+**Status:** DEPLOYED - Phase 2 real shadow observation active on production (2026-05-20 13:08 UTC)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Deployment date:** 2026-05-20 13:08 UTC (Option B: parallel evidence collection)
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+**Audits:**
+- `docs/audits/AUDIT_MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1_2026-05-20.md` (DONE)
 
 **Scope:** Prepare real BTC/ETH/SOL shadow diagnostics as a separate manual
 one-shot mode. Do not change the deployed systemd timer, do not replace
@@ -77,13 +80,26 @@ runtime.
 - sweep threshold changes
 
 **Acceptance criteria:**
-- Focused sidecar tests pass
-- compileall passes for new modules/tests
-- production DB sentinel remains unchanged in real-cycle tests
-- import guard blocks order/runtime/storage roots
-- active heartbeat command remains `sidecar_main.py --cycle-once`
+- Focused sidecar tests pass (6 new tests, all pass)
+- compileall passes for new modules/tests (PASS)
+- production DB sentinel remains unchanged in real-cycle tests (verified)
+- import guard blocks order/runtime/storage roots (strengthened: core/data/execution/main/orchestrator/storage)
+- active heartbeat command remains `sidecar_main.py --cycle-once` (verified until Phase 2 deployment)
 
-**Next:** Claude Code audit before any deployment or timer command change.
+**Phase 2 deployment (2026-05-20 13:08 UTC):**
+- Manual smoke test: 1 cycle, decision_rows=3, production_db_touched=false
+- Deployment method: systemd drop-in override (service file unchanged in repo)
+- Timer command switched: `--cycle-once` → `--real-cycle-once`
+- Deployment option: B (parallel evidence collection, did not wait for Day 3 heartbeat)
+- Operational heartbeat cycles before switch: 19
+- Real shadow cycles after switch: 3+ (ongoing)
+- BTC PAPER: PID 815407, no restart, btc-bot.service active
+- Last real cycle: 2026-05-20T13:08:48Z, all symbols no_sweep (normal market state)
+
+**Day 3 checkpoint now measures real_shadow_cycle mode:**
+- Target: 2026-05-23 08:18 UTC (72 hours from Day 0)
+- Required: ≥288 total cycles (19 operational_heartbeat + 269 real_shadow_cycle minimum)
+- Acceptance: zero production DB touches, BTC PAPER stable, timer active
 
 ### Deployment: MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1
 
@@ -168,9 +184,19 @@ Real signal generation milestone (`MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1`) aft
 - BTC PAPER: PID 815407, active, no restart
 - btc-bot.service: active, unaffected
 
-**Day 3 checkpoint target:** 2026-05-23 08:18 UTC (≥288 operational heartbeat cycles)
+**Phase 2 deployment (2026-05-20 13:08 UTC):**
+- Audit: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1 - DONE (commit 54b9c61)
+- Deployment method: systemd drop-in override (repo service file unchanged)
+- Timer command: `--cycle-once` → `--real-cycle-once`
+- Manual smoke test: 1 cycle, 3 decision rows, production_db_touched=false
+- Operational heartbeat cycles completed: 19 (Day 0 to Phase 2 switch)
+- Real shadow cycles: 3+ ongoing (market data + signal generation)
+- BTC PAPER: PID 815407, no restart
+- Deployment option: B (parallel evidence collection, did not wait for Day 3)
 
-**Next:** Passive monitoring until Day 3. After Day 3 PASS, proceed to Phase 2: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1 (real market data + signal generation, shadow_no_orders).
+**Day 3 checkpoint target:** 2026-05-23 08:18 UTC (≥288 total cycles: 19 operational + 269 real shadow minimum)
+
+**Next:** Passive monitoring until Day 3. Day 3 checkpoint measures real_shadow_cycle mode (BTC/ETH/SOL market data, sweep/reclaim detection, near-miss diagnostics). All shadow_no_orders boundary maintained.
 
 ---
 
