@@ -4,6 +4,32 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Run SOL depth-only asset-specific optimization offline
+**Decision:** Mark `SOL_ASSET_SPECIFIC_OPTIMIZATION_V1` ready for Claude Code
+audit as an offline Research Lab checkpoint.
+
+**Reason:** SOL transfer and risk-policy research showed real edge, but SOL had
+drawdown concentration under the frozen BTC threshold. The safe next step is a
+small depth-only test to see whether SOL prefers the stricter ETH-like sweep
+depth without changing runtime or shadow behavior.
+
+**Result:** Three depth variants were evaluated against the audited SOL dataset.
+The train-selected champion is `SOL_OPT_D0.00750`, changing only
+`min_sweep_depth_pct` to `0.0075`. OOS improved from baseline ER `2.041` and
+PF `3.32` to ER `2.573` and PF `4.29`, with max DD improving from `7.92%` to
+`3.57%`. 2x-cost OOS ER is `2.204`, and all four yearly folds remain positive.
+
+**Consequences:**
+- This is an offline candidate for audit, not a parameter promotion.
+- SOL remains unchanged in production sidecar until a separate audited shadow
+  update milestone and operator pull.
+- No change to BTC PAPER, M4, ETH shadow, runtime, `settings.py`, or production
+  DB.
+
+**Related:** `research_lab/sol_asset_specific_optimization.py`;
+`docs/analysis/SOL_ASSET_SPECIFIC_OPTIMIZATION_2026-05-20.md`;
+`research_lab/hypotheses/active/sol_asset_specific_optimization.json`.
+
 ## 2026-05-20 - Prepare ETH shadow depth update from audited optimization
 **Decision:** Prepare `ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1` as a small
 sidecar-only checkpoint for Claude Code audit.

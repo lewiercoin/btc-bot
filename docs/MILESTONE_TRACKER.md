@@ -40,6 +40,50 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_ASSET_SPECIFIC_OPTIMIZATION_V1
+
+**Status:** READY_FOR_AUDIT - `SOL_ASSET_SPECIFIC_CANDIDATE_FOR_AUDIT`
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_asset_specific_optimization.json`
+**Runner:** `research_lab/sol_asset_specific_optimization.py`
+**Report:** `docs/analysis/SOL_ASSET_SPECIFIC_OPTIMIZATION_2026-05-20.md`
+
+**Scope:** Offline Research Lab SOL-only depth optimization. No runtime,
+PAPER, LIVE, sidecar, M4, core, execution, orchestrator, settings, or
+production DB changes.
+
+**Methodology:**
+- Baseline: frozen BTC `trial-00095` transferred to SOL.
+- Grid: depth-only `min_sweep_depth_pct` values `[0.0055, 0.00649, 0.0075]`.
+- Frozen: all non-depth trial-00095 parameters.
+- Selection: train window only (`2022-01-01` to `2025-01-01`).
+- Evaluation: untouched OOS (`2025-01-01` to `2026-03-28`), yearly folds, and
+  2x cost stress.
+- No post-hoc rescue.
+
+**Result:**
+- Selected train champion: `SOL_OPT_D0.00750`.
+- Override: `min_sweep_depth_pct = 0.0075`.
+- Baseline OOS: 213 trades, ER 2.041, PF 3.32, max DD 7.92%.
+- Selected OOS: 156 trades, ER 2.573, PF 4.29, max DD 3.57%.
+- OOS ER improvement vs baseline: +26.1%.
+- OOS PF improvement vs baseline: +29.3%.
+- 2x cost OOS ER: 2.204.
+- Walk-forward: 4/4 positive folds.
+
+**Builder verdict:** `SOL_ASSET_SPECIFIC_CANDIDATE_FOR_AUDIT`
+
+**Validation:**
+- `pytest tests/test_sol_asset_specific_optimization.py tests/test_sol_trial_00095_transfer_feasibility.py -q --no-cov`
+  -> 13 passed.
+- `python -m compileall research_lab/sol_asset_specific_optimization.py tests/test_sol_asset_specific_optimization.py`
+  -> PASS.
+
+**Next:** Claude Code audit. This does not approve SOL-specific settings in
+sidecar, PAPER, LIVE, or runtime.
+
 ### Implementation: ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1
 
 **Status:** DEPLOYED - ETH shadow depth active on production (2026-05-20 17:56 UTC)
