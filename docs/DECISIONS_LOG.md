@@ -4,6 +4,33 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Design isolated multi-asset shadow sidecar before M4 completes
+**Decision:** Create `MULTI_ASSET_SHADOW_SIDECAR_DESIGN_V1` as a design-only
+milestone. The sidecar direction is allowed only as an isolated observer that
+cannot change what BTC M4 measures.
+
+**Reason:** The user wants early forward evidence for multi-asset behavior
+before the BTC M4 checkpoint finishes. Direct runtime integration would
+contaminate M4 because M4 is measuring the current BTC PAPER trial-00095 runtime
+under a frozen config. A sidecar can preserve M4 integrity if it runs as a
+separate process, writes to a separate database, places zero orders, and has no
+write path to production storage.
+
+**Consequences:**
+- BTC M4 remains BTC-only and sourced from the existing BTC PAPER runtime rows.
+- Sidecar design requires a separate service/process, separate lock, separate
+  DB under `research_lab/shadow/`, separate logs, and symbol-explicit rows.
+- Sidecar may not write to `storage/btc_bot.db`, restart `btc-bot.service`, read
+  trading keys, or import an order/execution path.
+- ETH/SOL/BTC shadow rows cannot be aggregated into BTC M4 conclusions.
+- Resource guards are mandatory: 12 GB disk floor, lower priority, recommended
+  memory and CPU caps.
+- This decision does not approve sidecar implementation, server deployment,
+  ETH/SOL PAPER, LIVE, runtime integration, or threshold changes.
+
+**Related:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`;
+`docs/MILESTONE_TRACKER.md`; BTC M4 checkpoint planned for 2026-06-13.
+
 ## 2026-05-20 - Design SOL shadow contract before any implementation
 **Decision:** Mark `SOL_SHADOW_CONTRACT_DESIGN_V1` ready for Claude Code audit
 as a design-only milestone.
