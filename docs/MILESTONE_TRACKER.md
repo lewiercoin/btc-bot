@@ -42,7 +42,7 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Deployment: MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1
 
-**Status:** ACTIVE (Phase 1: Operational Heartbeat)
+**Status:** READY_FOR_AUDIT - Phase 1 operational heartbeat implementation complete, not deployed
 **Builder:** Codex
 **Decision date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
@@ -78,7 +78,35 @@ truth; this checkpoint only clarifies their combined state.
 **Phase 2 (deferred):**
 Real signal generation milestone (`MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1`) after Phase 1 Day 3 PASS. Will add: market snapshots, real features, sweep/reclaim diagnostics, near-miss, portfolio shadow decisions.
 
-**Next:** Codex implements Phase 1. Claude Code audits before server deployment.
+**Implementation result:**
+- Added `--cycle-once` operational heartbeat mode to `sidecar_main.py`.
+- `--cycle-once` writes one non-dry-run `shadow_runs` row, one resource sample,
+  and three stub `shadow_decision_outcomes` rows for BTC/ETH/SOL.
+- `--cycle-once` records `operational_mode = operational_heartbeat`,
+  `signal_blocker = operational_heartbeat`, and `dry_run = 0`.
+- `--cycle-once` does not write near-miss rows, collect market data, generate
+  signals, run sweep/reclaim detection, or simulate portfolio decisions.
+- Added `multi-asset-shadow.service` and `multi-asset-shadow.timer` as repo
+  artifacts only; they are not installed or started by this commit.
+- Added `scripts/deploy_shadow_sidecar.sh` and
+  `scripts/shadow_sidecar_status.sh` for a future audited server deployment.
+- Updated the sidecar runbook with heartbeat, timer, and Day 3 checkpoint
+  commands.
+
+**Validation:**
+- `pytest tests/test_sidecar_isolation.py tests/test_shadow_schema.py tests/test_sidecar_cycle_once.py -q --no-cov`
+  -> 15 passed.
+- `python -m compileall sidecar_main.py research_lab/shadow_orchestrator.py research_lab/shadow_schema.py tests/test_sidecar_isolation.py tests/test_shadow_schema.py tests/test_sidecar_cycle_once.py`
+  -> PASS.
+- Manual `--cycle-once` against a temporary repo root returned
+  `operational_mode=operational_heartbeat`, `decision_rows=3`,
+  `near_miss_rows=0`, `resource_rows=1`, and `production_db_touched=false`.
+
+**Builder verdict:** `READY_FOR_AUDIT_DEPLOYMENT_FILES_ONLY`
+
+**Next:** Claude Code audit. No production server deployment, systemd install,
+timer start, long-running process, ETH/SOL PAPER, or BTC M4/runtime change is
+approved by this commit.
 
 ---
 
