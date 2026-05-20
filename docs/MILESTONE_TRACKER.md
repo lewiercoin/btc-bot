@@ -40,6 +40,51 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: MULTI_ASSET_SHADOW_SIDECAR_DESIGN_V1
+
+**Status:** READY_FOR_AUDIT - design only, no runtime approval
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+
+**Scope:** Design-only contract for an isolated multi-asset shadow sidecar that
+can collect BTC/ETH/SOL forward diagnostics before the BTC M4 checkpoint
+without changing what M4 measures. No implementation, service deployment,
+PAPER/LIVE orders, runtime integration, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, BTC PAPER
+config change, M4 parser/query change, sweep-threshold change, or order path
+is in scope.
+
+**Reason:** User wants to start early shadow observation while preserving M4
+integrity. The safe architecture is a separate observer process with separate
+lock, separate DB under `research_lab/shadow/`, no execution path, no writes to
+`storage/btc_bot.db`, no restart of `btc-bot.service`, and symbol-explicit
+diagnostics. This keeps BTC M4 sourced only from the active BTC PAPER runtime.
+
+**Design result:**
+- Sidecar must be separate from `btc-bot.service`.
+- Sidecar must use a separate lock path and separate database:
+  `research_lab/shadow/multi_asset_shadow.db`.
+- Sidecar must place zero orders and have no execution-engine dependency.
+- Sidecar must never write to `storage/btc_bot.db`.
+- BTC M4 remains BTC-only and reads only current BTC PAPER runtime rows.
+- ETH/SOL shadow diagnostics must be symbol-explicit and cannot be aggregated
+  into BTC M4 conclusions.
+- Resource guards are required: 12 GB disk floor, lower priority, recommended
+  `MemoryMax=512M` and `CPUQuota=50%`.
+- Day 0, Day 3, Day 14, and Day 30 checkpoint gates are specified.
+- Day 30 may only request a later PAPER consideration milestone; it does not
+  approve PAPER.
+
+**Builder verdict:** `READY_FOR_AUDIT_DESIGN_ONLY`
+
+**Next:** Claude Code audit. If PASS, a later implementation milestone may build
+the sidecar entrypoint, schema, safe-path guard, resource guard, and dry-run
+checks. No server-side sidecar process is approved by this design.
+
+---
+
 ### Research: SOL_SHADOW_CONTRACT_DESIGN_V1
 
 **Status:** CLOSED - audit PASS (design sound, gated behind BTC M4 and user approval)
