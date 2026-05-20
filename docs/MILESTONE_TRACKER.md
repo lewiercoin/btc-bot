@@ -40,6 +40,48 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: ETH_ASSET_SPECIFIC_OPTIMIZATION_V1
+
+**Status:** READY_FOR_AUDIT - `ETH_ASSET_SPECIFIC_CANDIDATE_FOR_AUDIT`
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Report:** `docs/analysis/ETH_ASSET_SPECIFIC_OPTIMIZATION_2026-05-20.md`
+
+**Scope:** Offline Research Lab ETH-only depth optimization. No runtime,
+PAPER, LIVE, sidecar, M4, core, execution, orchestrator, settings, or
+production DB changes.
+
+**Methodology:**
+- Baseline: frozen BTC `trial-00095` transferred to ETH.
+- Grid: depth-only `min_sweep_depth_pct` values `[0.0055, 0.00649, 0.0075]`.
+- Frozen: all non-depth trial-00095 parameters.
+- Selection: train window only (`2022-01-01` to `2025-01-01`).
+- Evaluation: untouched OOS (`2025-01-01` to `2026-03-28`), yearly folds, and
+  2x cost stress.
+- No post-hoc rescue.
+
+**Result:**
+- Selected train champion: `ETH_OPT_D0.00750`.
+- Override: `min_sweep_depth_pct = 0.0075`.
+- Baseline OOS: 162 trades, ER 1.766, PF 2.73, max DD 6.04%.
+- Selected OOS: 127 trades, ER 2.190, PF 3.50, max DD 4.88%.
+- OOS ER improvement vs baseline: +24.0%.
+- OOS PF improvement vs baseline: +28.3%.
+- 2x cost OOS ER: 1.808.
+- Walk-forward: 4/4 positive folds.
+
+**Builder verdict:** `ETH_ASSET_SPECIFIC_CANDIDATE_FOR_AUDIT`
+
+**Validation:**
+- `pytest tests/test_eth_asset_specific_optimization.py tests/test_eth_trial_00095_transfer_feasibility.py -q --no-cov`
+  -> 13 passed.
+- `python -m compileall research_lab/eth_asset_specific_optimization.py tests/test_eth_asset_specific_optimization.py`
+  -> PASS.
+
+**Next:** Claude Code audit. This does not approve ETH-specific settings in
+sidecar, PAPER, LIVE, or runtime.
+
 ### Implementation: MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1
 
 **Status:** DEPLOYED - portfolio gate integration active on production (2026-05-20 13:53 UTC)

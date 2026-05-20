@@ -4,6 +4,31 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Run ETH depth-only asset-specific optimization offline
+**Decision:** Mark `ETH_ASSET_SPECIFIC_OPTIMIZATION_V1` ready for Claude Code
+audit as an offline Research Lab checkpoint.
+
+**Reason:** Frozen BTC trial-00095 transferred strongly to ETH, but ETH may
+prefer a different sweep-depth threshold. The first ETH-specific pass should be
+small and auditable: depth-only, fixed grid, train-only selection, OOS gates,
+and no runtime/sidecar/M4 changes.
+
+**Result:** Three depth variants were evaluated against the audited ETH dataset.
+The train-selected champion is `ETH_OPT_D0.00750`, changing only
+`min_sweep_depth_pct` to `0.0075`. OOS improved from baseline ER `1.766` and
+PF `2.73` to ER `2.190` and PF `3.50`, with max DD improving from `6.04%` to
+`4.88%`. 2x-cost OOS ER is `1.808`, and all four yearly folds remain positive.
+
+**Consequences:**
+- This is an offline candidate for audit, not a parameter promotion.
+- No change to BTC PAPER, M4, sidecar, runtime, `settings.py`, or production DB.
+- A later audited milestone is required before any ETH-specific parameter can
+  affect shadow, PAPER, or runtime behavior.
+
+**Related:** `research_lab/eth_asset_specific_optimization.py`;
+`docs/analysis/ETH_ASSET_SPECIFIC_OPTIMIZATION_2026-05-20.md`;
+`research_lab/hypotheses/active/eth_asset_specific_optimization.json`.
+
 ## 2026-05-20 - Move real-shadow portfolio decisions onto audited gate contract
 **Decision:** Prepare `MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1` as a code-only
 checkpoint that makes real-shadow BTC/ETH/SOL decisions use
