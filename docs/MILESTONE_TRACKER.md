@@ -42,11 +42,14 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1
 
-**Status:** READY_FOR_AUDIT - `ETH_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+**Status:** DEPLOYED - ETH shadow depth active on production (2026-05-20 17:56 UTC)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Deployment date:** 2026-05-20 17:56 UTC (Option A: immediate pull)
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis spec:** `research_lab/hypotheses/active/eth_shadow_depth_parameter_update.json`
+**Audits:**
+- `docs/audits/AUDIT_ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1_2026-05-20.md` (DONE)
 
 **Scope:** Shadow-sidecar-only ETH threshold update. ETH `min_sweep_depth_pct`
 changes from the frozen BTC transfer value `0.00649` to the audited ETH
@@ -65,10 +68,16 @@ asset-specific candidate `0.0075`.
   BTC/SOL remain `0.00649`.
 - Real shadow cycle tests still verify production DB is untouched.
 
-**Builder verdict:** `ETH_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+**Deployment (2026-05-20 17:56 UTC):**
+- Server pull: 535f68a7 → cc147051
+- Deployment method: git pull --ff-only github research/sweep-family-expansion-v1 (no restarts)
+- First cycle with ETH 0.0075: shadow-real_shadow_cycle-dec0f6f9b378 (17:56 UTC)
+- Verification: production_db_touched=false, decision_rows=3
+- Thresholds: BTC 0.00649, ETH 0.0075, SOL 0.00649
+- BTC PAPER: PID 815407, no restart
+- Timer: active, next cycle 18:11 UTC
 
-**Next:** Claude Code audit. This does not change the production sidecar until
-the audited commit is pulled on the server.
+**Next:** ETH shadow collects forward evidence on audited threshold 0.0075. Monitor Day 3 checkpoint (2026-05-23) for multi-asset shadow stability.
 
 ### Research: ETH_ASSET_SPECIFIC_OPTIMIZATION_V1
 
