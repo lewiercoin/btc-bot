@@ -1,0 +1,90 @@
+{
+  "hypothesis_id": "SOL_ASSET_SPECIFIC_OPTIMIZATION_V1",
+  "name": "SOL Asset-Specific Trial-00095 Depth Optimization",
+  "class": "parameter_refinement",
+  "edge_rationale": "Frozen BTC trial-00095 transferred cleanly to SOL, but SOL microstructure may support a modestly different sweep-depth threshold. A small predeclared SOL-only depth grid can test whether SOL improves versus frozen transfer without changing runtime behavior.",
+  "counterparty_or_market_mechanism": "SOL stop-run and reclaim behavior may be similar to BTC but scaled by different liquidity and volatility. The candidate only remains credible if improvements persist out-of-sample and do not rely on post-hoc threshold rescue.",
+  "required_data": [
+    "Audited SOLUSDT 2022-2026 research snapshot",
+    "Frozen trial-00095 params from research store",
+    "15m candles",
+    "4h candles",
+    "1h candles derived from complete 15m candles inside replay temp DB",
+    "funding history",
+    "open interest samples",
+    "aggtrade buckets"
+  ],
+  "timeframe": [
+    "15m entry",
+    "4h bias",
+    "60s flow bucket"
+  ],
+  "baseline_reference": "SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1: frozen BTC trial-00095 on SOL, 1201 trades, ER 2.141, PF 3.42, 4/4 positive folds, standalone DD gate failed.",
+  "variables": [
+    {
+      "name": "min_sweep_depth_pct",
+      "values": [0.0055, 0.00649, 0.0075]
+    },
+    {
+      "name": "confluence_min",
+      "values": ["frozen trial-00095"]
+    },
+    {
+      "name": "direction_tfi_threshold",
+      "values": ["frozen trial-00095"]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab offline only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, settings, sidecar, M4, or production DB changes.",
+    "Only SOLUSDT is optimized in this milestone.",
+    "No confluence, TFI, CVD, OI, funding, force-order, exit, risk, or portfolio tuning.",
+    "No post-hoc rescue: selected variant is chosen from train metrics only.",
+    "Train window is 2022-01-01 to 2025-01-01.",
+    "OOS window is 2025-01-01 to 2026-03-28.",
+    "Full-year walk-forward and 2x cost stress are gates for the selected train champion only."
+  ],
+  "expected_observation": "If SOL sweep depth has asset-specific improvement, the train-selected depth candidate should improve OOS ER by at least 5% versus frozen SOL transfer while maintaining PF, drawdown, cost robustness, and 4/4 positive yearly folds.",
+  "acceptance_criteria": {
+    "train_min_trades": 250,
+    "train_min_er": 1.5,
+    "train_min_pf": 2.0,
+    "train_max_dd": 0.15,
+    "oos_min_trades": 80,
+    "oos_min_er": 1.5,
+    "oos_min_pf": 2.0,
+    "oos_max_dd": 0.12,
+    "min_oos_er_improvement_pct": 0.05,
+    "min_oos_pf_improvement_pct": 0.0,
+    "min_positive_wf_folds": 4,
+    "min_2x_cost_oos_er": 1.0
+  },
+  "kill_criteria": {
+    "runtime_change": "Any runtime/core/settings/execution/orchestrator/sidecar/M4 change invalidates this milestone.",
+    "post_hoc_rescue": "Changing grid values or selection criteria after seeing results invalidates this milestone.",
+    "source_db_mutation": "Mutating the audited SOL source snapshot invalidates this milestone.",
+    "oos_selection": "Selecting a variant by OOS metrics instead of train metrics invalidates this milestone.",
+    "insufficient_data": "If audited SOL dataset is unavailable, stop rather than substitute unaudited data."
+  },
+  "failure_modes": [
+    "Frozen BTC trial-00095 is already near-optimal for SOL.",
+    "Train improvement fails OOS, indicating overfit.",
+    "Looser sweep depth raises frequency but degrades ER or drawdown.",
+    "Stricter confluence improves ER but reduces OOS sample size below decision grade.",
+    "TFI threshold changes overfit to specific SOL regimes."
+  ],
+  "out_of_scope": [
+    "BTC parameter changes.",
+    "SOL shadow, PAPER, LIVE, or runtime parameter changes.",
+    "Runtime deployment.",
+    "Sidecar changes.",
+    "M4 changes.",
+    "Portfolio allocation.",
+    "Risk-cap changes.",
+    "Exit optimization.",
+    "CVD/OI/funding/force-order feature changes."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-20T00:00:00+00:00",
+  "status": "ACTIVE"
+}
