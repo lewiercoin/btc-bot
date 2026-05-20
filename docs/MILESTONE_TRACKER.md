@@ -42,11 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_V1
 
-**Status:** READY_FOR_AUDIT - implementation complete, dry-run only, no deployment
+**Status:** CLOSED - audit PASS (isolation boundaries enforced, dry-run infrastructure ready)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_2026-05-20.md`
 
 **Scope:** Implement isolated sidecar infrastructure only. No deployment, no systemd enable/start, no PAPER/LIVE orders, no runtime integration. Create auditable implementation ready for a separate deployment milestone.
 
