@@ -34,8 +34,11 @@ echo
 echo "== production DB info =="
 if [[ -f "${PROD_DB}" ]]; then
   stat -c "size=%s mtime=%Y path=%n" "${PROD_DB}"
-  sqlite3 "${PROD_DB}" ".dbinfo" >/dev/null
-  echo "production DB readable"
+  if sqlite3 "${PROD_DB}" "SELECT COUNT(*) FROM sqlite_master;" >/dev/null 2>&1; then
+    echo "production DB readable"
+  else
+    echo "production DB exists but is not readable or corrupted"
+  fi
 else
   echo "production DB not found: ${PROD_DB}"
 fi
