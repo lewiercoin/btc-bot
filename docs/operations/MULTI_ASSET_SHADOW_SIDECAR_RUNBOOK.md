@@ -63,6 +63,33 @@ Expected output:
 Heartbeat rows are stub diagnostics only. They do not collect market data,
 generate real signals, run sweep/reclaim detection, or simulate a portfolio.
 
+## Real Shadow Cycle Command
+
+`MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1` adds a manual real-diagnostic mode.
+It is code-only until a separate audit approves changing the timer/service
+command:
+
+```bash
+python sidecar_main.py \
+  --real-cycle-once \
+  --db-path research_lab/shadow/multi_asset_shadow.db \
+  --lock-path /tmp/multi-asset-shadow.lock \
+  --min-disk-free-gb 12
+```
+
+Expected output:
+
+- `operational_mode = real_shadow_cycle`
+- symbol-explicit rows for BTC/ETH/SOL in `shadow_decision_outcomes`
+- `shadow_signal_candidates` rows only for generated shadow candidates
+- `shadow_near_miss_diagnostics` rows only for shallow-sweep near misses
+- `production_db_touched = false`
+
+This command is read-only toward market-data sources and writes only to the
+sidecar DB. It must not be wired into `multi-asset-shadow.service` until the
+real signal cycle milestone passes audit. The active production heartbeat timer
+continues to run `--cycle-once`.
+
 ## Timer Management
 
 Timer/service files are installed only by the audited deployment milestone:

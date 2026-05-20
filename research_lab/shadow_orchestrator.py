@@ -31,7 +31,7 @@ SIDECAR_LOCK_DEFAULT = Path("/tmp/multi-asset-shadow.lock")
 MIN_DISK_FREE_BYTES = 12 * 1024**3
 CODE_VERSION = "multi_asset_shadow_sidecar_v1"
 DEFAULT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
-DISALLOWED_IMPORT_ROOTS = {"core", "data", "execution"}
+DISALLOWED_IMPORT_ROOTS = {"core", "data", "execution", "main", "orchestrator", "storage"}
 
 
 class ShadowGuardError(RuntimeError):
@@ -61,6 +61,8 @@ class DryRunResult:
     resource_rows: int
     production_db_touched: bool
     operational_mode: str
+    signal_candidate_rows: int = 0
+    portfolio_decision_rows: int = 0
 
 
 def utc_now_iso() -> str:
@@ -471,6 +473,91 @@ def run_cycle_once(
     )
 
 
+def run_real_cycle_once(
+    *,
+    db_path: str | Path = SHADOW_DB_DEFAULT,
+    lock_path: str | Path = SIDECAR_LOCK_DEFAULT,
+    repo_root: str | Path | None = None,
+    symbols: tuple[str, ...] = DEFAULT_SYMBOLS,
+    min_disk_free_bytes: int = MIN_DISK_FREE_BYTES,
+) -> DryRunResult:
+    from research_lab.shadow_signal_cycle import (
+        BinanceRestShadowMarketProvider,
+        default_symbol_configs,
+        run_real_shadow_cycle,
+    )
+
+    operational_mode = "real_shadow_cycle"
+    root = Path(repo_root or Path.cwd()).resolve()
+    lock = Path(lock_path)
+    ensure_lock_separation(lock)
+    resolved_db_path = resolve_shadow_db_path(db_path, repo_root=root)
+    before_prod = production_db_signature(root)
+    assert_no_order_path_imports(
+        (
+            Path(__file__).resolve(),
+            Path(__file__).resolve().with_name("shadow_schema.py"),
+            Path(__file__).resolve().with_name("shadow_signal_cycle.py"),
+            root / "sidecar_main.py",
+        )
+    )
+
+    with acquire_sidecar_lock(lock):
+        sample = collect_resource_sample(resolved_db_path.parent, min_disk_free_bytes)
+        with connect_shadow_db(resolved_db_path, repo_root=root) as conn:
+            initialize_shadow_schema(conn)
+            shadow_run_id = f"shadow-{operational_mode}-{uuid.uuid4().hex[:12]}"
+            config_hash = default_shadow_config_hash(symbols, operational_mode)
+            started_at = utc_now_iso()
+            _insert_shadow_run(
+                conn,
+                shadow_run_id=shadow_run_id,
+                started_at=started_at,
+                config_hash=config_hash,
+                db_path=resolved_db_path,
+                lock_path=lock,
+                dry_run=False,
+                repo_root=root,
+            )
+            _insert_resource_sample(conn, shadow_run_id, sample, source=operational_mode)
+            configs = tuple(config for config in default_symbol_configs() if config.symbol in symbols)
+            cycle_result = run_real_shadow_cycle(
+                conn,
+                shadow_run_id=shadow_run_id,
+                config_hash=config_hash,
+                provider=BinanceRestShadowMarketProvider(),
+                symbol_configs=configs,
+            )
+
+            decision_rows = conn.execute(
+                "SELECT COUNT(*) FROM shadow_decision_outcomes WHERE shadow_run_id = ?",
+                (shadow_run_id,),
+            ).fetchone()[0]
+            near_miss_rows = conn.execute(
+                "SELECT COUNT(*) FROM shadow_near_miss_diagnostics WHERE shadow_run_id = ?",
+                (shadow_run_id,),
+            ).fetchone()[0]
+            resource_rows = conn.execute(
+                "SELECT COUNT(*) FROM shadow_resource_samples WHERE shadow_run_id = ?",
+                (shadow_run_id,),
+            ).fetchone()[0]
+
+    after_prod = production_db_signature(root)
+    return DryRunResult(
+        shadow_run_id=shadow_run_id,
+        db_path=resolved_db_path,
+        lock_path=lock,
+        symbols=symbols,
+        decision_rows=int(decision_rows),
+        near_miss_rows=int(near_miss_rows),
+        resource_rows=int(resource_rows),
+        production_db_touched=before_prod != after_prod,
+        operational_mode=operational_mode,
+        signal_candidate_rows=cycle_result.signal_candidates,
+        portfolio_decision_rows=cycle_result.portfolio_decisions,
+    )
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Multi-asset shadow sidecar")
     mode = parser.add_mutually_exclusive_group(required=True)
@@ -479,6 +566,11 @@ def build_arg_parser() -> argparse.ArgumentParser:
         "--cycle-once",
         action="store_true",
         help="Run one operational heartbeat cycle and exit",
+    )
+    mode.add_argument(
+        "--real-cycle-once",
+        action="store_true",
+        help="Run one read-only real shadow diagnostic cycle and exit",
     )
     parser.add_argument("--db-path", default=SHADOW_DB_DEFAULT.as_posix())
     parser.add_argument("--lock-path", default=SIDECAR_LOCK_DEFAULT.as_posix())
@@ -492,7 +584,12 @@ def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
     symbols = tuple(symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip())
-    runner = run_dry_run if args.dry_run else run_cycle_once
+    if args.dry_run:
+        runner = run_dry_run
+    elif args.cycle_once:
+        runner = run_cycle_once
+    else:
+        runner = run_real_cycle_once
     try:
         result = runner(
             db_path=args.db_path,
@@ -514,7 +611,9 @@ def main(argv: list[str] | None = None) -> int:
                 "decision_rows": result.decision_rows,
                 "near_miss_rows": result.near_miss_rows,
                 "operational_mode": result.operational_mode,
+                "portfolio_decision_rows": result.portfolio_decision_rows,
                 "resource_rows": result.resource_rows,
+                "signal_candidate_rows": result.signal_candidate_rows,
                 "production_db_touched": result.production_db_touched,
             },
             sort_keys=True,
