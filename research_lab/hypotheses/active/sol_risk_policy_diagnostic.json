@@ -1,0 +1,72 @@
+{
+  "hypothesis_id": "SOL_RISK_POLICY_DIAGNOSTIC_V1",
+  "name": "SOL Risk Policy Diagnostic",
+  "class": "diagnostic_only",
+  "status": "ACTIVE",
+  "scope": "Research Lab offline risk-policy diagnostic only. Test SOL risk caps after frozen trial-00095 entry population is fixed. No entry tuning, threshold changes, exit changes, shadow design, PAPER deployment, runtime, core, settings, execution, or production storage changes.",
+  "edge_rationale": "SOL forensic analysis showed strong edge but higher drawdown and longer loss streaks than BTC/ETH. A smaller SOL risk cap may preserve SOL contribution while keeping portfolio capital drawdown inside policy.",
+  "counterparty_or_market_mechanism": "No new trading mechanism is tested. The existing sweep/reclaim transfer mechanism remains frozen; only portfolio risk sizing is evaluated offline.",
+  "required_data": [
+    "Frozen BTC trial-00095 replay trades",
+    "Frozen ETH trial-00095 transfer trades",
+    "Frozen SOL trial-00095 transfer trades",
+    "Offline portfolio gate contracts",
+    "Audited BTC, ETH, and SOL research datasets"
+  ],
+  "timeframe": [
+    "15m",
+    "portfolio replay"
+  ],
+  "baseline_reference": "BTC+ETH baseline: 696 approved trades, ER 1.955, PF 3.60, capital DD estimate 4.809%",
+  "variables": [
+    {
+      "name": "sol_risk_cap",
+      "values": [
+        0.0015,
+        0.002,
+        0.0025,
+        0.003,
+        0.0035
+      ]
+    }
+  ],
+  "frozen_assumptions": [
+    "BTC and ETH risk remain 0.35%.",
+    "SOL entry population remains frozen from trial-00095 transfer replay.",
+    "Risk-cap changes only offline SOL signal risk_pct.",
+    "No SOL threshold tuning.",
+    "No runtime, shadow, PAPER, LIVE, core, orchestrator, settings, execution, or production storage changes."
+  ],
+  "expected_observation": "If SOL is portfolio-safe with smaller size, one or more SOL risk caps should pass capital DD, ER, PF, SOL contribution, incremental PnL, and DD-increase gates.",
+  "acceptance_criteria": {
+    "max_capital_dd": 0.06,
+    "min_portfolio_er": 1.8,
+    "min_portfolio_pf": 3.0,
+    "min_sol_approved_trades": 500,
+    "min_incremental_pnl_pct": 0.01,
+    "max_capital_dd_increase_vs_btc_eth": 0.02
+  },
+  "kill_criteria": {
+    "runtime_change": "Any runtime/core/settings/execution/storage production change invalidates the milestone.",
+    "entry_tuning": "Any SOL-specific entry, threshold, or exit tuning invalidates the diagnostic.",
+    "source_db_mutation": "Mutating audited BTC/ETH/SOL source datasets invalidates the milestone.",
+    "promotion_claim": "Any SOL shadow/PAPER/runtime approval claim invalidates the milestone."
+  },
+  "failure_modes": [
+    "All SOL risk caps fail capital drawdown gates.",
+    "Smaller SOL risk caps reduce DD but add too little incremental PnL.",
+    "SOL contribution is too low after portfolio vetoes.",
+    "R-space metrics look good but capital DD remains above policy."
+  ],
+  "out_of_scope": [
+    "SOL shadow design",
+    "SOL PAPER deployment",
+    "SOL runtime integration",
+    "SOL threshold stability research",
+    "Entry or exit optimization",
+    "Changing trial-00095 parameters",
+    "Changing core, orchestrator, settings, execution, risk, or production storage"
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-20T00:00:00+00:00"
+}
