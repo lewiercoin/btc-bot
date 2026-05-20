@@ -42,11 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_SHADOW_CONTRACT_DESIGN_V1
 
-**Status:** READY_FOR_AUDIT_DESIGN_ONLY
+**Status:** CLOSED - audit PASS (design sound, gated behind BTC M4 and user approval)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_SOL_SHADOW_CONTRACT.md`
+**Audit:** `docs/audits/AUDIT_SOL_SHADOW_CONTRACT_DESIGN_2026-05-20.md`
 
 **Scope:** Design only. Defines the future SOL shadow/no-order observation
 contract after audited SOL transfer, forensic, and risk-policy evidence. No
