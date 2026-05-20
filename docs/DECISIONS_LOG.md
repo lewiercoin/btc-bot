@@ -31,6 +31,38 @@ write path to production storage.
 **Related:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`;
 `docs/MILESTONE_TRACKER.md`; BTC M4 checkpoint planned for 2026-06-13.
 
+## 2026-05-20 - Implement dry-run-only multi-asset shadow sidecar infrastructure
+**Decision:** Mark `MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_V1` ready for
+Claude Code audit as an implementation checkpoint, limited to dry-run
+infrastructure.
+
+**Reason:** The audited sidecar design allows early forward observation only if
+the implementation proves hard isolation first. This checkpoint builds the
+minimum auditable infrastructure before any service deployment: separate
+entrypoint, separate lock, separate DB, safe path guard, schema, order-path
+guard, resource guard, dry-run, and tests.
+
+**Result:** The implementation adds `sidecar_main.py`,
+`research_lab/shadow_orchestrator.py`, `research_lab/shadow_schema.py`,
+`docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`, and focused tests.
+Dry-run writes only to a DB under `research_lab/shadow/`, inserts symbol-explicit
+stub decisions and a nested near-miss payload, records a resource sample, and
+returns `production_db_touched=false`.
+
+**Validation:** Focused tests passed (`9 passed` with `--no-cov`), compileall
+passed for the new modules/tests, and a temporary dry-run produced 3 decision
+rows, 1 near-miss row, and 1 resource row without touching production storage.
+
+**Consequences:** This still does not approve systemd deployment, a long-running
+sidecar process, ETH/SOL PAPER, LIVE trading, runtime integration, threshold
+changes, or any change to BTC PAPER/M4. A separate deployment milestone and
+audit remain required before a server-side sidecar can run continuously.
+
+**Related:** `sidecar_main.py`; `research_lab/shadow_orchestrator.py`;
+`research_lab/shadow_schema.py`;
+`docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`;
+`docs/MILESTONE_TRACKER.md`.
+
 ## 2026-05-20 - Design SOL shadow contract before any implementation
 **Decision:** Mark `SOL_SHADOW_CONTRACT_DESIGN_V1` ready for Claude Code audit
 as a design-only milestone.

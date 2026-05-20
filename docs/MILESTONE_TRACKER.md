@@ -42,7 +42,7 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: MULTI_ASSET_SHADOW_SIDECAR_IMPLEMENTATION_V1
 
-**Status:** ACTIVE
+**Status:** READY_FOR_AUDIT - implementation complete, dry-run only, no deployment
 **Builder:** Codex
 **Decision date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
@@ -70,7 +70,31 @@ truth; this checkpoint only clarifies their combined state.
 - ETH/SOL PAPER approval
 - threshold changes
 
-**Next:** Codex implements. Claude Code audits before any deployment milestone.
+**Implementation result:**
+- Added `sidecar_main.py` as a separate entrypoint from `main.py`.
+- Added `research_lab/shadow_orchestrator.py` with dry-run orchestration,
+  sidecar lock acquisition, order-path import guard, resource sampling, and
+  production DB touch detection.
+- Added `research_lab/shadow_schema.py` with safe path guard and all six
+  required shadow tables.
+- Added `docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`.
+- Added tests for isolation, lock separation, path guard, schema creation,
+  nested near-miss payload, and no production DB writes.
+
+**Validation:**
+- `pytest tests/test_sidecar_isolation.py tests/test_shadow_schema.py -q --no-cov`
+  -> 9 passed.
+- `python -m compileall sidecar_main.py research_lab/shadow_orchestrator.py research_lab/shadow_schema.py tests/test_sidecar_isolation.py tests/test_shadow_schema.py`
+  -> PASS.
+- Manual dry-run with temporary repo root returned
+  `production_db_touched=false`, `decision_rows=3`, `near_miss_rows=1`,
+  `resource_rows=1`.
+
+**Builder verdict:** `READY_FOR_AUDIT_IMPLEMENTATION_DRY_RUN_ONLY`
+
+**Next:** Claude Code audit. This implementation still does not approve systemd
+deployment, long-running sidecar start, ETH/SOL PAPER, threshold changes, or any
+change to BTC PAPER/M4 runtime.
 
 ---
 
