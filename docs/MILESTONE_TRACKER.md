@@ -42,11 +42,14 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1
 
-**Status:** READY_FOR_AUDIT_CODE_ONLY_SHADOW_NO_ORDERS
+**Status:** DEPLOYED - portfolio gate integration active on production (2026-05-20 13:53 UTC)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Deployment date:** 2026-05-20 13:53 UTC (Option A: immediate pull)
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+**Audits:**
+- `docs/audits/AUDIT_MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1_2026-05-20.md` (DONE)
 
 **Scope:** Replace the local ad hoc real-shadow portfolio gating logic with the
 audited Research Lab portfolio gate contract. This is a code-only checkpoint.
@@ -86,7 +89,16 @@ contract already validated offline, while keeping all behavior in
 - `python -m compileall research_lab/models/portfolio_state.py research_lab/shadow_signal_cycle.py research_lab/shadow_orchestrator.py tests/test_portfolio_state.py tests/test_shadow_real_signal_cycle.py`
   -> PASS.
 
-**Builder verdict:** `READY_FOR_AUDIT_CODE_ONLY_SHADOW_NO_ORDERS`
+**Deployment (2026-05-20 13:53 UTC):**
+- Server pull: 54b9c617 → 535f68a7
+- Deployment method: git pull --ff-only (no restarts)
+- Commits pulled: 21e5f9d (portfolio gate), 535f68a (audit)
+- BTC PAPER: PID 815407, no restart
+- Timer: active, picked up new code on next cycle (13:53 UTC)
+- First cycle with ResearchPortfolioGate: shadow-real_shadow_cycle-88b349cfc757
+- Verification: production_db_touched=false, decision_rows=3, BTC PAPER stable
+- Latest outcomes: all no_sweep (normal market state)
+- Real shadow cycles: 6 (19 operational heartbeat + 6 real shadow total)
 
 ### Implementation: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1
 
