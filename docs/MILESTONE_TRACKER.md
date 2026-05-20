@@ -40,6 +40,54 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1
+
+**Status:** READY_FOR_AUDIT_CODE_ONLY_SHADOW_NO_ORDERS
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+
+**Scope:** Replace the local ad hoc real-shadow portfolio gating logic with the
+audited Research Lab portfolio gate contract. This is a code-only checkpoint.
+It does not deploy, restart services, change systemd units, enable orders,
+approve ETH/SOL PAPER, or change BTC PAPER/M4.
+
+**Reason:** The experimental multi-asset branch should move toward the final
+BTC/ETH/SOL runtime in small audited steps. The safest first step is to make
+the sidecar real-shadow cycle use the same deterministic portfolio gate
+contract already validated offline, while keeping all behavior in
+`research_lab/**` and preserving `orders_allowed=false`.
+
+**Implementation result:**
+- Extended research-only `SYMBOL_ORDER` to BTC/ETH/SOL.
+- `research_lab/shadow_signal_cycle.py` now adapts generated shadow candidates
+  into `PortfolioSignal` and evaluates them through `ResearchPortfolioGate`.
+- Default portfolio contract remains conservative:
+  - max 2 open positions total
+  - max 0.70% open risk
+  - deterministic order BTC -> ETH -> SOL
+- SOL remains `shadow_no_orders` with candidate risk 0.15%.
+- No persistent multi-asset runtime state is introduced in this checkpoint.
+
+**Out of scope:**
+- `core/**`, `execution/**`, `data/**`, `storage/**`, `orchestrator.py`,
+  `main.py`, `settings.py`
+- production DB writes or migrations
+- systemd command changes
+- BTC PAPER restart
+- M4 query/parser/config changes
+- ETH/SOL PAPER or LIVE
+- order placement
+
+**Validation:**
+- `pytest tests/test_portfolio_state.py tests/test_shadow_real_signal_cycle.py tests/test_sidecar_isolation.py tests/test_shadow_schema.py -q --no-cov`
+  -> 29 passed.
+- `python -m compileall research_lab/models/portfolio_state.py research_lab/shadow_signal_cycle.py research_lab/shadow_orchestrator.py tests/test_portfolio_state.py tests/test_shadow_real_signal_cycle.py`
+  -> PASS.
+
+**Builder verdict:** `READY_FOR_AUDIT_CODE_ONLY_SHADOW_NO_ORDERS`
+
 ### Implementation: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1
 
 **Status:** DEPLOYED - Phase 2 real shadow observation active on production (2026-05-20 13:08 UTC)

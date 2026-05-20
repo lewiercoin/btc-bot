@@ -52,6 +52,12 @@ def test_sort_portfolio_signals_uses_timestamp_then_symbol_order() -> None:
     ]
 
 
+def test_sort_portfolio_signals_places_sol_after_eth_on_same_bar() -> None:
+    ordered = sort_portfolio_signals([_signal("SOLUSDT"), _signal("ETHUSDT"), _signal("BTCUSDT")])
+
+    assert [s.symbol for s in ordered] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+
 def test_allow_both_same_bar_when_portfolio_caps_pass() -> None:
     gate = ResearchPortfolioGate()
     decisions = gate.evaluate_batch(
@@ -64,6 +70,25 @@ def test_allow_both_same_bar_when_portfolio_caps_pass() -> None:
     assert [d.signal.symbol for d in decisions] == ["BTCUSDT", "ETHUSDT"]
     assert all(d.approved for d in decisions)
     assert decisions[-1].portfolio_risk_after_pct == 0.007
+
+
+def test_portfolio_gate_supports_sol_without_cross_symbol_state_leak() -> None:
+    gate = ResearchPortfolioGate()
+    symbol_states = {
+        "BTCUSDT": SymbolRiskState(symbol="BTCUSDT", consecutive_losses=4, last_loss_at=NOW - timedelta(minutes=30)),
+    }
+
+    decisions = gate.evaluate_batch(
+        [_signal("BTCUSDT", minute=0), _signal("SOLUSDT", minute=15, risk_pct=0.0015, notional_pct=0.15)],
+        symbol_states=symbol_states,
+        portfolio_state=PortfolioRiskState(),
+        now=NOW,
+    )
+
+    assert decisions[0].approved is False
+    assert decisions[0].veto_reason == PortfolioVetoReason.SYMBOL_LOSS_STREAK_PAUSE.value
+    assert decisions[1].signal.symbol == "SOLUSDT"
+    assert decisions[1].approved is True
 
 
 def test_second_same_bar_signal_vetoed_when_total_risk_cap_exceeded() -> None:

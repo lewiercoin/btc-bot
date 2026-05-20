@@ -17,6 +17,15 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Protocol
 
+from research_lab.models.portfolio_state import (
+    PortfolioRiskConfig,
+    PortfolioRiskState,
+    PortfolioSignal,
+    ResearchPortfolioGate,
+    SYMBOL_ORDER,
+    SymbolRiskState,
+)
+
 
 MIN_SWEEP_DEPTH_PCT = 0.00649
 NEAR_MISS_FLOOR_MULT = 0.80
@@ -383,35 +392,76 @@ def evaluate_shadow_symbol(
 def apply_shadow_portfolio_gate(
     decisions: tuple[ShadowSymbolDecision, ...],
     *,
-    max_portfolio_risk_pct: float = 0.007,
+    portfolio_state: PortfolioRiskState | None = None,
+    symbol_states: dict[str, SymbolRiskState] | None = None,
+    config: PortfolioRiskConfig | None = None,
 ) -> tuple[ShadowSymbolDecision, ...]:
-    accepted_risk = 0.0
+    gate_config = config or PortfolioRiskConfig()
+    gate = ResearchPortfolioGate(gate_config)
+    generated = [
+        signal
+        for signal in (build_shadow_portfolio_signal(decision) for decision in decisions)
+        if signal is not None
+    ]
+    gate_decisions = gate.evaluate_batch(
+        generated,
+        symbol_states=symbol_states or {},
+        portfolio_state=portfolio_state or PortfolioRiskState(),
+        now=_cycle_now_from_decisions(decisions),
+    )
+    by_signal_id = {gate_decision.signal.signal_id: gate_decision for gate_decision in gate_decisions}
     updated: list[ShadowSymbolDecision] = []
-    for decision in sorted(decisions, key=lambda item: item.symbol):
-        if not decision.signal_generated:
+    for decision in decisions:
+        signal = build_shadow_portfolio_signal(decision)
+        if signal is None:
             updated.append(decision)
             continue
-        risk_after = accepted_risk + decision.candidate_risk_pct
-        if risk_after <= max_portfolio_risk_pct + 1e-12:
-            accepted_risk = risk_after
-            updated.append(
-                _replace_portfolio(
-                    decision,
-                    portfolio_shadow_decision="approve_shadow",
-                    portfolio_veto_reason=None,
-                    portfolio_risk_after_pct=risk_after,
-                )
+        gate_decision = by_signal_id[signal.signal_id]
+        updated.append(
+            _replace_portfolio(
+                decision,
+                portfolio_shadow_decision="approve_shadow" if gate_decision.approved else "veto_shadow",
+                portfolio_veto_reason=gate_decision.veto_reason,
+                portfolio_risk_after_pct=gate_decision.portfolio_risk_after_pct
+                if gate_decision.portfolio_risk_after_pct is not None
+                else 0.0,
             )
-        else:
-            updated.append(
-                _replace_portfolio(
-                    decision,
-                    portfolio_shadow_decision="veto_shadow",
-                    portfolio_veto_reason="portfolio_risk_cap_exceeded",
-                    portfolio_risk_after_pct=accepted_risk,
-                )
-            )
-    return tuple(updated)
+        )
+    return tuple(sorted(updated, key=_decision_sort_key))
+
+
+def build_shadow_portfolio_signal(decision: ShadowSymbolDecision) -> PortfolioSignal | None:
+    if not decision.signal_generated or decision.candidate_direction_preview is None:
+        return None
+    timestamp = datetime.fromisoformat(decision.timestamp_utc.replace("Z", "+00:00"))
+    return PortfolioSignal(
+        symbol=decision.symbol,
+        timestamp=timestamp,
+        direction=decision.candidate_direction_preview,
+        signal_id=f"shadow-{decision.symbol}-{decision.timestamp_utc}",
+        risk_pct=decision.candidate_risk_pct,
+        gross_notional_pct=_shadow_gross_notional_pct(decision.symbol),
+        confluence_score=decision.confluence_score_preview,
+    )
+
+
+def _shadow_gross_notional_pct(symbol: str) -> float:
+    if symbol == "SOLUSDT":
+        return 0.15
+    return 0.30
+
+
+def _cycle_now_from_decisions(decisions: tuple[ShadowSymbolDecision, ...]) -> datetime:
+    for decision in decisions:
+        return datetime.fromisoformat(decision.timestamp_utc.replace("Z", "+00:00"))
+    return utc_now()
+
+
+def _decision_sort_key(decision: ShadowSymbolDecision) -> tuple[datetime, int, str]:
+    rank = {symbol: index for index, symbol in enumerate(SYMBOL_ORDER)}
+    timestamp = datetime.fromisoformat(decision.timestamp_utc.replace("Z", "+00:00"))
+    symbol = decision.symbol.upper()
+    return (timestamp, rank.get(symbol, len(rank)), symbol)
 
 
 def _replace_portfolio(

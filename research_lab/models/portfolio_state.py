@@ -13,7 +13,7 @@ from enum import StrEnum
 from typing import Iterable
 
 
-SYMBOL_ORDER: tuple[str, ...] = ("BTCUSDT", "ETHUSDT")
+SYMBOL_ORDER: tuple[str, ...] = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
 
 
 class PortfolioVetoReason(StrEnum):
