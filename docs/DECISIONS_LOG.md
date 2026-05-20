@@ -4,6 +4,30 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Test SOL risk-policy frontier before any shadow design
+**Decision:** Mark `SOL_RISK_POLICY_DIAGNOSTIC_V1` ready for Claude Code audit.
+
+**Reason:** SOL drawdown forensic analysis showed that the edge is real but
+needs smaller sizing than BTC/ETH. The next safe step is to test predeclared
+SOL risk caps while keeping trial-00095 entries, exits, thresholds, and BTC/ETH
+risk unchanged.
+
+**Result:** SOL risk caps 0.15%, 0.20%, and 0.25% pass all 6 risk-policy gates.
+0.30% fails the 6% capital DD gate, and 0.35% fails both capital DD and
+DD-increase gates. The predeclared selection rule chooses 0.15% because it has
+the lowest capital DD among passing variants. All variants preserve the same
+entry population and R-space metrics: 1,545 approved portfolio trades, 905 SOL
+trades, ER 2.056, PF 3.49.
+
+**Consequences:** Builder verdict is `SOL_APPROVED_AT_RISK_0.0015` for offline
+research policy only. This does not approve SOL shadow, SOL PAPER, runtime
+integration, or any production setting change. If Claude Code audit passes, the
+next work can be a design-only SOL shadow/risk-policy contract.
+
+**Related:** `research_lab/sol_risk_policy_diagnostic.py`;
+`research_lab/hypotheses/active/sol_risk_policy_diagnostic.json`;
+`docs/analysis/SOL_RISK_POLICY_DIAGNOSTIC_2026-05-20.md`.
+
 ## 2026-05-20 - Diagnose SOL drawdown before any shadow design
 **Decision:** Mark `SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1` ready for Claude Code
 audit as a research-only diagnostic.

@@ -40,6 +40,53 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_RISK_POLICY_DIAGNOSTIC_V1
+
+**Status:** READY_FOR_AUDIT - risk frontier complete, awaiting Claude Code audit
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_risk_policy_diagnostic.json`
+**Runner:** `research_lab/sol_risk_policy_diagnostic.py`
+**Report:** `docs/analysis/SOL_RISK_POLICY_DIAGNOSTIC_2026-05-20.md`
+
+**Scope:** Research Lab offline risk-policy diagnostic only. Tests SOL risk caps
+after the frozen trial-00095 entry population is fixed. BTC and ETH risk remain
+at 0.35%. No runtime, SOL shadow, SOL PAPER, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, threshold
+change, entry tuning, or exit tuning is in scope.
+
+**Result:**
+- Tested SOL risk caps: 0.15%, 0.20%, 0.25%, 0.30%, 0.35%.
+- Entry population and R-space metrics are unchanged across scenarios:
+  1,545 approved portfolio trades, 905 approved SOL trades, ER 2.056, PF 3.49.
+- Passing caps: 0.15%, 0.20%, and 0.25% pass 6/6 gates.
+- Failing caps: 0.30% fails max capital DD (6.08% > 6.00%); 0.35% fails max
+  capital DD and DD-increase gates.
+- Selected policy by predeclared rule: SOL risk cap 0.15%, capital DD 5.24%,
+  incremental PnL vs BTC+ETH 251.78%.
+- 0.20% and 0.25% also pass, but the selection rule prefers the lowest capital
+  DD among passing variants.
+
+**Builder verdict:** `SOL_APPROVED_AT_RISK_0.0015`
+
+**Interpretation:** The offline frontier supports SOL only with smaller sizing
+than BTC/ETH. This does not approve SOL shadow, SOL PAPER, or runtime. If audit
+passes, the next safe step is a design-only SOL shadow/risk-policy contract that
+uses the approved cap as a candidate policy, still blocked from deployment by
+separate audit and user approval.
+
+**Validation:**
+- Local tests: `17 passed`.
+- Local compileall: PASS.
+- Server compileall: PASS.
+- BTC PAPER bot remained active during server replay.
+
+**Next:** Claude Code audit. No SOL shadow/PAPER/runtime step is approved by
+this result.
+
+---
+
 ### Research: SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1
 
 **Status:** CLOSED - audit PASS (methodology and forensic evidence)
