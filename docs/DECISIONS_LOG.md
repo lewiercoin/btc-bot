@@ -4,6 +4,34 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Move real-shadow portfolio decisions onto audited gate contract
+**Decision:** Prepare `MULTI_ASSET_SHADOW_PORTFOLIO_GATE_V1` as a code-only
+checkpoint that makes real-shadow BTC/ETH/SOL decisions use
+`ResearchPortfolioGate`.
+
+**Reason:** The experimental multi-asset branch should approach runtime
+integration gradually. Reusing the audited Research Lab portfolio gate is safer
+than maintaining separate ad hoc gating in the sidecar. This aligns the shadow
+path with the future runtime shape without promoting anything into `core/`,
+`orchestrator.py`, `settings.py`, production storage, or execution.
+
+**Result:** The sidecar real-shadow cycle now adapts generated shadow candidates
+to `PortfolioSignal` and evaluates them through the research-only portfolio
+contract. BTC/ETH/SOL ordering is deterministic, SOL remains `shadow_no_orders`
+at 0.15% candidate risk, and order placement remains impossible.
+
+**Consequences:**
+- No systemd change or deployment is included in this checkpoint.
+- No ETH/SOL PAPER or LIVE approval.
+- No change to BTC PAPER or M4 source data.
+- Claude Code audit is required before production can pull and use this
+  updated real-shadow gate.
+
+**Related:** `research_lab/models/portfolio_state.py`;
+`research_lab/shadow_signal_cycle.py`;
+`tests/test_portfolio_state.py`;
+`tests/test_shadow_real_signal_cycle.py`.
+
 ## 2026-05-20 - Prepare real shadow signal cycle before heartbeat checkpoint
 **Decision:** Start coding `MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1` before the
 24h heartbeat checkpoint, but keep it code-only and disconnected from the

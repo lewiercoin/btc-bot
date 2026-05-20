@@ -6,6 +6,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 from research_lab import shadow_orchestrator
+from research_lab.models.portfolio_state import PortfolioRiskConfig, PortfolioVetoReason
 from research_lab.shadow_orchestrator import DISALLOWED_IMPORT_ROOTS, _import_roots_from_file
 from research_lab.shadow_schema import SHADOW_DB_DEFAULT, connect_shadow_db, initialize_shadow_schema
 from research_lab.shadow_signal_cycle import (
@@ -188,18 +189,62 @@ def test_real_shadow_cycle_records_unavailable_symbol_without_crashing(tmp_path:
         assert json.loads(row[2])["data_status"] == "unavailable"
 
 
-def test_shadow_portfolio_gate_vetoes_third_signal_when_batch_risk_exceeds_cap() -> None:
+def test_shadow_portfolio_gate_uses_contract_position_cap_for_third_signal() -> None:
     decisions = tuple(
         evaluate_shadow_symbol(config, snapshot(config.symbol, trigger_low=99.2, trigger_close=100.2))
         for config in default_symbol_configs()
     )
-    gated = apply_shadow_portfolio_gate(decisions, max_portfolio_risk_pct=0.007)
+    gated = apply_shadow_portfolio_gate(decisions)
     by_symbol = {decision.symbol: decision for decision in gated}
 
     assert by_symbol["BTCUSDT"].portfolio_shadow_decision == "approve_shadow"
     assert by_symbol["ETHUSDT"].portfolio_shadow_decision == "approve_shadow"
     assert by_symbol["SOLUSDT"].portfolio_shadow_decision == "veto_shadow"
-    assert by_symbol["SOLUSDT"].portfolio_veto_reason == "portfolio_risk_cap_exceeded"
+    assert by_symbol["SOLUSDT"].portfolio_veto_reason == PortfolioVetoReason.PORTFOLIO_POSITION_CAP_EXCEEDED.value
+
+
+def test_shadow_portfolio_gate_returns_contract_symbol_order() -> None:
+    configs = default_symbol_configs()
+    decisions = tuple(
+        evaluate_shadow_symbol(config, snapshot(config.symbol, trigger_low=99.2, trigger_close=100.2))
+        for config in (configs[1], configs[2], configs[0])
+    )
+
+    gated = apply_shadow_portfolio_gate(decisions)
+
+    assert [decision.symbol for decision in gated] == ["BTCUSDT", "ETHUSDT", "SOLUSDT"]
+
+
+def test_shadow_portfolio_gate_can_surface_contract_risk_cap_veto() -> None:
+    decisions = tuple(
+        evaluate_shadow_symbol(config, snapshot(config.symbol, trigger_low=99.2, trigger_close=100.2))
+        for config in default_symbol_configs()
+    )
+    gated = apply_shadow_portfolio_gate(
+        decisions,
+        config=PortfolioRiskConfig(max_open_positions_total=3, max_directional_notional_pct=1.0),
+    )
+    by_symbol = {decision.symbol: decision for decision in gated}
+
+    assert by_symbol["BTCUSDT"].portfolio_shadow_decision == "approve_shadow"
+    assert by_symbol["ETHUSDT"].portfolio_shadow_decision == "approve_shadow"
+    assert by_symbol["SOLUSDT"].portfolio_shadow_decision == "veto_shadow"
+    assert by_symbol["SOLUSDT"].portfolio_veto_reason == PortfolioVetoReason.PORTFOLIO_RISK_CAP_EXCEEDED.value
+
+
+def test_shadow_portfolio_gate_allows_sol_when_caps_pass() -> None:
+    sol_config = default_symbol_configs()[-1]
+    sol_decision = evaluate_shadow_symbol(
+        sol_config,
+        snapshot(sol_config.symbol, trigger_low=99.2, trigger_close=100.2),
+    )
+
+    gated = apply_shadow_portfolio_gate((sol_decision,))
+
+    assert gated[0].symbol == "SOLUSDT"
+    assert gated[0].portfolio_shadow_decision == "approve_shadow"
+    assert gated[0].portfolio_veto_reason is None
+    assert gated[0].candidate_risk_pct == 0.0015
 
 
 def test_real_cycle_once_cli_preserves_production_db_and_writes_real_rows(
