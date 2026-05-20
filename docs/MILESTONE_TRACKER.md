@@ -42,11 +42,16 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Deployment: MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1
 
-**Status:** READY_FOR_AUDIT - Phase 1 operational heartbeat implementation complete, not deployed
+**Status:** DAY0_PASS - Phase 1 operational heartbeat deployed and running on production (2026-05-20 08:18 UTC)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Deployment date:** 2026-05-20 (Day 0 PASS after 3 attempts, 2 hotfixes)
 **Branch:** `research/sweep-family-expansion-v1`
 **Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+**Audits:**
+- `docs/audits/AUDIT_MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1_PHASE1_2026-05-20.md` (DONE)
+- `docs/audits/AUDIT_MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1_PHASE1_HOTFIX_2026-05-20.md` (DONE - portability fix)
+- `docs/audits/AUDIT_MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1_PHASE1_HOTFIX2_2026-05-20.md` (DONE - ownership fix)
 
 **Scope:** Deploy isolated systemd timer/service with operational heartbeat cycle only. No real market data, no signal generation. Prove timer/service isolation and stability before M4 (2026-06-13).
 
@@ -102,11 +107,25 @@ Real signal generation milestone (`MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1`) aft
   `operational_mode=operational_heartbeat`, `decision_rows=3`,
   `near_miss_rows=0`, `resource_rows=1`, and `production_db_touched=false`.
 
-**Builder verdict:** `READY_FOR_AUDIT_DEPLOYMENT_FILES_ONLY`
+**Day 0 deployment attempts:**
+1. Attempt 1 (commit c770d76): FAIL - sqlite3 `.dbinfo` portability issue (server build lacks SQLITE_ENABLE_DBPAGE_VTAB)
+2. Attempt 2 (commit ce82fdb): FAIL - file ownership mismatch (deploy script ran dry-run as root, service runs as btc-bot)
+3. Attempt 3 (commit d30c650): **PASS** (08:18 UTC)
 
-**Next:** Claude Code audit. No production server deployment, systemd install,
-timer start, long-running process, ETH/SOL PAPER, or BTC M4/runtime change is
-approved by this commit.
+**Day 0 PASS verification (2026-05-20 08:18-08:40 UTC):**
+- Deploy script output: `DAY0_PASS: multi-asset-shadow.service/multi-asset-shadow.timer installed, timer started, first cycle clean`
+- Timer: active, 15min cadence (OnUnitActiveSec=15min)
+- First cycle: 08:24:11 UTC, success
+- Second cycle: 08:39:12 UTC, success
+- Shadow DB: 3 total runs (1 dry-run + 2 operational heartbeat)
+- All cycles: `operational_mode=operational_heartbeat`, `production_db_touched=false`, `decision_rows=3`, `near_miss_rows=0`
+- File ownership: btc-bot:btc-bot (lock file, shadow DB)
+- BTC PAPER: PID 815407, active, no restart
+- btc-bot.service: active, unaffected
+
+**Day 3 checkpoint target:** 2026-05-23 08:18 UTC (≥288 operational heartbeat cycles)
+
+**Next:** Passive monitoring until Day 3. After Day 3 PASS, proceed to Phase 2: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1 (real market data + signal generation, shadow_no_orders).
 
 ---
 
