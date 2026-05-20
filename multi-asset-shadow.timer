@@ -1,0 +1,12 @@
+[Unit]
+Description=Multi-asset shadow sidecar observation timer
+Requires=btc-bot.service
+After=btc-bot.service
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=15min
+AccuracySec=1min
+
+[Install]
+WantedBy=timers.target

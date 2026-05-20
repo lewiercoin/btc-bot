@@ -1,0 +1,17 @@
+[Unit]
+Description=Multi-asset shadow sidecar (one-shot operational heartbeat)
+After=btc-bot.service
+
+[Service]
+Type=oneshot
+User=btc-bot
+WorkingDirectory=/home/btc-bot/btc-bot
+Environment="PYTHONPATH=/home/btc-bot/btc-bot"
+ExecStart=/home/btc-bot/btc-bot/.venv/bin/python sidecar_main.py --cycle-once
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7
+MemoryMax=512M
+CPUQuota=50%
+StandardOutput=journal
+StandardError=journal

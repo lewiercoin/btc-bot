@@ -40,6 +40,45 @@ Expected output is a single JSON object with:
 
 Any `production_db_touched = true` result is a hard failure.
 
+## Operational Heartbeat Command
+
+Phase 1 deployment uses one-shot heartbeat cycles, not real signal generation:
+
+```bash
+python sidecar_main.py \
+  --cycle-once \
+  --db-path research_lab/shadow/multi_asset_shadow.db \
+  --lock-path /tmp/multi-asset-shadow.lock \
+  --min-disk-free-gb 12
+```
+
+Expected output:
+
+- `operational_mode = operational_heartbeat`
+- `decision_rows = 3`
+- `near_miss_rows = 0`
+- `resource_rows = 1`
+- `production_db_touched = false`
+
+Heartbeat rows are stub diagnostics only. They do not collect market data,
+generate real signals, run sweep/reclaim detection, or simulate a portfolio.
+
+## Timer Management
+
+Timer/service files are installed only by the audited deployment milestone:
+
+```bash
+systemctl start multi-asset-shadow.timer
+systemctl stop multi-asset-shadow.timer
+systemctl status multi-asset-shadow.timer --no-pager
+systemctl list-timers --all | grep multi-asset-shadow
+journalctl -u multi-asset-shadow.service -f
+```
+
+Stopping `multi-asset-shadow.timer` must not stop or restart `btc-bot.service`.
+The service is `Type=oneshot`: each cycle starts a fresh Python process, writes
+one heartbeat batch, and exits.
+
 ## Day 0 Operator Checks
 
 Before any future deployment milestone starts a service:
@@ -80,6 +119,9 @@ Required tables:
 - `shadow_near_miss_diagnostics`
 - `shadow_resource_samples`
 
+For Phase 1, expected `signal_blocker` is `operational_heartbeat` for
+`--cycle-once` rows.
+
 ## Production DB Guard
 
 The sidecar must not open or write:
@@ -106,6 +148,26 @@ Do not proceed to deployment if any of these occur:
 - `production_db_touched` is true;
 - BTC PAPER process count is not exactly one;
 - nested `near_miss_diagnostics.sweep_depth_pct` is missing.
+
+## Day 3 Checkpoint
+
+After three days of timer operation, verify:
+
+```bash
+sqlite3 research_lab/shadow/multi_asset_shadow.db \
+  "SELECT COUNT(*) FROM shadow_runs WHERE dry_run = 0;"
+scripts/shadow_sidecar_status.sh
+ps -eo pid,ppid,lstart,cmd | grep "main.py --mode PAPER" | grep -v grep
+```
+
+Required:
+
+- at least 288 heartbeat cycles completed;
+- zero `production_db_touched` events in service output or logs;
+- BTC PAPER process count remains exactly 1;
+- BTC M4 config hash is unchanged from the Day 0 baseline;
+- resource guard has no unresolved breach;
+- timer can be stopped without affecting `btc-bot.service`.
 
 ## Promotion Boundary
 

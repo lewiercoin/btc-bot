@@ -63,6 +63,37 @@ audit remain required before a server-side sidecar can run continuously.
 `docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`;
 `docs/MILESTONE_TRACKER.md`.
 
+## 2026-05-20 - Prepare one-shot timer deployment files for sidecar heartbeat
+**Decision:** Mark `MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1` ready for Claude
+Code audit as Phase 1 operational heartbeat implementation. This prepares
+deployment artifacts but does not deploy them.
+
+**Reason:** The safest pre-M4 deployment shape is a systemd timer that runs a
+fresh one-shot process every 15 minutes. This validates process isolation,
+resource guards, production DB non-contamination, and operator monitoring before
+adding market data or real signal generation.
+
+**Result:** `--cycle-once` now performs one operational heartbeat cycle:
+sidecar lock, resource guard, production DB before/after signature check,
+sidecar DB writes only, three BTC/ETH/SOL stub decision rows, and exit. The
+systemd unit/timer, deploy script, status script, and runbook are prepared for
+audit.
+
+**Validation:** Focused sidecar tests passed (`15 passed` with `--no-cov`),
+compileall passed for the sidecar modules/tests, and a temporary manual
+`--cycle-once` returned `production_db_touched=false`, `decision_rows=3`,
+`near_miss_rows=0`, and `resource_rows=1`.
+
+**Consequences:** This checkpoint still does not install or start the timer on
+the production server. Real market data, signal generation, sweep/reclaim
+detection, near-miss diagnostics from live data, ETH/SOL PAPER, and runtime
+integration remain deferred to later audited milestones.
+
+**Related:** `multi-asset-shadow.service`; `multi-asset-shadow.timer`;
+`scripts/deploy_shadow_sidecar.sh`; `scripts/shadow_sidecar_status.sh`;
+`research_lab/shadow_orchestrator.py`;
+`docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`.
+
 ## 2026-05-20 - Design SOL shadow contract before any implementation
 **Decision:** Mark `SOL_SHADOW_CONTRACT_DESIGN_V1` ready for Claude Code audit
 as a design-only milestone.

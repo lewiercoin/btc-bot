@@ -1,4 +1,4 @@
-"""Isolated dry-run orchestration for the multi-asset shadow sidecar."""
+"""Isolated one-shot orchestration for the multi-asset shadow sidecar."""
 
 from __future__ import annotations
 
@@ -15,7 +15,6 @@ from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from types import TracebackType
 from typing import Iterator, TextIO
 
 from research_lab.shadow_schema import (
@@ -32,7 +31,7 @@ SIDECAR_LOCK_DEFAULT = Path("/tmp/multi-asset-shadow.lock")
 MIN_DISK_FREE_BYTES = 12 * 1024**3
 CODE_VERSION = "multi_asset_shadow_sidecar_v1"
 DEFAULT_SYMBOLS = ("BTCUSDT", "ETHUSDT", "SOLUSDT")
-DISALLOWED_IMPORT_ROOTS = {"execution"}
+DISALLOWED_IMPORT_ROOTS = {"core", "data", "execution"}
 
 
 class ShadowGuardError(RuntimeError):
@@ -61,6 +60,7 @@ class DryRunResult:
     near_miss_rows: int
     resource_rows: int
     production_db_touched: bool
+    operational_mode: str
 
 
 def utc_now_iso() -> str:
@@ -80,9 +80,10 @@ def git_commit(repo_root: Path | None = None) -> str:
         return "unknown"
 
 
-def default_shadow_config_hash(symbols: tuple[str, ...]) -> str:
+def default_shadow_config_hash(symbols: tuple[str, ...], operational_mode: str = "dry_run") -> str:
     payload = {
         "code_version": CODE_VERSION,
+        "operational_mode": operational_mode,
         "symbols": symbols,
         "db_default": SHADOW_DB_DEFAULT.as_posix(),
         "lock_default": SIDECAR_LOCK_DEFAULT.as_posix(),
@@ -232,7 +233,9 @@ def _insert_shadow_run(
     conn.commit()
 
 
-def _insert_resource_sample(conn, shadow_run_id: str, sample: ResourceSample) -> None:
+def _insert_resource_sample(
+    conn, shadow_run_id: str, sample: ResourceSample, *, source: str
+) -> None:
     conn.execute(
         """
         INSERT INTO shadow_resource_samples (
@@ -252,7 +255,7 @@ def _insert_resource_sample(conn, shadow_run_id: str, sample: ResourceSample) ->
             sample.cpu_system_seconds,
             sample.process_id,
             sample.guard_status,
-            json.dumps({"source": "dry_run"}, sort_keys=True),
+            json.dumps({"source": source}, sort_keys=True),
         ),
     )
     conn.commit()
@@ -273,14 +276,21 @@ def _insert_stub_decision(
     symbol: str,
     timestamp_utc: str,
     config_hash: str,
+    operational_mode: str,
 ) -> None:
     risk_profile, risk_pct, shadow_mode = _risk_profile(symbol)
     details = {
-        "dry_run": True,
+        "dry_run": operational_mode == "dry_run",
+        "operational_mode": operational_mode,
         "symbol": symbol,
-        "reason": "infrastructure_validation_no_market_data",
+        "reason": operational_mode,
         "orders_allowed": False,
     }
+    signal_blocker = (
+        "dry_run_no_market_data"
+        if operational_mode == "dry_run"
+        else "operational_heartbeat"
+    )
     conn.execute(
         """
         INSERT INTO shadow_decision_outcomes (
@@ -305,19 +315,19 @@ def _insert_stub_decision(
             shadow_mode,
             config_hash,
             0,
-            "dry_run_no_market_data",
+            signal_blocker,
             0,
             0,
             None,
             0.00649,
             "unknown",
-            "dry_run",
+            operational_mode,
             0.0,
             None,
             "not_evaluated",
             "not_evaluated",
             "not_evaluated",
-            "dry_run_no_signal",
+            f"{operational_mode}_no_signal",
             risk_pct,
             0.0,
             "pass",
@@ -328,13 +338,16 @@ def _insert_stub_decision(
     conn.commit()
 
 
-def run_dry_run(
+def _run_one_shot_cycle(
     *,
     db_path: str | Path = SHADOW_DB_DEFAULT,
     lock_path: str | Path = SIDECAR_LOCK_DEFAULT,
     repo_root: str | Path | None = None,
     symbols: tuple[str, ...] = DEFAULT_SYMBOLS,
     min_disk_free_bytes: int = MIN_DISK_FREE_BYTES,
+    operational_mode: str,
+    dry_run: bool,
+    include_payload_probe: bool,
 ) -> DryRunResult:
     root = Path(repo_root or Path.cwd()).resolve()
     lock = Path(lock_path)
@@ -353,8 +366,8 @@ def run_dry_run(
         sample = collect_resource_sample(resolved_db_path.parent, min_disk_free_bytes)
         with connect_shadow_db(resolved_db_path, repo_root=root) as conn:
             initialize_shadow_schema(conn)
-            shadow_run_id = f"shadow-dry-run-{uuid.uuid4().hex[:12]}"
-            config_hash = default_shadow_config_hash(symbols)
+            shadow_run_id = f"shadow-{operational_mode}-{uuid.uuid4().hex[:12]}"
+            config_hash = default_shadow_config_hash(symbols, operational_mode)
             started_at = utc_now_iso()
             _insert_shadow_run(
                 conn,
@@ -363,10 +376,10 @@ def run_dry_run(
                 config_hash=config_hash,
                 db_path=resolved_db_path,
                 lock_path=lock,
-                dry_run=True,
+                dry_run=dry_run,
                 repo_root=root,
             )
-            _insert_resource_sample(conn, shadow_run_id, sample)
+            _insert_resource_sample(conn, shadow_run_id, sample, source=operational_mode)
             for symbol in symbols:
                 _insert_stub_decision(
                     conn,
@@ -374,20 +387,22 @@ def run_dry_run(
                     symbol=symbol,
                     timestamp_utc=started_at,
                     config_hash=config_hash,
+                    operational_mode=operational_mode,
                 )
-            insert_near_miss(
-                conn,
-                shadow_run_id=shadow_run_id,
-                symbol=symbols[-1],
-                timestamp_utc=started_at,
-                sweep_depth_pct=0.00584,
-                threshold=0.00649,
-                depth_bucket="near_miss_high",
-                regime="dry_run",
-                session_hour=0,
-                rejection_reasons=["dry_run_payload_validation"],
-                created_at_utc=utc_now_iso(),
-            )
+            if include_payload_probe:
+                insert_near_miss(
+                    conn,
+                    shadow_run_id=shadow_run_id,
+                    symbol=symbols[-1],
+                    timestamp_utc=started_at,
+                    sweep_depth_pct=0.00584,
+                    threshold=0.00649,
+                    depth_bucket="near_miss_high",
+                    regime=operational_mode,
+                    session_hour=0,
+                    rejection_reasons=[f"{operational_mode}_payload_validation"],
+                    created_at_utc=utc_now_iso(),
+                )
 
             decision_rows = conn.execute(
                 "SELECT COUNT(*) FROM shadow_decision_outcomes WHERE shadow_run_id = ?",
@@ -412,12 +427,59 @@ def run_dry_run(
         near_miss_rows=int(near_miss_rows),
         resource_rows=int(resource_rows),
         production_db_touched=before_prod != after_prod,
+        operational_mode=operational_mode,
+    )
+
+
+def run_dry_run(
+    *,
+    db_path: str | Path = SHADOW_DB_DEFAULT,
+    lock_path: str | Path = SIDECAR_LOCK_DEFAULT,
+    repo_root: str | Path | None = None,
+    symbols: tuple[str, ...] = DEFAULT_SYMBOLS,
+    min_disk_free_bytes: int = MIN_DISK_FREE_BYTES,
+) -> DryRunResult:
+    return _run_one_shot_cycle(
+        db_path=db_path,
+        lock_path=lock_path,
+        repo_root=repo_root,
+        symbols=symbols,
+        min_disk_free_bytes=min_disk_free_bytes,
+        operational_mode="dry_run",
+        dry_run=True,
+        include_payload_probe=True,
+    )
+
+
+def run_cycle_once(
+    *,
+    db_path: str | Path = SHADOW_DB_DEFAULT,
+    lock_path: str | Path = SIDECAR_LOCK_DEFAULT,
+    repo_root: str | Path | None = None,
+    symbols: tuple[str, ...] = DEFAULT_SYMBOLS,
+    min_disk_free_bytes: int = MIN_DISK_FREE_BYTES,
+) -> DryRunResult:
+    return _run_one_shot_cycle(
+        db_path=db_path,
+        lock_path=lock_path,
+        repo_root=repo_root,
+        symbols=symbols,
+        min_disk_free_bytes=min_disk_free_bytes,
+        operational_mode="operational_heartbeat",
+        dry_run=False,
+        include_payload_probe=False,
     )
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Multi-asset shadow sidecar")
-    parser.add_argument("--dry-run", action="store_true", help="Run one isolated validation cycle and exit")
+    mode = parser.add_mutually_exclusive_group(required=True)
+    mode.add_argument("--dry-run", action="store_true", help="Run one isolated validation cycle and exit")
+    mode.add_argument(
+        "--cycle-once",
+        action="store_true",
+        help="Run one operational heartbeat cycle and exit",
+    )
     parser.add_argument("--db-path", default=SHADOW_DB_DEFAULT.as_posix())
     parser.add_argument("--lock-path", default=SIDECAR_LOCK_DEFAULT.as_posix())
     parser.add_argument("--repo-root", default=".")
@@ -429,16 +491,19 @@ def build_arg_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     parser = build_arg_parser()
     args = parser.parse_args(argv)
-    if not args.dry_run:
-        parser.error("Only --dry-run is implemented in this milestone")
     symbols = tuple(symbol.strip().upper() for symbol in args.symbols.split(",") if symbol.strip())
-    result = run_dry_run(
-        db_path=args.db_path,
-        lock_path=args.lock_path,
-        repo_root=args.repo_root,
-        symbols=symbols,
-        min_disk_free_bytes=int(args.min_disk_free_gb * 1024**3),
-    )
+    runner = run_dry_run if args.dry_run else run_cycle_once
+    try:
+        result = runner(
+            db_path=args.db_path,
+            lock_path=args.lock_path,
+            repo_root=args.repo_root,
+            symbols=symbols,
+            min_disk_free_bytes=int(args.min_disk_free_gb * 1024**3),
+        )
+    except ShadowGuardError as exc:
+        print(json.dumps({"error": str(exc), "status": "guard_failed"}, sort_keys=True))
+        return 1
     print(
         json.dumps(
             {
@@ -448,6 +513,7 @@ def main(argv: list[str] | None = None) -> int:
                 "symbols": result.symbols,
                 "decision_rows": result.decision_rows,
                 "near_miss_rows": result.near_miss_rows,
+                "operational_mode": result.operational_mode,
                 "resource_rows": result.resource_rows,
                 "production_db_touched": result.production_db_touched,
             },
