@@ -40,6 +40,51 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1
+
+**Status:** IN_PROGRESS - code-only preparation before 24h heartbeat checkpoint
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Blueprint:** `docs/BLUEPRINT_MULTI_ASSET_SHADOW_SIDECAR.md`
+
+**Scope:** Prepare real BTC/ETH/SOL shadow diagnostics as a separate manual
+one-shot mode. Do not change the deployed systemd timer, do not replace
+`--cycle-once`, and do not deploy real signal collection before audit.
+
+**Reason:** The operational heartbeat timer is already running and can continue
+collecting stability evidence. The user approved preparing Phase 2 code in
+parallel, provided it remains disconnected from M4 and from the active BTC PAPER
+runtime.
+
+**Deliverables:**
+- Add a self-contained real shadow signal cycle under `research_lab/`
+- Add a separate CLI flag, `--real-cycle-once`
+- Keep `--cycle-once` heartbeat behavior unchanged
+- Fetch/read market data through a sidecar-only provider boundary
+- Persist symbol-explicit decision rows, optional candidates, optional near-miss
+  diagnostics, and portfolio shadow decisions to `research_lab/shadow/`
+- Record unavailable/stale data explicitly instead of silently dropping symbols
+- Test with fake providers; no network access in unit tests
+
+**Out of scope:**
+- systemd service/timer command changes
+- deployment to production
+- ETH/SOL PAPER or LIVE
+- order placement
+- `execution/**`, `orchestrator.py`, `main.py`, `settings.py`, production DB
+  writes, or M4 query/parser changes
+- sweep threshold changes
+
+**Acceptance criteria:**
+- Focused sidecar tests pass
+- compileall passes for new modules/tests
+- production DB sentinel remains unchanged in real-cycle tests
+- import guard blocks order/runtime/storage roots
+- active heartbeat command remains `sidecar_main.py --cycle-once`
+
+**Next:** Claude Code audit before any deployment or timer command change.
+
 ### Deployment: MULTI_ASSET_SHADOW_SIDECAR_DEPLOYMENT_V1
 
 **Status:** DAY0_PASS - Phase 1 operational heartbeat deployed and running on production (2026-05-20 08:18 UTC)

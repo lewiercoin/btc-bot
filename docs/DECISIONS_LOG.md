@@ -4,6 +4,33 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Prepare real shadow signal cycle before heartbeat checkpoint
+**Decision:** Start coding `MULTI_ASSET_SHADOW_REAL_SIGNAL_CYCLE_V1` before the
+24h heartbeat checkpoint, but keep it code-only and disconnected from the
+deployed systemd timer.
+
+**Reason:** The user wants to avoid passive waiting while the operational
+heartbeat continues. Internal consultation agreed this is safe only if Phase 2
+adds a separate manual/auditable mode and does not replace `--cycle-once`,
+change `multi-asset-shadow.service`, touch BTC PAPER, or alter what BTC M4
+measures.
+
+**Result:** Phase 2 introduces a self-contained real-shadow diagnostic path
+under `research_lab/` with a fake-provider test harness and a separate CLI flag.
+The active production timer remains on `sidecar_main.py --cycle-once`, which
+continues to write heartbeat rows only.
+
+**Consequences:**
+- No deployment change is approved.
+- No market-data shadow mode is connected to systemd.
+- No orders, execution imports, runtime DB writes, or M4 query changes are in
+  scope.
+- Phase 2 must be audited before any timer/service command can be changed.
+
+**Related:** `research_lab/shadow_signal_cycle.py`;
+`research_lab/shadow_orchestrator.py`;
+`docs/operations/MULTI_ASSET_SHADOW_SIDECAR_RUNBOOK.md`.
+
 ## 2026-05-20 - Design isolated multi-asset shadow sidecar before M4 completes
 **Decision:** Create `MULTI_ASSET_SHADOW_SIDECAR_DESIGN_V1` as a design-only
 milestone. The sidecar direction is allowed only as an isolated observer that
