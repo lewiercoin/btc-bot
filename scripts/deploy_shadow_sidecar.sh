@@ -45,7 +45,7 @@ day0_checks() {
 
   cd "${REPO_DIR}"
   local dry_json
-  dry_json="$("${REPO_DIR}/.venv/bin/python" sidecar_main.py --dry-run)"
+  dry_json="$(sudo -u btc-bot -H "${REPO_DIR}/.venv/bin/python" sidecar_main.py --dry-run --repo-root "${REPO_DIR}")"
   echo "${dry_json}"
   echo "${dry_json}" | grep -q '"production_db_touched": false' || fail "dry-run touched production DB"
 
