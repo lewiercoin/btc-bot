@@ -10,7 +10,7 @@ from __future__ import annotations
 import argparse
 import json
 import statistics
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
@@ -231,7 +231,7 @@ def run_analysis(
         "trial_id": TRIAL_00095_ID,
         "baseline_btc_eth": BTC_ETH_BASELINE,
         "pipeline_trade_counts": {"BTCUSDT": len(btc.trades), "ETHUSDT": len(eth.trades), "SOLUSDT": len(sol.trades)},
-        "gate_contract": gates.__dict__,
+        "gate_contract": asdict(gates),
         "scenarios": scenarios,
         "selected_policy": selected,
         "generated_at": datetime.now(timezone.utc).isoformat(),
