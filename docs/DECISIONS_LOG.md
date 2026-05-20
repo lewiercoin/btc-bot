@@ -4,6 +4,29 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Prepare ETH shadow depth update from audited optimization
+**Decision:** Prepare `ETH_SHADOW_DEPTH_PARAMETER_UPDATE_V1` as a small
+sidecar-only checkpoint for Claude Code audit.
+
+**Reason:** `ETH_ASSET_SPECIFIC_OPTIMIZATION_V1` passed audit and selected
+`ETH_OPT_D0.00750`. Because ETH is still `shadow_no_orders`, applying the
+threshold only to sidecar diagnostics improves forward evidence quality without
+touching BTC PAPER, M4, execution, or production storage.
+
+**Result:** `default_symbol_configs()` now sets ETH `min_sweep_depth_pct` to
+`0.0075`. BTC and SOL remain at the frozen trial-00095 transfer value
+`0.00649`. Tests explicitly enforce this split.
+
+**Consequences:**
+- No PAPER, LIVE, execution, runtime, M4, or production DB change is approved.
+- Server sidecar behavior changes only after Claude Code audit PASS and a later
+  operator pull.
+- SOL remains unchanged until a separate audited SOL parameter milestone exists.
+
+**Related:** `research_lab/shadow_signal_cycle.py`;
+`research_lab/hypotheses/active/eth_shadow_depth_parameter_update.json`;
+`docs/analysis/ETH_ASSET_SPECIFIC_OPTIMIZATION_2026-05-20.md`.
+
 ## 2026-05-20 - Run ETH depth-only asset-specific optimization offline
 **Decision:** Mark `ETH_ASSET_SPECIFIC_OPTIMIZATION_V1` ready for Claude Code
 audit as an offline Research Lab checkpoint.
