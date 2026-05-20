@@ -42,13 +42,15 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Research: SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1
 
-**Status:** READY_FOR_AUDIT - diagnostic complete, awaiting Claude Code audit
+**Status:** CLOSED - audit PASS (methodology and forensic evidence)
 **Builder:** Codex
 **Decision date:** 2026-05-20
+**Audit date:** 2026-05-20
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/sol_drawdown_forensic_diagnostic.json`
 **Runner:** `research_lab/sol_drawdown_forensic_diagnostic.py`
 **Report:** `docs/analysis/SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_2026-05-20.md`
+**Audit:** `docs/audits/AUDIT_SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_2026-05-20.md`
 
 **Scope:** Research Lab diagnostic only. Regenerates frozen BTC, ETH, and SOL
 trial-00095 trades and analyzes SOL drawdown concentration, year/regime splits,
