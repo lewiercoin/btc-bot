@@ -4,6 +4,32 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-20 - Diagnose SOL drawdown before any shadow design
+**Decision:** Mark `SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1` ready for Claude Code
+audit as a research-only diagnostic.
+
+**Reason:** `SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1` confirmed a strong SOL
+edge but failed the standalone drawdown gate. Before considering SOL shadow or
+runtime design, the project needs to know whether the drawdown is crash/regime
+specific, whether portfolio vetoes already control it, and whether a
+SOL-specific risk cap could reduce capital drawdown without changing entries.
+
+**Result:** SOL standalone max DD is 32.72R with a 21-loss max streak. The
+offline portfolio gate reduces SOL to 905 approved trades with ER 2.120, PF
+3.41, max DD 21.31R, and max loss streak 15. Risk is concentrated in 2022 and
+in downtrend/crowded/normal regimes; uptrend SOL is strong. Daily R correlation
+with BTC and ETH remains low. SOL risk-cap sensitivity does not change R-space
+trade count but reduces capital drawdown from 6.81% at 0.35% risk to 5.32% at
+0.20% risk.
+
+**Consequences:** No SOL shadow or runtime approval. No entry/threshold tuning.
+If audit passes, the next safe work is a separately predeclared SOL risk-policy
+diagnostic/design milestone, not a deployment milestone.
+
+**Related:** `research_lab/sol_drawdown_forensic_diagnostic.py`;
+`research_lab/hypotheses/active/sol_drawdown_forensic_diagnostic.json`;
+`docs/analysis/SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_2026-05-20.md`.
+
 ## 2026-05-20 - Run SOL trial-00095 transfer feasibility
 **Decision:** Mark `SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1` ready for Claude
 Code audit after offline replay with frozen `optuna-default-v3-trial-00095`

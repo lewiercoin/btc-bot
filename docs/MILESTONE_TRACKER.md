@@ -40,6 +40,57 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research: SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_V1
+
+**Status:** READY_FOR_AUDIT - diagnostic complete, awaiting Claude Code audit
+**Builder:** Codex
+**Decision date:** 2026-05-20
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis:** `research_lab/hypotheses/active/sol_drawdown_forensic_diagnostic.json`
+**Runner:** `research_lab/sol_drawdown_forensic_diagnostic.py`
+**Report:** `docs/analysis/SOL_DRAWDOWN_FORENSIC_DIAGNOSTIC_2026-05-20.md`
+
+**Scope:** Research Lab diagnostic only. Regenerates frozen BTC, ETH, and SOL
+trial-00095 trades and analyzes SOL drawdown concentration, year/regime splits,
+loss streaks, daily R correlation, portfolio veto effects, and SOL risk-cap
+sensitivity. No runtime, SOL shadow, SOL PAPER, `core/**`, `execution/**`,
+`orchestrator.py`, `main.py`, `settings.py`, production storage, threshold
+change, entry tuning, or exit tuning is in scope.
+
+**Result:**
+- SOL standalone: 1,201 trades, ER 2.141, PF 3.42, max DD 32.72R, max loss
+  streak 21.
+- SOL after portfolio gate: 905 trades, ER 2.120, PF 3.41, max DD 21.31R,
+  max loss streak 15.
+- BTC+ETH+SOL portfolio: 1,545 trades, ER 2.056, PF 3.49, max DD 19.47R.
+- Year concentration: 2022 has SOL max DD 28.44R and weaker ER 1.523; 2023
+  DD is 9.18R; 2024/2025 DD around 17R.
+- Regime concentration: uptrend is strong (904 trades, ER 2.675, PF 4.39,
+  max DD 12.42R); downtrend/crowded/normal are weak and drive risk.
+- Loss streaks: SOL max streak 21 vs BTC 10 and ETH 9.
+- Daily R correlation remains low: SOL/BTC 0.086, SOL/ETH 0.109.
+- Risk-cap sensitivity changes capital DD, not entry population: SOL risk cap
+  0.20% gives capital DD 5.32%; 0.35% gives 6.81%.
+
+**Builder verdict:** `FORENSIC_COMPLETE_SOL_RISK_FOLLOWUP_RECOMMENDED`
+
+**Interpretation:** SOL risk is not a random edge failure. It is concentrated in
+downtrend/crowded/crash-like conditions and long SOL-specific loss streaks.
+The next safe step, if audit agrees, is a separate predeclared SOL risk-policy
+diagnostic/design milestone. This result does not approve SOL shadow, SOL
+PAPER, runtime integration, or threshold changes.
+
+**Validation:**
+- Local tests: `17 passed`.
+- Local compileall: PASS.
+- Server compileall: PASS.
+- BTC PAPER bot remained active during server replay.
+
+**Next:** Claude Code audit. No SOL shadow/PAPER/runtime step is approved by
+this result.
+
+---
+
 ### Research: SOL_TRIAL_00095_TRANSFER_FEASIBILITY_V1
 
 **Status:** CLOSED - audit PASS (methodology), HYPOTHESIS_FAILED (verdict), edge confirmed but DD exceeds gate
