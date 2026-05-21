@@ -1,0 +1,79 @@
+{
+  "hypothesis_id": "DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1",
+  "name": "ETH/SOL Depth Threshold Portfolio Impact Diagnostic",
+  "class": "diagnostic_only",
+  "edge_rationale": "ETH and SOL asset-specific optimization both favored min_sweep_depth_pct 0.0075, but the tighter threshold reduces trade frequency. Before changing SOL shadow behavior or moving toward BTC/ETH/SOL PAPER, the portfolio impact of 0.00649 versus 0.0075 must be measured directly.",
+  "counterparty_or_market_mechanism": "Higher sweep-depth thresholds may filter lower-quality stop-runs, improving ER/PF and drawdown, but may also remove useful independent signals that improve multi-asset portfolio frequency and diversification.",
+  "required_data": [
+    "Audited BTC trial-00095 replay snapshot",
+    "Audited ETHUSDT 2022-2026 research snapshot",
+    "Audited SOLUSDT 2022-2026 research snapshot",
+    "Frozen trial-00095 params from research store",
+    "Existing offline ResearchPortfolioGate contract"
+  ],
+  "timeframe": [
+    "15m entry",
+    "4h bias",
+    "OOS 2025-01-01 to 2026-03-28"
+  ],
+  "baseline_reference": "Current production shadow profile uses BTC 0.00649, ETH 0.0075, and SOL 0.00649. ETH/SOL asset-specific optimization reports selected 0.0075 with fewer trades and higher ER/PF.",
+  "variables": [
+    {
+      "name": "ETHUSDT min_sweep_depth_pct",
+      "values": [0.00649, 0.0075]
+    },
+    {
+      "name": "SOLUSDT min_sweep_depth_pct",
+      "values": [0.00649, 0.0075]
+    },
+    {
+      "name": "BTCUSDT min_sweep_depth_pct",
+      "values": ["frozen trial-00095"]
+    }
+  ],
+  "frozen_assumptions": [
+    "Research Lab diagnostic only.",
+    "No production, PAPER, LIVE, runtime, core, execution, orchestrator, settings, sidecar, M4, or production DB changes.",
+    "Only ETH/SOL min_sweep_depth_pct scenario inputs vary.",
+    "All non-depth trial-00095 parameters remain frozen.",
+    "BTC remains frozen trial-00095.",
+    "Portfolio simulation uses existing ResearchPortfolioGate.",
+    "BTC/ETH candidate risk remains 0.35%; SOL candidate risk remains 0.15%.",
+    "This diagnostic cannot approve PAPER or LIVE."
+  ],
+  "expected_observation": "If ETH/SOL asset-specific depth is portfolio-beneficial, the ETH/SOL 0.0075 scenario should retain enough trade frequency while maintaining low correlation, low overlap, and acceptable portfolio drawdown versus the current shadow profile.",
+  "acceptance_criteria": {
+    "min_portfolio_trades": 250,
+    "min_sol_trade_retention_pct": 0.65,
+    "max_portfolio_dd_r": 20.0,
+    "max_daily_corr_abs": 0.70,
+    "max_same_bar_overlap_share": 0.10
+  },
+  "kill_criteria": {
+    "runtime_change": "Any runtime/core/settings/execution/orchestrator/sidecar/M4 change invalidates this milestone.",
+    "source_db_mutation": "Mutating audited source snapshots invalidates this milestone.",
+    "parameter_expansion": "Changing parameters beyond ETH/SOL min_sweep_depth_pct invalidates this milestone.",
+    "promotion_claim": "Claiming PAPER/LIVE/runtime approval invalidates this milestone.",
+    "missing_data_substitution": "Substituting unaudited data if a source snapshot is unavailable invalidates this milestone."
+  },
+  "failure_modes": [
+    "Asset-specific thresholds improve standalone ER/PF but reduce frequency too much.",
+    "Lower SOL threshold adds useful diversification despite worse standalone drawdown.",
+    "Portfolio gate vetoes obscure standalone trade-count changes.",
+    "OOS sample is too short to decide threshold promotion without forward shadow evidence.",
+    "Same-bar overlap or daily correlation rises under one threshold profile."
+  ],
+  "out_of_scope": [
+    "Runtime deployment.",
+    "Sidecar threshold update.",
+    "PAPER or LIVE orders.",
+    "BTC parameter changes.",
+    "SOL risk-cap redesign.",
+    "Portfolio gate redesign.",
+    "M4 query/parser/config changes.",
+    "ETF data integration."
+  ],
+  "author": "Codex",
+  "created_at": "2026-05-21T00:00:00+00:00",
+  "status": "ACTIVE"
+}
