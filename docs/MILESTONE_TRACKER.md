@@ -40,13 +40,65 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
-### Reporting: M4_MULTI_ASSET_QUERY_EXTENSION_V1
+### Reporting: MULTI_ASSET_SHADOW_EVIDENCE_CHECKPOINT_V1
 
-**Status:** READY_FOR_AUDIT - per-symbol M4 query/report extension implemented
+**Status:** READY_FOR_AUDIT - read-only shadow evidence checkpoint implemented
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`
+**Depends on:** deployed dormant multi-asset runtime, capacity guardrails, and M4 query extension
+
+**Scope:** Add a read-only evidence checkpoint for the multi-asset shadow
+sidecar before any future ETH/SOL PAPER approval. This milestone does not
+activate ETH/SOL PAPER, change runtime behavior, change settings, alter
+strategy parameters, or write to production storage.
+
+**Implementation:**
+- Added `scripts/multi_asset_shadow_evidence_checkpoint.py`.
+- The checkpoint reads:
+  - `shadow_runs` for observed runs;
+  - `shadow_decision_outcomes` for complete BTC/ETH/SOL cycles, blockers,
+    signals, thresholds, and per-symbol rows;
+  - `shadow_near_miss_diagnostics` for near-miss counts;
+  - `shadow_portfolio_decisions` for portfolio approvals/vetoes;
+  - `shadow_resource_samples` for resource guard status, RSS, and disk floor;
+  - production `positions` and table list to verify no ETH/SOL positions and
+    no `symbol_state`/`portfolio_state` tables;
+  - optional `journalctl` output to count `production_db_touched=true`.
+- Supports `--days`, `--hours`, `--expected-min-cycles`, `--json`, and
+  markdown output.
+
+**Acceptance criteria:**
+- Complete-cycle count meets the selected expected minimum.
+- BTC/ETH/SOL all have shadow rows in the selected window.
+- Resource guards have zero failures.
+- Production DB touch count is zero for the selected window.
+- Production ETH/SOL position count is zero.
+- Production multi-asset state tables are absent while runtime remains dormant.
+
+**Validation:**
+- `pytest tests/test_multi_asset_shadow_evidence_checkpoint.py -q -o addopts=` -> 4 passed.
+- `python -m compileall scripts/multi_asset_shadow_evidence_checkpoint.py tests/test_multi_asset_shadow_evidence_checkpoint.py` -> PASS.
+- Production read-only smoke via stdin:
+  - last 2h, expected_min_cycles=6 -> `status=pass`, 7 complete cycles,
+    `production_db_touched_true_count=0`, no ETH/SOL positions, no multi-asset
+    state tables, resource guard pass;
+  - last 24h, expected_min_cycles=80 -> `status=fail` due to
+    `production_db_touched_true_count=2`. This is a checkpoint finding, not a
+    code failure; it requires review before approval.
+
+**Next:** Claude Code audit. After audit, optionally deploy the checkpoint
+script code-only and use it for 72h / 30d / 60d evidence reviews.
+
+### Reporting: M4_MULTI_ASSET_QUERY_EXTENSION_V1
+
+**Status:** DONE - audited and deployed per-symbol M4 query/report extension
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Deployment date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
 **Depends on:** `MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1` (audit DONE, deployed dormant)
+**Audit:** `docs/audits/AUDIT_M4_MULTI_ASSET_QUERY_EXTENSION_V1_2026-05-21.md` (DONE)
 
 **Scope:** Extend M4 near-miss reporting so future multi-asset runtime rows can
 be queried per symbol while preserving the current BTC-only default. This
