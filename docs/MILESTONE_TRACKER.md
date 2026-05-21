@@ -40,6 +40,48 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Operations: MULTI_ASSET_PAPER_PREDEPLOY_GUARDRAILS_V1
+
+**Status:** PREPARED - rollback branch/tag and verified DB backup created
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
+**Rollback tag:** `pre-multi-asset-paper-20260521T095342Z`
+**Source commit:** `1e08686`
+
+**Scope:** Prepare the operational rollback surface before continuing toward
+BTC/ETH/SOL PAPER without waiting for the passive Day 3 shadow checkpoint. This
+is a guardrail checkpoint only. It does not implement multi-asset runtime,
+enable ETH/SOL PAPER orders, change strategy parameters, migrate production
+storage, or change systemd units.
+
+**Acceptance criteria:**
+- Separate deploy branch exists and is pushed.
+- Rollback tag points to the pre-runtime-change commit.
+- Production DB backup exists outside the repo checkout.
+- Backup integrity check passes.
+- BTC PAPER returns healthy after backup.
+- Current runtime limitation is recorded: `orchestrator.py`/`settings.py`
+  remain single-symbol, so ETH/SOL PAPER requires a separate audited runtime
+  milestone.
+
+**Result:**
+- Branch pushed: `deploy/multi-asset-paper-v1`.
+- Rollback tag pushed: `pre-multi-asset-paper-20260521T095342Z`.
+- Verified backup:
+  `/home/btc-bot/backups/manual/pre_multi_asset_paper_quiesced_20260521T101101Z/btc_bot.db`.
+- Backup verification: `PRAGMA integrity_check=ok`, `trade_log_count=795`.
+- BTC PAPER restarted after quiesced snapshot: PID `890590`, active, healthy,
+  safe mode off, zero open positions.
+- Multi-asset shadow timer active after backup.
+
+**Next:** `MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1` on
+`deploy/multi-asset-paper-v1`. Required scope: symbol-explicit runtime
+contracts, portfolio gate promotion from research-only contract to runtime-safe
+contract, recovery/state tests, single-symbol BTC compatibility test, and no
+ETH/SOL order placement until Claude Code audit and operator deployment
+approval.
+
 ### Implementation: SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1
 
 **Status:** DEPLOYED - SOL shadow depth active on production (2026-05-21 09:44 UTC)
