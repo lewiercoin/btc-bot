@@ -4,6 +4,36 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Prepare SOL shadow depth update from audited optimization and portfolio diagnostic
+**Decision:** Prepare `SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1` as a small
+sidecar-only checkpoint for Claude Code audit.
+
+**Reason:** `SOL_ASSET_SPECIFIC_OPTIMIZATION_V1` passed audit and selected
+`SOL_OPT_D0.00750`. `DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1` then
+confirmed that moving SOL from `0.00649` to `0.0075` improves OOS portfolio ER
+and PF while reducing max DD by 46.8%, with SOL trade retention still above the
+65% gate. Because SOL is still `shadow_no_orders`, this can improve forward
+shadow evidence without touching BTC PAPER, M4, execution, or production
+storage.
+
+**Result:** `default_symbol_configs()` now sets SOL `min_sweep_depth_pct` to
+`0.0075`. BTC remains at the frozen trial-00095 transfer value `0.00649`; ETH
+remains at the audited shadow value `0.0075`. Tests explicitly enforce all
+three thresholds.
+
+**Consequences:**
+- No PAPER, LIVE, execution, runtime, M4, systemd, or production DB change is
+  approved.
+- Server sidecar behavior changes only after Claude Code audit PASS and a later
+  operator pull.
+- Full multi-asset PAPER still requires a separate runtime contract and
+  implementation milestone.
+
+**Related:** `research_lab/shadow_signal_cycle.py`;
+`research_lab/hypotheses/active/sol_shadow_depth_parameter_update.json`;
+`docs/audits/AUDIT_SOL_ASSET_SPECIFIC_OPTIMIZATION_V1_2026-05-20.md`;
+`docs/audits/AUDIT_DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1_2026-05-21.md`.
+
 ## 2026-05-20 - Run SOL depth-only asset-specific optimization offline
 **Decision:** Mark `SOL_ASSET_SPECIFIC_OPTIMIZATION_V1` ready for Claude Code
 audit as an offline Research Lab checkpoint.

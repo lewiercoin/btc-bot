@@ -98,14 +98,16 @@ def test_evaluate_shadow_symbol_detects_signal_near_miss_and_no_sweep() -> None:
     assert full_signal.candidate_direction_preview == "LONG"
 
 
-def test_default_shadow_symbol_configs_use_audited_eth_depth_only_override() -> None:
+def test_default_shadow_symbol_configs_use_audited_asset_specific_depth_overrides() -> None:
     configs = {config.symbol: config for config in default_symbol_configs()}
 
     assert configs["BTCUSDT"].min_sweep_depth_pct == 0.00649
     assert configs["ETHUSDT"].min_sweep_depth_pct == 0.0075
-    assert configs["SOLUSDT"].min_sweep_depth_pct == 0.00649
+    assert configs["SOLUSDT"].min_sweep_depth_pct == 0.0075
     assert configs["ETHUSDT"].shadow_mode == "shadow_no_orders"
     assert configs["ETHUSDT"].candidate_risk_pct == 0.0035
+    assert configs["SOLUSDT"].shadow_mode == "shadow_no_orders"
+    assert configs["SOLUSDT"].candidate_risk_pct == 0.0015
 
 
 def test_run_real_shadow_cycle_persists_symbol_rows_candidates_and_near_miss(tmp_path: Path) -> None:

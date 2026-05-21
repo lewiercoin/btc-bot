@@ -40,15 +40,55 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1
+
+**Status:** READY_FOR_AUDIT - `SOL_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `research/sweep-family-expansion-v1`
+**Hypothesis spec:** `research_lab/hypotheses/active/sol_shadow_depth_parameter_update.json`
+**Source audits:**
+- `docs/audits/AUDIT_SOL_ASSET_SPECIFIC_OPTIMIZATION_V1_2026-05-20.md` (DONE)
+- `docs/audits/AUDIT_DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1_2026-05-21.md` (DONE)
+
+**Scope:** Shadow-sidecar-only SOL threshold update. SOL
+`min_sweep_depth_pct` changes from the frozen BTC transfer value `0.00649` to
+the audited SOL asset-specific candidate `0.0075`.
+
+**Boundaries:**
+- BTC remains at frozen `trial-00095` threshold `0.00649`.
+- ETH remains at audited shadow threshold `0.0075`.
+- SOL remains `shadow_no_orders`; this does not approve PAPER or LIVE.
+- No changes to runtime execution, `core/`, `execution/`, `orchestrator.py`,
+  `main.py`, `settings.py`, production storage, sidecar systemd files, or M4.
+- Deployment requires Claude Code audit PASS and a later operator pull.
+
+**Evidence:**
+- SOL optimization selected `SOL_OPT_D0.00750`: OOS ER 2.573 vs 2.041
+  baseline, PF 4.29 vs 3.32, DD 3.57% vs 7.92%.
+- Portfolio diagnostic candidate profile BTC 0.00649 / ETH 0.0075 /
+  SOL 0.0075: 267 portfolio trades, ER 2.364, PF 4.38, max DD 8.77R.
+- Candidate vs current shadow: -36 portfolio trades (-11.9%), ER +15.4%,
+  PF +18.3%, DD -46.8%, SOL retention 73.2%.
+
+**Validation:**
+- `tests/test_shadow_real_signal_cycle.py` verifies BTC uses `0.00649` while
+  ETH/SOL use `0.0075`.
+- Real shadow cycle tests still verify production DB is untouched.
+
+**Next:** Claude Code audit. This does not approve SOL PAPER, LIVE, runtime, or
+server deployment.
+
 ### Research: DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1
 
-**Status:** READY_FOR_AUDIT - `ASSET_SPECIFIC_DEPTH_SUPPORTED_FOR_SHADOW_DECISION`
+**Status:** CLOSED - audit PASS
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis:** `research_lab/hypotheses/active/depth_threshold_portfolio_impact_diagnostic.json`
 **Runner:** `research_lab/depth_threshold_portfolio_impact_diagnostic.py`
 **Report:** `docs/analysis/DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_2026-05-21.md`
+**Audit:** `docs/audits/AUDIT_DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1_2026-05-21.md`
 
 **Scope:** Research Lab diagnostic only. Compare ETH/SOL depth-threshold
 profiles before deciding whether to change SOL shadow depth. No runtime,
@@ -90,11 +130,9 @@ production DB changes.
   `python -m research_lab.depth_threshold_portfolio_impact_diagnostic`
   -> report generated, verdict above.
 
-**Next:** Claude Code audit. This diagnostic does not approve SOL shadow
-threshold deployment, PAPER, LIVE, or runtime. If audit passes and user
-approves, the next implementation checkpoint can be
-`SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1` or a broader
-`MULTI_ASSET_PAPER_RUNTIME_CONTRACT_V1`.
+**Next:** `SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1` if user chooses incremental
+shadow parameter migration. This diagnostic does not approve PAPER, LIVE, or
+runtime.
 
 ### Research: SOL_ASSET_SPECIFIC_OPTIMIZATION_V1
 
