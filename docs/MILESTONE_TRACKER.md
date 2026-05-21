@@ -40,13 +40,57 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Fix: SHADOW_PRODUCTION_TOUCH_GUARD_FIX_V1
+
+**Status:** READY_FOR_AUDIT - production touch false-positive guard fixed
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** `MULTI_ASSET_PAPER_APPROVAL_V1`
+
+**Scope:** Fix the multi-asset shadow sidecar isolation guard so concurrent BTC
+PAPER writes do not produce false `production_db_touched=true` failures. This
+milestone does not activate ETH/SOL PAPER, change trading settings, change
+strategy parameters, or write to production storage.
+
+**Investigation summary:**
+- Problem entries:
+  - `2026-05-21T01:30:08Z`: overlapped BTC decision cycle writes at
+    `01:30:00Z`-`01:30:06Z`; production DB rows were written in
+    `decision_outcomes`, `market_snapshots`, `feature_snapshots`, and
+    `alerts_errors`.
+  - `2026-05-21T16:23:01Z`: did not overlap a logged decision cycle, but BTC
+    runtime metrics/WAL activity can update DB files between cycles.
+- Static code review found no production DB connection or write path in the
+  sidecar modules. The old guard only compared `storage/btc_bot.db`
+  `(exists, size, mtime)` before/after the sidecar run.
+
+**Implementation:**
+- Added `production_db_opened_by_process()` in
+  `research_lab/shadow_orchestrator.py`.
+- `production_db_touched` now means this sidecar process had
+  `btc_bot.db`, `btc_bot.db-wal`, or `btc_bot.db-shm` open via `/proc/self/fd`.
+- Added `production_db_signature_changed` as a separate diagnostic field for
+  concurrent BTC runtime DB drift.
+- CLI JSON now emits both fields and still exits non-zero only when
+  `production_db_touched=true`.
+
+**Validation:**
+- `pytest tests/test_sidecar_cycle_once.py tests/test_sidecar_isolation.py tests/test_shadow_real_signal_cycle.py tests/test_shadow_schema.py tests/test_multi_asset_shadow_evidence_checkpoint.py -q -o addopts=` -> 30 passed.
+- `python -m compileall research_lab/shadow_orchestrator.py tests/test_sidecar_cycle_once.py tests/test_sidecar_isolation.py` -> PASS.
+
+**Next:** Claude Code audit. If accepted, deploy code-only, wait for at least
+one fresh shadow cycle, then rerun the evidence checkpoint on a clean post-fix
+window.
+
 ### Reporting: MULTI_ASSET_SHADOW_EVIDENCE_CHECKPOINT_V1
 
-**Status:** READY_FOR_AUDIT - read-only shadow evidence checkpoint implemented
+**Status:** DONE - audited; deployment pending touch-guard fix
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`
 **Depends on:** deployed dormant multi-asset runtime, capacity guardrails, and M4 query extension
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_SHADOW_EVIDENCE_CHECKPOINT_V1_2026-05-21.md` (DONE, approval blocked by touch-guard investigation)
 
 **Scope:** Add a read-only evidence checkpoint for the multi-asset shadow
 sidecar before any future ETH/SOL PAPER approval. This milestone does not

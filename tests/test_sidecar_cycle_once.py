@@ -35,6 +35,7 @@ def test_cycle_once_operational_heartbeat(tmp_path: Path) -> None:
 
     assert result.operational_mode == "operational_heartbeat"
     assert result.production_db_touched is False
+    assert result.production_db_signature_changed is False
     assert production_db.read_bytes() == before
     assert result.decision_rows == 3
     assert result.near_miss_rows == 0
@@ -80,13 +81,7 @@ def test_cycle_once_exits_nonzero_if_production_touched(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     create_production_db(tmp_path)
-    signatures = iter(
-        [
-            (True, 100, 1.0),
-            (True, 101, 2.0),
-        ]
-    )
-    monkeypatch.setattr(shadow_orchestrator, "production_db_signature", lambda _root: next(signatures))
+    monkeypatch.setattr(shadow_orchestrator, "production_db_opened_by_process", lambda _root: True)
 
     exit_code = shadow_orchestrator.main(
         [
@@ -106,6 +101,40 @@ def test_cycle_once_exits_nonzero_if_production_touched(
     payload = json.loads(out)
     assert exit_code == 1
     assert payload["production_db_touched"] is True
+
+
+def test_cycle_once_signature_change_is_warning_not_touch_failure(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    create_production_db(tmp_path)
+    signatures = iter(
+        [
+            (True, 100, 1.0),
+            (True, 101, 2.0),
+        ]
+    )
+    monkeypatch.setattr(shadow_orchestrator, "production_db_signature", lambda _root: next(signatures))
+    monkeypatch.setattr(shadow_orchestrator, "production_db_opened_by_process", lambda _root: False)
+
+    exit_code = shadow_orchestrator.main(
+        [
+            "--cycle-once",
+            "--repo-root",
+            str(tmp_path),
+            "--db-path",
+            SHADOW_DB_DEFAULT.as_posix(),
+            "--lock-path",
+            str(tmp_path / "multi-asset-shadow.lock"),
+            "--min-disk-free-gb",
+            "0.000001",
+        ]
+    )
+
+    out = capsys.readouterr().out
+    payload = json.loads(out)
+    assert exit_code == 0
+    assert payload["production_db_touched"] is False
+    assert payload["production_db_signature_changed"] is True
 
 
 def test_cycle_once_import_guard_has_no_market_or_signal_generation_imports() -> None:

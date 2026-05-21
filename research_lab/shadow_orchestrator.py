@@ -60,6 +60,7 @@ class DryRunResult:
     near_miss_rows: int
     resource_rows: int
     production_db_touched: bool
+    production_db_signature_changed: bool
     operational_mode: str
     signal_candidate_rows: int = 0
     portfolio_decision_rows: int = 0
@@ -199,6 +200,34 @@ def production_db_signature(repo_root: Path) -> tuple[bool, int | None, float | 
         return (False, None, None)
     stat = path.stat()
     return (True, int(stat.st_size), float(stat.st_mtime))
+
+
+def production_db_opened_by_process(repo_root: Path) -> bool:
+    """Return true when this process has the production DB/WAL/SHM open.
+
+    The shadow sidecar runs concurrently with the BTC bot. Production DB mtime
+    can change during a sidecar run because the BTC bot writes runtime metrics,
+    decisions, or WAL checkpoints. That is not evidence that the sidecar touched
+    the production DB. Open-file ownership is the isolation signal.
+    """
+
+    fd_root = Path("/proc/self/fd")
+    if not fd_root.exists():
+        return False
+    storage_db = (repo_root / "storage" / "btc_bot.db").resolve()
+    protected = {
+        storage_db,
+        storage_db.with_name(storage_db.name + "-wal"),
+        storage_db.with_name(storage_db.name + "-shm"),
+    }
+    for fd in fd_root.iterdir():
+        try:
+            target = fd.resolve()
+        except OSError:
+            continue
+        if target in protected:
+            return True
+    return False
 
 
 def _insert_shadow_run(
@@ -356,6 +385,7 @@ def _run_one_shot_cycle(
     ensure_lock_separation(lock)
     resolved_db_path = resolve_shadow_db_path(db_path, repo_root=root)
     before_prod = production_db_signature(root)
+    before_prod_open = production_db_opened_by_process(root)
     assert_no_order_path_imports(
         (
             Path(__file__).resolve(),
@@ -420,6 +450,7 @@ def _run_one_shot_cycle(
             ).fetchone()[0]
 
     after_prod = production_db_signature(root)
+    after_prod_open = production_db_opened_by_process(root)
     return DryRunResult(
         shadow_run_id=shadow_run_id,
         db_path=resolved_db_path,
@@ -428,7 +459,8 @@ def _run_one_shot_cycle(
         decision_rows=int(decision_rows),
         near_miss_rows=int(near_miss_rows),
         resource_rows=int(resource_rows),
-        production_db_touched=before_prod != after_prod,
+        production_db_touched=before_prod_open or after_prod_open,
+        production_db_signature_changed=before_prod != after_prod,
         operational_mode=operational_mode,
     )
 
@@ -493,6 +525,7 @@ def run_real_cycle_once(
     ensure_lock_separation(lock)
     resolved_db_path = resolve_shadow_db_path(db_path, repo_root=root)
     before_prod = production_db_signature(root)
+    before_prod_open = production_db_opened_by_process(root)
     assert_no_order_path_imports(
         (
             Path(__file__).resolve(),
@@ -543,6 +576,7 @@ def run_real_cycle_once(
             ).fetchone()[0]
 
     after_prod = production_db_signature(root)
+    after_prod_open = production_db_opened_by_process(root)
     return DryRunResult(
         shadow_run_id=shadow_run_id,
         db_path=resolved_db_path,
@@ -551,7 +585,8 @@ def run_real_cycle_once(
         decision_rows=int(decision_rows),
         near_miss_rows=int(near_miss_rows),
         resource_rows=int(resource_rows),
-        production_db_touched=before_prod != after_prod,
+        production_db_touched=before_prod_open or after_prod_open,
+        production_db_signature_changed=before_prod != after_prod,
         operational_mode=operational_mode,
         signal_candidate_rows=cycle_result.signal_candidates,
         portfolio_decision_rows=cycle_result.portfolio_decisions,
@@ -615,6 +650,7 @@ def main(argv: list[str] | None = None) -> int:
                 "resource_rows": result.resource_rows,
                 "signal_candidate_rows": result.signal_candidate_rows,
                 "production_db_touched": result.production_db_touched,
+                "production_db_signature_changed": result.production_db_signature_changed,
             },
             sort_keys=True,
         )

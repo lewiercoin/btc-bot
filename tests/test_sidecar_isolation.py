@@ -63,6 +63,7 @@ def test_dry_run_writes_shadow_db_only_and_leaves_production_db_untouched(tmp_pa
     )
 
     assert result.production_db_touched is False
+    assert result.production_db_signature_changed is False
     assert production_db.read_bytes() == before
     assert result.db_path == tmp_path / "research_lab" / "shadow" / "multi_asset_shadow.db"
     assert result.decision_rows == 3
