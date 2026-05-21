@@ -40,12 +40,57 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
-### Operations: RUNTIME_CAPACITY_GUARDRAILS_V1
+### Reporting: M4_MULTI_ASSET_QUERY_EXTENSION_V1
 
-**Status:** READY_FOR_AUDIT - production capacity checker implemented
+**Status:** READY_FOR_AUDIT - per-symbol M4 query/report extension implemented
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`
+**Depends on:** `MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1` (audit DONE, deployed dormant)
+
+**Scope:** Extend M4 near-miss reporting so future multi-asset runtime rows can
+be queried per symbol while preserving the current BTC-only default. This
+milestone is reporting/query readiness only. It does not activate ETH/SOL
+PAPER, change strategy parameters, change execution, or alter BTC M4 decision
+criteria.
+
+**Implementation:**
+- Extended `scripts/report_near_miss_diagnostics.py` with:
+  - default BTC-only query behavior for backward compatibility;
+  - `--symbol` for explicit symbol selection;
+  - `--all-symbols` for opt-in portfolio-wide reporting;
+  - per-symbol summary section in generated markdown;
+  - symbol resolution from `details_json.symbol`,
+    `near_miss_diagnostics.symbol`, linked `market_snapshots.symbol`, or
+    BTCUSDT fallback for legacy rows.
+- Updated dormant multi-symbol orchestrator near-miss payloads to pass the
+  resolved symbol and symbol-specific `min_sweep_depth_pct` threshold into the
+  diagnostic payload. Existing BTC default remains `0.00649`.
+
+**Boundaries:**
+- Existing BTC M4 reports remain BTC-only unless the operator passes
+  `--all-symbols` or non-BTC `--symbol`.
+- Legacy BTC rows without symbol metadata remain classified as BTCUSDT.
+- No production DB schema migration.
+- No ETH/SOL orders or runtime activation.
+
+**Validation:**
+- `pytest tests/test_near_miss_diagnostics.py tests/test_orchestrator_runtime_logging.py -q -o addopts=` -> 30 passed.
+- `python -m compileall scripts/report_near_miss_diagnostics.py orchestrator.py tests/test_near_miss_diagnostics.py tests/test_orchestrator_runtime_logging.py` -> PASS.
+- Local smoke generated an `--all-symbols` report successfully.
+- Production read-only smoke via stdin generated `/tmp/m4_multi_asset_query_smoke.md` successfully: 96 BTC cycles, 57 sweep-too-shallow rejections, 5 near-misses, BTC-only symbol breakdown.
+
+**Next:** Claude Code audit. If accepted, this removes the M4 query/reporting
+blocker for a future activation approval, but ETH/SOL PAPER still requires
+shadow evidence, capacity gate, and explicit operator approval.
+
+### Operations: RUNTIME_CAPACITY_GUARDRAILS_V1
+
+**Status:** DONE - audited capacity checker ready for optional deployment
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
+**Audit:** `docs/audits/AUDIT_RUNTIME_CAPACITY_GUARDRAILS_V1_2026-05-21.md` (DONE)
 
 **Scope:** Add a non-trading capacity checker to gate any future ETH/SOL PAPER
 activation. This milestone records the server capacity concern and adds an

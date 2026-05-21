@@ -14,6 +14,7 @@ This script is READ-ONLY and safe to run against production databases.
 """
 
 import argparse
+import json
 import sqlite3
 import sys
 from datetime import datetime, timedelta, timezone
@@ -37,76 +38,136 @@ def parse_args():
         "--output",
         help="Output markdown file path (default: docs/diagnostics/near_miss_report_YYYY-MM-DD.md)",
     )
+    parser.add_argument(
+        "--symbol",
+        action="append",
+        help="Symbol(s) to include, comma-separated or repeated. Default: BTCUSDT for M4 compatibility.",
+    )
+    parser.add_argument(
+        "--all-symbols",
+        action="store_true",
+        help="Include all symbols and emit per-symbol sections.",
+    )
     return parser.parse_args()
 
 
-def query_decision_outcomes(conn: sqlite3.Connection, days: int):
+def _parse_symbols(values: list[str] | None) -> tuple[str, ...]:
+    if not values:
+        return ("BTCUSDT",)
+    symbols: list[str] = []
+    for value in values:
+        symbols.extend(part.strip().upper() for part in value.split(",") if part.strip())
+    return tuple(dict.fromkeys(symbols)) or ("BTCUSDT",)
+
+
+def query_decision_outcomes(
+    conn: sqlite3.Connection,
+    days: int,
+    *,
+    symbols: tuple[str, ...] = ("BTCUSDT",),
+    all_symbols: bool = False,
+):
     """Query decision outcomes for the specified date range."""
     cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
     query = """
     SELECT 
-        cycle_timestamp,
-        outcome_group,
-        outcome_reason,
-        details_json
-    FROM decision_outcomes
-    WHERE cycle_timestamp >= ?
-    ORDER BY cycle_timestamp DESC
+        do.cycle_timestamp,
+        do.outcome_group,
+        do.outcome_reason,
+        do.details_json,
+        do.snapshot_id,
+        ms.symbol AS snapshot_symbol
+    FROM decision_outcomes do
+    LEFT JOIN market_snapshots ms
+        ON ms.snapshot_id = do.snapshot_id
+    WHERE do.cycle_timestamp >= ?
+    ORDER BY do.cycle_timestamp DESC
     """
     
     cursor = conn.cursor()
     cursor.execute(query, (cutoff,))
-    return cursor.fetchall()
+    rows = cursor.fetchall()
+    if all_symbols:
+        return rows
+    allowed = {symbol.upper() for symbol in symbols}
+    return [row for row in rows if _resolve_row_symbol(row) in allowed]
 
 
 def analyze_near_misses(rows):
     """Analyze near-miss data from decision outcomes."""
-    total_cycles = len(rows)
+    return _analyze_near_miss_events([_event_from_row(row) for row in rows])
+
+
+def _empty_analysis() -> dict:
+    return {
+        "total_cycles": 0,
+        "total_sweep_too_shallow": 0,
+        "near_miss_count": 0,
+        "far_below": 0,
+        "near_miss_low": 0,
+        "baseline_pass": 0,
+        "stricter_pass": 0,
+        "within_10pct": 0,
+        "within_20pct": 0,
+        "within_30pct": 0,
+        "regime_counts": {},
+        "session_counts": {"ASIA": 0, "EU": 0, "US": 0},
+        "rejection_reasons": {},
+        "baseline_trades": 0,
+        "baseline_pass_rejected_by_007": 0,
+        "symbol_counts": {},
+        "per_symbol": {},
+    }
+
+
+def _analyze_near_miss_events(events: list[dict]) -> dict:
+    analysis = _analyze_near_miss_events_without_per_symbol(events)
+    events_by_symbol = {}
+    for event in events:
+        events_by_symbol.setdefault(event["symbol"], []).append(event)
+    analysis["per_symbol"] = {}
+    for symbol, symbol_events in sorted(events_by_symbol.items()):
+        symbol_analysis = _analyze_near_miss_events_no_breakdown(symbol_events)
+        analysis["per_symbol"][symbol] = symbol_analysis
+    return analysis
+
+
+def _analyze_near_miss_events_no_breakdown(events: list[dict]) -> dict:
+    analysis = _empty_analysis()
+    analysis.update(_analyze_near_miss_events_without_per_symbol(events))
+    return analysis
+
+
+def _analyze_near_miss_events_without_per_symbol(events: list[dict]) -> dict:
+    total_cycles = len(events)
     total_sweep_too_shallow = 0
     near_miss_count = 0
-    
-    # Depth buckets
     far_below = 0
     near_miss_low = 0
     baseline_pass = 0
     stricter_pass = 0
-    
-    # Threshold proximity
     within_10pct = 0
     within_20pct = 0
     within_30pct = 0
-    
-    # Regime breakdown
     regime_counts = {}
-    
-    # Session breakdown
     session_counts = {"ASIA": 0, "EU": 0, "US": 0}
-    
-    # Rejection reasons
     rejection_reasons = {}
-    
-    # Shadow comparison (baseline vs 0.007)
     baseline_trades = 0
     baseline_pass_rejected_by_007 = 0
-    
-    for row in rows:
-        cycle_ts, outcome_group, outcome_reason, details_json = row
-        
+    symbol_counts = {}
+
+    for event in events:
+        outcome_group = event["outcome_group"]
+        outcome_reason = event["outcome_reason"]
+        details = event["details"]
+        symbol = event["symbol"]
+        symbol_counts[symbol] = symbol_counts.get(symbol, 0) + 1
         if outcome_reason == "sweep_too_shallow":
             total_sweep_too_shallow += 1
-            
-            import json
-            try:
-                details = json.loads(details_json) if details_json else {}
-            except:
-                details = {}
-            
             near_miss = details.get("near_miss_diagnostics")
             if near_miss:
                 near_miss_count += 1
-                
-                # Depth bucket
                 depth_bucket = near_miss.get("depth_bucket")
                 if depth_bucket == "far_below":
                     far_below += 1
@@ -116,8 +177,6 @@ def analyze_near_misses(rows):
                     baseline_pass += 1
                 elif depth_bucket == "stricter_pass":
                     stricter_pass += 1
-                
-                # Threshold proximity
                 depth = near_miss.get("sweep_depth_pct", details.get("sweep_depth_pct", 0))
                 threshold = near_miss.get("threshold", 0.00649)
                 if threshold > 0:
@@ -128,12 +187,8 @@ def analyze_near_misses(rows):
                         within_20pct += 1
                     if -30 <= distance_pct < 0:
                         within_30pct += 1
-                
-                # Regime breakdown
                 regime = near_miss.get("regime", "unknown")
                 regime_counts[regime] = regime_counts.get(regime, 0) + 1
-                
-                # Session breakdown
                 session_hour = near_miss.get("session_hour", 0)
                 if 0 <= session_hour < 8:
                     session_counts["ASIA"] += 1
@@ -141,21 +196,13 @@ def analyze_near_misses(rows):
                     session_counts["EU"] += 1
                 else:
                     session_counts["US"] += 1
-                
-                # Rejection reasons
-                reasons = near_miss.get("rejection_reasons", [])
-                for reason in reasons:
+                for reason in near_miss.get("rejection_reasons", []):
                     rejection_reasons[reason] = rejection_reasons.get(reason, 0) + 1
-                
-                # Shadow comparison
                 if depth_bucket == "baseline_pass":
                     baseline_pass_rejected_by_007 += 1
-        
-        # Count baseline trades (sweep depth >= 0.00649)
-        # This is an approximation - we count signals that passed the threshold
         if outcome_group == "signal_generated":
             baseline_trades += 1
-    
+
     return {
         "total_cycles": total_cycles,
         "total_sweep_too_shallow": total_sweep_too_shallow,
@@ -172,7 +219,41 @@ def analyze_near_misses(rows):
         "rejection_reasons": rejection_reasons,
         "baseline_trades": baseline_trades,
         "baseline_pass_rejected_by_007": baseline_pass_rejected_by_007,
+        "symbol_counts": symbol_counts,
+        "per_symbol": {},
     }
+
+
+def _event_from_row(row) -> dict:
+    values = tuple(row)
+    cycle_ts, outcome_group, outcome_reason, details_json = values[:4]
+    details = _parse_details(details_json)
+    return {
+        "cycle_timestamp": cycle_ts,
+        "outcome_group": outcome_group,
+        "outcome_reason": outcome_reason,
+        "details": details,
+        "symbol": _resolve_row_symbol(values, details=details),
+    }
+
+
+def _parse_details(details_json: str | None) -> dict:
+    try:
+        parsed = json.loads(details_json) if details_json else {}
+    except json.JSONDecodeError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
+
+
+def _resolve_row_symbol(row, *, details: dict | None = None) -> str:
+    details = details if details is not None else _parse_details(row[3] if len(row) > 3 else None)
+    symbol = details.get("symbol")
+    near_miss = details.get("near_miss_diagnostics")
+    if not symbol and isinstance(near_miss, dict):
+        symbol = near_miss.get("symbol")
+    if not symbol and len(row) > 5:
+        symbol = row[5]
+    return str(symbol or "BTCUSDT").upper()
 
 
 def generate_report(analysis, days, output_path):
@@ -194,7 +275,8 @@ def generate_report(analysis, days, output_path):
     near_miss_count = analysis["near_miss_count"]
     
     lines.append(f"- Total decision cycles: {total_cycles}")
-    lines.append(f"- Sweep too shallow rejections: {total_sweep_too_shallow} ({total_sweep_too_shallow/total_cycles*100:.1f}%)")
+    sweep_pct = total_sweep_too_shallow / total_cycles * 100 if total_cycles else 0.0
+    lines.append(f"- Sweep too shallow rejections: {total_sweep_too_shallow} ({sweep_pct:.1f}%)")
     lines.append(f"- Near-miss events (depth >= 0.004): {near_miss_count}")
     lines.append("")
     
@@ -206,6 +288,20 @@ def generate_report(analysis, days, output_path):
             lines.append(f"Near-miss count ({near_miss_count}) is reasonable vs baseline trades ({analysis['baseline_trades']}). Threshold is appropriate.")
     else:
         lines.append("**Key Finding:** No near-miss events recorded. Market conditions may be generating very shallow sweeps (< 0.4%).")
+    lines.append("")
+
+    # Symbol Breakdown
+    lines.append("## Symbol Breakdown")
+    lines.append("")
+    lines.append("| Symbol | Cycles | Sweep Too Shallow | Near-Misses | Baseline Trades |")
+    lines.append("|---|---:|---:|---:|---:|")
+    for symbol, symbol_analysis in sorted(analysis.get("per_symbol", {}).items()):
+        lines.append(
+            f"| {symbol} | {symbol_analysis['total_cycles']} | "
+            f"{symbol_analysis['total_sweep_too_shallow']} | "
+            f"{symbol_analysis['near_miss_count']} | "
+            f"{symbol_analysis['baseline_trades']} |"
+        )
     lines.append("")
     
     # Depth Distribution
@@ -341,7 +437,12 @@ def main():
     
     try:
         # Query decision outcomes
-        rows = query_decision_outcomes(conn, args.days)
+        rows = query_decision_outcomes(
+            conn,
+            args.days,
+            symbols=_parse_symbols(args.symbol),
+            all_symbols=args.all_symbols,
+        )
         
         # Analyze near-misses
         analysis = analyze_near_misses(rows)

@@ -443,6 +443,51 @@ def test_near_miss_payload_includes_nested_sweep_depth_pct() -> None:
     assert near_miss["depth_bucket"] == "near_miss_low"
 
 
+def test_near_miss_payload_accepts_symbol_specific_threshold() -> None:
+    timestamp = datetime(2026, 5, 21, 11, 0, tzinfo=timezone.utc)
+    diagnostics = SignalDiagnostics(
+        timestamp=timestamp,
+        config_hash="test-config",
+        regime=RegimeState.NORMAL,
+        blocked_by="sweep_too_shallow",
+        sweep_detected=True,
+        reclaim_detected=False,
+        sweep_side="LOW",
+        sweep_level=185.0,
+        sweep_depth_pct=0.0070,
+        direction_inferred=None,
+        direction_allowed=None,
+        confluence_preview=None,
+        candidate_reasons_preview=[],
+    )
+    features = Features(
+        schema_version="test",
+        config_hash="test-config",
+        timestamp=timestamp,
+        atr_15m=2.0,
+        atr_4h=10.0,
+        atr_4h_norm=0.01,
+        ema50_4h=180.0,
+        ema200_4h=170.0,
+        funding_pct_60d=33.8,
+        oi_delta_pct=-0.004,
+        tfi_60s=0.6,
+    )
+
+    payload = BotOrchestrator._signal_diagnostics_payload(
+        diagnostics,
+        features,
+        symbol="ETHUSDT",
+        threshold=0.0075,
+    )
+
+    assert payload["symbol"] == "ETHUSDT"
+    near_miss = payload["near_miss_diagnostics"]
+    assert near_miss["symbol"] == "ETHUSDT"
+    assert near_miss["threshold"] == 0.0075
+    assert near_miss["depth_bucket"] == "near_miss_low"
+
+
 def test_start_persists_config_snapshot(paper_settings) -> None:
     assert paper_settings.storage is not None
     conn = make_conn(paper_settings.storage.schema_path)
