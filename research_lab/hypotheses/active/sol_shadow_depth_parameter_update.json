@@ -1,0 +1,34 @@
+{
+  "hypothesis_id": "SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1",
+  "status": "READY_FOR_AUDIT",
+  "builder": "Codex",
+  "decision_date": "2026-05-21",
+  "scope": "Update SOL shadow-only sweep depth threshold from frozen BTC trial-00095 baseline to audited SOL asset-specific candidate.",
+  "source_evidence": {
+    "sol_optimization_milestone": "SOL_ASSET_SPECIFIC_OPTIMIZATION_V1",
+    "sol_optimization_audit": "docs/audits/AUDIT_SOL_ASSET_SPECIFIC_OPTIMIZATION_V1_2026-05-20.md",
+    "portfolio_diagnostic_milestone": "DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1",
+    "portfolio_diagnostic_audit": "docs/audits/AUDIT_DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1_2026-05-21.md",
+    "selected_variant": "SOL_OPT_D0.00750",
+    "baseline_min_sweep_depth_pct": 0.00649,
+    "sol_shadow_min_sweep_depth_pct": 0.0075,
+    "candidate_portfolio_trade_delta_pct": -0.119,
+    "candidate_portfolio_er_improvement_pct": 0.154,
+    "candidate_portfolio_pf_improvement_pct": 0.183,
+    "candidate_portfolio_dd_reduction_pct": 0.468,
+    "sol_trade_retention_pct": 0.732
+  },
+  "constraints": [
+    "BTC trial-00095 threshold remains unchanged at 0.00649.",
+    "ETH shadow threshold remains unchanged at 0.0075.",
+    "SOL remains shadow_no_orders.",
+    "No PAPER or LIVE approval.",
+    "No execution, core, orchestrator, main.py, settings.py, production DB, systemd, or M4 changes.",
+    "Server deployment requires separate audit pass and operator pull."
+  ],
+  "validation": [
+    "tests/test_shadow_real_signal_cycle.py verifies BTC uses 0.00649 while ETH/SOL use 0.0075.",
+    "Real shadow cycle tests verify production DB remains untouched."
+  ],
+  "builder_verdict": "SOL_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT"
+}
