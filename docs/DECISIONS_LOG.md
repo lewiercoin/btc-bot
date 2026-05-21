@@ -4,6 +4,43 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Fix shadow production touch guard false positives
+**Decision:** Implement `SHADOW_PRODUCTION_TOUCH_GUARD_FIX_V1` before any
+`MULTI_ASSET_PAPER_APPROVAL_V1` work. The existing sidecar guard treated any
+production DB signature change during a sidecar run as
+`production_db_touched=true`. That is too strict while BTC PAPER is running
+concurrently.
+
+**Investigation:**
+- `2026-05-21T01:30:08Z` sidecar `production_db_touched=true` overlapped a BTC
+  decision cycle that started at `01:30:00Z` and finished at `01:30:06Z`.
+  Production DB rows were written in that window:
+  `decision_outcomes`, `market_snapshots`, `feature_snapshots`, and
+  `alerts_errors`.
+- `2026-05-21T16:23:01Z` sidecar `production_db_touched=true` did not overlap a
+  logged BTC decision cycle, but the BTC bot writes runtime metrics and WAL
+  state between cycles without a decision log entry. Current production DB WAL
+  and SHM mtimes update continuously while the bot is running.
+- Static review of `research_lab/shadow_orchestrator.py`,
+  `research_lab/shadow_schema.py`, and `research_lab/shadow_signal_cycle.py`
+  found no production DB connection or write path. The only production DB
+  interaction in the sidecar guard was `Path.stat()` on `storage/btc_bot.db`.
+
+**Fix:**
+- Redefine `production_db_touched` as process-owned access: true only if the
+  sidecar process has `storage/btc_bot.db`, `btc_bot.db-wal`, or
+  `btc_bot.db-shm` open via `/proc/self/fd`.
+- Preserve mtime/size drift as `production_db_signature_changed`, a diagnostic
+  signal for concurrent BTC writes, not a hard isolation failure.
+
+**Consequences:**
+- Old `production_db_touched=true` entries remain a historical finding.
+- Future sidecar runs should no longer fail just because BTC PAPER writes its
+  own DB concurrently.
+- Approval remains blocked until this fix is audited and deployed code-only,
+  then a fresh checkpoint window shows `production_db_touched=true` count is
+  zero.
+
 ## 2026-05-21 - Add multi-asset shadow evidence checkpoint before PAPER approval
 **Decision:** Implement `MULTI_ASSET_SHADOW_EVIDENCE_CHECKPOINT_V1` as the next
 read-only checkpoint before any future `MULTI_ASSET_PAPER_APPROVAL_V1`.
