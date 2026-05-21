@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -87,6 +88,114 @@ def test_load_settings_experiment_profile_applies_runtime_throughput_overrides(
     assert settings.risk.cooldown_minutes_after_loss == 30
     assert settings.risk.duplicate_level_tolerance_pct == 0.0004
     assert settings.risk.duplicate_level_window_hours == 24
+
+
+def test_load_settings_experiment_profile_applies_multi_asset_runtime_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "multi_asset": {
+                    "enabled": True,
+                    "enabled_symbols": ["btcusdt", "ethusdt", "solusdt"],
+                    "symbol_overrides": [
+                        {"symbol": "ethusdt", "min_sweep_depth_pct": 0.0075},
+                        {"symbol": "solusdt", "min_sweep_depth_pct": 0.0075},
+                    ],
+                    "max_open_positions_total": 2,
+                    "max_open_positions_per_symbol": 1,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert settings.multi_asset.enabled is True
+    assert settings.multi_asset.enabled_symbols == ("BTCUSDT", "ETHUSDT", "SOLUSDT")
+    assert [item.symbol for item in settings.multi_asset.symbol_overrides] == ["ETHUSDT", "SOLUSDT"]
+    assert [item.min_sweep_depth_pct for item in settings.multi_asset.symbol_overrides] == [0.0075, 0.0075]
+
+
+def test_load_settings_experiment_profile_multi_asset_overlay_changes_config_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    baseline = load_settings(project_root=tmp_path, profile="experiment")
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "multi_asset": {
+                    "enabled": True,
+                    "enabled_symbols": ["BTCUSDT", "ETHUSDT", "SOLUSDT"],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert baseline.multi_asset.enabled is False
+    assert changed.multi_asset.enabled is True
+    assert baseline.config_hash != changed.config_hash
+
+
+def test_load_settings_experiment_profile_rejects_invalid_multi_asset_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "multi_asset": {
+                    "enabled": True,
+                    "enabled_symbols": ["BTCUSDT", "ETHUSDT"],
+                    "symbol_overrides": [
+                        {"symbol": "SOLUSDT", "min_sweep_depth_pct": 0.0075},
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="not listed"):
+        load_settings(project_root=tmp_path, profile="experiment")
+
+
+def test_load_settings_experiment_profile_rejects_unknown_symbol_override_key(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "multi_asset": {
+                    "enabled": True,
+                    "enabled_symbols": ["BTCUSDT", "ETHUSDT"],
+                    "symbol_overrides": [
+                        {"symbol": "ETHUSDT", "min_sweep_depth_pct": 0.0075, "risk": 0.001},
+                    ],
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="Unknown multi_asset.symbol_overrides"):
+        load_settings(project_root=tmp_path, profile="experiment")
 
 
 def test_load_settings_experiment_profile_forces_uptrend_pullback_off_even_when_env_enabled(
