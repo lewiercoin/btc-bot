@@ -40,13 +40,55 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
-### Implementation: MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1
+### Operations: RUNTIME_CAPACITY_GUARDRAILS_V1
 
-**Status:** READY_FOR_AUDIT - dormant multi-symbol PAPER loop implemented
+**Status:** READY_FOR_AUDIT - production capacity checker implemented
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`
+
+**Scope:** Add a non-trading capacity checker to gate any future ETH/SOL PAPER
+activation. This milestone records the server capacity concern and adds an
+operator CLI that evaluates disk, memory, load, bot RSS, shadow RSS, and last
+decision-cycle duration. It does not change runtime behavior, production
+settings, strategy parameters, M4, execution, or systemd units.
+
+**Implementation:**
+- Added `scripts/runtime_capacity_check.py`.
+- The checker reads runtime metrics from `storage/btc_bot.db`, latest shadow
+  resource sample from `research_lab/shadow/multi_asset_shadow.db`, OS disk and
+  memory state, load average, and optional bot PID RSS.
+- Default activation guardrails:
+  - disk used <= 85%
+  - disk free >= 12 GB
+  - memory available >= 1 GB
+  - load1 per CPU <= 0.75
+  - bot RSS <= 512 MB
+  - shadow RSS <= 256 MB
+  - last completed decision cycle <= 60 seconds
+- Output is JSON and exit code is `2` on failed guardrails.
+
+**Validation:**
+- `pytest tests/test_runtime_capacity_check.py -q -o addopts=` -> 6 passed.
+- `python -m compileall scripts/runtime_capacity_check.py tests/test_runtime_capacity_check.py` -> PASS.
+- Local CLI smoke confirmed fail behavior when local disk usage exceeded the
+  default 85% threshold.
+- Production dry-run via stdin, without installing the file, returned
+  `status=pass`: disk used 74.2%, memory available ~3.2 GB, load1 0.0, bot RSS
+  ~92 MB, shadow RSS ~26 MB, last cycle duration ~8.9 seconds.
+
+**Next:** Claude Code audit. If accepted, deploy the checker code-only and run
+it on production before any ETH/SOL PAPER activation decision.
+
+### Implementation: MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1
+
+**Status:** DEPLOYED - dormant multi-symbol PAPER loop active on production
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Deployment date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
 **Depends on:** `MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1` (audit DONE, deployed dormant)
+**Audit:** `docs/audits/AUDIT_MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1_2026-05-21.md` (DONE)
 
 **Scope:** Add the runtime contracts needed for a future BTC/ETH/SOL PAPER
 approval while keeping production activation disabled. This milestone adds a
@@ -85,9 +127,14 @@ change M4, or alter BTC-only behavior when `multi_asset.enabled=false`.
 - `python scripts/smoke_orchestrator.py` -> PASS.
 - `python -m compileall orchestrator.py storage/state_store.py execution/execution_engine.py execution/paper_execution_engine.py execution/live_execution_engine.py scripts/smoke_orchestrator.py tests/test_multi_asset_state_store.py tests/test_multi_asset_orchestrator_dispatch.py tests/test_execution_symbol_gates.py` -> PASS.
 
-**Next:** Push for Claude Code audit. If audit passes, decide separately
-whether to deploy the dormant loop code. ETH/SOL PAPER approval remains a
-future milestone.
+**Deployment verification:** Production reached commit `2461dba0`, BTC PAPER
+remained active with PID `894855`, `NRestarts=0`, first post-deploy cycle at
+`2026-05-21T14:15:00Z` completed with `no_signal`, `multi_asset.enabled=false`,
+no `symbol_state`/`portfolio_state` tables were created, ETH/SOL positions
+remained zero, and the shadow sidecar completed with `production_db_touched=false`.
+
+**Next:** Capacity guardrails and M4 multi-asset query extension are required
+before any ETH/SOL PAPER activation approval.
 
 ### Implementation: MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1
 

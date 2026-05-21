@@ -4,6 +4,35 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Require capacity guardrails before ETH/SOL PAPER activation
+**Decision:** Add `RUNTIME_CAPACITY_GUARDRAILS_V1` before any future ETH/SOL
+PAPER activation. Current production capacity is sufficient for dormant
+contracts and shadow sidecar, but activation must have an explicit resource
+gate.
+
+**Reason:** Server inspection after Phase 4 deployment showed low current load
+(`load average 0.00`, bot around `0.5% CPU` and ~80 MB RSS, shadow sidecar
+around 26 MB RSS for a short one-shot run), but full multi-asset PAPER will add
+REST/API work and longer runtime cycles. The relevant risk is not the dormant
+code already deployed; it is uncontrolled growth in cycle duration, API calls,
+disk usage, or memory during activation.
+
+**Guardrails:**
+- Disk must stay below 85% used and have at least 12 GB free.
+- Available memory must stay above 1 GB.
+- Load average per CPU must stay below 0.75.
+- BTC bot RSS must stay below 512 MB.
+- Shadow sidecar RSS must stay below 256 MB.
+- Last completed decision cycle must stay below 60 seconds.
+
+**Consequences:**
+- `RUNTIME_CAPACITY_GUARDRAILS_V1` is a readiness milestone, not a trading
+  activation milestone.
+- ETH/SOL PAPER remains blocked until capacity, M4 extension, shadow evidence,
+  and explicit operator approval all pass.
+- The capacity checker must be runnable on production without modifying the
+  production database or trading settings.
+
 ## 2026-05-21 - Implement dormant multi-asset PAPER orchestrator loop
 **Decision:** Build `MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1` on
 `deploy/multi-asset-paper-v1` after the dormant foundation contracts were
