@@ -3,7 +3,12 @@
 import json
 import pytest
 
-from scripts.report_near_miss_diagnostics import analyze_near_misses
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+import sqlite3
+
+from scripts.report_near_miss_diagnostics import analyze_near_misses, query_decision_outcomes, _parse_symbols
+from storage.db import init_db
 
 
 def compute_depth_bucket(depth: float, threshold: float = 0.00649) -> str:
@@ -150,6 +155,8 @@ class TestNearMissReportCompatibility:
 
         assert analysis["near_miss_count"] == 1
         assert analysis["within_10pct"] == 1
+        assert analysis["symbol_counts"] == {"BTCUSDT": 1}
+        assert analysis["per_symbol"]["BTCUSDT"]["near_miss_count"] == 1
 
     def test_report_falls_back_to_top_level_sweep_depth_pct(self):
         rows = [
@@ -176,6 +183,60 @@ class TestNearMissReportCompatibility:
 
         assert analysis["near_miss_count"] == 1
         assert analysis["within_10pct"] == 1
+
+    def test_report_uses_symbol_from_details_payload(self):
+        rows = [
+            (
+                "2026-05-16T00:00:00+00:00",
+                "no_signal",
+                "sweep_too_shallow",
+                json.dumps(
+                    {
+                        "symbol": "ETHUSDT",
+                        "near_miss_diagnostics": {
+                            "sweep_depth_pct": 0.0059,
+                            "threshold": 0.0075,
+                            "depth_bucket": "near_miss_low",
+                            "regime": "normal",
+                            "session_hour": 12,
+                            "rejection_reasons": ["sweep_too_shallow"],
+                        },
+                    }
+                ),
+            )
+        ]
+
+        analysis = analyze_near_misses(rows)
+
+        assert analysis["symbol_counts"] == {"ETHUSDT": 1}
+        assert analysis["per_symbol"]["ETHUSDT"]["near_miss_count"] == 1
+
+    def test_report_uses_symbol_from_nested_near_miss_payload(self):
+        rows = [
+            (
+                "2026-05-16T00:00:00+00:00",
+                "no_signal",
+                "sweep_too_shallow",
+                json.dumps(
+                    {
+                        "near_miss_diagnostics": {
+                            "symbol": "SOLUSDT",
+                            "sweep_depth_pct": 0.0059,
+                            "threshold": 0.0075,
+                            "depth_bucket": "near_miss_low",
+                            "regime": "normal",
+                            "session_hour": 12,
+                            "rejection_reasons": ["sweep_too_shallow"],
+                        },
+                    }
+                ),
+            )
+        ]
+
+        analysis = analyze_near_misses(rows)
+
+        assert analysis["symbol_counts"] == {"SOLUSDT": 1}
+        assert analysis["per_symbol"]["SOLUSDT"]["near_miss_count"] == 1
 
     def test_near_miss_condition_depth_in_range(self):
         """Near-miss SHOULD be added for depth [0.004, threshold)."""
@@ -207,3 +268,69 @@ class TestNearMissReportCompatibility:
                       and depth >= 0.004)
         
         assert not should_add
+
+
+class TestMultiAssetM4QueryExtension:
+    def test_parse_symbols_accepts_repeated_and_comma_separated_values(self):
+        assert _parse_symbols(["btcusdt, ethusdt", "SOLUSDT"]) == ("BTCUSDT", "ETHUSDT", "SOLUSDT")
+
+    def test_query_decision_outcomes_defaults_to_btc_legacy_rows(self):
+        conn = _make_conn()
+        ts = datetime.now(timezone.utc) - timedelta(hours=1)
+        try:
+            conn.execute(
+                """
+                INSERT INTO decision_outcomes (
+                    cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, details_json
+                ) VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (ts.isoformat(), "no_signal", "sweep_too_shallow", "normal", "cfg", "{}"),
+            )
+            conn.commit()
+
+            rows = query_decision_outcomes(conn, days=1)
+        finally:
+            conn.close()
+
+        assert len(rows) == 1
+        analysis = analyze_near_misses(rows)
+        assert analysis["symbol_counts"] == {"BTCUSDT": 1}
+
+    def test_query_decision_outcomes_filters_by_symbol_from_details(self):
+        conn = _make_conn()
+        ts = datetime.now(timezone.utc) - timedelta(hours=1)
+        try:
+            for symbol in ("BTCUSDT", "ETHUSDT"):
+                conn.execute(
+                    """
+                    INSERT INTO decision_outcomes (
+                        cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ts.isoformat(),
+                        "no_signal",
+                        "sweep_too_shallow",
+                        "normal",
+                        "cfg",
+                        json.dumps({"symbol": symbol}),
+                    ),
+                )
+            conn.commit()
+
+            eth_rows = query_decision_outcomes(conn, days=1, symbols=("ETHUSDT",))
+            all_rows = query_decision_outcomes(conn, days=1, all_symbols=True)
+        finally:
+            conn.close()
+
+        assert len(eth_rows) == 1
+        assert analyze_near_misses(eth_rows)["symbol_counts"] == {"ETHUSDT": 1}
+        assert analyze_near_misses(all_rows)["symbol_counts"] == {"BTCUSDT": 1, "ETHUSDT": 1}
+
+
+def _make_conn() -> sqlite3.Connection:
+    schema_path = Path(__file__).resolve().parents[1] / "storage" / "schema.sql"
+    conn = sqlite3.connect(":memory:")
+    conn.row_factory = sqlite3.Row
+    init_db(conn, schema_path)
+    return conn

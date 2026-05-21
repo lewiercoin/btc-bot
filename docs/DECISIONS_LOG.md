@@ -4,6 +4,33 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Extend M4 near-miss reporting to per-symbol queries
+**Decision:** Implement `M4_MULTI_ASSET_QUERY_EXTENSION_V1` as a reporting and
+query compatibility milestone before any ETH/SOL PAPER activation. The default
+M4 report remains BTC-only; multi-symbol reporting is opt-in via CLI flags.
+
+**Reason:** Dormant multi-asset runtime contracts are deployed, but activation
+needs per-symbol M4 context. BTC M4 must remain a clean BTC-only measurement
+while ETH/SOL readiness work proceeds. A symbol-explicit query layer lets the
+operator inspect future ETH/SOL runtime rows separately without contaminating
+the current BTC checkpoint.
+
+**Implementation boundaries:**
+- Preserve the default `BTCUSDT` behavior in `scripts/report_near_miss_diagnostics.py`.
+- Add explicit `--symbol` and `--all-symbols` query modes.
+- Resolve symbols from decision details, nested near-miss payloads, or linked
+  market snapshots; legacy rows without a symbol are treated as BTCUSDT.
+- Use symbol-specific near-miss thresholds in the dormant multi-symbol
+  orchestrator path.
+- Do not change strategy parameters, execution, production settings, or M4
+  decision criteria.
+
+**Consequences:**
+- BTC M4 remains comparable with prior reports.
+- Future ETH/SOL M4 rows can be reported per symbol after a separate activation
+  milestone creates them.
+- This is not approval for ETH/SOL PAPER.
+
 ## 2026-05-21 - Require capacity guardrails before ETH/SOL PAPER activation
 **Decision:** Add `RUNTIME_CAPACITY_GUARDRAILS_V1` before any future ETH/SOL
 PAPER activation. Current production capacity is sufficient for dormant

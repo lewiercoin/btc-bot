@@ -701,7 +701,14 @@ class BotOrchestrator:
                             regime=regime.value,
                             snapshot_id=snapshot_id,
                             feature_snapshot_id=feature_snapshot_id,
-                            details={"symbol": symbol, **self._signal_diagnostics_payload(diagnostics, features)},
+                            details={
+                                **self._signal_diagnostics_payload(
+                                    diagnostics,
+                                    features,
+                                    symbol=symbol,
+                                    threshold=strategy.min_sweep_depth_pct,
+                                )
+                            },
                             context=context,
                         )
                         continue
@@ -1218,7 +1225,13 @@ class BotOrchestrator:
         LOG.info(message, *values)
 
     @staticmethod
-    def _signal_diagnostics_payload(diagnostics: SignalDiagnostics, features: Features | None = None) -> dict[str, object]:
+    def _signal_diagnostics_payload(
+        diagnostics: SignalDiagnostics,
+        features: Features | None = None,
+        *,
+        symbol: str | None = None,
+        threshold: float = 0.00649,
+    ) -> dict[str, object]:
         payload = {
             "timestamp": diagnostics.timestamp.isoformat(),
             "config_hash": diagnostics.config_hash,
@@ -1234,19 +1247,19 @@ class BotOrchestrator:
             "confluence_preview": diagnostics.confluence_preview,
             "candidate_reasons_preview": diagnostics.candidate_reasons_preview,
         }
-        
+        if symbol is not None:
+            payload["symbol"] = symbol.upper()
+
         # Add near-miss diagnostics for sweep_too_shallow rejections with depth >= 0.004
-        if (diagnostics.blocked_by == "sweep_too_shallow" 
-                and diagnostics.sweep_depth_pct is not None 
+        if (diagnostics.blocked_by == "sweep_too_shallow"
+                and diagnostics.sweep_depth_pct is not None
                 and diagnostics.sweep_depth_pct >= 0.004
                 and features is not None):
-            # Get current threshold from settings (default 0.00649 for trial-00095)
-            threshold = 0.00649  # Baseline threshold from trial-00095
             depth = diagnostics.sweep_depth_pct
-            
+
             # Compute threshold distance (negative for rejects)
             threshold_distance = (depth - threshold) / threshold if threshold > 0 else 0.0
-            
+
             # Compute depth bucket
             if depth < 0.004:
                 depth_bucket = "far_below"
@@ -1256,10 +1269,10 @@ class BotOrchestrator:
                 depth_bucket = "baseline_pass"
             else:
                 depth_bucket = "stricter_pass"
-            
+
             # Get session hour
             session_hour = diagnostics.timestamp.hour
-            
+
             # Build near-miss payload
             near_miss_data = {
                 "sweep_depth_pct": depth,
@@ -1276,9 +1289,11 @@ class BotOrchestrator:
                 "session_hour": session_hour,
                 "rejection_reasons": diagnostics.candidate_reasons_preview or ["sweep_too_shallow"],
             }
-            
+            if symbol is not None:
+                near_miss_data["symbol"] = symbol.upper()
+
             payload["near_miss_diagnostics"] = near_miss_data
-        
+
         return payload
 
     def _process_trade_lifecycle(self, snapshot: MarketSnapshot, *, symbol: str | None = None) -> list[dict]:
