@@ -9,9 +9,16 @@ from execution.execution_engine import ExecutionEngine, PositionPersister
 
 
 class PaperExecutionEngine(ExecutionEngine):
-    def __init__(self, *, position_persister: PositionPersister, symbol: str = "BTCUSDT") -> None:
+    def __init__(
+        self,
+        *,
+        position_persister: PositionPersister,
+        symbol: str = "BTCUSDT",
+        allowed_symbols: tuple[str, ...] | None = None,
+    ) -> None:
         self.position_persister = position_persister
         self.symbol = symbol.upper()
+        self.allowed_symbols = tuple(s.upper() for s in (allowed_symbols or (self.symbol,)))
 
     def execute_signal(
         self,
@@ -24,6 +31,9 @@ class PaperExecutionEngine(ExecutionEngine):
         ask_price: float | None = None,
         snapshot_id: str | None = None,
     ) -> None:
+        if self.symbol not in self.allowed_symbols:
+            allowed = ",".join(self.allowed_symbols)
+            raise ValueError(f"paper_execution_symbol_not_allowed:symbol={self.symbol}:allowed={allowed}")
         if snapshot_price is None:
             raise ValueError("PaperExecutionEngine requires snapshot_price for fill simulation.")
 

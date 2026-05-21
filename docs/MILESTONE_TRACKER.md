@@ -40,6 +40,57 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Implementation: MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1
+
+**Status:** READY_FOR_AUDIT - dormant runtime contracts implemented
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
+**Contract review:** `docs/MULTI_ASSET_PAPER_RUNTIME_CONTRACT_REVIEW_V1.md`
+
+**Scope:** Implement dormant multi-asset runtime foundation contracts without
+activating ETH/SOL PAPER. This milestone extracts the audited portfolio gate
+contract into runtime-safe `core/`, adds multi-asset settings contracts and
+symbol config resolution, and adds execution symbol allowlists. It does not
+implement a multi-symbol orchestrator loop, enable ETH/SOL market data or
+orders, add a production DB migration, change M4, or change strategy
+parameters.
+
+**Implementation:**
+- Added `core/portfolio_gate.py` with runtime-safe `RuntimePortfolioGate`,
+  portfolio/symbol state contracts, deterministic symbol ordering, veto
+  reasons, and recovery helpers.
+- Converted `research_lab/models/portfolio_state.py` into a compatibility
+  wrapper that re-exports the runtime-safe contracts. Runtime code does not
+  import from `research_lab`.
+- Added `MultiAssetConfig`, `SymbolStrategyOverride`,
+  `validate_multi_asset_config()`, and `resolve_symbol_config()` to
+  `settings.py`.
+- Default config remains dormant: `multi_asset.enabled=false`,
+  `enabled_symbols=("BTCUSDT",)`.
+- Added paper/live execution allowlists. Default constructor behavior still
+  allows the engine's configured symbol only; orchestrator passes the dormant
+  settings allowlist.
+
+**Boundaries:**
+- No ETH/SOL PAPER orders are possible under default settings.
+- No `symbol_state` table or startup migration is added in this milestone.
+- No rewrite of the existing BTC decision loop.
+- No change to `core/risk_engine.py`, `core/governance.py`, production DB, M4,
+  sidecar systemd, or deployment config.
+- A future implementation may add multi-symbol orchestration and symbol-state
+  persistence as separate audited milestones.
+
+**Validation:**
+- `pytest tests/test_settings.py tests/test_core_portfolio_gate.py tests/test_portfolio_state.py tests/test_execution_symbol_gates.py tests/test_paper_execution_realism.py -q -o addopts=` -> 33 passed.
+- `pytest tests/test_shadow_real_signal_cycle.py tests/test_sidecar_isolation.py tests/test_shadow_schema.py scripts/smoke_orchestrator.py -q -o addopts=` -> 19 passed.
+- `python -m compileall settings.py core/portfolio_gate.py research_lab/models/portfolio_state.py execution/paper_execution_engine.py execution/live_execution_engine.py tests/test_settings.py tests/test_core_portfolio_gate.py tests/test_execution_symbol_gates.py` -> PASS.
+
+**Next:** Claude Code audit. If audit passes, Phase 2 deployment is code-only
+and dormant: pull the contracts to production with `multi_asset.enabled=false`
+and verify BTC PAPER behavior plus ETH/SOL order blocking. ETH/SOL PAPER
+activation remains a separate approval milestone.
+
 ### Operations: MULTI_ASSET_PAPER_PREDEPLOY_GUARDRAILS_V1
 
 **Status:** PREPARED - rollback branch/tag and verified DB backup created

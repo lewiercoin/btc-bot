@@ -121,6 +121,7 @@ def build_default_bundle(
         execution_engine: ExecutionEngine = PaperExecutionEngine(
             position_persister=position_persister,
             symbol=settings.strategy.symbol.upper(),
+            allowed_symbols=settings.multi_asset.enabled_symbols,
         )
     else:
         order_manager = OrderManager(
@@ -137,6 +138,7 @@ def build_default_bundle(
             entry_order_type=settings.execution.live_entry_order_type,
             entry_timeout_seconds=settings.execution.entry_timeout_seconds,
             poll_interval_seconds=settings.execution.live_fill_poll_seconds,
+            allowed_symbols=settings.multi_asset.enabled_symbols,
         )
 
     return EngineBundle(
