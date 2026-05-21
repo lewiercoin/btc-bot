@@ -4,6 +4,36 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Prepare separate deploy branch and DB rollback point for multi-asset PAPER
+**Decision:** Continue toward BTC/ETH/SOL PAPER before the passive Day 3 shadow
+checkpoint, but isolate the work on `deploy/multi-asset-paper-v1` and preserve
+a rollback point before any runtime implementation.
+
+**Reason:** The asset-specific shadow migration is deployed and verified, and
+the operator chose to continue toward full PAPER without waiting for the
+scheduled Day 3 checkpoint. The active runtime is still single-symbol, so the
+next deploy path must not promote ETH/SOL by a simple parameter switch. It
+requires audited runtime work for symbol-explicit signals, portfolio risk
+state, recovery, and paper execution routing.
+
+**Result:** Created rollback tag `pre-multi-asset-paper-20260521T095342Z` at
+commit `1e08686` and pushed branch `deploy/multi-asset-paper-v1`. A quiesced
+production DB backup was created at
+`/home/btc-bot/backups/manual/pre_multi_asset_paper_quiesced_20260521T101101Z/btc_bot.db`
+with `PRAGMA integrity_check=ok` and `trade_log_count=795`.
+
+**Consequences:**
+- BTC PAPER was briefly stopped for a consistent DB snapshot and restarted with
+  PID `890590`; it remained healthy, PAPER mode, safe mode off, and with zero
+  open positions.
+- This checkpoint does not approve ETH/SOL PAPER orders yet.
+- The next safe implementation milestone is a runtime foundation/parity
+  milestone on the deploy branch, followed by Claude Code audit before any
+  production pull that can place ETH/SOL paper orders.
+
+**Related:** `docs/DISASTER_RECOVERY.md`;
+`docs/blueprints/MULTI_ASSET_PORTFOLIO_ARCHITECTURE_V1_2026-05-19.md`.
+
 ## 2026-05-21 - Prepare SOL shadow depth update from audited optimization and portfolio diagnostic
 **Decision:** Prepare `SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1` as a small
 sidecar-only checkpoint for Claude Code audit.
