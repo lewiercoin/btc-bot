@@ -4,6 +4,39 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Add multi-asset shadow evidence checkpoint before PAPER approval
+**Decision:** Implement `MULTI_ASSET_SHADOW_EVIDENCE_CHECKPOINT_V1` as the next
+read-only checkpoint before any future `MULTI_ASSET_PAPER_APPROVAL_V1`.
+
+**Reason:** Technical readiness milestones are deployed, but ETH/SOL PAPER
+activation still needs forward evidence. The checkpoint must summarize shadow
+cycle coverage, per-symbol signal/near-miss/blocker behavior, portfolio shadow
+decisions, resource guard status, production DB isolation, and production
+position safety.
+
+**Implementation boundaries:**
+- Read only from `research_lab/shadow/multi_asset_shadow.db`, production
+  `storage/btc_bot.db`, and optional `journalctl`.
+- Do not change shadow runtime, BTC PAPER runtime, settings, risk, execution,
+  M4 criteria, or production DB schema.
+- Treat BTC/ETH/SOL rows independently and require complete cycles to include
+  all three symbols.
+- Surface `production_db_touched=true` journal events as a failure for the
+  selected evidence window.
+
+**Initial production smoke:** Last 2h window passed: 7 complete cycles, zero
+production DB touch events, no ETH/SOL positions, no multi-asset state tables,
+resource guard pass. Last 24h window failed because journal contained two
+`production_db_touched=true` sidecar outputs; this needs operator awareness
+before approval and may reflect concurrent BTC runtime DB writes during sidecar
+mtime checks.
+
+**Consequences:**
+- The next approval decision should use this checkpoint over a selected evidence
+  window, not ad hoc SQL snippets.
+- Any non-zero `production_db_touched=true` count requires investigation or an
+  explicit operator waiver before ETH/SOL PAPER approval.
+
 ## 2026-05-21 - Extend M4 near-miss reporting to per-symbol queries
 **Decision:** Implement `M4_MULTI_ASSET_QUERY_EXTENSION_V1` as a reporting and
 query compatibility milestone before any ETH/SOL PAPER activation. The default
