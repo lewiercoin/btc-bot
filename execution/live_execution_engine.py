@@ -28,12 +28,14 @@ class LiveExecutionEngine(ExecutionEngine):
         entry_order_type: str = "LIMIT",
         entry_timeout_seconds: int = 90,
         poll_interval_seconds: float = 1.0,
+        allowed_symbols: tuple[str, ...] | None = None,
     ) -> None:
         self.position_persister = position_persister
         self.rest_client = rest_client
         self.order_manager = order_manager
         self.audit_logger = audit_logger
         self.symbol = symbol.upper()
+        self.allowed_symbols = tuple(s.upper() for s in (allowed_symbols or (self.symbol,)))
         self.entry_order_type = entry_order_type.upper()
         self.entry_timeout_seconds = max(int(entry_timeout_seconds), 1)
         self.poll_interval_seconds = max(float(poll_interval_seconds), 0.0)
@@ -47,6 +49,9 @@ class LiveExecutionEngine(ExecutionEngine):
         snapshot_price: float | None = None,
     ) -> None:
         _ = snapshot_price
+        if self.symbol not in self.allowed_symbols:
+            allowed = ",".join(self.allowed_symbols)
+            raise LiveExecutionError(f"live_execution_symbol_not_allowed:symbol={self.symbol}:allowed={allowed}")
         try:
             self._set_leverage(leverage)
             entry_side = "BUY" if signal.direction == "LONG" else "SELL"

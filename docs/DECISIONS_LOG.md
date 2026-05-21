@@ -4,6 +4,35 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Implement dormant multi-asset PAPER runtime foundation
+**Decision:** Implement `MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1` as dormant
+runtime contracts after the contract review and internal model consultation.
+
+**Reason:** Continuing directly to full BTC/ETH/SOL PAPER would be too large a
+runtime jump. The safer step is to move shared deterministic portfolio
+contracts into runtime-safe `core/`, add symbol-aware settings resolution, and
+add execution allowlists while preserving the existing BTC-only orchestrator
+path and keeping ETH/SOL disabled.
+
+**Result:** `core/portfolio_gate.py` now owns the portfolio gate contract,
+`research_lab/models/portfolio_state.py` re-exports it for research
+compatibility, `settings.py` has dormant `MultiAssetConfig` and
+`resolve_symbol_config()`, and paper/live execution engines reject symbols
+outside their allowlists before order/position writes.
+
+**Consequences:**
+- Default runtime remains BTC-only: `multi_asset.enabled=false` and
+  `enabled_symbols=("BTCUSDT",)`.
+- ETH/SOL market data, decisions, orders, and recovery are not activated.
+- No `symbol_state` table or production DB migration is added in this
+  milestone.
+- Full multi-asset PAPER still requires a separate audited activation
+  milestone after code-only deployment verification.
+
+**Related:** `core/portfolio_gate.py`; `settings.py`;
+`execution/paper_execution_engine.py`; `execution/live_execution_engine.py`;
+`docs/MULTI_ASSET_PAPER_RUNTIME_CONTRACT_REVIEW_V1.md`.
+
 ## 2026-05-21 - Prepare separate deploy branch and DB rollback point for multi-asset PAPER
 **Decision:** Continue toward BTC/ETH/SOL PAPER before the passive Day 3 shadow
 checkpoint, but isolate the work on `deploy/multi-asset-paper-v1` and preserve

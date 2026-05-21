@@ -114,6 +114,24 @@ class StrategyConfig:
 
 
 @dataclass(frozen=True)
+class SymbolStrategyOverride:
+    symbol: str
+    min_sweep_depth_pct: float | None = None
+
+
+@dataclass(frozen=True)
+class MultiAssetConfig:
+    enabled: bool = False
+    enabled_symbols: tuple[str, ...] = ("BTCUSDT",)
+    symbol_overrides: tuple[SymbolStrategyOverride, ...] = ()
+    max_total_risk_pct_open: float = 0.0070
+    max_gross_notional_pct: float = 1.0
+    max_directional_notional_pct: float = 0.75
+    max_open_positions_total: int = 2
+    max_open_positions_per_symbol: int = 1
+
+
+@dataclass(frozen=True)
 class RiskConfig:
     risk_per_trade_pct: float = 0.007
     max_leverage: int = 8
@@ -283,6 +301,7 @@ class AppSettings:
     schema_version: str
     mode: BotMode
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
+    multi_asset: MultiAssetConfig = field(default_factory=MultiAssetConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     data_quality: DataQualityConfig = field(default_factory=DataQualityConfig)
@@ -298,6 +317,7 @@ class AppSettings:
             "schema_version": self.schema_version,
             "mode": self.mode.value,
             "strategy": asdict(self.strategy),
+            "multi_asset": asdict(self.multi_asset),
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
             "data_quality": asdict(self.data_quality),
@@ -384,6 +404,59 @@ def _serialize_settings(settings: AppSettings) -> dict[str, Any]:
     return payload
 
 
+def validate_multi_asset_config(config: MultiAssetConfig) -> MultiAssetConfig:
+    symbols = tuple(symbol.upper() for symbol in config.enabled_symbols)
+    if not symbols:
+        raise ValueError("multi_asset.enabled_symbols must contain at least one symbol.")
+    if len(set(symbols)) != len(symbols):
+        raise ValueError("multi_asset.enabled_symbols contains duplicate symbols.")
+    if not config.enabled and len(symbols) > 1:
+        raise ValueError("multi_asset.enabled must be true when more than one symbol is enabled.")
+    if config.enabled and "BTCUSDT" not in symbols:
+        raise ValueError("multi_asset.enabled requires BTCUSDT in enabled_symbols.")
+
+    overrides: list[SymbolStrategyOverride] = []
+    seen_overrides: set[str] = set()
+    for override in config.symbol_overrides:
+        symbol = override.symbol.upper()
+        if symbol in seen_overrides:
+            raise ValueError(f"Duplicate multi_asset.symbol_overrides entry for {symbol}.")
+        if symbol not in symbols:
+            raise ValueError(f"Override symbol {symbol} is not listed in multi_asset.enabled_symbols.")
+        seen_overrides.add(symbol)
+        overrides.append(dataclasses.replace(override, symbol=symbol))
+
+    normalized = dataclasses.replace(config, enabled_symbols=symbols, symbol_overrides=tuple(overrides))
+    if normalized.max_total_risk_pct_open <= 0:
+        raise ValueError("multi_asset.max_total_risk_pct_open must be positive.")
+    if normalized.max_gross_notional_pct <= 0:
+        raise ValueError("multi_asset.max_gross_notional_pct must be positive.")
+    if normalized.max_directional_notional_pct <= 0:
+        raise ValueError("multi_asset.max_directional_notional_pct must be positive.")
+    if normalized.max_open_positions_total < 1:
+        raise ValueError("multi_asset.max_open_positions_total must be at least 1.")
+    if normalized.max_open_positions_per_symbol < 1:
+        raise ValueError("multi_asset.max_open_positions_per_symbol must be at least 1.")
+    return normalized
+
+
+def resolve_symbol_config(
+    baseline: StrategyConfig,
+    symbol: str,
+    multi_asset: MultiAssetConfig,
+) -> StrategyConfig:
+    normalized_symbol = symbol.upper()
+    validated = validate_multi_asset_config(multi_asset)
+    override = next((item for item in validated.symbol_overrides if item.symbol == normalized_symbol), None)
+    if override is None:
+        return dataclasses.replace(baseline, symbol=normalized_symbol)
+
+    values: dict[str, Any] = {"symbol": normalized_symbol}
+    if override.min_sweep_depth_pct is not None:
+        values["min_sweep_depth_pct"] = override.min_sweep_depth_pct
+    return dataclasses.replace(baseline, **values)
+
+
 def _load_runtime_overlay(root: Path) -> dict[str, Any]:
     raw_path = os.getenv("BOT_SETTINGS_PATH")
     overlay_path = Path(raw_path) if raw_path else root / "settings.json"
@@ -446,6 +519,7 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         mode=mode,
         storage=storage,
     )
+    settings = dataclasses.replace(settings, multi_asset=validate_multi_asset_config(settings.multi_asset))
     research_strategy = dataclasses.replace(
         settings.strategy,
         allow_uptrend_pullback=_env_flag("ALLOW_UPTREND_PULLBACK", settings.strategy.allow_uptrend_pullback),
