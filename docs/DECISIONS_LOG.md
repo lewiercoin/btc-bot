@@ -4,6 +4,38 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Implement dormant multi-asset PAPER orchestrator loop
+**Decision:** Build `MULTI_ASSET_PAPER_ORCHESTRATOR_LOOP_V1` on
+`deploy/multi-asset-paper-v1` after the dormant foundation contracts were
+audited and deployed. The implementation remains gated behind
+`multi_asset.enabled=true`; production stays disabled by default.
+
+**Reason:** Phase 2 proved that dormant config, symbol resolution, portfolio
+gate, and execution allowlists can be deployed without changing BTC PAPER
+behavior. The next required step toward full BTC/ETH/SOL PAPER is a
+symbol-explicit runtime loop and recoverable per-symbol/portfolio state, but
+ETH/SOL activation still requires a separate approval milestone.
+
+**Implementation boundaries:**
+- Keep the existing BTC single-symbol decision path as the default path.
+- Add a separate multi-symbol PAPER loop only when `multi_asset.enabled=true`
+  and multiple enabled symbols are configured.
+- Create `symbol_state` and `portfolio_state` only via explicit multi-asset
+  schema initialization; normal disabled startup must not create these tables.
+- Derive open positions and recent trade state from persisted runtime tables,
+  then overlay persisted pause/emergency state.
+- Use REST-only snapshot assembly for non-BTC symbols in the first multi-symbol
+  loop to avoid reusing BTC websocket buffers.
+- Keep live multi-symbol execution inactive; paper execution may route an
+  allowed symbol per call for test/runtime foundation use.
+
+**Consequences:**
+- Production remains BTC-only until a future approval milestone changes
+  settings and monitoring.
+- Claude Code audit is required before any deployment of the dormant loop code.
+- ETH/SOL PAPER activation remains blocked by explicit approval, not by this
+  implementation milestone.
+
 ## 2026-05-21 - Implement dormant multi-asset PAPER runtime foundation
 **Decision:** Implement `MULTI_ASSET_PAPER_RUNTIME_FOUNDATION_V1` as dormant
 runtime contracts after the contract review and internal model consultation.

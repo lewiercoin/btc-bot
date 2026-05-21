@@ -13,6 +13,7 @@ from core.context_engine import ContextEngine
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
 from core.models import Features, GovernanceRuntimeState, MarketContext, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
+from core.portfolio_gate import PortfolioRiskConfig, PortfolioRiskState, PortfolioSignal, RuntimePortfolioGate, SymbolRiskState
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
@@ -41,7 +42,7 @@ from monitoring.metrics import (
     MetricsRegistry,
 )
 from monitoring.telegram_notifier import TelegramConfig, TelegramNotifier
-from settings import AppSettings, BotMode, build_signal_regime_direction_whitelist
+from settings import AppSettings, BotMode, StrategyConfig, build_signal_regime_direction_whitelist, resolve_symbol_config
 from storage.position_persister import SqlitePositionPersister
 from storage.repositories import (
     fetch_funding_rates,
@@ -55,6 +56,35 @@ from storage.state_store import StateStore
 from core.funding import compute_funding_paid
 
 LOG = logging.getLogger(__name__)
+
+
+def _signal_config_from_strategy(strategy: StrategyConfig) -> SignalConfig:
+    return SignalConfig(
+        confluence_min=strategy.confluence_min,
+        min_sweep_depth_pct=strategy.min_sweep_depth_pct,
+        ema_trend_gap_pct=strategy.ema_trend_gap_pct,
+        entry_offset_atr=strategy.entry_offset_atr,
+        invalidation_offset_atr=strategy.invalidation_offset_atr,
+        min_stop_distance_pct=strategy.min_stop_distance_pct,
+        tp1_atr_mult=strategy.tp1_atr_mult,
+        tp2_atr_mult=strategy.tp2_atr_mult,
+        weight_sweep_detected=strategy.weight_sweep_detected,
+        weight_reclaim_confirmed=strategy.weight_reclaim_confirmed,
+        weight_cvd_divergence=strategy.weight_cvd_divergence,
+        weight_tfi_impulse=strategy.weight_tfi_impulse,
+        weight_force_order_spike=strategy.weight_force_order_spike,
+        weight_regime_special=strategy.weight_regime_special,
+        weight_ema_trend_alignment=strategy.weight_ema_trend_alignment,
+        weight_funding_supportive=strategy.weight_funding_supportive,
+        direction_tfi_threshold=strategy.direction_tfi_threshold,
+        direction_tfi_threshold_inverse=strategy.direction_tfi_threshold_inverse,
+        tfi_impulse_threshold=strategy.tfi_impulse_threshold,
+        allow_uptrend_pullback=strategy.allow_uptrend_pullback,
+        uptrend_pullback_tfi_threshold=strategy.uptrend_pullback_tfi_threshold,
+        uptrend_pullback_min_sweep_depth_pct=strategy.uptrend_pullback_min_sweep_depth_pct,
+        uptrend_pullback_confluence_min=strategy.uptrend_pullback_confluence_min,
+        regime_direction_whitelist=build_signal_regime_direction_whitelist(strategy),
+    )
 
 
 @dataclass(slots=True)
@@ -76,7 +106,6 @@ def build_default_bundle(
     governance_state_provider: Callable[[], GovernanceRuntimeState],
     risk_state_provider: Callable[[], RiskRuntimeState],
 ) -> EngineBundle:
-    signal_whitelist = build_signal_regime_direction_whitelist(settings.strategy)
     audit_logger = AuditLogger(connection=conn)
     
     # Initialize proxy transport if enabled
@@ -188,34 +217,7 @@ def build_default_bundle(
             )
         ),
         context_engine=ContextEngine(config=settings.context),
-        signal_engine=SignalEngine(
-            SignalConfig(
-                confluence_min=settings.strategy.confluence_min,
-                min_sweep_depth_pct=settings.strategy.min_sweep_depth_pct,
-                ema_trend_gap_pct=settings.strategy.ema_trend_gap_pct,
-                entry_offset_atr=settings.strategy.entry_offset_atr,
-                invalidation_offset_atr=settings.strategy.invalidation_offset_atr,
-                min_stop_distance_pct=settings.strategy.min_stop_distance_pct,
-                tp1_atr_mult=settings.strategy.tp1_atr_mult,
-                tp2_atr_mult=settings.strategy.tp2_atr_mult,
-                weight_sweep_detected=settings.strategy.weight_sweep_detected,
-                weight_reclaim_confirmed=settings.strategy.weight_reclaim_confirmed,
-                weight_cvd_divergence=settings.strategy.weight_cvd_divergence,
-                weight_tfi_impulse=settings.strategy.weight_tfi_impulse,
-                weight_force_order_spike=settings.strategy.weight_force_order_spike,
-                weight_regime_special=settings.strategy.weight_regime_special,
-                weight_ema_trend_alignment=settings.strategy.weight_ema_trend_alignment,
-                weight_funding_supportive=settings.strategy.weight_funding_supportive,
-                direction_tfi_threshold=settings.strategy.direction_tfi_threshold,
-                direction_tfi_threshold_inverse=settings.strategy.direction_tfi_threshold_inverse,
-                tfi_impulse_threshold=settings.strategy.tfi_impulse_threshold,
-                allow_uptrend_pullback=settings.strategy.allow_uptrend_pullback,
-                uptrend_pullback_tfi_threshold=settings.strategy.uptrend_pullback_tfi_threshold,
-                uptrend_pullback_min_sweep_depth_pct=settings.strategy.uptrend_pullback_min_sweep_depth_pct,
-                uptrend_pullback_confluence_min=settings.strategy.uptrend_pullback_confluence_min,
-                regime_direction_whitelist=signal_whitelist,
-            )
-        ),
+        signal_engine=SignalEngine(_signal_config_from_strategy(settings.strategy)),
         governance=GovernanceLayer(
             GovernanceConfig(
                 cooldown_minutes_after_loss=settings.risk.cooldown_minutes_after_loss,
@@ -372,6 +374,9 @@ class BotOrchestrator:
     def run_decision_cycle(self, now: datetime | None = None) -> None:
         cycle_started = time.perf_counter()
         timestamp = (now or self._now()).astimezone(timezone.utc)
+        if self._multi_asset_paper_enabled():
+            self._run_multi_asset_paper_decision_cycle(timestamp=timestamp, cycle_started=cycle_started)
+            return
         cycle_outcome = "unknown"
         snapshot_id: str | None = None
         feature_snapshot_id: str | None = None
@@ -627,6 +632,301 @@ class BotOrchestrator:
                 cycle_outcome,
                 duration_ms,
             )
+
+    def _multi_asset_paper_enabled(self) -> bool:
+        return (
+            self.settings.mode == BotMode.PAPER
+            and self.settings.multi_asset.enabled
+            and len(self.settings.multi_asset.enabled_symbols) > 1
+        )
+
+    def _run_multi_asset_paper_decision_cycle(self, *, timestamp: datetime, cycle_started: float) -> None:
+        cycle_outcome = "unknown"
+        snapshots: dict[str, MarketSnapshot] = {}
+        generated: list[dict[str, object]] = []
+        self.state_store.ensure_multi_asset_schema()
+        self._update_runtime_metrics(
+            last_decision_cycle_started_at=timestamp,
+            decision_cycle_status="running",
+        )
+        LOG.info(
+            "Multi-asset PAPER decision cycle started | timestamp=%s | symbols=%s",
+            timestamp.isoformat(),
+            ",".join(self.settings.multi_asset.enabled_symbols),
+        )
+        try:
+            self.state_store.refresh_runtime_state(timestamp)
+            state = self.state_store.load()
+            if state and state.safe_mode:
+                cycle_outcome = "safe_mode_skip"
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group=cycle_outcome,
+                    outcome_reason=cycle_outcome,
+                    details={"multi_asset": True, "symbols": list(self.settings.multi_asset.enabled_symbols)},
+                )
+                return
+
+            for symbol in self.settings.multi_asset.enabled_symbols:
+                try:
+                    snapshot = self._build_symbol_snapshot(symbol, timestamp)
+                    snapshots[symbol] = snapshot
+                    snapshot_id = self.state_store.record_market_snapshot(snapshot)
+                    closed_events = self._process_trade_lifecycle(snapshot, symbol=symbol)
+                    if closed_events:
+                        self.metrics.inc(TRADES_CLOSED, len(closed_events))
+                        self._notify_closed_trades(closed_events)
+
+                    strategy = resolve_symbol_config(self.settings.strategy, symbol, self.settings.multi_asset)
+                    feature_engine = FeatureEngine(getattr(self.bundle.feature_engine, "config", None))
+                    features = feature_engine.compute(
+                        snapshot=snapshot,
+                        schema_version=self.settings.schema_version,
+                        config_hash=self.settings.config_hash,
+                    )
+                    feature_snapshot_id = self.state_store.record_feature_snapshot(
+                        snapshot_id=snapshot_id,
+                        features=features,
+                    )
+                    regime = self.bundle.regime_engine.classify(features)
+                    context = self.bundle.context_engine.classify(features)
+                    signal_engine = SignalEngine(_signal_config_from_strategy(strategy))
+                    diagnostics = signal_engine.diagnose(features, regime, context)
+                    candidate = signal_engine.generate(features, regime, diagnostics=diagnostics, context=context)
+                    if candidate is None:
+                        self._record_decision_outcome(
+                            timestamp=timestamp,
+                            outcome_group="no_signal",
+                            outcome_reason=diagnostics.blocked_by or "no_signal",
+                            regime=regime.value,
+                            snapshot_id=snapshot_id,
+                            feature_snapshot_id=feature_snapshot_id,
+                            details={"symbol": symbol, **self._signal_diagnostics_payload(diagnostics, features)},
+                            context=context,
+                        )
+                        continue
+
+                    save_signal_candidate(self.conn, candidate, self.settings.schema_version, self.settings.config_hash)
+                    self.conn.commit()
+                    self.metrics.inc(SIGNALS_GENERATED)
+
+                    symbol_states = self.state_store.get_symbol_states(self.settings.multi_asset.enabled_symbols, now=timestamp)
+                    symbol_state = symbol_states.get(symbol, SymbolRiskState(symbol=symbol))
+                    governance = GovernanceLayer(
+                        self.bundle.governance.config,
+                        state_provider=lambda state=symbol_state: GovernanceRuntimeState(
+                            trades_today=state.trades_today,
+                            consecutive_losses=state.consecutive_losses,
+                            daily_dd_pct=0.0,
+                            weekly_dd_pct=0.0,
+                            last_trade_at=state.last_trade_at,
+                            last_loss_at=state.last_loss_at,
+                        ),
+                    )
+                    governance_decision = governance.evaluate(candidate)
+                    if not governance_decision.approved:
+                        self._record_decision_outcome(
+                            timestamp=timestamp,
+                            outcome_group="governance_veto",
+                            outcome_reason="governance_veto",
+                            regime=candidate.regime.value,
+                            signal_id=candidate.signal_id,
+                            snapshot_id=snapshot_id,
+                            feature_snapshot_id=feature_snapshot_id,
+                            details={"symbol": symbol, "notes": governance_decision.notes},
+                            context=context,
+                        )
+                        self.metrics.inc(GOVERNANCE_VETOES)
+                        continue
+
+                    executable = governance.to_executable(candidate, governance_decision)
+                    save_executable_signal(self.conn, executable)
+                    self.conn.commit()
+                    risk = RiskEngine(
+                        self.bundle.risk_engine.config,
+                        state_provider=lambda state=symbol_state: RiskRuntimeState(
+                            consecutive_losses=state.consecutive_losses,
+                            daily_dd_pct=0.0,
+                            weekly_dd_pct=0.0,
+                        ),
+                    )
+                    risk_decision = risk.evaluate(
+                        signal=executable,
+                        equity=self.REFERENCE_EQUITY,
+                        open_positions=symbol_state.open_positions_count,
+                    )
+                    if not risk_decision.allowed:
+                        self._record_decision_outcome(
+                            timestamp=timestamp,
+                            outcome_group="risk_block",
+                            outcome_reason="risk_block",
+                            regime=candidate.regime.value,
+                            signal_id=candidate.signal_id,
+                            snapshot_id=snapshot_id,
+                            feature_snapshot_id=feature_snapshot_id,
+                            details={"symbol": symbol, "reason": risk_decision.reason},
+                            context=context,
+                        )
+                        self.metrics.inc(RISK_BLOCKS)
+                        continue
+
+                    generated.append(
+                        {
+                            "symbol": symbol,
+                            "snapshot": snapshot,
+                            "candidate": candidate,
+                            "executable": executable,
+                            "risk_decision": risk_decision,
+                            "context": context,
+                            "snapshot_id": snapshot_id,
+                            "feature_snapshot_id": feature_snapshot_id,
+                            "portfolio_signal": self._portfolio_signal_from_execution(
+                                symbol=symbol,
+                                executable=executable,
+                                size=risk_decision.size,
+                                timestamp=timestamp,
+                            ),
+                        }
+                    )
+                except Exception as exc:
+                    cycle_outcome = "symbol_cycle_failed"
+                    self._record_decision_outcome(
+                        timestamp=timestamp,
+                        outcome_group=cycle_outcome,
+                        outcome_reason=cycle_outcome,
+                        details={"symbol": symbol, "error": str(exc)},
+                    )
+                    self.bundle.audit_logger.log_error("multi_asset", f"Symbol cycle failed for {symbol}: {exc}")
+                    self.metrics.inc(ERRORS_TOTAL)
+
+            if not generated:
+                cycle_outcome = "no_signal"
+                self.state_store.mark_healthy()
+                return
+
+            recovered = self.state_store.recover_multi_asset_portfolio_state(
+                self.settings.multi_asset.enabled_symbols,
+                now=timestamp,
+            )
+            gate = RuntimePortfolioGate(
+                PortfolioRiskConfig(
+                    max_total_risk_pct_open=self.settings.multi_asset.max_total_risk_pct_open,
+                    max_open_positions_total=self.settings.multi_asset.max_open_positions_total,
+                    max_open_positions_per_symbol=self.settings.multi_asset.max_open_positions_per_symbol,
+                    max_gross_notional_pct=self.settings.multi_asset.max_gross_notional_pct,
+                    max_directional_notional_pct=self.settings.multi_asset.max_directional_notional_pct,
+                    symbol_order=self.settings.multi_asset.enabled_symbols,
+                )
+            )
+            decisions = gate.evaluate_batch(
+                [item["portfolio_signal"] for item in generated if isinstance(item["portfolio_signal"], PortfolioSignal)],
+                symbol_states=recovered.symbols,
+                portfolio_state=recovered.portfolio,
+                now=timestamp,
+            )
+            by_signal_id = {decision.signal.signal_id: decision for decision in decisions}
+            opened = 0
+            for item in generated:
+                executable = item["executable"]
+                if not hasattr(executable, "signal_id"):
+                    continue
+                decision = by_signal_id.get(executable.signal_id)
+                symbol = str(item["symbol"])
+                if decision is None or not decision.approved:
+                    self._record_decision_outcome(
+                        timestamp=timestamp,
+                        outcome_group="portfolio_veto",
+                        outcome_reason=decision.veto_reason if decision else "portfolio_veto",
+                        regime=item["candidate"].regime.value,
+                        signal_id=executable.signal_id,
+                        snapshot_id=str(item["snapshot_id"]),
+                        feature_snapshot_id=str(item["feature_snapshot_id"]),
+                        details={"symbol": symbol, "portfolio_veto_reason": decision.veto_reason if decision else None},
+                        context=item["context"],
+                    )
+                    continue
+
+                snapshot = item["snapshot"]
+                risk_decision = item["risk_decision"]
+                self.bundle.execution_engine.execute_signal(
+                    executable,
+                    size=risk_decision.size,
+                    leverage=risk_decision.leverage,
+                    snapshot_price=float(snapshot.price),
+                    bid_price=snapshot.bid,
+                    ask_price=snapshot.ask,
+                    snapshot_id=snapshot.snapshot_id,
+                    symbol=symbol,
+                )
+                filled_entry_price = self.state_store.record_trade_open(
+                    candidate=item["candidate"],
+                    executable=executable,
+                    schema_version=self.settings.schema_version,
+                    config_hash=self.settings.config_hash,
+                )
+                opened += 1
+                self.metrics.inc(TRADES_OPENED)
+                self._record_decision_outcome(
+                    timestamp=timestamp,
+                    outcome_group="signal_generated",
+                    outcome_reason="signal_generated",
+                    regime=item["candidate"].regime.value,
+                    signal_id=executable.signal_id,
+                    snapshot_id=str(item["snapshot_id"]),
+                    feature_snapshot_id=str(item["feature_snapshot_id"]),
+                    details={"symbol": symbol, "entry_price": filled_entry_price},
+                    context=item["context"],
+                )
+
+            cycle_outcome = "signal_generated" if opened else "portfolio_veto"
+            self.state_store.mark_healthy()
+        finally:
+            duration_ms = (time.perf_counter() - cycle_started) * 1000.0
+            self.metrics.set_gauge(CYCLE_DURATION_MS, duration_ms)
+            self._update_runtime_metrics(
+                last_decision_cycle_finished_at=timestamp,
+                last_decision_outcome=cycle_outcome,
+                decision_cycle_status="idle",
+                last_snapshot_symbol=",".join(snapshots.keys()) if snapshots else None,
+                last_ws_message_at=self._last_ws_message_at(),
+            )
+            LOG.info(
+                "Multi-asset PAPER decision cycle finished | timestamp=%s | outcome=%s | duration_ms=%.1f",
+                timestamp.isoformat(),
+                cycle_outcome,
+                duration_ms,
+            )
+
+    def _build_symbol_snapshot(self, symbol: str, timestamp: datetime) -> MarketSnapshot:
+        if symbol.upper() == self.settings.strategy.symbol.upper():
+            return self.bundle.market_data.build_snapshot(symbol=symbol, timestamp=timestamp)
+        provider = MarketDataAssembler(
+            rest_client=self.bundle.market_data.rest_client,
+            websocket_client=None,
+            config=self.bundle.market_data.config,
+            db_connection=self.conn,
+        )
+        return provider.build_snapshot(symbol=symbol, timestamp=timestamp)
+
+    def _portfolio_signal_from_execution(
+        self,
+        *,
+        symbol: str,
+        executable,
+        size: float,
+        timestamp: datetime,
+    ) -> PortfolioSignal:
+        risk_abs = abs(float(executable.entry_price) - float(executable.stop_loss)) * float(size)
+        notional = abs(float(executable.entry_price) * float(size))
+        return PortfolioSignal(
+            symbol=symbol,
+            timestamp=timestamp,
+            direction=executable.direction,
+            signal_id=executable.signal_id,
+            risk_pct=risk_abs / self.REFERENCE_EQUITY,
+            gross_notional_pct=notional / self.REFERENCE_EQUITY,
+            confluence_score=0.0,
+        )
 
     def send_daily_summary(self, day: date | None = None) -> None:
         summary_day = day or self._now().date()
@@ -981,8 +1281,11 @@ class BotOrchestrator:
         
         return payload
 
-    def _process_trade_lifecycle(self, snapshot: MarketSnapshot) -> list[dict]:
+    def _process_trade_lifecycle(self, snapshot: MarketSnapshot, *, symbol: str | None = None) -> list[dict]:
         open_records = self.state_store.get_open_trade_records()
+        if symbol is not None:
+            normalized_symbol = symbol.upper()
+            open_records = [record for record in open_records if record.position.symbol.upper() == normalized_symbol]
         if not open_records:
             return []
 

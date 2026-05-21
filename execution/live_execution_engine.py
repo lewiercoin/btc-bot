@@ -47,11 +47,15 @@ class LiveExecutionEngine(ExecutionEngine):
         leverage: int,
         *,
         snapshot_price: float | None = None,
+        symbol: str | None = None,
     ) -> None:
         _ = snapshot_price
-        if self.symbol not in self.allowed_symbols:
+        target_symbol = (symbol or self.symbol).upper()
+        if target_symbol != self.symbol:
+            raise LiveExecutionError(f"live_execution_symbol_mismatch:engine={self.symbol}:requested={target_symbol}")
+        if target_symbol not in self.allowed_symbols:
             allowed = ",".join(self.allowed_symbols)
-            raise LiveExecutionError(f"live_execution_symbol_not_allowed:symbol={self.symbol}:allowed={allowed}")
+            raise LiveExecutionError(f"live_execution_symbol_not_allowed:symbol={target_symbol}:allowed={allowed}")
         try:
             self._set_leverage(leverage)
             entry_side = "BUY" if signal.direction == "LONG" else "SELL"
