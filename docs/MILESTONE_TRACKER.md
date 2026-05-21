@@ -40,9 +40,46 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Runtime: MULTI_ASSET_PAPER_APPROVAL_PREP_V1
+
+**Status:** READY_FOR_AUDIT - runtime overlay activation prep implemented
+**Builder:** Codex
+**Decision date:** 2026-05-21
+**Branch:** `deploy/multi-asset-paper-v1`
+**Depends on:** deployed dormant multi-asset runtime, M4 extension, capacity
+guardrails, shadow evidence checkpoint, and shadow production-touch guard fix
+
+**Scope:** Prepare the final BTC/ETH/SOL PAPER activation surface without
+activating ETH/SOL. This milestone adds validated `multi_asset` support to the
+runtime settings overlay and documents the activation runbook. It does not edit
+production `settings.json`, restart production services, change strategy
+defaults, change execution behavior, or place ETH/SOL orders.
+
+**Implementation:**
+- `settings.py` now accepts a `multi_asset` section in the runtime overlay for
+  `live` and `experiment` profiles.
+- `enabled_symbols` JSON arrays are normalized to uppercase tuples.
+- `symbol_overrides` JSON entries are coerced to `SymbolStrategyOverride`
+  instances and reject unknown keys before validation.
+- `validate_multi_asset_config()` remains the authority for multi-asset safety
+  gates: BTC required when enabled, no duplicates, no overrides outside enabled
+  symbols, and positive portfolio caps.
+- Added `docs/operations/MULTI_ASSET_PAPER_ACTIVATION_RUNBOOK.md` for
+  pre-checks, overlay shape, rollback anchors, and post-activation checks.
+
+**Validation:**
+- `pytest tests/test_settings.py tests/test_settings_profile.py -q -o addopts=` -> 24 passed.
+- `pytest tests/test_settings.py tests/test_settings_profile.py tests/test_multi_asset_orchestrator_dispatch.py tests/test_execution_symbol_gates.py tests/test_core_portfolio_gate.py tests/test_multi_asset_state_store.py -q -o addopts=` -> 35 passed.
+- `pytest -q -o addopts=` -> 608 passed, 24 skipped.
+- `python -m compileall settings.py tests/test_settings_profile.py` -> PASS.
+
+**Next:** Claude Code audit. If accepted and deployed code-only, activation can
+be performed later as an explicit production `settings.json` change plus
+service restart and checkpoint verification.
+
 ### Fix: SHADOW_PRODUCTION_TOUCH_GUARD_FIX_V1
 
-**Status:** READY_FOR_AUDIT - production touch false-positive guard fixed
+**Status:** DONE - audited, deployed, and fresh checkpoint verified
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`

@@ -483,6 +483,42 @@ def _section_overrides(payload: dict[str, Any], section: str, cfg_type: type[Any
     return dict(raw)
 
 
+def _coerce_symbol_strategy_override(raw: Any) -> SymbolStrategyOverride:
+    if not isinstance(raw, dict):
+        raise ValueError("multi_asset.symbol_overrides entries must be JSON objects.")
+
+    allowed = {field.name for field in dataclasses.fields(SymbolStrategyOverride)}
+    unknown = sorted(set(raw) - allowed)
+    if unknown:
+        names = ", ".join(unknown)
+        raise ValueError(f"Unknown multi_asset.symbol_overrides runtime setting(s): {names}")
+    if "symbol" not in raw:
+        raise ValueError("multi_asset.symbol_overrides entries require symbol.")
+    return SymbolStrategyOverride(**raw)
+
+
+def _multi_asset_overrides(payload: dict[str, Any]) -> dict[str, Any]:
+    overrides = _section_overrides(payload, "multi_asset", MultiAssetConfig)
+    if not overrides:
+        return {}
+
+    if "enabled_symbols" in overrides:
+        raw_symbols = overrides["enabled_symbols"]
+        if not isinstance(raw_symbols, list | tuple):
+            raise ValueError("multi_asset.enabled_symbols must be a JSON array.")
+        overrides["enabled_symbols"] = tuple(str(symbol).upper() for symbol in raw_symbols)
+
+    if "symbol_overrides" in overrides:
+        raw_overrides = overrides["symbol_overrides"]
+        if not isinstance(raw_overrides, list | tuple):
+            raise ValueError("multi_asset.symbol_overrides must be a JSON array.")
+        overrides["symbol_overrides"] = tuple(
+            _coerce_symbol_strategy_override(item) for item in raw_overrides
+        )
+
+    return overrides
+
+
 def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -> AppSettings:
     if profile not in {"live", "experiment"}:
         return settings
@@ -499,9 +535,13 @@ def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -
 
     strategy_overrides = _section_overrides(payload, "strategy", StrategyConfig)
     risk_overrides = _section_overrides(payload, "risk", RiskConfig)
+    multi_asset_overrides = _multi_asset_overrides(payload)
     strategy = dataclasses.replace(settings.strategy, **strategy_overrides)
     risk = dataclasses.replace(settings.risk, **risk_overrides)
-    return dataclasses.replace(settings, strategy=strategy, risk=risk)
+    multi_asset = validate_multi_asset_config(
+        dataclasses.replace(settings.multi_asset, **multi_asset_overrides)
+    )
+    return dataclasses.replace(settings, strategy=strategy, risk=risk, multi_asset=multi_asset)
 
 
 def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:

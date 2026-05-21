@@ -4,6 +4,32 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-21 - Prepare config-only multi-asset PAPER activation
+**Decision:** Continue toward full BTC/ETH/SOL PAPER without fixed day-count
+evidence targets, but keep the work split into small audited stages. The next
+stage is `MULTI_ASSET_PAPER_APPROVAL_PREP_V1`: add a runtime overlay path for
+`multi_asset` so activation can be performed explicitly through production
+configuration instead of hard-coded defaults.
+
+**Reason:** Dormant runtime contracts, orchestrator loop, M4 reporting,
+capacity guardrails, shadow checkpointing, and the shadow touch guard fix are
+already deployed and verified. The remaining activation gap is operational:
+production `settings.json` currently supports `strategy` and `risk` overlays
+only, so ETH/SOL PAPER cannot be enabled by a controlled config delta.
+
+**Boundaries:**
+- Do not enable ETH/SOL PAPER in code defaults.
+- Do not change production `settings.json` during this prep milestone.
+- Do not restart production services during this prep milestone.
+- Keep BTC as the required enabled symbol when `multi_asset.enabled=true`.
+- Validate `enabled_symbols` and `symbol_overrides` before runtime use.
+
+**Consequences:**
+- Future activation can be a small, inspectable production config change plus
+  restart and post-checks.
+- Invalid multi-asset overlays fail at settings load, before any order path.
+- Activation still requires an explicit operator step after audit.
+
 ## 2026-05-21 - Fix shadow production touch guard false positives
 **Decision:** Implement `SHADOW_PRODUCTION_TOUCH_GUARD_FIX_V1` before any
 `MULTI_ASSET_PAPER_APPROVAL_V1` work. The existing sidecar guard treated any
