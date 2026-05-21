@@ -24,8 +24,10 @@ three thresholds.
 **Consequences:**
 - No PAPER, LIVE, execution, runtime, M4, systemd, or production DB change is
   approved.
-- Server sidecar behavior changes only after Claude Code audit PASS and a later
-  operator pull.
+- Server sidecar behavior changed after Claude Code audit PASS and operator
+  pull on 2026-05-21 09:44 UTC. The first verified sidecar smoke used BTC
+  `0.00649`, ETH `0.0075`, and SOL `0.0075`, with
+  `production_db_touched=false` and BTC PAPER PID `815407` unchanged.
 - Full multi-asset PAPER still requires a separate runtime contract and
   implementation milestone.
 

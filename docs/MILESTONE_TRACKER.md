@@ -42,11 +42,13 @@ truth; this checkpoint only clarifies their combined state.
 
 ### Implementation: SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1
 
-**Status:** READY_FOR_AUDIT - `SOL_SHADOW_DEPTH_UPDATE_READY_FOR_AUDIT`
+**Status:** DEPLOYED - SOL shadow depth active on production (2026-05-21 09:44 UTC)
 **Builder:** Codex
 **Decision date:** 2026-05-21
+**Deployment date:** 2026-05-21 09:44 UTC (Option A: immediate pull)
 **Branch:** `research/sweep-family-expansion-v1`
 **Hypothesis spec:** `research_lab/hypotheses/active/sol_shadow_depth_parameter_update.json`
+**Audit:** `docs/audits/AUDIT_SOL_SHADOW_DEPTH_PARAMETER_UPDATE_V1_2026-05-21.md` (DONE)
 **Source audits:**
 - `docs/audits/AUDIT_SOL_ASSET_SPECIFIC_OPTIMIZATION_V1_2026-05-20.md` (DONE)
 - `docs/audits/AUDIT_DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1_2026-05-21.md` (DONE)
@@ -76,8 +78,20 @@ the audited SOL asset-specific candidate `0.0075`.
   ETH/SOL use `0.0075`.
 - Real shadow cycle tests still verify production DB is untouched.
 
-**Next:** Claude Code audit. This does not approve SOL PAPER, LIVE, runtime, or
-server deployment.
+**Deployment (2026-05-21 09:44 UTC):**
+- Server pull: `cc147051` -> `0c6028c1`.
+- Deployment method: `git pull --ff-only github research/sweep-family-expansion-v1`.
+- Manual post-pull sidecar smoke: `systemctl start multi-asset-shadow.service`
+  returned `ExecMainStatus=0`.
+- First verified cycle with SOL 0.0075:
+  `shadow-real_shadow_cycle-6ca91d1bfbd6` at `2026-05-21T09:44:15Z`.
+- Verification: `production_db_touched=false`, `decision_rows=3`.
+- Thresholds: BTC 0.00649, ETH 0.0075, SOL 0.0075.
+- BTC PAPER: PID 815407, active, no restart.
+- Timer: active, next cycle 09:59 UTC.
+
+**Next:** Continue forward shadow evidence collection with asset-specific ETH
+and SOL depths. This does not approve SOL PAPER, LIVE, or runtime.
 
 ### Research: DEPTH_THRESHOLD_PORTFOLIO_IMPACT_DIAGNOSTIC_V1
 
