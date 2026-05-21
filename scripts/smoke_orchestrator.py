@@ -13,7 +13,18 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from core.models import ExecutableSignal, MarketSnapshot, RegimeState, SettlementMetrics, SignalCandidate, SignalDiagnostics
+from core.models import (
+    ExecutableSignal,
+    Features,
+    MarketContext,
+    MarketSnapshot,
+    RegimeState,
+    SessionBucket,
+    SettlementMetrics,
+    SignalCandidate,
+    SignalDiagnostics,
+    VolatilityBucket,
+)
 from core.risk_engine import ExitDecision, RiskDecision
 from execution.execution_engine import ExecutionEngine
 from monitoring.audit_logger import AuditLogger
@@ -119,9 +130,21 @@ class FakeMarketData:
 
 class FakeFeatureEngine:
     def compute(self, snapshot, schema_version: str, config_hash: str):  # type: ignore[no-untyped-def]
-        _ = schema_version
-        _ = config_hash
-        return {"timestamp": snapshot.timestamp}
+        return Features(
+            schema_version=schema_version,
+            config_hash=config_hash,
+            timestamp=snapshot.timestamp,
+            atr_15m=50.0,
+            atr_4h=200.0,
+            atr_4h_norm=0.02,
+            ema50_4h=101.0,
+            ema200_4h=99.0,
+            sweep_detected=True,
+            reclaim_detected=True,
+            sweep_level=100.0,
+            sweep_depth_pct=0.01,
+            sweep_side="LOW",
+        )
 
 
 class FakeRegimeEngine:
@@ -130,16 +153,30 @@ class FakeRegimeEngine:
         return RegimeState.NORMAL
 
 
+class FakeContextEngine:
+    def classify(self, features):  # type: ignore[no-untyped-def]
+        _ = features
+        return MarketContext(
+            session_bucket=SessionBucket.US,
+            volatility_bucket=VolatilityBucket.NORMAL,
+            context_eligible=True,
+            context_block_reason=None,
+            context_policy_version="smoke",
+            neutral_mode_active=False,
+        )
+
+
 class FakeSignalEngine:
     def __init__(self, *, emit_signals: bool = True) -> None:
         self.emit_signals = emit_signals
         self.diagnose_calls = 0
         self.generate_calls = 0
 
-    def diagnose(self, features, regime):  # type: ignore[no-untyped-def]
+    def diagnose(self, features, regime, context=None):  # type: ignore[no-untyped-def]
+        _ = context
         self.diagnose_calls += 1
         return SignalDiagnostics(
-            timestamp=features["timestamp"],
+            timestamp=features.timestamp,
             config_hash="smoke",
             regime=regime,
             blocked_by=None if self.emit_signals else "smoke_blocked",
@@ -154,13 +191,14 @@ class FakeSignalEngine:
             candidate_reasons_preview=["smoke"] if self.emit_signals else [],
         )
 
-    def generate(self, features, regime, diagnostics=None):  # type: ignore[no-untyped-def]
+    def generate(self, features, regime, diagnostics=None, context=None):  # type: ignore[no-untyped-def]
+        _ = context
         self.generate_calls += 1
         if diagnostics is not None and diagnostics.blocked_by is not None:
             return None
         if not self.emit_signals:
             return None
-        ts = features["timestamp"]
+        ts = features.timestamp
         return SignalCandidate(
             signal_id=f"sig-{uuid4().hex[:12]}",
             timestamp=ts,
@@ -262,7 +300,15 @@ class FakeExecutionEngine(ExecutionEngine):
         leverage: int,
         *,
         snapshot_price: float | None = None,
+        bid_price: float | None = None,
+        ask_price: float | None = None,
+        snapshot_id: str | None = None,
+        symbol: str | None = None,
     ) -> None:
+        _ = bid_price
+        _ = ask_price
+        _ = snapshot_id
+        _ = symbol
         self.execute_calls += 1
         if self.should_fail:
             raise RuntimeError("forced_execution_failure")
@@ -552,6 +598,7 @@ def make_bundle(conn: sqlite3.Connection, clock: FakeClock, *, emit_signals: boo
         market_data=market_data,  # type: ignore[arg-type]
         feature_engine=FakeFeatureEngine(),  # type: ignore[arg-type]
         regime_engine=FakeRegimeEngine(),  # type: ignore[arg-type]
+        context_engine=FakeContextEngine(),  # type: ignore[arg-type]
         signal_engine=signal_engine,  # type: ignore[arg-type]
         governance=FakeGovernance(),  # type: ignore[arg-type]
         risk_engine=FakeRiskEngine(),  # type: ignore[arg-type]

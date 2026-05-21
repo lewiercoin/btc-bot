@@ -52,5 +52,6 @@ class ExecutionEngine(ABC):
         leverage: int,
         *,
         snapshot_price: float | None = None,
+        symbol: str | None = None,
     ) -> None:
         raise NotImplementedError

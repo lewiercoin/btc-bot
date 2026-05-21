@@ -7,6 +7,14 @@ from datetime import date, datetime, timedelta, timezone
 from uuid import uuid4
 
 from core.models import BotState, ExecutableSignal, FeatureSnapshot, Features, GovernanceRuntimeState, MarketSnapshot, Position, RiskRuntimeState, SettlementMetrics, SignalCandidate
+from core.portfolio_gate import (
+    PortfolioOpenPosition,
+    PortfolioRiskState,
+    PortfolioTradeEvent,
+    RecoveredPortfolioState,
+    SymbolRiskState,
+    recover_portfolio_state,
+)
 from storage.repositories import (
     close_position,
     fetch_decision_outcome_counts,
@@ -395,6 +403,184 @@ class StateStore:
                 )
             )
         return positions
+
+    def ensure_multi_asset_schema(self) -> None:
+        """Create multi-asset state tables only when the explicit multi-asset path asks for them."""
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS symbol_state (
+                symbol TEXT PRIMARY KEY,
+                updated_at TEXT NOT NULL,
+                symbol_paused_until TEXT,
+                pause_reason TEXT
+            )
+            """
+        )
+        self.connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS portfolio_state (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                updated_at TEXT NOT NULL,
+                portfolio_paused_until TEXT,
+                emergency_stop_active INTEGER NOT NULL DEFAULT 0,
+                last_portfolio_loss_at TEXT
+            )
+            """
+        )
+        self.connection.commit()
+
+    def upsert_symbol_state(self, symbol: str, state: SymbolRiskState, *, updated_at: datetime | None = None) -> None:
+        self.ensure_multi_asset_schema()
+        ts = (updated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        self.connection.execute(
+            """
+            INSERT INTO symbol_state (
+                symbol, updated_at, symbol_paused_until, pause_reason
+            ) VALUES (?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                updated_at = excluded.updated_at,
+                symbol_paused_until = excluded.symbol_paused_until,
+                pause_reason = excluded.pause_reason
+            """,
+            (
+                symbol.upper(),
+                ts.isoformat(),
+                _to_utc(state.symbol_paused_until).isoformat() if state.symbol_paused_until else None,
+                state.pause_reason,
+            ),
+        )
+        self.connection.commit()
+
+    def upsert_portfolio_state(self, state: PortfolioRiskState, *, updated_at: datetime | None = None) -> None:
+        self.ensure_multi_asset_schema()
+        ts = (updated_at or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        self.connection.execute(
+            """
+            INSERT INTO portfolio_state (
+                id, updated_at, portfolio_paused_until, emergency_stop_active, last_portfolio_loss_at
+            ) VALUES (1, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+                updated_at = excluded.updated_at,
+                portfolio_paused_until = excluded.portfolio_paused_until,
+                emergency_stop_active = excluded.emergency_stop_active,
+                last_portfolio_loss_at = excluded.last_portfolio_loss_at
+            """,
+            (
+                ts.isoformat(),
+                _to_utc(state.portfolio_paused_until).isoformat() if state.portfolio_paused_until else None,
+                1 if state.emergency_stop_active else 0,
+                _to_utc(state.last_portfolio_loss_at).isoformat() if state.last_portfolio_loss_at else None,
+            ),
+        )
+        self.connection.commit()
+
+    def recover_multi_asset_portfolio_state(
+        self,
+        symbols: tuple[str, ...],
+        *,
+        now: datetime | None = None,
+        lookback_days: int = 7,
+    ) -> RecoveredPortfolioState:
+        ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        normalized_symbols = tuple(symbol.upper() for symbol in symbols)
+        open_positions = [
+            PortfolioOpenPosition(
+                symbol=position.symbol,
+                direction=position.direction,
+                risk_pct=_position_risk_pct(position, self.reference_equity),
+                gross_notional_pct=_position_gross_notional_pct(position, self.reference_equity),
+                opened_at=position.opened_at,
+            )
+            for position in self.get_open_positions_snapshot()
+            if position.symbol.upper() in normalized_symbols
+        ]
+        recent_trades = self._fetch_portfolio_trade_events(
+            symbols=normalized_symbols,
+            since=ts - timedelta(days=max(int(lookback_days), 1)),
+        )
+        recovered = recover_portfolio_state(
+            symbols=normalized_symbols,
+            open_positions=open_positions,
+            recent_trades=recent_trades,
+            now=ts,
+        )
+        return self._overlay_persisted_multi_asset_state(recovered)
+
+    def get_symbol_states(self, symbols: tuple[str, ...], *, now: datetime | None = None) -> dict[str, SymbolRiskState]:
+        return self.recover_multi_asset_portfolio_state(symbols, now=now).symbols
+
+    def get_portfolio_state(self, symbols: tuple[str, ...], *, now: datetime | None = None) -> PortfolioRiskState:
+        return self.recover_multi_asset_portfolio_state(symbols, now=now).portfolio
+
+    def _fetch_portfolio_trade_events(self, *, symbols: tuple[str, ...], since: datetime) -> list[PortfolioTradeEvent]:
+        if not symbols:
+            return []
+        placeholders = ", ".join("?" for _ in symbols)
+        rows = self.connection.execute(
+            f"""
+            SELECT p.symbol, t.pnl_r, t.closed_at
+            FROM trade_log t
+            JOIN positions p ON p.position_id = t.position_id
+            WHERE t.closed_at IS NOT NULL
+              AND t.closed_at >= ?
+              AND p.symbol IN ({placeholders})
+            ORDER BY t.closed_at ASC
+            """,
+            (since.isoformat(), *symbols),
+        ).fetchall()
+        return [
+            PortfolioTradeEvent(
+                symbol=row["symbol"],
+                pnl_r=float(row["pnl_r"]),
+                closed_at=_parse_datetime(row["closed_at"]),
+            )
+            for row in rows
+        ]
+
+    def _overlay_persisted_multi_asset_state(self, recovered: RecoveredPortfolioState) -> RecoveredPortfolioState:
+        symbol_rows = self._fetch_symbol_state_rows()
+        symbols = {
+            symbol: replace(
+                state,
+                symbol_paused_until=_parse_datetime(row["symbol_paused_until"]) if row and row["symbol_paused_until"] else None,
+                pause_reason=row["pause_reason"] if row else None,
+            )
+            for symbol, state in recovered.symbols.items()
+            for row in [symbol_rows.get(symbol)]
+        }
+        portfolio_row = self._fetch_portfolio_state_row()
+        portfolio = recovered.portfolio
+        if portfolio_row is not None:
+            portfolio = replace(
+                portfolio,
+                portfolio_paused_until=_parse_datetime(portfolio_row["portfolio_paused_until"])
+                if portfolio_row["portfolio_paused_until"]
+                else None,
+                emergency_stop_active=bool(portfolio_row["emergency_stop_active"]),
+                last_portfolio_loss_at=_parse_datetime(portfolio_row["last_portfolio_loss_at"])
+                if portfolio_row["last_portfolio_loss_at"]
+                else portfolio.last_portfolio_loss_at,
+            )
+        return RecoveredPortfolioState(portfolio=portfolio, symbols=symbols)
+
+    def _fetch_symbol_state_rows(self) -> dict[str, dict]:
+        if not self._table_exists("symbol_state"):
+            return {}
+        rows = self.connection.execute("SELECT * FROM symbol_state").fetchall()
+        return {row["symbol"].upper(): dict(row) for row in rows}
+
+    def _fetch_portfolio_state_row(self) -> dict | None:
+        if not self._table_exists("portfolio_state"):
+            return None
+        row = self.connection.execute("SELECT * FROM portfolio_state WHERE id = 1").fetchone()
+        return dict(row) if row else None
+
+    def _table_exists(self, name: str) -> bool:
+        row = self.connection.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+            (name,),
+        ).fetchone()
+        return row is not None
 
     def set_safe_mode(self, enabled: bool, reason: str | None = None, now: datetime | None = None) -> BotState:
         ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
@@ -836,3 +1022,19 @@ def _to_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _parse_datetime(value: object) -> datetime:
+    if isinstance(value, datetime):
+        return _to_utc(value)
+    return _to_utc(datetime.fromisoformat(str(value)))
+
+
+def _position_risk_pct(position: Position, reference_equity: float) -> float:
+    risk_abs = abs(float(position.entry_price) - float(position.stop_loss)) * float(position.size)
+    return risk_abs / max(float(reference_equity), 1e-8)
+
+
+def _position_gross_notional_pct(position: Position, reference_equity: float) -> float:
+    notional = abs(float(position.entry_price) * float(position.size))
+    return notional / max(float(reference_equity), 1e-8)

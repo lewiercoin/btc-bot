@@ -64,3 +64,24 @@ def test_paper_execution_rejects_symbol_before_persister_writes() -> None:
     assert persister.positions == 0
     assert persister.executions == 0
     assert persister.commits == 0
+
+
+def test_paper_execution_can_route_allowed_symbol_per_call() -> None:
+    captured: dict[str, str] = {}
+
+    class CapturingPersister(RecordingPersister):
+        def insert_position(self, **kwargs) -> None:  # type: ignore[no-untyped-def]
+            super().insert_position(**kwargs)
+            captured["symbol"] = kwargs["symbol"]
+
+    persister = CapturingPersister()
+    engine = PaperExecutionEngine(
+        position_persister=persister,
+        symbol="BTCUSDT",
+        allowed_symbols=("BTCUSDT", "ETHUSDT"),
+    )
+
+    engine.execute_signal(_signal(), size=1.0, leverage=3, snapshot_price=100.0, symbol="ETHUSDT")
+
+    assert captured["symbol"] == "ETHUSDT"
+    assert persister.positions == 1

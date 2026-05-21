@@ -30,10 +30,12 @@ class PaperExecutionEngine(ExecutionEngine):
         bid_price: float | None = None,
         ask_price: float | None = None,
         snapshot_id: str | None = None,
+        symbol: str | None = None,
     ) -> None:
-        if self.symbol not in self.allowed_symbols:
+        target_symbol = (symbol or self.symbol).upper()
+        if target_symbol not in self.allowed_symbols:
             allowed = ",".join(self.allowed_symbols)
-            raise ValueError(f"paper_execution_symbol_not_allowed:symbol={self.symbol}:allowed={allowed}")
+            raise ValueError(f"paper_execution_symbol_not_allowed:symbol={target_symbol}:allowed={allowed}")
         if snapshot_price is None:
             raise ValueError("PaperExecutionEngine requires snapshot_price for fill simulation.")
 
@@ -67,7 +69,7 @@ class PaperExecutionEngine(ExecutionEngine):
         self.position_persister.insert_position(
             position_id=position_id,
             signal_id=signal.signal_id,
-            symbol=self.symbol,
+            symbol=target_symbol,
             direction=signal.direction,
             status="OPEN",
             entry_price=filled_price,
