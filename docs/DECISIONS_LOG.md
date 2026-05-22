@@ -4,6 +4,28 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Add cap-aware PAPER sizing for shared BTC/ETH/SOL capital
+**Decision:** Implement `PAPER_CAP_AWARE_POSITION_SIZING_V1` before relying on
+multi-asset PAPER as an investor-style shared-capital simulation.
+
+**Reason:** The 2026 YTD BTC/ETH/SOL replay showed valid single-symbol
+candidates, but the active portfolio gross cap (`max_gross_notional_pct=1.0`)
+would veto every candidate because initial risk sizing can use leverage-derived
+notional above available portfolio capacity. For a realistic shared account,
+the bot should reduce PAPER size to available capacity when possible, and only
+then let the portfolio gate approve or veto.
+
+**Boundaries:**
+- Portfolio gate remains the hard authority.
+- Runtime only scales size downward; it never increases risk or notional.
+- No production settings, thresholds, schema, or live execution defaults change.
+- If no capacity remains, the original signal is left for normal portfolio-gate
+  veto handling.
+
+**Consequence:** Multi-asset PAPER can use smaller positions instead of
+wasting otherwise valid signals solely due to gross/directional/risk capacity
+fit, while preserving portfolio caps and auditability.
+
 ## 2026-05-22 - Prepare Telegram alerts activation through runtime settings
 **Decision:** Implement `TELEGRAM_ALERTS_RUNTIME_ACTIVATION_V1` before enabling
 Telegram notifications for BTC/ETH/SOL PAPER.

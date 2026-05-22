@@ -40,6 +40,40 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Runtime Fix: PAPER_CAP_AWARE_POSITION_SIZING_V1
+
+**Status:** READY_FOR_AUDIT - cap-aware PAPER sizing implemented
+**Builder:** Codex
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** investor-style BTC/ETH/SOL PAPER simulation reliability
+
+**Scope:** Prevent valid multi-asset PAPER signals from being wasted solely
+because initial risk sizing reaches leverage-derived notional before portfolio
+gross/directional/risk capacity is considered. The portfolio gate remains the
+hard authority; this milestone only reduces candidate size before gate
+evaluation when a smaller position can fit available portfolio capacity.
+
+**Implementation:**
+- Added deterministic portfolio-capacity sizing helpers in `orchestrator.py`.
+- Multi-asset PAPER now linearly scales `risk_decision.size`,
+  `PortfolioSignal.risk_pct`, and `PortfolioSignal.gross_notional_pct` before
+  portfolio-gate evaluation when gross, directional, or total-risk capacity is
+  the limiting factor.
+- If no capacity remains, the original signal is left for the portfolio gate to
+  veto normally.
+- Added regression tests for gross-cap resizing, contract symbol ordering, and
+  zero-capacity behavior.
+
+**Validation:**
+- `python -m compileall orchestrator.py core/portfolio_gate.py`
+- `pytest tests/test_portfolio_capacity_sizing.py tests/test_core_portfolio_gate.py tests/test_multi_asset_orchestrator_dispatch.py -q -o addopts=` -> 10 passed.
+- Focused runtime/config suite -> 50 passed.
+- Full suite -> 626 passed, 24 skipped.
+
+**Next:** Commit and push for Claude Code audit. Deploy only after audit
+closure; production settings do not need to change for this code path.
+
 ### Monitoring: TELEGRAM_ALERTS_RUNTIME_ACTIVATION_V1
 
 **Status:** READY_FOR_AUDIT - runtime alerts overlay implemented
