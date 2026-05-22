@@ -327,6 +327,7 @@ class BotOrchestrator:
         LOG.info("Bot started in %s mode", self.settings.mode.value)
         self.state_store.ensure_initialized()
         startup_ts = self._now()
+        self._sync_simulation_reference_equity(startup_ts)
         self.state_store.persist_config_snapshot(
             config_hash=self.settings.config_hash,
             strategy_snapshot=asdict(self.settings.strategy),
@@ -532,7 +533,7 @@ class BotOrchestrator:
 
             risk_decision = self.bundle.risk_engine.evaluate(
                 signal=executable,
-                equity=self.REFERENCE_EQUITY,
+                equity=self._risk_equity(timestamp),
                 open_positions=self.state_store.get_open_positions(),
             )
             if not risk_decision.allowed:
@@ -640,11 +641,30 @@ class BotOrchestrator:
             and len(self.settings.multi_asset.enabled_symbols) > 1
         )
 
+    def _paper_simulation_enabled(self) -> bool:
+        return self.settings.mode == BotMode.PAPER and self.settings.paper_simulation.enabled
+
+    def _risk_equity(self, now: datetime | None = None) -> float:
+        if not self._paper_simulation_enabled():
+            return self.REFERENCE_EQUITY
+        account = self.state_store.ensure_paper_simulation_account(
+            starting_balance_usd=self.settings.paper_simulation.starting_balance_usd,
+            enabled=True,
+            now=now,
+        )
+        return max(account.current_balance_usd, 1e-8)
+
+    def _sync_simulation_reference_equity(self, now: datetime | None = None) -> float:
+        equity = self._risk_equity(now)
+        self.state_store.reference_equity = max(equity, 1e-8)
+        return equity
+
     def _run_multi_asset_paper_decision_cycle(self, *, timestamp: datetime, cycle_started: float) -> None:
         cycle_outcome = "unknown"
         snapshots: dict[str, MarketSnapshot] = {}
         generated: list[dict[str, object]] = []
         self.state_store.ensure_multi_asset_schema()
+        self._sync_simulation_reference_equity(timestamp)
         self._update_runtime_metrics(
             last_decision_cycle_started_at=timestamp,
             decision_cycle_status="running",
@@ -759,7 +779,7 @@ class BotOrchestrator:
                     )
                     risk_decision = risk.evaluate(
                         signal=executable,
-                        equity=self.REFERENCE_EQUITY,
+                        equity=self._risk_equity(timestamp),
                         open_positions=symbol_state.open_positions_count,
                     )
                     if not risk_decision.allowed:
@@ -792,6 +812,7 @@ class BotOrchestrator:
                                 executable=executable,
                                 size=risk_decision.size,
                                 timestamp=timestamp,
+                                reference_equity=self._risk_equity(timestamp),
                             ),
                         }
                     )
@@ -811,6 +832,7 @@ class BotOrchestrator:
                 self.state_store.mark_healthy()
                 return
 
+            self._sync_simulation_reference_equity(timestamp)
             recovered = self.state_store.recover_multi_asset_portfolio_state(
                 self.settings.multi_asset.enabled_symbols,
                 now=timestamp,
@@ -922,7 +944,9 @@ class BotOrchestrator:
         executable,
         size: float,
         timestamp: datetime,
+        reference_equity: float | None = None,
     ) -> PortfolioSignal:
+        equity = max(float(reference_equity or self.REFERENCE_EQUITY), 1e-8)
         risk_abs = abs(float(executable.entry_price) - float(executable.stop_loss)) * float(size)
         notional = abs(float(executable.entry_price) * float(size))
         return PortfolioSignal(
@@ -930,8 +954,8 @@ class BotOrchestrator:
             timestamp=timestamp,
             direction=executable.direction,
             signal_id=executable.signal_id,
-            risk_pct=risk_abs / self.REFERENCE_EQUITY,
-            gross_notional_pct=notional / self.REFERENCE_EQUITY,
+            risk_pct=risk_abs / equity,
+            gross_notional_pct=notional / equity,
             confluence_score=0.0,
         )
 
@@ -1356,6 +1380,13 @@ class BotOrchestrator:
                 settlement=settlement,
                 closed_at=snapshot.timestamp,
             )
+            if self._paper_simulation_enabled():
+                self.state_store.apply_paper_simulation_pnl(
+                    pnl_abs=settlement.pnl_abs,
+                    compound_pnl=self.settings.paper_simulation.compound_pnl,
+                    now=snapshot.timestamp,
+                )
+                self._sync_simulation_reference_equity(snapshot.timestamp)
             closed_events.append(
                 {
                     "position_id": record.position.position_id,

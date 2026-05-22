@@ -40,9 +40,37 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Runtime Foundation: PAPER_SIMULATION_ACCOUNT_FOUNDATION_V1
+
+**Status:** READY_FOR_AUDIT - paper simulation account foundation implemented
+**Builder:** Codex
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** configurable investor-style BTC/ETH/SOL PAPER sizing
+
+**Scope:** Add a disabled-by-default PAPER simulation account so position
+sizing can use an explicit account balance, for example 1000 USD, instead of
+the fixed runtime reference equity. Closed trade PnL can compound into the
+simulation balance. This milestone does not add dashboard controls and does not
+change production settings by default.
+
+**Implementation:**
+- Added `paper_simulation` runtime overlay config with validation and config
+  hash inclusion.
+- Added persistent `paper_simulation_account` storage for starting balance,
+  current balance, realized PnL, and update time.
+- Wired PAPER risk sizing and portfolio-risk percentages to use the simulation
+  account balance only when `paper_simulation.enabled=true`.
+- Applied closed-trade PnL to the simulation account when compounding is
+  enabled.
+
+**Validation:** Pending local test run.
+
+**Next:** Run focused and full validation, commit, push for Claude Code audit.
+
 ### Runtime Fix: MULTI_ASSET_POSITION_MONITOR_SYMBOL_ROUTING_FIX_V1
 
-**Status:** READY_FOR_AUDIT - multi-asset monitor lifecycle routing fixed
+**Status:** DONE - audited and deployed code-only
 **Builder:** Codex
 **Decision date:** 2026-05-22
 **Branch:** `deploy/multi-asset-paper-v1`

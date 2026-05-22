@@ -192,6 +192,15 @@ CREATE TABLE IF NOT EXISTS runtime_metrics (
     config_hash TEXT
 );
 
+CREATE TABLE IF NOT EXISTS paper_simulation_account (
+    id INTEGER PRIMARY KEY CHECK(id = 1),
+    enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
+    starting_balance_usd REAL NOT NULL,
+    current_balance_usd REAL NOT NULL,
+    realized_pnl_usd REAL NOT NULL DEFAULT 0,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS decision_outcomes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     cycle_timestamp TEXT NOT NULL,
