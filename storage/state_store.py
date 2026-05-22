@@ -519,11 +519,13 @@ class StateStore:
             symbols=normalized_symbols,
             since=ts - timedelta(days=max(int(lookback_days), 1)),
         )
+        persisted_dd = self.load_all_symbol_dd_states()
         recovered = recover_portfolio_state(
             symbols=normalized_symbols,
             open_positions=open_positions,
             recent_trades=recent_trades,
             now=ts,
+            persisted_symbol_dd=persisted_dd if persisted_dd else None,
         )
         return self._overlay_persisted_multi_asset_state(recovered)
 
@@ -1118,6 +1120,153 @@ class StateStore:
                 max_drawdown = drawdown
 
         return min(max(max_drawdown, 0.0), 1.0)
+
+    # --- Per-symbol drawdown state methods ---
+
+    def load_symbol_dd_state(self, symbol: str) -> dict[str, object] | None:
+        """Load persisted drawdown state for a single symbol."""
+        cursor = self.connection.execute(
+            "SELECT * FROM symbol_drawdown_state WHERE symbol = ?",
+            (symbol.upper(),),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        if isinstance(row, sqlite3.Row):
+            return dict(row)
+        cols = [d[0] for d in cursor.description]
+        return dict(zip(cols, row))
+
+    def load_all_symbol_dd_states(self) -> dict[str, dict[str, object]]:
+        """Load persisted drawdown states for all symbols."""
+        cursor = self.connection.execute(
+            "SELECT * FROM symbol_drawdown_state"
+        )
+        result: dict[str, dict[str, object]] = {}
+        for row in cursor.fetchall():
+            if isinstance(row, sqlite3.Row):
+                d = dict(row)
+            else:
+                cols = [desc[0] for desc in cursor.description]
+                d = dict(zip(cols, row))
+            result[d["symbol"]] = d
+        return result
+
+    def upsert_symbol_dd_state(self, state: dict[str, object]) -> None:
+        """Insert or update drawdown state for a symbol."""
+        self.connection.execute(
+            """INSERT INTO symbol_drawdown_state
+                (symbol, cumulative_r, local_high_watermark_r, rolling_drawdown_r,
+                 daily_pnl_r, weekly_pnl_r, daily_start_date, weekly_start_date,
+                 trades_today, consecutive_losses, last_trade_at, last_loss_at, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(symbol) DO UPDATE SET
+                cumulative_r = excluded.cumulative_r,
+                local_high_watermark_r = excluded.local_high_watermark_r,
+                rolling_drawdown_r = excluded.rolling_drawdown_r,
+                daily_pnl_r = excluded.daily_pnl_r,
+                weekly_pnl_r = excluded.weekly_pnl_r,
+                daily_start_date = excluded.daily_start_date,
+                weekly_start_date = excluded.weekly_start_date,
+                trades_today = excluded.trades_today,
+                consecutive_losses = excluded.consecutive_losses,
+                last_trade_at = excluded.last_trade_at,
+                last_loss_at = excluded.last_loss_at,
+                updated_at = excluded.updated_at
+            """,
+            (
+                state["symbol"],
+                state["cumulative_r"],
+                state["local_high_watermark_r"],
+                state["rolling_drawdown_r"],
+                state["daily_pnl_r"],
+                state["weekly_pnl_r"],
+                state["daily_start_date"],
+                state["weekly_start_date"],
+                state["trades_today"],
+                state["consecutive_losses"],
+                state["last_trade_at"],
+                state["last_loss_at"],
+                state["updated_at"],
+            ),
+        )
+        self.connection.commit()
+
+    def update_symbol_dd_after_trade(
+        self, *, symbol: str, pnl_r: float, closed_at: datetime
+    ) -> dict[str, object]:
+        """Update per-symbol drawdown state after a trade closes.
+
+        Handles:
+        - Daily/weekly PnL reset on new period
+        - Cumulative R tracking
+        - True high-watermark update
+        - rolling_drawdown_r = cumulative_r - local_high_watermark_r
+        - Consecutive losses tracking
+        """
+        now = _to_utc(closed_at)
+        today_str = now.date().isoformat()
+        weekday = now.weekday()  # Monday=0
+        week_start_str = (now.date() - timedelta(days=weekday)).isoformat()
+
+        existing = self.load_symbol_dd_state(symbol)
+        if existing is None:
+            existing = {
+                "symbol": symbol.upper(),
+                "cumulative_r": 0.0,
+                "local_high_watermark_r": 0.0,
+                "rolling_drawdown_r": 0.0,
+                "daily_pnl_r": 0.0,
+                "weekly_pnl_r": 0.0,
+                "daily_start_date": today_str,
+                "weekly_start_date": week_start_str,
+                "trades_today": 0,
+                "consecutive_losses": 0,
+                "last_trade_at": None,
+                "last_loss_at": None,
+                "updated_at": now.isoformat(),
+            }
+
+        # Daily reset check
+        if existing["daily_start_date"] != today_str:
+            existing["daily_pnl_r"] = 0.0
+            existing["daily_start_date"] = today_str
+            existing["trades_today"] = 0
+
+        # Weekly reset check
+        if existing["weekly_start_date"] != week_start_str:
+            existing["weekly_pnl_r"] = 0.0
+            existing["weekly_start_date"] = week_start_str
+
+        # Update cumulative R and period PnL
+        existing["cumulative_r"] = float(existing["cumulative_r"]) + pnl_r
+        existing["daily_pnl_r"] = float(existing["daily_pnl_r"]) + pnl_r
+        existing["weekly_pnl_r"] = float(existing["weekly_pnl_r"]) + pnl_r
+        existing["trades_today"] = int(existing["trades_today"]) + 1
+
+        # High-watermark update
+        hwm = float(existing["local_high_watermark_r"])
+        cum = float(existing["cumulative_r"])
+        if cum > hwm:
+            existing["local_high_watermark_r"] = cum
+            hwm = cum
+
+        # Rolling drawdown from high-watermark (always <= 0)
+        existing["rolling_drawdown_r"] = cum - hwm
+
+        # Consecutive losses
+        if pnl_r < 0:
+            existing["consecutive_losses"] = int(existing["consecutive_losses"]) + 1
+            existing["last_loss_at"] = now.isoformat()
+        else:
+            existing["consecutive_losses"] = 0
+
+        existing["last_trade_at"] = now.isoformat()
+        existing["updated_at"] = now.isoformat()
+
+        self.upsert_symbol_dd_state(existing)
+        return existing
+
 
 
 def _to_utc(value: datetime) -> datetime:
