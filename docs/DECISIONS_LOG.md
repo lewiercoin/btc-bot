@@ -4,6 +4,27 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Prepare Telegram alerts activation through runtime settings
+**Decision:** Implement `TELEGRAM_ALERTS_RUNTIME_ACTIVATION_V1` before enabling
+Telegram notifications for BTC/ETH/SOL PAPER.
+
+**Reason:** Telegram support already exists in the notifier and orchestrator,
+but runtime overlays did not expose the `alerts` section. Activation should be
+a controlled production config/env change, not a code default or committed
+secret. The old SMC signal bot can be retired operationally after this bot can
+send its own verified alert.
+
+**Boundaries:**
+- Do not store Telegram bot tokens or chat IDs in the repository.
+- Keep Telegram disabled by default.
+- Token and chat ID remain environment variables.
+- Add only a one-shot test alert script; do not add Telegram commands or an
+  interactive control surface.
+
+**Consequence:** After audit and code-only deploy, Telegram can be activated by
+setting environment variables, enabling `alerts.telegram_enabled=true` in
+`settings.json`, restarting the service, and sending one test alert.
+
 ## 2026-05-22 - Add persistent PAPER simulation account before dashboard controls
 **Decision:** Implement `PAPER_SIMULATION_ACCOUNT_FOUNDATION_V1` as the next
 small step toward investor-style BTC/ETH/SOL PAPER simulation.

@@ -547,6 +547,30 @@ def _paper_simulation_overrides(payload: dict[str, Any]) -> dict[str, Any]:
     return overrides
 
 
+def validate_alert_config(config: AlertConfig) -> AlertConfig:
+    if not isinstance(config.telegram_enabled, bool):
+        raise ValueError("alerts.telegram_enabled must be a boolean.")
+    if not config.telegram_bot_token_env.strip():
+        raise ValueError("alerts.telegram_bot_token_env must be non-empty.")
+    if not config.telegram_chat_id_env.strip():
+        raise ValueError("alerts.telegram_chat_id_env must be non-empty.")
+    return config
+
+
+def _alerts_overrides(payload: dict[str, Any]) -> dict[str, Any]:
+    overrides = _section_overrides(payload, "alerts", AlertConfig)
+    if not overrides:
+        return {}
+    if "telegram_enabled" in overrides and not isinstance(overrides["telegram_enabled"], bool):
+        raise ValueError("alerts.telegram_enabled must be a boolean.")
+    for key in ("telegram_bot_token_env", "telegram_chat_id_env"):
+        if key in overrides:
+            value = overrides[key]
+            if not isinstance(value, str) or not value.strip():
+                raise ValueError(f"alerts.{key} must be a non-empty string.")
+    return overrides
+
+
 def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -> AppSettings:
     if profile not in {"live", "experiment"}:
         return settings
@@ -565,6 +589,7 @@ def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -
     risk_overrides = _section_overrides(payload, "risk", RiskConfig)
     multi_asset_overrides = _multi_asset_overrides(payload)
     paper_simulation_overrides = _paper_simulation_overrides(payload)
+    alerts_overrides = _alerts_overrides(payload)
     strategy = dataclasses.replace(settings.strategy, **strategy_overrides)
     risk = dataclasses.replace(settings.risk, **risk_overrides)
     multi_asset = validate_multi_asset_config(
@@ -573,12 +598,14 @@ def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -
     paper_simulation = validate_paper_simulation_config(
         dataclasses.replace(settings.paper_simulation, **paper_simulation_overrides)
     )
+    alerts = validate_alert_config(dataclasses.replace(settings.alerts, **alerts_overrides))
     return dataclasses.replace(
         settings,
         strategy=strategy,
         risk=risk,
         multi_asset=multi_asset,
         paper_simulation=paper_simulation,
+        alerts=alerts,
     )
 
 
@@ -601,6 +628,7 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         settings,
         multi_asset=validate_multi_asset_config(settings.multi_asset),
         paper_simulation=validate_paper_simulation_config(settings.paper_simulation),
+        alerts=validate_alert_config(settings.alerts),
     )
     research_strategy = dataclasses.replace(
         settings.strategy,
