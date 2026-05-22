@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import replace
 from datetime import datetime, timezone
+from types import SimpleNamespace
 
 from orchestrator import BotOrchestrator
 from scripts.smoke_orchestrator import FakeClock, FakeHealthMonitor, FakeTelegramNotifier, make_bundle, make_conn
@@ -61,3 +62,54 @@ def test_enabled_multi_asset_config_dispatches_to_separate_loop(monkeypatch) -> 
 
     assert calls["multi"] == 1
     assert signal_engine.generate_calls == 0
+
+
+def test_multi_asset_position_monitor_routes_lifecycle_by_position_symbol(monkeypatch) -> None:  # type: ignore[no-untyped-def]
+    base = load_settings()
+    assert base.storage is not None
+    settings = replace(
+        base,
+        multi_asset=MultiAssetConfig(enabled=True, enabled_symbols=("BTCUSDT", "ETHUSDT", "SOLUSDT")),
+    )
+    conn = make_conn(base.storage.schema_path)
+    clock = FakeClock(NOW)
+    bundle, _, _, _ = make_bundle(conn, clock, emit_signals=False)
+    orchestrator = BotOrchestrator(
+        settings=settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=FakeHealthMonitor(),
+        telegram_notifier=FakeTelegramNotifier(),
+        now_provider=clock.now,
+    )
+    monkeypatch.setattr(
+        orchestrator.state_store,
+        "get_open_trade_records",
+        lambda: [
+            SimpleNamespace(position=SimpleNamespace(symbol="ETHUSDT")),
+            SimpleNamespace(position=SimpleNamespace(symbol="SOLUSDT")),
+        ],
+    )
+    routed_symbols: list[str] = []
+    lifecycle_symbols: list[str | None] = []
+
+    def fail_btc_snapshot(now):  # type: ignore[no-untyped-def]
+        raise AssertionError("multi-asset monitor must not use BTC-only snapshot")
+
+    def build_symbol_snapshot(symbol, timestamp):  # type: ignore[no-untyped-def]
+        routed_symbols.append(symbol)
+        return SimpleNamespace(symbol=symbol, timestamp=timestamp)
+
+    def process_lifecycle(snapshot, *, symbol=None):  # type: ignore[no-untyped-def]
+        lifecycle_symbols.append(symbol)
+        assert snapshot.symbol == symbol
+        return []
+
+    monkeypatch.setattr(orchestrator, "_build_snapshot", fail_btc_snapshot)
+    monkeypatch.setattr(orchestrator, "_build_symbol_snapshot", build_symbol_snapshot)
+    monkeypatch.setattr(orchestrator, "_process_trade_lifecycle", process_lifecycle)
+
+    orchestrator._run_position_monitor_cycle(NOW)
+
+    assert routed_symbols == ["ETHUSDT", "SOLUSDT"]
+    assert lifecycle_symbols == ["ETHUSDT", "SOLUSDT"]

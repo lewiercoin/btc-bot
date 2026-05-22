@@ -4,6 +4,26 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Fix multi-asset position monitor symbol routing before first ETH/SOL trade
+**Decision:** Implement `MULTI_ASSET_POSITION_MONITOR_SYMBOL_ROUTING_FIX_V1`
+before treating BTC/ETH/SOL PAPER as ready for an investor-style simulation.
+
+**Reason:** Post-deployment review found that the 15-second position monitor
+still used the BTC-only snapshot path. The 15-minute multi-asset decision cycle
+processed lifecycle per symbol correctly, but an open ETH/SOL position could be
+evaluated by the fast monitor using BTC high/low/close between decision cycles.
+No ETH/SOL positions existed when this was found, so no trade was affected.
+
+**Fix boundary:**
+- Route position-monitor lifecycle by each open position's symbol when
+  `multi_asset.enabled=true` in PAPER mode.
+- Preserve the existing BTC-only monitor path when multi-asset is disabled.
+- Do not change strategy, thresholds, risk limits, execution sizing,
+  production settings, or database schema.
+
+**Consequence:** The fix must be audited and deployed code-only before relying
+on first ETH/SOL PAPER trade lifecycle behavior.
+
 ## 2026-05-22 - Start M4 quality window from multi-asset activation
 **Decision:** Add `MULTI_ASSET_PAPER_QUALITY_M4_WINDOW_V1` before using M4 for
 post-activation BTC/ETH/SOL quality review. The report must support an exact
