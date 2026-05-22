@@ -4,6 +4,40 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Defer multi-symbol WebSocket to post-FeatureEngine milestone
+
+**Decision:** Accept REST aggTrades for ETH/SOL in PAPER as conscious simplification.
+
+**Reason:** FeatureEngine persistence is BLOCKER (degraded features without bootstrap).
+WebSocket is parity enhancement but REST provides sufficient data quality for 15-min cycles.
+Auditor confirmed: REST aggTrades for 15-min decision windows produce negligible staleness
+vs WebSocket real-time stream.
+
+**Boundaries:**
+- Multi-symbol WebSocket will be implemented before LIVE transition.
+- Monitor M4 quality reports for REST vs WS signal quality differences.
+- Document any observed degradation in ETH/SOL vs BTC metrics.
+
+**Consequence:** PAPER tests with REST aggTrades for ETH/SOL. If M4 shows degradation,
+WebSocket milestone prioritized before further PAPER evidence collection.
+
+## 2026-05-22 - Multi-asset code analysis: 3 fix decisions
+
+**Decision:** Auditor and builder agreed on fixes required before multi-asset PAPER
+produces valid evidence.
+
+**Fixes approved:**
+1. **MULTI_ASSET_FEATURE_ENGINE_PERSISTENCE_V1** (BLOCKER): Per-symbol FeatureEngine
+   bootstrap and persistence across cycles. Without this, ETH/SOL OI z-score, CVD
+   divergence, and EMA features are garbage (fresh instance each cycle).
+2. **MULTI_ASSET_DD_TRACKING_V1**: Per-symbol DD in governance/risk providers
+   (currently hardcoded 0.0) + true high-watermark drawdown tracking (Blueprint
+   spec: "-8R from local high-watermark", current proxy: min(0, weekly_pnl)).
+3. **MULTI_ASSET_WEBSOCKET_V1** (deferred): Multi-symbol WebSocket for PAPER=LIVE
+   parity. Accepted as REST-only for now (see separate decision above).
+
+**Sequence:** #1 (FeatureEngine) → #2 (DD tracking) → #3 (WebSocket before LIVE).
+
 ## 2026-05-22 - Add cap-aware PAPER sizing for shared BTC/ETH/SOL capital
 **Decision:** Implement `PAPER_CAP_AWARE_POSITION_SIZING_V1` before relying on
 multi-asset PAPER as an investor-style shared-capital simulation.

@@ -40,6 +40,41 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Runtime Fix: MULTI_ASSET_FEATURE_ENGINE_PERSISTENCE_V1
+
+**Status:** READY_FOR_AUDIT
+**Builder:** Cascade
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** ETH/SOL signal quality in PAPER (features degraded without bootstrap)
+
+**Problem:** Multi-asset PAPER cycle created a fresh `FeatureEngine` for every
+symbol on every 15-minute cycle. Without bootstrap, OI z-score baseline, CVD
+divergence history, and force-order rate history were empty — producing degraded
+or invalid features for ETH/SOL. This meant PAPER was not testing real signal
+quality for non-BTC symbols.
+
+**Fix:**
+- Added `_feature_engines: dict[str, FeatureEngine]` to `BotOrchestrator.__init__`,
+  seeded with the primary BTC engine.
+- Added `_bootstrap_feature_engine_for_symbol()` helper that creates a new
+  `FeatureEngine`, bootstraps OI and CVD history from DB, and stores it.
+- In `start()`, when multi-asset PAPER is enabled, bootstraps all non-BTC
+  enabled symbols before the runtime loop begins.
+- In `_run_multi_asset_paper_decision_cycle`, uses the persistent engine from
+  `_feature_engines[symbol]` instead of creating a fresh instance. Falls back
+  to creating one with a warning if missing.
+
+**Validation:**
+- `python -m compileall . -q` — clean
+- `pytest tests/test_multi_asset_feature_engine_persistence.py` — 8/8 passed
+- Full suite — 619 passed, 24 skipped, 0 failures
+
+**Related decisions:** DECISIONS_LOG 2026-05-22 (3 fix decisions + WS deferral)
+
+**Next:** Push for Claude Code audit. Milestone #2 (DD tracking) follows after
+audit closure.
+
 ### Runtime Fix: PAPER_CAP_AWARE_POSITION_SIZING_V1
 
 **Status:** READY_FOR_AUDIT - cap-aware PAPER sizing implemented

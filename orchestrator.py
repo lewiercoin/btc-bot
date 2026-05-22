@@ -384,6 +384,9 @@ class BotOrchestrator:
         self._sleep_fn = sleep_fn or time.sleep
         self._critical_execution_errors = 0
         self._consecutive_health_failures = 0
+        self._feature_engines: dict[str, FeatureEngine] = {
+            self.settings.strategy.symbol.upper(): self.bundle.feature_engine,
+        }
         self._current_utc_day: date | None = None
         self._next_decision_at: datetime | None = None
         self._next_monitor_at: datetime | None = None
@@ -429,6 +432,11 @@ class BotOrchestrator:
         )
         bootstrap_summary = self._bootstrap_feature_engine_history(startup_ts)
         self._record_bootstrap_summary(bootstrap_summary)
+        if self._multi_asset_paper_enabled():
+            for _ma_symbol in self.settings.multi_asset.enabled_symbols:
+                if _ma_symbol.upper() != self.settings.strategy.symbol.upper():
+                    _ma_summary = self._bootstrap_feature_engine_for_symbol(_ma_symbol, startup_ts)
+                    LOG.info("Bootstrapped FeatureEngine for %s | %s", _ma_symbol, json.dumps(_ma_summary, sort_keys=True))
         self.state_store.refresh_runtime_state(startup_ts)
 
         recovery_report = self.recovery.run_startup_sync()
@@ -792,7 +800,11 @@ class BotOrchestrator:
                         self._notify_closed_trades(closed_events)
 
                     strategy = resolve_symbol_config(self.settings.strategy, symbol, self.settings.multi_asset)
-                    feature_engine = FeatureEngine(getattr(self.bundle.feature_engine, "config", None))
+                    feature_engine = self._feature_engines.get(symbol.upper())
+                    if feature_engine is None:
+                        feature_engine = FeatureEngine(getattr(self.bundle.feature_engine, "config", None))
+                        self._feature_engines[symbol.upper()] = feature_engine
+                        LOG.warning("FeatureEngine for %s created without bootstrap", symbol)
                     features = feature_engine.compute(
                         snapshot=snapshot,
                         schema_version=self.settings.schema_version,
@@ -1315,6 +1327,24 @@ class BotOrchestrator:
             "oi": oi_summary,
             "cvd": cvd_summary,
         }
+
+    def _bootstrap_feature_engine_for_symbol(self, symbol: str, now: "datetime") -> dict[str, object]:
+        """Bootstrap a FeatureEngine for a non-primary symbol and store it."""
+        engine = FeatureEngine(getattr(self.bundle.feature_engine, "config", None))
+        oi_since = now.astimezone(timezone.utc) - timedelta(days=self.settings.data_quality.oi_baseline_days)
+        oi_rows = fetch_oi_samples(self.conn, symbol=symbol, since_ts=oi_since)
+        feature_config = getattr(engine, "config", None)
+        cvd_window_bars = int(
+            getattr(feature_config, "cvd_divergence_window_bars", self.settings.data_quality.cvd_divergence_bars)
+        )
+        cvd_rows = fetch_cvd_price_history(
+            self.conn, symbol=symbol, timeframe="15m",
+            limit=max(self.settings.data_quality.cvd_divergence_bars, cvd_window_bars) + 1,
+        )
+        oi_summary = engine.bootstrap_oi_history(oi_rows) if hasattr(engine, "bootstrap_oi_history") else {"loaded_samples": len(oi_rows), "skipped": "no_bootstrap"}
+        cvd_summary = engine.bootstrap_cvd_price_history(cvd_rows) if hasattr(engine, "bootstrap_cvd_price_history") else {"loaded_bars": len(cvd_rows), "skipped": "no_bootstrap"}
+        self._feature_engines[symbol.upper()] = engine
+        return {"symbol": symbol, "oi": oi_summary, "cvd": cvd_summary}
 
     def _record_bootstrap_summary(self, summary: dict[str, object]) -> None:
         LOG.info("Feature bootstrap summary | %s", json.dumps(summary, sort_keys=True))
