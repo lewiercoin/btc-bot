@@ -40,9 +40,42 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Runtime Fix: MULTI_ASSET_POSITION_MONITOR_SYMBOL_ROUTING_FIX_V1
+
+**Status:** READY_FOR_AUDIT - multi-asset monitor lifecycle routing fixed
+**Builder:** Codex
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** investor-style BTC/ETH/SOL PAPER simulation confidence
+
+**Scope:** Fix the fast position-monitor lifecycle path after multi-asset PAPER
+activation. The 15-minute multi-asset decision cycle already processed
+lifecycle per symbol, but the 15-second monitor path still built the BTC-only
+snapshot and called lifecycle without a symbol filter. This milestone routes
+monitor lifecycle checks by each open position's symbol in multi-asset PAPER
+mode. It does not change strategy, thresholds, risk limits, execution sizing,
+production settings, or database schema.
+
+**Implementation:**
+- `_run_position_monitor_cycle()` now reads open trade records once.
+- When `_multi_asset_paper_enabled()` is true, it builds one symbol-specific
+  snapshot for each symbol with open positions and calls
+  `_process_trade_lifecycle(snapshot, symbol=symbol)`.
+- The existing BTC-only monitor path remains unchanged when multi-asset PAPER is
+  not enabled.
+- Added a regression test that fails if the multi-asset monitor uses the
+  BTC-only snapshot path for ETH/SOL open positions.
+
+**Validation:**
+- `pytest tests/test_multi_asset_orchestrator_dispatch.py tests/test_funding_fees.py tests/test_execution_symbol_gates.py -q -o addopts=` -> 11 passed.
+- `python -m compileall orchestrator.py tests/test_multi_asset_orchestrator_dispatch.py` -> PASS.
+
+**Next:** Run full suite, push for Claude Code audit, then deploy code-only
+before relying on first ETH/SOL position lifecycle monitoring.
+
 ### Reporting: MULTI_ASSET_PAPER_QUALITY_M4_WINDOW_V1
 
-**Status:** READY_FOR_AUDIT - exact post-activation M4 window implemented
+**Status:** DONE - audited and deployed code-only
 **Builder:** Codex
 **Decision date:** 2026-05-22
 **Branch:** `deploy/multi-asset-paper-v1`

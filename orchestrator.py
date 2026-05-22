@@ -972,12 +972,23 @@ class BotOrchestrator:
             self._sleep(sleep_seconds)
 
     def _run_position_monitor_cycle(self, now: datetime) -> None:
-        if not self.state_store.get_open_trade_records():
+        open_records = self.state_store.get_open_trade_records()
+        if not open_records:
             return
 
         try:
-            snapshot = self._build_snapshot(now)
-            closed_events = self._process_trade_lifecycle(snapshot)
+            closed_events: list[dict]
+            if self._multi_asset_paper_enabled():
+                closed_events = []
+                symbols = tuple(
+                    dict.fromkeys(record.position.symbol.upper() for record in open_records)
+                )
+                for symbol in symbols:
+                    snapshot = self._build_symbol_snapshot(symbol, now)
+                    closed_events.extend(self._process_trade_lifecycle(snapshot, symbol=symbol))
+            else:
+                snapshot = self._build_snapshot(now)
+                closed_events = self._process_trade_lifecycle(snapshot)
             if closed_events:
                 self.metrics.inc(TRADES_CLOSED, len(closed_events))
                 self.bundle.audit_logger.log_trade(
