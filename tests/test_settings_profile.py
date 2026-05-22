@@ -148,6 +148,80 @@ def test_load_settings_experiment_profile_multi_asset_overlay_changes_config_has
     assert baseline.config_hash != changed.config_hash
 
 
+def test_load_settings_experiment_profile_applies_paper_simulation_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "paper_simulation": {
+                    "enabled": True,
+                    "starting_balance_usd": 1000,
+                    "compound_pnl": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert settings.paper_simulation.enabled is True
+    assert settings.paper_simulation.starting_balance_usd == 1000.0
+    assert settings.paper_simulation.compound_pnl is True
+
+
+def test_load_settings_experiment_profile_paper_simulation_overlay_changes_config_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    baseline = load_settings(project_root=tmp_path, profile="experiment")
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "paper_simulation": {
+                    "enabled": True,
+                    "starting_balance_usd": 1000,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert baseline.paper_simulation.enabled is False
+    assert changed.paper_simulation.enabled is True
+    assert baseline.config_hash != changed.config_hash
+
+
+def test_load_settings_experiment_profile_rejects_invalid_paper_simulation_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "paper_simulation": {
+                    "enabled": True,
+                    "starting_balance_usd": 0,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="starting_balance_usd"):
+        load_settings(project_root=tmp_path, profile="experiment")
+
+
 def test_load_settings_experiment_profile_rejects_invalid_multi_asset_overlay(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

@@ -4,6 +4,28 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Add persistent PAPER simulation account before dashboard controls
+**Decision:** Implement `PAPER_SIMULATION_ACCOUNT_FOUNDATION_V1` as the next
+small step toward investor-style BTC/ETH/SOL PAPER simulation.
+
+**Reason:** Current PAPER sizing uses a fixed 10000 USD reference equity. That
+is useful for normalized bot testing but does not represent a realistic
+operator account such as 1000 USD where losses reduce the next position size
+and wins increase available balance. The foundation must be persistent and
+recoverable before any dashboard controls can safely change it.
+
+**Boundaries:**
+- Default remains disabled; production behavior is unchanged until explicitly
+  enabled in runtime settings.
+- No AI/ML logic enters the execution or real-time decision path.
+- Dashboard controls are deferred to a separate milestone after audit.
+- Trade signals, governance, execution routing, and asset thresholds remain
+  unchanged.
+
+**Consequence:** When enabled, PAPER risk sizing can use the current simulation
+balance and compound realized PnL, enabling a realistic shared-capital
+BTC/ETH/SOL account simulation.
+
 ## 2026-05-22 - Fix multi-asset position monitor symbol routing before first ETH/SOL trade
 **Decision:** Implement `MULTI_ASSET_POSITION_MONITOR_SYMBOL_ROUTING_FIX_V1`
 before treating BTC/ETH/SOL PAPER as ready for an investor-style simulation.

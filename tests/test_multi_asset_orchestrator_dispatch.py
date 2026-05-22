@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from orchestrator import BotOrchestrator
 from scripts.smoke_orchestrator import FakeClock, FakeHealthMonitor, FakeTelegramNotifier, make_bundle, make_conn
-from settings import MultiAssetConfig, load_settings
+from settings import MultiAssetConfig, PaperSimulationConfig, load_settings
 
 
 NOW = datetime(2026, 5, 21, 12, 0, tzinfo=timezone.utc)
@@ -113,3 +113,37 @@ def test_multi_asset_position_monitor_routes_lifecycle_by_position_symbol(monkey
 
     assert routed_symbols == ["ETHUSDT", "SOLUSDT"]
     assert lifecycle_symbols == ["ETHUSDT", "SOLUSDT"]
+
+
+def test_paper_simulation_account_balance_overrides_reference_equity_for_sizing() -> None:
+    base = load_settings()
+    assert base.storage is not None
+    settings = replace(
+        base,
+        paper_simulation=PaperSimulationConfig(
+            enabled=True,
+            starting_balance_usd=1000.0,
+            compound_pnl=True,
+        ),
+    )
+    conn = make_conn(base.storage.schema_path)
+    clock = FakeClock(NOW)
+    bundle, _, _, _ = make_bundle(conn, clock, emit_signals=False)
+    orchestrator = BotOrchestrator(
+        settings=settings,
+        conn=conn,
+        bundle=bundle,
+        health_monitor=FakeHealthMonitor(),
+        telegram_notifier=FakeTelegramNotifier(),
+        now_provider=clock.now,
+    )
+
+    assert orchestrator._risk_equity(NOW) == 1000.0
+
+    orchestrator.state_store.apply_paper_simulation_pnl(
+        pnl_abs=-125.0,
+        compound_pnl=True,
+        now=NOW,
+    )
+
+    assert orchestrator._risk_equity(NOW) == 875.0

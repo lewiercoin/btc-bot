@@ -132,6 +132,13 @@ class MultiAssetConfig:
 
 
 @dataclass(frozen=True)
+class PaperSimulationConfig:
+    enabled: bool = False
+    starting_balance_usd: float = 1000.0
+    compound_pnl: bool = True
+
+
+@dataclass(frozen=True)
 class RiskConfig:
     risk_per_trade_pct: float = 0.007
     max_leverage: int = 8
@@ -302,6 +309,7 @@ class AppSettings:
     mode: BotMode
     strategy: StrategyConfig = field(default_factory=StrategyConfig)
     multi_asset: MultiAssetConfig = field(default_factory=MultiAssetConfig)
+    paper_simulation: PaperSimulationConfig = field(default_factory=PaperSimulationConfig)
     risk: RiskConfig = field(default_factory=RiskConfig)
     execution: ExecutionConfig = field(default_factory=ExecutionConfig)
     data_quality: DataQualityConfig = field(default_factory=DataQualityConfig)
@@ -318,6 +326,7 @@ class AppSettings:
             "mode": self.mode.value,
             "strategy": asdict(self.strategy),
             "multi_asset": asdict(self.multi_asset),
+            "paper_simulation": asdict(self.paper_simulation),
             "risk": asdict(self.risk),
             "execution": asdict(self.execution),
             "data_quality": asdict(self.data_quality),
@@ -440,6 +449,12 @@ def validate_multi_asset_config(config: MultiAssetConfig) -> MultiAssetConfig:
     return normalized
 
 
+def validate_paper_simulation_config(config: PaperSimulationConfig) -> PaperSimulationConfig:
+    if config.starting_balance_usd <= 0:
+        raise ValueError("paper_simulation.starting_balance_usd must be positive.")
+    return config
+
+
 def resolve_symbol_config(
     baseline: StrategyConfig,
     symbol: str,
@@ -519,6 +534,19 @@ def _multi_asset_overrides(payload: dict[str, Any]) -> dict[str, Any]:
     return overrides
 
 
+def _paper_simulation_overrides(payload: dict[str, Any]) -> dict[str, Any]:
+    overrides = _section_overrides(payload, "paper_simulation", PaperSimulationConfig)
+    if not overrides:
+        return {}
+    if "starting_balance_usd" in overrides:
+        overrides["starting_balance_usd"] = float(overrides["starting_balance_usd"])
+    if "enabled" in overrides and not isinstance(overrides["enabled"], bool):
+        raise ValueError("paper_simulation.enabled must be a boolean.")
+    if "compound_pnl" in overrides and not isinstance(overrides["compound_pnl"], bool):
+        raise ValueError("paper_simulation.compound_pnl must be a boolean.")
+    return overrides
+
+
 def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -> AppSettings:
     if profile not in {"live", "experiment"}:
         return settings
@@ -536,12 +564,22 @@ def _apply_runtime_overlay(settings: AppSettings, *, root: Path, profile: str) -
     strategy_overrides = _section_overrides(payload, "strategy", StrategyConfig)
     risk_overrides = _section_overrides(payload, "risk", RiskConfig)
     multi_asset_overrides = _multi_asset_overrides(payload)
+    paper_simulation_overrides = _paper_simulation_overrides(payload)
     strategy = dataclasses.replace(settings.strategy, **strategy_overrides)
     risk = dataclasses.replace(settings.risk, **risk_overrides)
     multi_asset = validate_multi_asset_config(
         dataclasses.replace(settings.multi_asset, **multi_asset_overrides)
     )
-    return dataclasses.replace(settings, strategy=strategy, risk=risk, multi_asset=multi_asset)
+    paper_simulation = validate_paper_simulation_config(
+        dataclasses.replace(settings.paper_simulation, **paper_simulation_overrides)
+    )
+    return dataclasses.replace(
+        settings,
+        strategy=strategy,
+        risk=risk,
+        multi_asset=multi_asset,
+        paper_simulation=paper_simulation,
+    )
 
 
 def load_settings(project_root: Path | None = None, *, profile: str = "research") -> AppSettings:
@@ -559,7 +597,11 @@ def load_settings(project_root: Path | None = None, *, profile: str = "research"
         mode=mode,
         storage=storage,
     )
-    settings = dataclasses.replace(settings, multi_asset=validate_multi_asset_config(settings.multi_asset))
+    settings = dataclasses.replace(
+        settings,
+        multi_asset=validate_multi_asset_config(settings.multi_asset),
+        paper_simulation=validate_paper_simulation_config(settings.paper_simulation),
+    )
     research_strategy = dataclasses.replace(
         settings.strategy,
         allow_uptrend_pullback=_env_flag("ALLOW_UPTREND_PULLBACK", settings.strategy.allow_uptrend_pullback),

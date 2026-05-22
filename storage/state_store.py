@@ -55,6 +55,15 @@ class OpenTradeRecord:
     position: Position
 
 
+@dataclass(slots=True, frozen=True)
+class PaperSimulationAccount:
+    enabled: bool
+    starting_balance_usd: float
+    current_balance_usd: float
+    realized_pnl_usd: float
+    updated_at: datetime
+
+
 class StateStore:
     def __init__(self, connection: sqlite3.Connection, mode: str, reference_equity: float = 10_000.0) -> None:
         self.connection = connection
@@ -144,6 +153,18 @@ class StateStore:
             cursor.execute("ALTER TABLE runtime_metrics ADD COLUMN feature_quality_json TEXT DEFAULT NULL")
             self.connection.commit()
             LOG.info("Migration applied: added feature_quality_json column to runtime_metrics")
+
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS paper_simulation_account (
+                id INTEGER PRIMARY KEY CHECK(id = 1),
+                enabled INTEGER NOT NULL CHECK(enabled IN (0, 1)),
+                starting_balance_usd REAL NOT NULL,
+                current_balance_usd REAL NOT NULL,
+                realized_pnl_usd REAL NOT NULL DEFAULT 0,
+                updated_at TEXT NOT NULL
+            )
+        """)
+        self.connection.commit()
 
         cursor.execute("""
             CREATE TABLE IF NOT EXISTS oi_samples (
@@ -574,6 +595,87 @@ class StateStore:
             return None
         row = self.connection.execute("SELECT * FROM portfolio_state WHERE id = 1").fetchone()
         return dict(row) if row else None
+
+    def ensure_paper_simulation_account(
+        self,
+        *,
+        starting_balance_usd: float,
+        enabled: bool = True,
+        now: datetime | None = None,
+    ) -> PaperSimulationAccount:
+        if starting_balance_usd <= 0:
+            raise ValueError("starting_balance_usd must be positive.")
+        self._apply_migrations()
+        existing = self.get_paper_simulation_account()
+        ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        if existing is not None:
+            self.connection.execute(
+                """
+                UPDATE paper_simulation_account
+                SET enabled = ?, updated_at = ?
+                WHERE id = 1
+                """,
+                (1 if enabled else 0, ts.isoformat()),
+            )
+            self.connection.commit()
+            account = self.get_paper_simulation_account()
+            assert account is not None
+            return account
+
+        self.connection.execute(
+            """
+            INSERT INTO paper_simulation_account (
+                id, enabled, starting_balance_usd, current_balance_usd, realized_pnl_usd, updated_at
+            ) VALUES (1, ?, ?, ?, 0.0, ?)
+            """,
+            (1 if enabled else 0, float(starting_balance_usd), float(starting_balance_usd), ts.isoformat()),
+        )
+        self.connection.commit()
+        account = self.get_paper_simulation_account()
+        assert account is not None
+        return account
+
+    def get_paper_simulation_account(self) -> PaperSimulationAccount | None:
+        self._apply_migrations()
+        row = self.connection.execute(
+            "SELECT * FROM paper_simulation_account WHERE id = 1"
+        ).fetchone()
+        if row is None:
+            return None
+        return PaperSimulationAccount(
+            enabled=bool(row["enabled"]),
+            starting_balance_usd=float(row["starting_balance_usd"]),
+            current_balance_usd=float(row["current_balance_usd"]),
+            realized_pnl_usd=float(row["realized_pnl_usd"]),
+            updated_at=_parse_datetime(row["updated_at"]),
+        )
+
+    def apply_paper_simulation_pnl(
+        self,
+        *,
+        pnl_abs: float,
+        compound_pnl: bool = True,
+        now: datetime | None = None,
+    ) -> PaperSimulationAccount:
+        self._apply_migrations()
+        existing = self.get_paper_simulation_account()
+        if existing is None:
+            raise RuntimeError("paper_simulation_account is not initialized.")
+        ts = (now or datetime.now(timezone.utc)).astimezone(timezone.utc)
+        self.connection.execute(
+            """
+            UPDATE paper_simulation_account
+            SET current_balance_usd = current_balance_usd + ?,
+                realized_pnl_usd = realized_pnl_usd + ?,
+                updated_at = ?
+            WHERE id = 1
+            """,
+            (float(pnl_abs) if compound_pnl else 0.0, float(pnl_abs), ts.isoformat()),
+        )
+        self.connection.commit()
+        account = self.get_paper_simulation_account()
+        assert account is not None
+        return account
 
     def _table_exists(self, name: str) -> bool:
         row = self.connection.execute(
