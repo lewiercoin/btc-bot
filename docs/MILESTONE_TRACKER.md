@@ -40,9 +40,38 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Monitoring: TELEGRAM_ALERTS_RUNTIME_ACTIVATION_V1
+
+**Status:** READY_FOR_AUDIT - runtime alerts overlay implemented
+**Builder:** Codex
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** replacing the old SMC Telegram bot with this BTC/ETH/SOL PAPER bot
+
+**Scope:** Expose the existing Telegram alert integration through runtime
+settings while keeping credentials out of the repository. The milestone does
+not activate Telegram on production and does not add interactive Telegram bot
+commands.
+
+**Implementation:**
+- Added validated `alerts` runtime overlay support for `telegram_enabled` and
+  env-var name overrides.
+- Kept Telegram disabled by default and token/chat ID sourced from environment
+  variables only.
+- Added `scripts/send_telegram_test_alert.py` for a one-shot post-deploy smoke
+  alert.
+- Added settings overlay tests for enablement, config hash changes, and invalid
+  alert configuration.
+
+**Validation:** Pending local test run.
+
+**Next:** Run validation, commit, push for Claude Code audit. After audit:
+code-only deploy, set Telegram env vars via systemd drop-in, enable alerts in
+production `settings.json`, restart, and send one test alert.
+
 ### Runtime Foundation: PAPER_SIMULATION_ACCOUNT_FOUNDATION_V1
 
-**Status:** READY_FOR_AUDIT - paper simulation account foundation implemented
+**Status:** DONE - audited, deployed, and activated operationally
 **Builder:** Codex
 **Decision date:** 2026-05-22
 **Branch:** `deploy/multi-asset-paper-v1`

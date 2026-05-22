@@ -222,6 +222,98 @@ def test_load_settings_experiment_profile_rejects_invalid_paper_simulation_overl
         load_settings(project_root=tmp_path, profile="experiment")
 
 
+def test_load_settings_experiment_profile_applies_alerts_runtime_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "alerts": {
+                    "telegram_enabled": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    settings = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert settings.alerts.telegram_enabled is True
+    assert settings.alerts.telegram_bot_token_env == "TELEGRAM_BOT_TOKEN"
+    assert settings.alerts.telegram_chat_id_env == "TELEGRAM_CHAT_ID"
+
+
+def test_load_settings_experiment_profile_alerts_overlay_changes_config_hash(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    baseline = load_settings(project_root=tmp_path, profile="experiment")
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "alerts": {
+                    "telegram_enabled": True,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    changed = load_settings(project_root=tmp_path, profile="experiment")
+
+    assert baseline.alerts.telegram_enabled is False
+    assert changed.alerts.telegram_enabled is True
+    assert baseline.config_hash != changed.config_hash
+
+
+def test_load_settings_experiment_profile_rejects_invalid_alerts_overlay(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "alerts": {
+                    "telegram_enabled": "yes",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="telegram_enabled"):
+        load_settings(project_root=tmp_path, profile="experiment")
+
+
+def test_load_settings_experiment_profile_rejects_empty_alert_env_name(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    monkeypatch.delenv("BOT_MODE", raising=False)
+    (tmp_path / "settings.json").write_text(
+        json.dumps(
+            {
+                "schema_version": "v1.0",
+                "alerts": {
+                    "telegram_enabled": True,
+                    "telegram_bot_token_env": "",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ValueError, match="telegram_bot_token_env"):
+        load_settings(project_root=tmp_path, profile="experiment")
+
+
 def test_load_settings_experiment_profile_rejects_invalid_multi_asset_overlay(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
