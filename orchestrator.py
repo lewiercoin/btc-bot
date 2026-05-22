@@ -13,7 +13,14 @@ from core.context_engine import ContextEngine
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
 from core.models import Features, GovernanceRuntimeState, MarketContext, MarketSnapshot, RiskRuntimeState, SignalDiagnostics
-from core.portfolio_gate import PortfolioRiskConfig, PortfolioRiskState, PortfolioSignal, RuntimePortfolioGate, SymbolRiskState
+from core.portfolio_gate import (
+    PortfolioRiskConfig,
+    PortfolioRiskState,
+    PortfolioSignal,
+    RuntimePortfolioGate,
+    SymbolRiskState,
+    sort_portfolio_signals,
+)
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
@@ -56,6 +63,93 @@ from storage.state_store import StateStore
 from core.funding import compute_funding_paid
 
 LOG = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True, slots=True)
+class PortfolioCapacityAdjustment:
+    signal_id: str
+    size_scale: float
+    reason: str | None = None
+
+
+def _portfolio_capacity_scale(
+    signal: PortfolioSignal,
+    *,
+    portfolio_state: PortfolioRiskState,
+    accepted: list[PortfolioSignal],
+    config: PortfolioRiskConfig,
+) -> tuple[float, str | None]:
+    """Return a linear size scale that fits remaining portfolio capacity.
+
+    Risk, gross notional, and directional notional are all linear in order size.
+    The portfolio gate remains authoritative; this helper only reduces a
+    candidate before gate evaluation when a smaller paper position can fit.
+    """
+
+    limits: list[tuple[float, str]] = []
+
+    gross_used = portfolio_state.gross_notional_pct + sum(item.gross_notional_pct for item in accepted)
+    if signal.gross_notional_pct > 0:
+        limits.append(((config.max_gross_notional_pct - gross_used) / signal.gross_notional_pct, "gross_notional_cap"))
+
+    risk_used = portfolio_state.total_risk_pct_open + sum(item.risk_pct for item in accepted)
+    if signal.risk_pct > 0:
+        limits.append(((config.max_total_risk_pct_open - risk_used) / signal.risk_pct, "portfolio_risk_cap"))
+
+    if signal.normalized_direction == "LONG":
+        directional_used = portfolio_state.directional_notional_pct_long + sum(
+            item.gross_notional_pct for item in accepted if item.normalized_direction == "LONG"
+        )
+    else:
+        directional_used = portfolio_state.directional_notional_pct_short + sum(
+            item.gross_notional_pct for item in accepted if item.normalized_direction == "SHORT"
+        )
+    if signal.gross_notional_pct > 0:
+        limits.append(
+            (
+                (config.max_directional_notional_pct - directional_used) / signal.gross_notional_pct,
+                "directional_notional_cap",
+            )
+        )
+
+    if not limits:
+        return 1.0, None
+
+    scale, reason = min(limits, key=lambda item: item[0])
+    if scale >= 1.0:
+        return 1.0, None
+    if scale <= 1e-9:
+        return 1.0, None
+    return max(scale, 0.0), reason
+
+
+def _apply_portfolio_capacity_sizing(
+    signals: list[PortfolioSignal],
+    *,
+    portfolio_state: PortfolioRiskState,
+    config: PortfolioRiskConfig,
+) -> tuple[list[PortfolioSignal], dict[str, PortfolioCapacityAdjustment]]:
+    adjusted: list[PortfolioSignal] = []
+    adjustments: dict[str, PortfolioCapacityAdjustment] = {}
+    capacity_reserved: list[PortfolioSignal] = []
+
+    for signal in sort_portfolio_signals(signals, symbol_order=config.symbol_order):
+        scale, reason = _portfolio_capacity_scale(signal, portfolio_state=portfolio_state, accepted=capacity_reserved, config=config)
+        if scale < 1.0:
+            signal = replace(
+                signal,
+                risk_pct=signal.risk_pct * scale,
+                gross_notional_pct=signal.gross_notional_pct * scale,
+            )
+            adjustments[signal.signal_id] = PortfolioCapacityAdjustment(
+                signal_id=signal.signal_id,
+                size_scale=scale,
+                reason=reason,
+            )
+        adjusted.append(signal)
+        capacity_reserved.append(signal)
+
+    return adjusted, adjustments
 
 
 def _signal_config_from_strategy(strategy: StrategyConfig) -> SignalConfig:
@@ -837,18 +931,38 @@ class BotOrchestrator:
                 self.settings.multi_asset.enabled_symbols,
                 now=timestamp,
             )
-            gate = RuntimePortfolioGate(
-                PortfolioRiskConfig(
-                    max_total_risk_pct_open=self.settings.multi_asset.max_total_risk_pct_open,
-                    max_open_positions_total=self.settings.multi_asset.max_open_positions_total,
-                    max_open_positions_per_symbol=self.settings.multi_asset.max_open_positions_per_symbol,
-                    max_gross_notional_pct=self.settings.multi_asset.max_gross_notional_pct,
-                    max_directional_notional_pct=self.settings.multi_asset.max_directional_notional_pct,
-                    symbol_order=self.settings.multi_asset.enabled_symbols,
-                )
+            portfolio_config = PortfolioRiskConfig(
+                max_total_risk_pct_open=self.settings.multi_asset.max_total_risk_pct_open,
+                max_open_positions_total=self.settings.multi_asset.max_open_positions_total,
+                max_open_positions_per_symbol=self.settings.multi_asset.max_open_positions_per_symbol,
+                max_gross_notional_pct=self.settings.multi_asset.max_gross_notional_pct,
+                max_directional_notional_pct=self.settings.multi_asset.max_directional_notional_pct,
+                symbol_order=self.settings.multi_asset.enabled_symbols,
             )
+            raw_portfolio_signals = [item["portfolio_signal"] for item in generated if isinstance(item["portfolio_signal"], PortfolioSignal)]
+            portfolio_signals, capacity_adjustments = _apply_portfolio_capacity_sizing(
+                raw_portfolio_signals,
+                portfolio_state=recovered.portfolio,
+                config=portfolio_config,
+            )
+            for item in generated:
+                signal = item.get("portfolio_signal")
+                risk_decision = item.get("risk_decision")
+                if not isinstance(signal, PortfolioSignal):
+                    continue
+                adjustment = capacity_adjustments.get(signal.signal_id)
+                if adjustment is None:
+                    continue
+                adjusted_signal = next((candidate for candidate in portfolio_signals if candidate.signal_id == signal.signal_id), None)
+                if adjusted_signal is None:
+                    continue
+                item["portfolio_signal"] = adjusted_signal
+                item["risk_decision"] = replace(risk_decision, size=risk_decision.size * adjustment.size_scale)
+                item["capacity_adjustment"] = adjustment
+
+            gate = RuntimePortfolioGate(portfolio_config)
             decisions = gate.evaluate_batch(
-                [item["portfolio_signal"] for item in generated if isinstance(item["portfolio_signal"], PortfolioSignal)],
+                portfolio_signals,
                 symbol_states=recovered.symbols,
                 portfolio_state=recovered.portfolio,
                 now=timestamp,
@@ -870,13 +984,28 @@ class BotOrchestrator:
                         signal_id=executable.signal_id,
                         snapshot_id=str(item["snapshot_id"]),
                         feature_snapshot_id=str(item["feature_snapshot_id"]),
-                        details={"symbol": symbol, "portfolio_veto_reason": decision.veto_reason if decision else None},
+                        details={
+                            "symbol": symbol,
+                            "portfolio_veto_reason": decision.veto_reason if decision else None,
+                            "capacity_adjustment": asdict(item["capacity_adjustment"])
+                            if isinstance(item.get("capacity_adjustment"), PortfolioCapacityAdjustment)
+                            else None,
+                        },
                         context=item["context"],
                     )
                     continue
 
                 snapshot = item["snapshot"]
                 risk_decision = item["risk_decision"]
+                capacity_adjustment = item.get("capacity_adjustment")
+                if isinstance(capacity_adjustment, PortfolioCapacityAdjustment):
+                    LOG.info(
+                        "Adjusted PAPER position size to portfolio capacity | symbol=%s | signal_id=%s | scale=%.6f | reason=%s",
+                        symbol,
+                        executable.signal_id,
+                        capacity_adjustment.size_scale,
+                        capacity_adjustment.reason,
+                    )
                 self.bundle.execution_engine.execute_signal(
                     executable,
                     size=risk_decision.size,
