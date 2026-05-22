@@ -7,7 +7,13 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 import sqlite3
 
-from scripts.report_near_miss_diagnostics import analyze_near_misses, query_decision_outcomes, _parse_symbols
+from scripts.report_near_miss_diagnostics import (
+    analyze_near_misses,
+    generate_report,
+    query_decision_outcomes,
+    _normalize_since,
+    _parse_symbols,
+)
 from storage.db import init_db
 
 
@@ -326,6 +332,59 @@ class TestMultiAssetM4QueryExtension:
         assert len(eth_rows) == 1
         assert analyze_near_misses(eth_rows)["symbol_counts"] == {"ETHUSDT": 1}
         assert analyze_near_misses(all_rows)["symbol_counts"] == {"BTCUSDT": 1, "ETHUSDT": 1}
+
+    def test_query_decision_outcomes_filters_by_since_timestamp(self):
+        conn = _make_conn()
+        try:
+            for ts, symbol in (
+                ("2026-05-21T20:45:00+00:00", "BTCUSDT"),
+                ("2026-05-21T21:00:00+00:00", "ETHUSDT"),
+                ("2026-05-21T21:15:00+00:00", "SOLUSDT"),
+            ):
+                conn.execute(
+                    """
+                    INSERT INTO decision_outcomes (
+                        cycle_timestamp, outcome_group, outcome_reason, regime, config_hash, details_json
+                    ) VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        ts,
+                        "no_signal",
+                        "sweep_too_shallow",
+                        "normal",
+                        "cfg",
+                        json.dumps({"symbol": symbol}),
+                    ),
+                )
+            conn.commit()
+
+            rows = query_decision_outcomes(
+                conn,
+                days=30,
+                all_symbols=True,
+                since="2026-05-21T21:00:00Z",
+            )
+        finally:
+            conn.close()
+
+        analysis = analyze_near_misses(rows)
+        assert analysis["symbol_counts"] == {"ETHUSDT": 1, "SOLUSDT": 1}
+
+    def test_normalize_since_accepts_zulu_and_naive_utc(self):
+        assert _normalize_since("2026-05-21T21:00:00Z") == "2026-05-21T21:00:00+00:00"
+        assert _normalize_since("2026-05-21T21:00:00") == "2026-05-21T21:00:00+00:00"
+
+    def test_generate_report_labels_since_window(self, tmp_path: Path):
+        output = tmp_path / "report.md"
+        content = generate_report(
+            analyze_near_misses([]),
+            days=7,
+            output_path=output,
+            since="2026-05-21T21:00:00Z",
+        )
+
+        assert "**Analysis Window:** Since 2026-05-21T21:00:00+00:00" in content
+        assert output.exists()
 
 
 def _make_conn() -> sqlite3.Connection:

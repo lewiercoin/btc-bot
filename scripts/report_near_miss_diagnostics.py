@@ -32,7 +32,11 @@ def parse_args():
         "--days",
         type=int,
         default=7,
-        help="Number of days to analyze (default: 7)",
+        help="Number of days to analyze when --since is not provided (default: 7)",
+    )
+    parser.add_argument(
+        "--since",
+        help="UTC inclusive start timestamp for the analysis window, e.g. 2026-05-21T21:00:00Z.",
     )
     parser.add_argument(
         "--output",
@@ -66,9 +70,10 @@ def query_decision_outcomes(
     *,
     symbols: tuple[str, ...] = ("BTCUSDT",),
     all_symbols: bool = False,
+    since: str | None = None,
 ):
     """Query decision outcomes for the specified date range."""
-    cutoff = (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
+    cutoff = _normalize_since(since) if since else (datetime.now(timezone.utc) - timedelta(days=days)).isoformat()
     
     query = """
     SELECT 
@@ -92,6 +97,20 @@ def query_decision_outcomes(
         return rows
     allowed = {symbol.upper() for symbol in symbols}
     return [row for row in rows if _resolve_row_symbol(row) in allowed]
+
+
+def _normalize_since(raw: str | None) -> str | None:
+    if raw is None:
+        return None
+    value = raw.strip()
+    if not value:
+        raise ValueError("--since must not be empty.")
+    if value.endswith("Z"):
+        value = f"{value[:-1]}+00:00"
+    parsed = datetime.fromisoformat(value)
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc).isoformat()
 
 
 def analyze_near_misses(rows):
@@ -256,7 +275,7 @@ def _resolve_row_symbol(row, *, details: dict | None = None) -> str:
     return str(symbol or "BTCUSDT").upper()
 
 
-def generate_report(analysis, days, output_path):
+def generate_report(analysis, days, output_path, *, since: str | None = None):
     """Generate markdown report from analysis results."""
     lines = []
     
@@ -264,7 +283,10 @@ def generate_report(analysis, days, output_path):
     lines.append("# Near-Miss Diagnostics Report")
     lines.append("")
     lines.append(f"**Date:** {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S UTC')}")
-    lines.append(f"**Analysis Window:** Last {days} days")
+    if since:
+        lines.append(f"**Analysis Window:** Since {_normalize_since(since)}")
+    else:
+        lines.append(f"**Analysis Window:** Last {days} days")
     lines.append("")
     
     # Executive Summary
@@ -442,13 +464,14 @@ def main():
             args.days,
             symbols=_parse_symbols(args.symbol),
             all_symbols=args.all_symbols,
+            since=args.since,
         )
         
         # Analyze near-misses
         analysis = analyze_near_misses(rows)
         
         # Generate report
-        generate_report(analysis, args.days, args.output)
+        generate_report(analysis, args.days, args.output, since=args.since)
         
     finally:
         conn.close()

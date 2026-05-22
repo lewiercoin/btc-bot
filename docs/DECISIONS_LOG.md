@@ -4,6 +4,29 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-05-22 - Start M4 quality window from multi-asset activation
+**Decision:** Add `MULTI_ASSET_PAPER_QUALITY_M4_WINDOW_V1` before using M4 for
+post-activation BTC/ETH/SOL quality review. The report must support an exact
+UTC `--since` timestamp so post-activation quality is not mixed with the prior
+BTC-only runtime window.
+
+**Reason:** Full multi-asset PAPER was activated at `2026-05-21T21:00:00Z`.
+The existing `--days` window can include BTC-only rows from before activation,
+which contaminates per-symbol quality comparisons. M4 history remains useful,
+but post-activation evidence needs a clean start boundary.
+
+**Boundaries:**
+- Reporting/query change only.
+- Read-only database access.
+- No strategy, risk, execution, runtime, production settings, or DB schema
+  changes.
+- Do not delete or overwrite historical BTC-only M4 evidence.
+
+**Consequences:**
+- `scripts/report_near_miss_diagnostics.py --all-symbols --since
+  2026-05-21T21:00:00Z` becomes the clean post-activation M4 command.
+- BTC-only M4 and multi-asset PAPER M4 can be compared without mixing windows.
+
 ## 2026-05-21 - Prepare config-only multi-asset PAPER activation
 **Decision:** Continue toward full BTC/ETH/SOL PAPER without fixed day-count
 evidence targets, but keep the work split into small audited stages. The next

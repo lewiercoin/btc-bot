@@ -40,9 +40,42 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Reporting: MULTI_ASSET_PAPER_QUALITY_M4_WINDOW_V1
+
+**Status:** READY_FOR_AUDIT - exact post-activation M4 window implemented
+**Builder:** Codex
+**Decision date:** 2026-05-22
+**Branch:** `deploy/multi-asset-paper-v1`
+**Depends on:** activated multi-asset PAPER runtime (`2026-05-21T21:00:00Z`)
+
+**Scope:** Add an exact UTC start boundary to the near-miss/M4 diagnostics
+report so BTC/ETH/SOL PAPER quality can be measured from activation time
+without mixing pre-activation BTC-only rows. This milestone is reporting-only:
+it does not change strategy, risk, execution, production settings, runtime
+behavior, or database schema.
+
+**Implementation:**
+- Added `--since` to `scripts/report_near_miss_diagnostics.py`.
+- `--since` accepts UTC timestamps such as `2026-05-21T21:00:00Z` and normalizes
+  them to timezone-aware UTC ISO strings.
+- `query_decision_outcomes()` now uses the exact `--since` cutoff when provided;
+  `--days` remains the fallback and preserves existing behavior.
+- Generated reports label exact-start windows as `Analysis Window: Since ...`.
+
+**Validation:**
+- `pytest tests/test_near_miss_diagnostics.py -q -o addopts=` -> 25 passed.
+- `pytest tests/test_near_miss_diagnostics.py tests/test_orchestrator_runtime_logging.py -q -o addopts=` -> 33 passed.
+- `python -m compileall scripts/report_near_miss_diagnostics.py tests/test_near_miss_diagnostics.py` -> PASS.
+- Local CLI smoke confirmed `--since 2026-05-21T21:00:00Z` generates a report
+  with the exact window label. Local DB has no production rows in that window,
+  so production smoke should be run after audit/deploy.
+
+**Next:** Claude Code audit. If accepted, deploy code-only and run:
+`python scripts/report_near_miss_diagnostics.py --all-symbols --since 2026-05-21T21:00:00Z --output /tmp/m4_multi_asset_paper_quality.md`.
+
 ### Runtime: MULTI_ASSET_PAPER_APPROVAL_PREP_V1
 
-**Status:** READY_FOR_AUDIT - runtime overlay activation prep implemented
+**Status:** DONE - audited, deployed, and used for BTC/ETH/SOL PAPER activation
 **Builder:** Codex
 **Decision date:** 2026-05-21
 **Branch:** `deploy/multi-asset-paper-v1`
