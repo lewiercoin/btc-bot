@@ -1554,10 +1554,22 @@ class BotOrchestrator:
                     "entry_price": record.position.entry_price,
                     "exit_price": settlement.exit_price,
                     "pnl_abs": settlement.pnl_abs,
+                    "pnl_r": settlement.pnl_r,
                     "exit_reason": settlement.exit_reason,
                     "closed_at": snapshot.timestamp.isoformat(),
                 }
             )
+        # Update per-symbol DD state for each closed trade
+        if self._multi_asset_paper_enabled():
+            for evt in closed_events:
+                try:
+                    self.state_store.update_symbol_dd_after_trade(
+                        symbol=evt["symbol"],
+                        pnl_r=float(evt.get("pnl_r", 0.0)),
+                        closed_at=snapshot.timestamp,
+                    )
+                except Exception as dd_exc:
+                    LOG.warning("Failed to update symbol DD state for %s: %s", evt.get("symbol"), dd_exc)
         return closed_events
 
     def _compute_position_funding_paid(

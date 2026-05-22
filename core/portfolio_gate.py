@@ -303,6 +303,7 @@ def recover_portfolio_state(
     open_positions: Iterable[PortfolioOpenPosition],
     recent_trades: Iterable[PortfolioTradeEvent],
     now: datetime,
+    persisted_symbol_dd: dict[str, dict[str, object]] | None = None,
 ) -> RecoveredPortfolioState:
     normalized_symbols = tuple(symbol.upper() for symbol in symbols)
     position_list = list(open_positions)
@@ -311,7 +312,8 @@ def recover_portfolio_state(
     for symbol in normalized_symbols:
         symbol_positions = [p for p in position_list if p.symbol.upper() == symbol]
         symbol_trades = [t for t in trade_list if t.symbol.upper() == symbol]
-        symbol_states[symbol] = _recover_symbol_state(symbol, symbol_positions, symbol_trades, now)
+        _persisted = (persisted_symbol_dd or {}).get(symbol)
+        symbol_states[symbol] = _recover_symbol_state(symbol, symbol_positions, symbol_trades, now, persisted_dd=_persisted)
 
     total_risk = sum(float(p.risk_pct) for p in position_list)
     gross = sum(float(p.gross_notional_pct) for p in position_list)
@@ -339,17 +341,30 @@ def _recover_symbol_state(
     open_positions: list[PortfolioOpenPosition],
     trades: list[PortfolioTradeEvent],
     now: datetime,
+    *,
+    persisted_dd: dict[str, object] | None = None,
 ) -> SymbolRiskState:
     daily_pnl = sum(t.pnl_r for t in trades if _same_utc_day(t.closed_at, now))
     weekly_pnl = sum(t.pnl_r for t in trades if _within_rolling_days(t.closed_at, now, days=7))
+    # Use persisted DD state when available (true high-watermark tracking)
+    if persisted_dd is not None:
+        rolling_dd = float(persisted_dd.get("rolling_drawdown_r", 0.0))
+        daily_pnl = float(persisted_dd.get("daily_pnl_r", daily_pnl))
+        weekly_pnl = float(persisted_dd.get("weekly_pnl_r", weekly_pnl))
+        consec_losses = int(persisted_dd.get("consecutive_losses", 0))
+        trades_today_count = int(persisted_dd.get("trades_today", 0))
+    else:
+        rolling_dd = min(0.0, weekly_pnl)
+        consec_losses = _global_consecutive_losses(trades)
+        trades_today_count = sum(1 for t in trades if _same_utc_day(t.closed_at, now))
     return SymbolRiskState(
         symbol=symbol,
         open_positions_count=len(open_positions),
-        trades_today=sum(1 for t in trades if _same_utc_day(t.closed_at, now)),
-        consecutive_losses=_global_consecutive_losses(trades),
+        trades_today=trades_today_count,
+        consecutive_losses=consec_losses,
         daily_pnl_r=daily_pnl,
         weekly_pnl_r=weekly_pnl,
-        rolling_drawdown_r=min(0.0, weekly_pnl),
+        rolling_drawdown_r=rolling_dd,
         last_trade_at=max((_to_utc(t.closed_at) for t in trades), default=None),
         last_loss_at=_last_loss_at(trades),
     )

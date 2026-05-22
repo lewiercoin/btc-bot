@@ -321,6 +321,22 @@ CREATE TABLE IF NOT EXISTS alerts_errors (
     payload_json TEXT
 );
 
+CREATE TABLE IF NOT EXISTS symbol_drawdown_state (
+    symbol TEXT PRIMARY KEY,
+    cumulative_r REAL NOT NULL DEFAULT 0.0,
+    local_high_watermark_r REAL NOT NULL DEFAULT 0.0,
+    rolling_drawdown_r REAL NOT NULL DEFAULT 0.0,
+    daily_pnl_r REAL NOT NULL DEFAULT 0.0,
+    weekly_pnl_r REAL NOT NULL DEFAULT 0.0,
+    daily_start_date TEXT NOT NULL,
+    weekly_start_date TEXT NOT NULL,
+    trades_today INTEGER NOT NULL DEFAULT 0,
+    consecutive_losses INTEGER NOT NULL DEFAULT 0,
+    last_trade_at TEXT,
+    last_loss_at TEXT,
+    updated_at TEXT NOT NULL
+);
+
 CREATE INDEX IF NOT EXISTS idx_candles_symbol_tf_time
     ON candles(symbol, timeframe, open_time);
 CREATE INDEX IF NOT EXISTS idx_funding_symbol_time
