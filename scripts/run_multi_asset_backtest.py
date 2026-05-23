@@ -339,8 +339,8 @@ def run_multi_asset_replay(
                 regime_engine = RegimeEngine(RegimeConfig())
                 regime = regime_engine.classify(features)
 
-                context_engine = type("ContextEngine", (), {"classify": lambda self, f: MarketContext.NORMAL})()
-                context = context_engine.classify(features)
+                # Skip context classification for replay (not critical for M1+M2 validation)
+                context = None
 
                 signal_engine = SignalEngine(_signal_config_from_strategy(strategy))
                 diagnostics = signal_engine.diagnose(features, regime, context)
