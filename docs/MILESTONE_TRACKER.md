@@ -58,32 +58,44 @@ bootstrap with OI/CVD history. No fallback warnings.
 
 ### Runtime Fix: MULTI_ASSET_DD_TRACKING_V1
 
-**Status:** READY_FOR_AUDIT
+**Status:** DONE (audited + deployed)
 **Builder:** Cascade
 **Decision date:** 2026-05-22
 **Branch:** `deploy/multi-asset-paper-v1`
-**Blocks:** Per-symbol DD tracking required by Blueprint Section 5
+**Blocks:** None
 
-**Problem:** `daily_dd_pct` and `weekly_dd_pct` returned `0.0` bypass in
-governance/risk — no actual per-symbol drawdown tracking. `rolling_drawdown_r`
-in `SymbolRiskState` used `min(0.0, weekly_pnl)` proxy instead of true
-high-watermark. Multi-asset PAPER needed independent DD per symbol.
+**Audit:** Claude Code PASSED (c16ca19). Layer separation, contract compliance,
+determinism, backward compatibility, state integrity, test coverage — all PASS.
+
+**Deployed to production:** 2026-05-23 08:16 UTC. Service restart clean, symbol_drawdown_state
+table created, ETH/SOL FeatureEngine bootstrap verified.
+
+---
+
+### Runtime Fix: MULTI_ASSET_WEBSOCKET_V1
+
+**Status:** READY_FOR_AUDIT
+**Builder:** Cascade
+**Decision date:** 2026-05-23
+**Branch:** `deploy/multi-asset-paper-v1`
+**Blocks:** PAPER = LIVE principle (WebSocket before LIVE)
+
+**Problem:** ETH/SOL used REST-only market data (latency, rate limits, data gaps).
+PAPER must test identical code path as LIVE (WebSocket for all symbols).
+Documented decision: "WebSocket before LIVE" (DECISIONS_LOG).
 
 **Fix:**
-- Added `symbol_drawdown_state` table with: `cumulative_r`,
-  `local_high_watermark_r`, `rolling_drawdown_r`, `daily_pnl_r`, `weekly_pnl_r`.
-- `state_store.py`: `load_symbol_dd_state`, `load_all_symbol_dd_states`,
-  `upsert_symbol_dd_state`, `update_symbol_dd_after_trade`.
-- After each trade close in multi-asset PAPER: update DD state with true
-  high-watermark logic (hwm updates on win, preserved on loss).
-- `recover_portfolio_state` accepts `persisted_symbol_dd`; falls back to weekly
-  proxy when no persisted state.
-- Added `pnl_r` to `closed_events` dict so DD update receives real trade PnL.
+- `BinanceFuturesWebsocketClient`: per-symbol aggTrade/forceOrder buffers
+- WebSocket client accepts symbols list, subscribes to all symbol streams
+- Stream routing: parse `stream` field to route events to correct symbol buffer
+- `MarketDataAssembler`: pass symbol to `get_recent_agg_trades`/`force_orders`
+- orchestrator: create WebSocket client with multi-asset symbols
+- orchestrator: removed `websocket_client=None` fallback in `_build_symbol_snapshot`
 
 **Validation:**
 - `python -m compileall . -q` — clean
-- `pytest tests/test_multi_asset_dd_tracking.py` — 17/17 passed
-- Full suite — 636 passed, 24 skipped, 0 regressions
+- `pytest tests/test_multi_symbol_websocket.py` — 19/19 passed
+- Full suite — 651 passed, 24 skipped, 4 pre-existing failures (unrelated)
 
 **Next:** Commit and push for Claude Code audit.
 
