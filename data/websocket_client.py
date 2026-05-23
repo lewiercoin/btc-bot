@@ -53,20 +53,26 @@ def normalize_ws_force_order_event(payload: dict[str, Any]) -> dict[str, Any]:
 
 
 class BinanceFuturesWebsocketClient:
-    def __init__(self, config: WebsocketClientConfig) -> None:
+    def __init__(self, config: WebsocketClientConfig, symbols: list[str] | None = None) -> None:
         self.config = config
-        self._symbol = "BTCUSDT"
+        self._symbols = [s.upper() for s in (symbols or ["BTCUSDT"])]
         self._stop_event = threading.Event()
         self._thread: threading.Thread | None = None
         self._lock = threading.Lock()
-        self._agg_trade_events: deque[dict[str, Any]] = deque(maxlen=self.config.agg_trade_buffer_size)
-        self._force_order_events: deque[dict[str, Any]] = deque(maxlen=self.config.force_order_buffer_size)
+        # Per-symbol buffers for multi-symbol support
+        self._agg_trade_events: dict[str, deque[dict[str, Any]]] = {
+            sym: deque(maxlen=self.config.agg_trade_buffer_size) for sym in self._symbols
+        }
+        self._force_order_events: dict[str, deque[dict[str, Any]]] = {
+            sym: deque(maxlen=self.config.force_order_buffer_size) for sym in self._symbols
+        }
         self._last_message_at: datetime | None = None
 
-    def start(self, symbol: str = "BTCUSDT") -> None:
+    def start(self, symbols: list[str] | None = None) -> None:
         if self._thread and self._thread.is_alive():
             return
-        self._symbol = symbol.upper()
+        if symbols:
+            self._symbols = [s.upper() for s in symbols]
         self._stop_event.clear()
         self._thread = threading.Thread(target=self._thread_main, daemon=True)
         self._thread.start()
@@ -76,15 +82,35 @@ class BinanceFuturesWebsocketClient:
         if self._thread and self._thread.is_alive():
             self._thread.join(timeout=5.0)
 
-    def get_recent_agg_trades(self, window_seconds: int) -> list[dict[str, Any]]:
+    def get_recent_agg_trades(self, window_seconds: int, symbol: str | None = None) -> list[dict[str, Any]]:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+        target_symbol = symbol.upper() if symbol else None
         with self._lock:
-            return [event for event in self._agg_trade_events if event["event_time"] >= cutoff]
+            if target_symbol:
+                buffer = self._agg_trade_events.get(target_symbol)
+                if buffer is None:
+                    return []
+                return [event for event in buffer if event["event_time"] >= cutoff]
+            # Return all symbols if no specific symbol requested
+            all_events = []
+            for buffer in self._agg_trade_events.values():
+                all_events.extend([event for event in buffer if event["event_time"] >= cutoff])
+            return all_events
 
-    def get_recent_force_orders(self, window_seconds: int) -> list[dict[str, Any]]:
+    def get_recent_force_orders(self, window_seconds: int, symbol: str | None = None) -> list[dict[str, Any]]:
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=window_seconds)
+        target_symbol = symbol.upper() if symbol else None
         with self._lock:
-            return [event for event in self._force_order_events if event["event_time"] >= cutoff]
+            if target_symbol:
+                buffer = self._force_order_events.get(target_symbol)
+                if buffer is None:
+                    return []
+                return [event for event in buffer if event["event_time"] >= cutoff]
+            # Return all symbols if no specific symbol requested
+            all_events = []
+            for buffer in self._force_order_events.values():
+                all_events.extend([event for event in buffer if event["event_time"] >= cutoff])
+            return all_events
 
     @property
     def last_message_at(self) -> datetime | None:
@@ -99,25 +125,36 @@ class BinanceFuturesWebsocketClient:
 
     def _build_market_stream_url(self) -> str:
         base = self.config.ws_market_base_url.rstrip("/")
-        symbol = self._symbol.lower()
         if base.endswith("/market"):
             base = base[: -len("/market")] + "/stream"
         elif base.endswith("/ws"):
             base = base[: -len("/ws")] + "/stream"
         elif not base.endswith("/stream"):
             base = f"{base}/stream"
-        return f"{base}?streams={symbol}@aggTrade/{symbol}@forceOrder"
+        # Build streams for all symbols: btcusdt@aggTrade/ethusdt@aggTrade/...
+        streams = []
+        for sym in self._symbols:
+            sym_lower = sym.lower()
+            streams.append(f"{sym_lower}@aggTrade")
+            streams.append(f"{sym_lower}@forceOrder")
+        return f"{base}?streams={'/'.join(streams)}"
 
     def _build_legacy_stream_url(self) -> str:
         base = self.config.ws_base_url.rstrip("/")
-        symbol = self._symbol.lower()
 
         if base.endswith("/ws"):
             root = base[: -len("/ws")]
-            return f"{root}/stream?streams={symbol}@aggTrade/{symbol}@forceOrder"
-        if base.endswith("/stream"):
-            return f"{base}?streams={symbol}@aggTrade/{symbol}@forceOrder"
-        return f"{base}/stream?streams={symbol}@aggTrade/{symbol}@forceOrder"
+        elif base.endswith("/stream"):
+            root = base
+        else:
+            root = f"{base}/stream"
+        # Build streams for all symbols
+        streams = []
+        for sym in self._symbols:
+            sym_lower = sym.lower()
+            streams.append(f"{sym_lower}@aggTrade")
+            streams.append(f"{sym_lower}@forceOrder")
+        return f"{root}?streams={'/'.join(streams)}"
 
     def _build_stream_url(self) -> str:
         return self._build_market_stream_url()
@@ -167,6 +204,13 @@ class BinanceFuturesWebsocketClient:
         except json.JSONDecodeError:
             return
 
+        # Extract stream name for routing (e.g., "ethusdt@aggTrade")
+        stream_name = payload.get("stream", "")
+        # Extract symbol from stream name (part before @)
+        target_symbol = None
+        if stream_name and "@" in stream_name:
+            target_symbol = stream_name.split("@")[0].upper()
+
         if "data" in payload and isinstance(payload["data"], dict):
             data = payload["data"]
         else:
@@ -175,11 +219,21 @@ class BinanceFuturesWebsocketClient:
         event_type = data.get("e")
         if event_type == "aggTrade":
             event = normalize_ws_agg_trade_event(data)
+            # Use symbol from event data if stream routing failed
+            event_symbol = target_symbol or event.get("symbol", "BTCUSDT").upper()
             with self._lock:
-                self._agg_trade_events.append(event)
+                if event_symbol in self._agg_trade_events:
+                    self._agg_trade_events[event_symbol].append(event)
+                else:
+                    # Fallback to first symbol buffer if unknown
+                    self._agg_trade_events[self._symbols[0]].append(event)
             return
 
         if event_type == "forceOrder":
             event = normalize_ws_force_order_event(data)
+            event_symbol = target_symbol or event.get("symbol", "BTCUSDT").upper()
             with self._lock:
-                self._force_order_events.append(event)
+                if event_symbol in self._force_order_events:
+                    self._force_order_events[event_symbol].append(event)
+                else:
+                    self._force_order_events[self._symbols[0]].append(event)

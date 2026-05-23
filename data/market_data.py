@@ -133,7 +133,7 @@ class MarketDataAssembler:
             flow_quality,
             agg_meta,
         ) = self._load_agg_trade_windows(symbol=symbol, now=now)
-        force_orders_60s = self._load_force_order_window(now=now)
+        force_orders_60s = self._load_force_order_window(now=now, symbol=symbol)
         etf_bias_daily, dxy_daily = self._load_external_bias(now=now)
         total_latency_ms = (time.perf_counter() - build_started) * 1000.0
         build_finished_at = datetime.now(timezone.utc)
@@ -233,7 +233,7 @@ class MarketDataAssembler:
         ws_events: list[dict[str, Any]] = []
         source = "ws"
         if self.websocket_client is not None:
-            ws_events = self.websocket_client.get_recent_agg_trades(15 * 60)
+            ws_events = self.websocket_client.get_recent_agg_trades(15 * 60, symbol=symbol)
 
         if not ws_events:
             source = "rest"
@@ -506,10 +506,10 @@ class MarketDataAssembler:
             self.db_connection.rollback()
             raise
 
-    def _load_force_order_window(self, now: datetime) -> list[dict[str, Any]]:
+    def _load_force_order_window(self, now: datetime, symbol: str | None = None) -> list[dict[str, Any]]:
         if self.websocket_client is None:
             return []
-        events = self.websocket_client.get_recent_force_orders(60)
+        events = self.websocket_client.get_recent_force_orders(60, symbol=symbol)
         return filter_events_by_window(events, now=now, window_seconds=60)
 
     def _resolve_exchange_timestamp(

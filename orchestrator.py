@@ -236,7 +236,8 @@ def build_default_bundle(
             ws_market_base_url=settings.exchange.futures_ws_market_base_url,
             heartbeat_seconds=settings.execution.ws_heartbeat_seconds,
             reconnect_seconds=settings.execution.ws_reconnect_seconds,
-        )
+        ),
+        symbols=settings.multi_asset.enabled_symbols if settings.multi_asset.enabled_symbols else [settings.strategy.symbol],
     )
     position_persister = SqlitePositionPersister(conn)
 
@@ -1068,15 +1069,8 @@ class BotOrchestrator:
             )
 
     def _build_symbol_snapshot(self, symbol: str, timestamp: datetime) -> MarketSnapshot:
-        if symbol.upper() == self.settings.strategy.symbol.upper():
-            return self.bundle.market_data.build_snapshot(symbol=symbol, timestamp=timestamp)
-        provider = MarketDataAssembler(
-            rest_client=self.bundle.market_data.rest_client,
-            websocket_client=None,
-            config=self.bundle.market_data.config,
-            db_connection=self.conn,
-        )
-        return provider.build_snapshot(symbol=symbol, timestamp=timestamp)
+        # Multi-asset: use same WebSocket client for all symbols
+        return self.bundle.market_data.build_snapshot(symbol=symbol, timestamp=timestamp)
 
     def _portfolio_signal_from_execution(
         self,
@@ -1652,8 +1646,8 @@ class BotOrchestrator:
             return
 
         try:
-            websocket_client.start(symbol=self.settings.strategy.symbol)
-            LOG.info("Market data feed thread started for %s.", self.settings.strategy.symbol)
+            websocket_client.start(symbols=self.settings.multi_asset.enabled_symbols if self.settings.multi_asset.enabled_symbols else [self.settings.strategy.symbol])
+            LOG.info("Market data feed thread started for %s.", ", ".join(self.settings.multi_asset.enabled_symbols if self.settings.multi_asset.enabled_symbols else [self.settings.strategy.symbol]))
             self.bundle.audit_logger.log_info("orchestrator", "Market data feeds started.")
         except Exception as exc:
             reason = f"feed_start_failed:{exc}"
