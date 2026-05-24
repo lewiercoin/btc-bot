@@ -18,7 +18,7 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from settings import load_settings
-from storage.db import connect, init_db, transaction
+from storage.db import connect, transaction
 
 LOG = logging.getLogger(__name__)
 
@@ -400,7 +400,7 @@ def main() -> None:
 
     conn = connect(settings.storage.db_path)
     conn.execute("PRAGMA busy_timeout = 5000;")
-    init_db(conn, settings.storage.schema_path)
+    # NOTE: Do NOT call init_db() on existing database - causes corruption with WAL mode
 
     session = requests.Session()
     try:
