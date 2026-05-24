@@ -20,7 +20,7 @@ def migrate_cvd_from_research_lab(
     research_db_path: Path,
     production_db_path: Path,
     symbol: str,
-    days_back: int = 7,
+    bars_limit: int = 50,
 ) -> int:
     """Migrate CVD data from research lab DB to production DB.
 
@@ -28,7 +28,7 @@ def migrate_cvd_from_research_lab(
         research_db_path: Path to research lab database
         production_db_path: Path to production database
         symbol: Symbol to migrate (e.g., 'ETHUSDT')
-        days_back: Number of days of history to migrate (default: 7)
+        bars_limit: Number of most recent bars to migrate (default: 50)
 
     Returns:
         Number of rows migrated
@@ -43,9 +43,6 @@ def migrate_cvd_from_research_lab(
         # Get current timestamp for captured_at
         captured_at = datetime.now(timezone.utc).isoformat()
 
-        # Calculate cutoff date (days_back from now)
-        cutoff = (datetime.now(timezone.utc) - timedelta(days=days_back)).isoformat()
-
         # Count existing rows in production for this symbol
         cursor = production_conn.execute(
             "SELECT COUNT(*) FROM cvd_price_history WHERE symbol = ? AND timeframe = '15m'",
@@ -54,31 +51,36 @@ def migrate_cvd_from_research_lab(
         existing_count = cursor.fetchone()[0]
         print(f"  Existing {symbol} CVD rows in production: {existing_count}")
 
-        # Count rows in research lab (recent only)
+        # Count rows in research lab (get most recent N bars)
         cursor = research_conn.execute(
             """SELECT COUNT(*)
                FROM aggtrade_buckets
-               WHERE symbol = ? AND timeframe = '15m' AND bucket_time >= ?""",
-            (symbol, cutoff)
+               WHERE symbol = ? AND timeframe = '15m'""",
+            (symbol,)
         )
-        research_count = cursor.fetchone()[0]
-        print(f"  Found {research_count} recent rows in research lab for {symbol}")
+        total_count = cursor.fetchone()[0]
+        print(f"  Found {total_count} total rows in research lab for {symbol}")
 
-        if research_count == 0:
-            print(f"  ⚠ No recent data found for {symbol} in research lab")
+        if total_count == 0:
+            print(f"  ⚠ No data found for {symbol} in research lab")
             return 0
 
-        # Get timestamp range from research lab
+        # Get timestamp range from research lab (last N bars)
         cursor = research_conn.execute(
             """SELECT
                 datetime(MIN(bucket_time)) as oldest,
                 datetime(MAX(bucket_time)) as newest
-               FROM aggtrade_buckets
-               WHERE symbol = ? AND timeframe = '15m' AND bucket_time >= ?""",
-            (symbol, cutoff)
+               FROM (
+                   SELECT bucket_time
+                   FROM aggtrade_buckets
+                   WHERE symbol = ? AND timeframe = '15m'
+                   ORDER BY bucket_time DESC
+                   LIMIT ?
+               )""",
+            (symbol, bars_limit)
         )
         oldest, newest = cursor.fetchone()
-        print(f"  Research lab date range: {oldest} → {newest}")
+        print(f"  Migrating last {bars_limit} bars: {oldest} → {newest}")
 
         # Migrate data with schema conversion
         # Join aggtrade_buckets with candles to get price_close
@@ -92,16 +94,19 @@ def migrate_cvd_from_research_lab(
                    c.close as price_close,
                    a.cvd,
                    a.tfi
-               FROM aggtrade_buckets a
+               FROM (
+                   SELECT symbol, timeframe, bucket_time, cvd, tfi
+                   FROM aggtrade_buckets
+                   WHERE symbol = ? AND timeframe = '15m'
+                   ORDER BY bucket_time DESC
+                   LIMIT ?
+               ) a
                JOIN candles c ON
                    a.symbol = c.symbol
                    AND a.timeframe = c.timeframe
                    AND a.bucket_time = c.open_time
-               WHERE a.symbol = ?
-                   AND a.timeframe = '15m'
-                   AND a.bucket_time >= ?
                ORDER BY a.bucket_time""",
-            (symbol, cutoff)
+            (symbol, bars_limit)
         )
 
         rows_inserted = 0
@@ -180,10 +185,10 @@ def main() -> int:
     ]
 
     total_migrated = 0
-    days_back = 7  # Migrate last 7 days (plenty for 30-bar requirement)
+    bars_limit = 50  # Migrate last 50 bars (more than 30-bar requirement)
 
     print("=" * 80)
-    print(f"CVD DATA MIGRATION: Research Lab → Production (last {days_back} days)")
+    print(f"CVD DATA MIGRATION: Research Lab → Production (last {bars_limit} bars)")
     print("=" * 80)
     print()
 
@@ -195,7 +200,7 @@ def main() -> int:
             print(f"⚠ Research DB not found: {research_db}")
             continue
 
-        rows = migrate_cvd_from_research_lab(research_db, production_db, symbol, days_back)
+        rows = migrate_cvd_from_research_lab(research_db, production_db, symbol, bars_limit)
         total_migrated += rows
         print()
 
