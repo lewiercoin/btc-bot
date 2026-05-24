@@ -53,8 +53,8 @@ def test_oi_repository_round_trips_samples_in_timestamp_order() -> None:
 def test_oi_baseline_bootstrap_survives_restart_when_history_is_mature() -> None:
     now = datetime(2026, 3, 1, tzinfo=timezone.utc)
     rows = [
-        {"timestamp": now - timedelta(days=60), "oi_value": 100.0},
-        {"timestamp": now - timedelta(days=30), "oi_value": 120.0},
+        {"timestamp": now - timedelta(days=60 - offset), "oi_value": 100.0 + offset}
+        for offset in range(60)
     ]
     engine = FeatureEngine(FeatureEngineConfig(oi_baseline_days=60, oi_z_window_days=60))
     engine.bootstrap_oi_history(rows)
@@ -74,3 +74,33 @@ def test_oi_baseline_bootstrap_survives_restart_when_history_is_mature() -> None
 
     assert features.quality["oi_baseline"].status == "ready"
     assert features.quality["oi_baseline"].metadata["days_covered"] == 60.0
+
+
+def test_oi_baseline_detects_large_backfill_gap() -> None:
+    now = datetime(2026, 5, 24, tzinfo=timezone.utc)
+    rows = [
+        {"timestamp": now - timedelta(days=60), "oi_value": 100.0},
+        {"timestamp": now - timedelta(days=59), "oi_value": 101.0},
+        {"timestamp": now - timedelta(minutes=15), "oi_value": 120.0},
+    ]
+    engine = FeatureEngine(FeatureEngineConfig(oi_baseline_days=60, oi_z_window_days=35))
+    engine.bootstrap_oi_history(rows)
+
+    features = engine.compute(
+        MarketSnapshot(
+            symbol="BTCUSDT",
+            timestamp=now,
+            price=100.0,
+            bid=99.5,
+            ask=100.5,
+            open_interest=121.0,
+        ),
+        "v1.0",
+        "hash",
+    )
+
+    quality = features.quality["oi_baseline"]
+    assert quality.status == "degraded"
+    assert quality.reason == "oi_baseline_gap"
+    assert quality.metadata["days_covered"] == 60.0
+    assert quality.metadata["max_gap_days"] > quality.metadata["allowed_gap_days"]

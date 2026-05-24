@@ -54,9 +54,8 @@ def _conn() -> sqlite3.Connection:
 
 def _seed_open_interest(conn: sqlite3.Connection, now: datetime) -> None:
     rows = [
-        (now - timedelta(days=60), 100.0),
-        (now - timedelta(days=30), 120.0),
-        (now - timedelta(days=4), 140.0),
+        (now - timedelta(days=60 - offset), 100.0 + offset)
+        for offset in range(60)
     ]
     for ts, value in rows:
         conn.execute(
@@ -147,9 +146,9 @@ def test_backfill_oi_on_empty_table() -> None:
 
     assert result.ready is True
     assert result.days_covered == 60.0
-    assert result.inserted_historical == 3
+    assert result.inserted_historical == 60
     assert result.inserted_current == 1
-    assert len(rows) == 4
+    assert len(rows) == 61
 
 
 def test_backfill_oi_idempotent() -> None:
@@ -165,7 +164,7 @@ def test_backfill_oi_idempotent() -> None:
     finally:
         conn.close()
 
-    assert first_count == 4
+    assert first_count == 61
     assert second_count == first_count
     assert second.inserted_historical == 0
     assert second.inserted_current == 0
