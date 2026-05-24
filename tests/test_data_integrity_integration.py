@@ -102,8 +102,8 @@ def test_restart_bootstrap_restores_mature_oi_and_cvd_quality() -> None:
     engine = FeatureEngine(FeatureEngineConfig(oi_baseline_days=60, oi_z_window_days=60, cvd_divergence_bars=3))
     engine.bootstrap_oi_history(
         [
-            {"timestamp": now - timedelta(days=60), "oi_value": 100.0},
-            {"timestamp": now - timedelta(days=30), "oi_value": 110.0},
+            {"timestamp": now - timedelta(days=60 - offset), "oi_value": 100.0 + offset}
+            for offset in range(60)
         ]
     )
     engine.bootstrap_cvd_price_history(

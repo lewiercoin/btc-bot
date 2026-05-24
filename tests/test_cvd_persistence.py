@@ -102,3 +102,32 @@ def test_cvd_bootstrap_preserves_divergence_readiness_after_restart() -> None:
 
     assert features.quality["cvd_divergence"].status == "ready"
     assert features.quality["cvd_divergence"].metadata["loaded_bars"] == 3
+
+
+def test_cvd_bootstrap_detects_gap_in_required_recent_window() -> None:
+    now = datetime(2026, 5, 24, 12, 0, tzinfo=timezone.utc)
+    rows = [
+        {"bar_time": now - timedelta(days=58), "price_close": 100.0, "cvd": 1.0},
+        {"bar_time": now - timedelta(days=58, minutes=-15), "price_close": 101.0, "cvd": 2.0},
+        {"bar_time": now - timedelta(minutes=15), "price_close": 102.0, "cvd": 3.0},
+    ]
+    engine = FeatureEngine(FeatureEngineConfig(cvd_divergence_bars=3, cvd_divergence_window_bars=3))
+    engine.bootstrap_cvd_price_history(rows)
+
+    features = engine.compute(
+        MarketSnapshot(
+            symbol="BTCUSDT",
+            timestamp=now,
+            price=103.0,
+            bid=102.5,
+            ask=103.5,
+            aggtrades_bucket_15m={"cvd": 4.0},
+        ),
+        "v1.0",
+        "hash",
+    )
+
+    quality = features.quality["cvd_divergence"]
+    assert quality.status == "degraded"
+    assert quality.reason == "cvd_history_gap"
+    assert quality.metadata["max_gap_seconds"] > quality.metadata["allowed_gap_seconds"]

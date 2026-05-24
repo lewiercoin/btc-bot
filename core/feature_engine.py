@@ -28,6 +28,9 @@ class FeatureEngineConfig:
     force_order_history_points: int = 180
     cvd_divergence_window_bars: int = 10
     cvd_divergence_bars: int = 30
+    oi_max_gap_days: float = 1.0
+    cvd_bar_interval_minutes: int = 15
+    cvd_max_gap_multiplier: float = 2.0
     flow_coverage_ready: float = 0.90
     flow_coverage_degraded: float = 0.70
     funding_coverage_ready: float = 0.90
@@ -80,6 +83,15 @@ def zscore(values: list[float], value: float) -> float:
     if sd == 0:
         return 0.0
     return (value - avg) / sd
+
+
+def _max_gap_seconds(timestamps: list[datetime]) -> float:
+    if len(timestamps) < 2:
+        return 0.0
+    return max(
+        (right - left).total_seconds()
+        for left, right in zip(timestamps, timestamps[1:])
+    )
 
 
 def compute_ema(values: list[float], period: int) -> float:
@@ -428,15 +440,18 @@ class FeatureEngine:
             self._oi_history[-1] = oi_sample
         else:
             self._oi_history.append(oi_sample)
-        threshold = now - timedelta(days=self.config.oi_z_window_days)
+        retention_days = max(float(self.config.oi_z_window_days), float(self.config.oi_baseline_days))
+        threshold = now - timedelta(days=retention_days)
         while self._oi_history and self._oi_history[0][0] < threshold:
             self._oi_history.popleft()
 
-        values = [value for _, value in self._oi_history]
-        prev = values[-2] if len(values) >= 2 else oi_value
+        z_threshold = now - timedelta(days=max(float(self.config.oi_z_window_days), 0.0))
+        z_values = [value for timestamp, value in self._oi_history if timestamp >= z_threshold]
+        all_values = [value for _, value in self._oi_history]
+        prev = all_values[-2] if len(all_values) >= 2 else oi_value
         delta_pct = 0.0 if prev == 0 else (oi_value - prev) / prev
         quality = self._oi_quality(now)
-        return float(oi_value), zscore(values, float(oi_value)), delta_pct, quality
+        return float(oi_value), zscore(z_values, float(oi_value)), delta_pct, quality
 
     def _oi_quality(self, now: datetime) -> FeatureQuality:
         loaded_samples = len(self._oi_history)
@@ -446,14 +461,25 @@ class FeatureEngine:
         if oldest is not None and newest is not None:
             days_covered = max((newest - oldest).total_seconds() / 86_400.0, 0.0)
         required_days = max(float(self.config.oi_baseline_days), 0.0)
+        max_gap_seconds = _max_gap_seconds([timestamp for timestamp, _ in self._oi_history])
+        max_gap_days = max_gap_seconds / 86_400.0
+        allowed_gap_days = max(float(self.config.oi_max_gap_days), 0.0)
         metadata = {
             "loaded_samples": loaded_samples,
             "required_days": required_days,
             "days_covered": days_covered,
+            "max_gap_days": max_gap_days,
+            "allowed_gap_days": allowed_gap_days,
             "oldest_timestamp": oldest.isoformat() if oldest else None,
             "newest_timestamp": newest.isoformat() if newest else None,
         }
         if loaded_samples >= 2 and days_covered >= required_days:
+            if max_gap_days > allowed_gap_days:
+                return FeatureQuality.degraded(
+                    reason="oi_baseline_gap",
+                    metadata=metadata,
+                    provenance="bootstrapped-from-db",
+                )
             return FeatureQuality.ready(
                 reason="oi_baseline_mature",
                 metadata=metadata,
@@ -476,13 +502,28 @@ class FeatureEngine:
         required_bars = max(int(self.config.cvd_divergence_bars), 1)
         oldest = self._cvd_price_history[0][0] if self._cvd_price_history else None
         newest = self._cvd_price_history[-1][0] if self._cvd_price_history else None
+        recent_bars = list(self._cvd_price_history)[-required_bars:]
+        max_gap_seconds = _max_gap_seconds([timestamp for timestamp, _, _ in recent_bars])
+        allowed_gap_seconds = (
+            max(int(self.config.cvd_bar_interval_minutes), 1)
+            * max(float(self.config.cvd_max_gap_multiplier), 1.0)
+            * 60.0
+        )
         metadata = {
             "loaded_bars": loaded_bars,
             "required_bars": required_bars,
+            "max_gap_seconds": max_gap_seconds,
+            "allowed_gap_seconds": allowed_gap_seconds,
             "oldest_timestamp": oldest.isoformat() if oldest else None,
             "newest_timestamp": newest.isoformat() if newest else None,
         }
         if loaded_bars >= required_bars:
+            if max_gap_seconds > allowed_gap_seconds:
+                return FeatureQuality.degraded(
+                    reason="cvd_history_gap",
+                    metadata=metadata,
+                    provenance="bootstrapped-from-db",
+                )
             return FeatureQuality.ready(
                 reason="cvd_history_mature",
                 metadata=metadata,
