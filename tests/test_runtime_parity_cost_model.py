@@ -8,7 +8,9 @@ from core.models import Position
 from scripts.run_runtime_parity_backtest import (
     CostModelConfig,
     DynamicThresholdConfig,
+    SymbolRuntime,
     _dynamic_min_sweep_depth_pct,
+    _portfolio_state,
     calculate_trade_costs,
 )
 
@@ -81,3 +83,23 @@ def test_dynamic_threshold_clamps_atr_relative_value() -> None:
     assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.020, config=cfg) == pytest.approx(0.005)
     assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.001, config=cfg) == pytest.approx(0.0025)
     assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.100, config=cfg) == pytest.approx(0.0075)
+
+
+def test_portfolio_state_resets_stale_daily_and_weekly_runtime_pnl() -> None:
+    runtime = SymbolRuntime(
+        trades_today=3,
+        current_day="2026-01-01",
+        current_week="2026-W01",
+        daily_pnl_r=-3.0,
+        weekly_pnl_r=-5.0,
+    )
+
+    _, symbol_states = _portfolio_state(
+        [],
+        {"BTCUSDT": runtime},
+        now=datetime(2026, 1, 12, 12, 0, tzinfo=timezone.utc),
+    )
+
+    assert symbol_states["BTCUSDT"].trades_today == 0
+    assert symbol_states["BTCUSDT"].daily_pnl_r == 0.0
+    assert symbol_states["BTCUSDT"].weekly_pnl_r == 0.0
