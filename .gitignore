@@ -168,6 +168,20 @@ _tmp_*
 scripts/_db_check*.py
 scripts/_q_v2*.py
 scripts/_diag_signals.py
+check_aggtrade_schema.py
+check_local_db.py
+check_research_db.py
+check_research_db_detailed.py
+check_research_schema.py
+migrate_all_to_production.py
+migrate_oi_to_production.py
+
+# Generated validation outputs
+validation/*.json
+!validation/runtime_parity_2026q1_multi_asset.json
+!validation/runtime_parity_smoke.json
+!validation/runtime_parity_smoke_short.json
+!validation/runtime_parity_smoke_short_2.json
 
 # Deploy artifacts (SSH keys + git bundle)
 btc-bot-deploy
