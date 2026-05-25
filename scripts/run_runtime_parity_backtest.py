@@ -87,6 +87,14 @@ class TradeCostBreakdown:
     risk_abs: float
 
 
+@dataclass(frozen=True, slots=True)
+class DynamicThresholdConfig:
+    mode: str = "fixed"
+    atr_multiplier: float = 0.0
+    floor_threshold: float = 0.0
+    ceiling_threshold: float = 1.0
+
+
 @dataclass(slots=True)
 class SymbolRuntime:
     trades_today: int = 0
@@ -201,6 +209,37 @@ def _signal_config(strategy: StrategyConfig) -> SignalConfig:
         uptrend_pullback_confluence_min=strategy.uptrend_pullback_confluence_min,
         regime_direction_whitelist=build_signal_regime_direction_whitelist(strategy),
     )
+
+
+def _dynamic_min_sweep_depth_pct(
+    *,
+    base_threshold: float,
+    atr_4h_norm: float,
+    config: DynamicThresholdConfig | None,
+) -> float:
+    if config is None or config.mode == "fixed":
+        return float(base_threshold)
+    if config.mode != "atr_4h_relative":
+        raise ValueError(f"Unsupported dynamic threshold mode: {config.mode}")
+    raw = max(float(atr_4h_norm), 0.0) * float(config.atr_multiplier)
+    return max(float(config.floor_threshold), min(raw, float(config.ceiling_threshold)))
+
+
+def _signal_config_for_features(
+    strategy: StrategyConfig,
+    *,
+    atr_4h_norm: float,
+    dynamic_threshold: DynamicThresholdConfig | None,
+) -> SignalConfig:
+    config = _signal_config(strategy)
+    threshold = _dynamic_min_sweep_depth_pct(
+        base_threshold=strategy.min_sweep_depth_pct,
+        atr_4h_norm=atr_4h_norm,
+        config=dynamic_threshold,
+    )
+    if threshold == config.min_sweep_depth_pct:
+        return config
+    return dataclasses.replace(config, min_sweep_depth_pct=threshold)
 
 
 def _feature_config(settings: AppSettings, strategy: StrategyConfig) -> FeatureEngineConfig:
@@ -558,6 +597,7 @@ def run_backtest(
     warmup_days: int,
     initial_equity: float,
     cost_config: CostModelConfig | None = None,
+    dynamic_threshold: DynamicThresholdConfig | None = None,
 ) -> tuple[BacktestResult, list[TradeLog]]:
     resolved_cost_config = cost_config or CostModelConfig()
     warmup_start = start_ts - timedelta(days=warmup_days)
@@ -614,7 +654,13 @@ def run_backtest(
             strategy = resolve_symbol_config(settings.strategy, symbol, settings.multi_asset)
             features = engines[symbol].compute(snapshot, settings.schema_version, settings.config_hash)
             regime = regime_engine.classify(features)
-            signal_engine = SignalEngine(_signal_config(strategy))
+            signal_engine = SignalEngine(
+                _signal_config_for_features(
+                    strategy,
+                    atr_4h_norm=features.atr_4h_norm,
+                    dynamic_threshold=dynamic_threshold,
+                )
+            )
             diagnostics = signal_engine.diagnose(features, regime, context=None)
             candidate = signal_engine.generate(features, regime, diagnostics=diagnostics, context=None)
             if candidate is None:
@@ -856,6 +902,10 @@ def main() -> int:
         default=[],
         help="Per-symbol threshold override, e.g. ETHUSDT=0.0065. May be repeated.",
     )
+    parser.add_argument("--dynamic-threshold-mode", choices=("fixed", "atr_4h_relative"), default="fixed")
+    parser.add_argument("--dynamic-threshold-atr-multiplier", type=float, default=0.0)
+    parser.add_argument("--dynamic-threshold-floor", type=float, default=0.0)
+    parser.add_argument("--dynamic-threshold-ceiling", type=float, default=1.0)
     parser.add_argument("--output-json", type=Path)
     args = parser.parse_args()
 
@@ -886,6 +936,12 @@ def main() -> int:
                 slippage_bps_per_side=float(args.slippage_bps),
                 funding_enabled=not bool(args.disable_funding),
                 funding_fallback_rate_per_8h=float(args.funding_fallback_rate_per_8h),
+            ),
+            dynamic_threshold=DynamicThresholdConfig(
+                mode=str(args.dynamic_threshold_mode),
+                atr_multiplier=float(args.dynamic_threshold_atr_multiplier),
+                floor_threshold=float(args.dynamic_threshold_floor),
+                ceiling_threshold=float(args.dynamic_threshold_ceiling),
             ),
         )
     finally:
