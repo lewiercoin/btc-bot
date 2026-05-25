@@ -99,6 +99,7 @@ class DynamicThresholdConfig:
 class SymbolRuntime:
     trades_today: int = 0
     current_day: str | None = None
+    current_week: str | None = None
     consecutive_losses: int = 0
     last_trade_at: datetime | None = None
     last_loss_at: datetime | None = None
@@ -130,6 +131,11 @@ def _to_utc(value: datetime) -> datetime:
     if value.tzinfo is None:
         return value.replace(tzinfo=timezone.utc)
     return value.astimezone(timezone.utc)
+
+
+def _week_key(value: datetime) -> str:
+    iso_year, iso_week, _ = _to_utc(value).isocalendar()
+    return f"{iso_year:04d}-W{iso_week:02d}"
 
 
 def _parse_ts(raw: str, *, end: bool = False) -> datetime:
@@ -334,11 +340,30 @@ def _state_for_symbol(runtime: SymbolRuntime, now: datetime, open_count: int) ->
     )
 
 
-def _portfolio_state(open_positions: list[OpenBacktestPosition], runtimes: dict[str, SymbolRuntime]) -> tuple[PortfolioRiskState, dict[str, SymbolRiskState]]:
+def _sync_runtime_period(runtime: SymbolRuntime, now: datetime) -> None:
+    day = now.date().isoformat()
+    if runtime.current_day != day:
+        runtime.current_day = day
+        runtime.trades_today = 0
+        runtime.daily_pnl_r = 0.0
+    week = _week_key(now)
+    if runtime.current_week != week:
+        runtime.current_week = week
+        runtime.weekly_pnl_r = 0.0
+
+
+def _portfolio_state(
+    open_positions: list[OpenBacktestPosition],
+    runtimes: dict[str, SymbolRuntime],
+    *,
+    now: datetime,
+) -> tuple[PortfolioRiskState, dict[str, SymbolRiskState]]:
     total_risk = sum(item.risk_pct for item in open_positions)
     gross = sum(item.gross_notional_pct for item in open_positions)
     long_notional = sum(item.gross_notional_pct for item in open_positions if item.position.direction == "LONG")
     short_notional = sum(item.gross_notional_pct for item in open_positions if item.position.direction == "SHORT")
+    for runtime in runtimes.values():
+        _sync_runtime_period(runtime, now)
     symbols = {
         symbol: SymbolRiskState(
             symbol=symbol,
@@ -575,6 +600,7 @@ def _close_positions(
             )
         )
         runtime = runtimes[item.symbol]
+        _sync_runtime_period(runtime, timestamp)
         runtime.last_trade_at = timestamp
         runtime.daily_pnl_r += trade.pnl_r
         runtime.weekly_pnl_r += trade.pnl_r
@@ -704,7 +730,7 @@ def run_backtest(
         if not generated:
             continue
 
-        portfolio_state, symbol_states = _portfolio_state(open_positions, runtimes)
+        portfolio_state, symbol_states = _portfolio_state(open_positions, runtimes, now=timestamp)
         adjusted_generated: list[tuple[str, SignalCandidate, RiskDecision, PortfolioSignal, dict[str, Any]]] = []
         accepted_for_sizing: list[PortfolioSignal] = []
         portfolio_config = _portfolio_config(settings)
@@ -767,11 +793,7 @@ def run_backtest(
                 updated_at=timestamp,
                 signal_id=candidate.signal_id,
             )
-            trade_day = timestamp.date().isoformat()
-            if runtimes[symbol].current_day != trade_day:
-                runtimes[symbol].current_day = trade_day
-                runtimes[symbol].trades_today = 0
-                runtimes[symbol].daily_pnl_r = 0.0
+            _sync_runtime_period(runtimes[symbol], timestamp)
             runtimes[symbol].trades_today += 1
             open_positions.append(
                 OpenBacktestPosition(
