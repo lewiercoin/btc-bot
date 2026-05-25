@@ -1,0 +1,229 @@
+{
+  "result": {
+    "start_ts_utc": "2026-03-20T00:00:00+00:00",
+    "end_ts_utc": "2026-03-20T12:00:00+00:00",
+    "warmup_start_ts_utc": "2026-03-10T00:00:00+00:00",
+    "symbols": [
+      "BTCUSDT",
+      "ETHUSDT",
+      "SOLUSDT"
+    ],
+    "evaluation_cycles": 48,
+    "missing_snapshots": {},
+    "outcome_reasons": {
+      "BTCUSDT": {
+        "no_sweep": 17,
+        "sweep_too_shallow": 21,
+        "uptrend_continuation_weak": 8
+      },
+      "ETHUSDT": {
+        "no_sweep": 18,
+        "sweep_too_shallow": 18,
+        "uptrend_continuation_weak": 10
+      },
+      "SOLUSDT": {
+        "sweep_too_shallow": 19,
+        "no_sweep": 14,
+        "uptrend_continuation_weak": 15
+      }
+    },
+    "signal_candidates": {
+      "BTCUSDT": 2,
+      "ETHUSDT": 2
+    },
+    "governance_vetoes": {
+      "BTCUSDT": {
+        "duplicate_level": 1
+      },
+      "ETHUSDT": {},
+      "SOLUSDT": {}
+    },
+    "risk_vetoes": {
+      "BTCUSDT": {
+        "rr_below_min:1.796": 1
+      },
+      "ETHUSDT": {},
+      "SOLUSDT": {}
+    },
+    "portfolio_vetoes": {
+      "BTCUSDT": {},
+      "ETHUSDT": {},
+      "SOLUSDT": {}
+    },
+    "trades_by_symbol": {
+      "ETHUSDT": 2
+    },
+    "performance": {
+      "trades_count": 2,
+      "expectancy_r": -1.0,
+      "pnl_abs": -4.799999999999976,
+      "pnl_r_sum": -2.0,
+      "max_drawdown_pct": 0.0047999999999999545,
+      "win_rate": 0.0,
+      "avg_winner_r": 0.0,
+      "avg_loser_r": -1.0,
+      "profit_factor": 0.0,
+      "max_consecutive_losses": 2,
+      "sharpe_ratio": 0.0,
+      "total_fees": 0.0
+    },
+    "data_ranges": {
+      "candles": [
+        {
+          "symbol": "BTCUSDT",
+          "rows": 256394,
+          "oldest": "2020-09-01T00:00:00+00:00",
+          "newest": "2026-03-28T20:30:00+00:00"
+        },
+        {
+          "symbol": "ETHUSDT",
+          "rows": 157794,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-27T23:45:00+00:00"
+        },
+        {
+          "symbol": "SOLUSDT",
+          "rows": 157794,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-27T23:45:00+00:00"
+        }
+      ],
+      "aggtrade_buckets": [
+        {
+          "symbol": "BTCUSDT",
+          "rows": 3122272,
+          "oldest": "2020-09-01T00:00:00+00:00",
+          "newest": "2026-03-28T21:14:00+00:00"
+        },
+        {
+          "symbol": "ETHUSDT",
+          "rows": 2376062,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-27T23:59:00+00:00"
+        },
+        {
+          "symbol": "SOLUSDT",
+          "rows": 2376062,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-27T23:59:00+00:00"
+        }
+      ],
+      "open_interest": [
+        {
+          "symbol": "BTCUSDT",
+          "rows": 524971,
+          "oldest": "2020-09-01T00:00:00+00:00",
+          "newest": "2026-03-29T00:00:00+00:00"
+        }
+      ],
+      "oi_samples": [
+        {
+          "symbol": "ETHUSDT",
+          "rows": 445403,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-28T00:00:00+00:00"
+        },
+        {
+          "symbol": "SOLUSDT",
+          "rows": 445386,
+          "oldest": "2022-01-01T00:00:00+00:00",
+          "newest": "2026-03-28T00:00:00+00:00"
+        }
+      ],
+      "funding": [
+        {
+          "symbol": "BTCUSDT",
+          "rows": 6105,
+          "oldest": "2020-09-01T00:00:00+00:00",
+          "newest": "2026-03-28T16:00:00+00:00"
+        },
+        {
+          "symbol": "ETHUSDT",
+          "rows": 4641,
+          "oldest": "2022-01-01T00:00:00.006000+00:00",
+          "newest": "2026-03-27T16:00:00+00:00"
+        },
+        {
+          "symbol": "SOLUSDT",
+          "rows": 4716,
+          "oldest": "2022-01-01T00:00:00.006000+00:00",
+          "newest": "2026-03-27T16:00:00+00:00"
+        }
+      ]
+    }
+  },
+  "trades": [
+    {
+      "trade_id": "bt-ETHUSDT-2026-03-20T04:15:00+00:00",
+      "signal_id": "bt-ETHUSDT-2026-03-20T04:15:00+00:00",
+      "opened_at": "2026-03-20 04:15:00+00:00",
+      "closed_at": "2026-03-20 04:45:00+00:00",
+      "direction": "LONG",
+      "regime": "uptrend",
+      "confluence_score": 12.95,
+      "entry_price": 2147.0561,
+      "exit_price": 2140.18552048,
+      "size": 0.3493155115974847,
+      "fees": 0.0,
+      "slippage_bps": 0.0,
+      "pnl_abs": -2.3999999999999537,
+      "pnl_r": -1.0,
+      "mae": 3.1599430494618557,
+      "mfe": 2.2858857763428224,
+      "exit_reason": "SL",
+      "funding_paid": 0.0,
+      "features_at_entry_json": {
+        "atr_15m": 8.609999999999998,
+        "atr_4h": 51.73285714285709,
+        "atr_4h_norm": 0.02399427524540576,
+        "ema50_4h": 2169.4893203057686,
+        "ema200_4h": 2125.085184376528,
+        "sweep_depth_pct": 0.005384332338132532,
+        "sweep_side": "HIGH",
+        "funding_pct_60d": 19.0,
+        "oi_zscore_60d": 0.3966125016898088,
+        "cvd_15m": 8202.229999999889,
+        "tfi_60s": 0.4056744484576306,
+        "force_order_rate_60s": 0.0,
+        "force_order_spike": false,
+        "symbol": "ETHUSDT"
+      }
+    },
+    {
+      "trade_id": "bt-ETHUSDT-2026-03-20T11:15:00+00:00",
+      "signal_id": "bt-ETHUSDT-2026-03-20T11:15:00+00:00",
+      "opened_at": "2026-03-20 11:15:00+00:00",
+      "closed_at": "2026-03-20 11:45:00+00:00",
+      "direction": "LONG",
+      "regime": "uptrend",
+      "confluence_score": 12.95,
+      "entry_price": 2145.067292857143,
+      "exit_price": 2138.20307752,
+      "size": 0.34963938077720175,
+      "fees": 0.0,
+      "slippage_bps": 0.0,
+      "pnl_abs": -2.4000000000000226,
+      "pnl_r": -1.0,
+      "mae": 4.138783744649866,
+      "mfe": 1.4694319230164372,
+      "exit_reason": "SL",
+      "funding_paid": 0.0,
+      "features_at_entry_json": {
+        "atr_15m": 10.729285714285684,
+        "atr_4h": 51.80571428571424,
+        "atr_4h_norm": 0.024018709477865927,
+        "ema50_4h": 2168.346739427696,
+        "ema200_4h": 2119.9883527027446,
+        "sweep_depth_pct": 0.005925518424586023,
+        "sweep_side": "HIGH",
+        "funding_pct_60d": 20.0,
+        "oi_zscore_60d": 0.27521780442707955,
+        "cvd_15m": 14568.631999999645,
+        "tfi_60s": 0.45428480629650503,
+        "force_order_rate_60s": 0.0,
+        "force_order_spike": false,
+        "symbol": "ETHUSDT"
+      }
+    }
+  ]
+}

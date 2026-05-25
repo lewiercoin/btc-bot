@@ -223,12 +223,15 @@ class ReplayLoader:
         open_interest_rows = self.connection.execute(
             """
             SELECT timestamp, oi_value
-            FROM open_interest
-            WHERE symbol = ?
-              AND timestamp <= ?
+            FROM (
+                SELECT timestamp, oi_value FROM open_interest WHERE symbol = ?
+                UNION
+                SELECT timestamp, oi_value FROM oi_samples WHERE symbol = ?
+            )
+            WHERE timestamp <= ?
             ORDER BY timestamp ASC
             """,
-            (symbol, end_ts.isoformat()),
+            (symbol, symbol, end_ts.isoformat()),
         ).fetchall()
         open_interest_timestamps = [_parse_timestamp(row["timestamp"]) for row in open_interest_rows]
         open_interest_values = [float(row["oi_value"]) for row in open_interest_rows]
@@ -239,10 +242,11 @@ class ReplayLoader:
             FROM aggtrade_buckets
             WHERE symbol = ?
               AND timeframe IN ('15m', '60s')
+              AND bucket_time >= ?
               AND bucket_time <= ?
             ORDER BY timeframe ASC, bucket_time ASC
             """,
-            (symbol, end_ts.isoformat()),
+            (symbol, lookback_start.isoformat(), end_ts.isoformat()),
         ).fetchall()
         agg_15m_rows: list[dict[str, Any]] = []
         agg_60s_rows: list[dict[str, Any]] = []
