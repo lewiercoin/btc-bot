@@ -5,7 +5,12 @@ from datetime import datetime, timezone
 import pytest
 
 from core.models import Position
-from scripts.run_runtime_parity_backtest import CostModelConfig, calculate_trade_costs
+from scripts.run_runtime_parity_backtest import (
+    CostModelConfig,
+    DynamicThresholdConfig,
+    _dynamic_min_sweep_depth_pct,
+    calculate_trade_costs,
+)
 
 
 def test_calculate_trade_costs_applies_fees_slippage_and_funding() -> None:
@@ -53,3 +58,26 @@ def test_calculate_trade_costs_applies_fees_slippage_and_funding() -> None:
     assert costs.net_pnl_abs == pytest.approx(98.55)
     assert costs.risk_abs == pytest.approx(50.0)
     assert costs.net_pnl_r == pytest.approx(1.971)
+
+
+def test_dynamic_threshold_uses_fixed_base_when_disabled() -> None:
+    threshold = _dynamic_min_sweep_depth_pct(
+        base_threshold=0.00649,
+        atr_4h_norm=0.012,
+        config=DynamicThresholdConfig(mode="fixed"),
+    )
+
+    assert threshold == pytest.approx(0.00649)
+
+
+def test_dynamic_threshold_clamps_atr_relative_value() -> None:
+    cfg = DynamicThresholdConfig(
+        mode="atr_4h_relative",
+        atr_multiplier=0.25,
+        floor_threshold=0.0025,
+        ceiling_threshold=0.0075,
+    )
+
+    assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.020, config=cfg) == pytest.approx(0.005)
+    assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.001, config=cfg) == pytest.approx(0.0025)
+    assert _dynamic_min_sweep_depth_pct(base_threshold=0.00649, atr_4h_norm=0.100, config=cfg) == pytest.approx(0.0075)
