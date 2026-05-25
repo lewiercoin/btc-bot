@@ -21,8 +21,9 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from backtest.replay_loader import ReplayLoader, ReplayLoaderConfig
 from backtest.performance import summarize
+from backtest.replay_loader import ReplayLoader, ReplayLoaderConfig
+from core.funding import compute_funding_paid
 from core.feature_engine import FeatureEngine, FeatureEngineConfig
 from core.governance import GovernanceConfig, GovernanceLayer
 from core.models import (
@@ -52,6 +53,32 @@ class OpenBacktestPosition:
     entry_candle_index: int
 
 
+@dataclass(frozen=True, slots=True)
+class CostModelConfig:
+    maker_fee_pct: float = 0.0002
+    taker_fee_pct: float = 0.0005
+    slippage_bps_per_side: float = 3.0
+    funding_enabled: bool = True
+    funding_fallback_rate_per_8h: float = 0.0001
+
+
+@dataclass(frozen=True, slots=True)
+class TradeCostBreakdown:
+    entry_fee: float
+    exit_fee: float
+    fees_total: float
+    entry_slippage: float
+    exit_slippage: float
+    slippage_total: float
+    funding_paid: float
+    total_cost: float
+    gross_pnl_abs: float
+    net_pnl_abs: float
+    gross_pnl_r: float
+    net_pnl_r: float
+    risk_abs: float
+
+
 @dataclass(slots=True)
 class SymbolRuntime:
     trades_today: int = 0
@@ -78,6 +105,8 @@ class BacktestResult:
     portfolio_vetoes: dict[str, dict[str, int]] = field(default_factory=dict)
     trades_by_symbol: dict[str, int] = field(default_factory=dict)
     performance: dict[str, Any] = field(default_factory=dict)
+    gross_performance: dict[str, Any] = field(default_factory=dict)
+    cost_breakdown: dict[str, float] = field(default_factory=dict)
     data_ranges: dict[str, Any] = field(default_factory=dict)
 
 
@@ -272,6 +301,98 @@ def _capacity_scale(
     return max(min(min(limits), 1.0), 0.0)
 
 
+def _funding_period_count(opened_at: datetime, closed_at: datetime) -> int:
+    opened = _to_utc(opened_at)
+    closed = _to_utc(closed_at)
+    if closed <= opened:
+        return 0
+    day = opened.replace(hour=0, minute=0, second=0, microsecond=0)
+    count = 0
+    while day <= closed:
+        for hour in (0, 8, 16):
+            funding_time = day.replace(hour=hour)
+            if opened < funding_time <= closed:
+                count += 1
+        day += timedelta(days=1)
+    return count
+
+
+def _funding_paid(
+    *,
+    position: Position,
+    closed_at: datetime,
+    funding_samples: list[dict[str, Any]],
+    config: CostModelConfig,
+) -> float:
+    if not config.funding_enabled:
+        return 0.0
+    notional = max(float(position.entry_price) * float(position.size), 0.0)
+    if notional <= 0.0:
+        return 0.0
+
+    relevant_samples = [
+        sample
+        for sample in funding_samples
+        if _to_utc(position.opened_at) < _to_utc(sample["funding_time"]) <= _to_utc(closed_at)
+    ]
+    if relevant_samples:
+        return compute_funding_paid(
+            direction=position.direction,
+            notional=notional,
+            opened_at=position.opened_at,
+            closed_at=closed_at,
+            funding_samples=relevant_samples,
+        )
+
+    periods = _funding_period_count(position.opened_at, closed_at)
+    return notional * float(config.funding_fallback_rate_per_8h) * periods
+
+
+def calculate_trade_costs(
+    *,
+    position: Position,
+    exit_price: float,
+    gross_pnl_abs: float,
+    gross_pnl_r: float,
+    closed_at: datetime,
+    funding_samples: list[dict[str, Any]],
+    config: CostModelConfig,
+) -> TradeCostBreakdown:
+    entry_notional = abs(float(position.entry_price) * float(position.size))
+    exit_notional = abs(float(exit_price) * float(position.size))
+    entry_fee = entry_notional * float(config.taker_fee_pct)
+    exit_fee = exit_notional * float(config.maker_fee_pct)
+    entry_slippage = entry_notional * float(config.slippage_bps_per_side) / 10_000.0
+    exit_slippage = exit_notional * float(config.slippage_bps_per_side) / 10_000.0
+    funding = _funding_paid(
+        position=position,
+        closed_at=closed_at,
+        funding_samples=funding_samples,
+        config=config,
+    )
+    fees_total = entry_fee + exit_fee
+    slippage_total = entry_slippage + exit_slippage
+    total_cost = fees_total + slippage_total + funding
+    net_pnl_abs = float(gross_pnl_abs) - total_cost
+    risk_abs = abs(float(position.entry_price) - float(position.stop_loss)) * float(position.size)
+    net_pnl_r = net_pnl_abs / max(risk_abs, 1e-8)
+    return TradeCostBreakdown(
+        entry_fee=entry_fee,
+        exit_fee=exit_fee,
+        fees_total=fees_total,
+        entry_slippage=entry_slippage,
+        exit_slippage=exit_slippage,
+        slippage_total=slippage_total,
+        funding_paid=funding,
+        total_cost=total_cost,
+        gross_pnl_abs=float(gross_pnl_abs),
+        net_pnl_abs=net_pnl_abs,
+        gross_pnl_r=float(gross_pnl_r),
+        net_pnl_r=net_pnl_r,
+        risk_abs=risk_abs,
+    )
+
+
 def _close_positions(
     *,
     timestamp: datetime,
@@ -279,8 +400,10 @@ def _close_positions(
     open_positions: list[OpenBacktestPosition],
     risk_engine: RiskEngine,
     runtimes: dict[str, SymbolRuntime],
-) -> list[TradeLog]:
+    cost_config: CostModelConfig,
+) -> tuple[list[TradeLog], list[TradeLog]]:
     closed: list[TradeLog] = []
+    closed_gross: list[TradeLog] = []
     remaining: list[OpenBacktestPosition] = []
     for item in open_positions:
         snapshot = snapshots_at_time.get(item.symbol)
@@ -306,6 +429,17 @@ def _close_positions(
             exit_reason=str(decision.reason),
             candles_15m=snapshot.candles_15m[item.entry_candle_index :],
         )
+        costs = calculate_trade_costs(
+            position=item.position,
+            exit_price=float(metrics.exit_price),
+            gross_pnl_abs=float(metrics.pnl_abs),
+            gross_pnl_r=float(metrics.pnl_r),
+            closed_at=timestamp,
+            funding_samples=snapshot.funding_history,
+            config=cost_config,
+        )
+        entry_features = dict(item.entry_features)
+        entry_features["cost_breakdown"] = asdict(costs)
         trade = TradeLog(
             trade_id=f"bt-{item.position.position_id}",
             signal_id=item.position.signal_id,
@@ -317,16 +451,39 @@ def _close_positions(
             entry_price=item.position.entry_price,
             exit_price=metrics.exit_price,
             size=item.position.size,
-            fees=0.0,
-            slippage_bps=0.0,
-            pnl_abs=metrics.pnl_abs,
-            pnl_r=metrics.pnl_r,
+            fees=costs.fees_total,
+            slippage_bps=cost_config.slippage_bps_per_side,
+            pnl_abs=costs.net_pnl_abs,
+            pnl_r=costs.net_pnl_r,
             mae=metrics.mae,
             mfe=metrics.mfe,
             exit_reason=metrics.exit_reason,
-            features_at_entry_json=item.entry_features,
+            funding_paid=costs.funding_paid,
+            features_at_entry_json=entry_features,
         )
         closed.append(trade)
+        closed_gross.append(
+            TradeLog(
+                trade_id=trade.trade_id,
+                signal_id=trade.signal_id,
+                opened_at=trade.opened_at,
+                closed_at=trade.closed_at,
+                direction=trade.direction,
+                regime=trade.regime,
+                confluence_score=trade.confluence_score,
+                entry_price=trade.entry_price,
+                exit_price=trade.exit_price,
+                size=trade.size,
+                fees=0.0,
+                slippage_bps=0.0,
+                pnl_abs=metrics.pnl_abs,
+                pnl_r=metrics.pnl_r,
+                mae=metrics.mae,
+                mfe=metrics.mfe,
+                exit_reason=metrics.exit_reason,
+                features_at_entry_json=item.entry_features,
+            )
+        )
         runtime = runtimes[item.symbol]
         runtime.last_trade_at = timestamp
         runtime.daily_pnl_r += trade.pnl_r
@@ -337,7 +494,7 @@ def _close_positions(
         elif trade.pnl_r > 0:
             runtime.consecutive_losses = 0
     open_positions[:] = remaining
-    return closed
+    return closed, closed_gross
 
 
 def run_backtest(
@@ -349,7 +506,9 @@ def run_backtest(
     end_ts: datetime,
     warmup_days: int,
     initial_equity: float,
+    cost_config: CostModelConfig | None = None,
 ) -> tuple[BacktestResult, list[TradeLog]]:
+    resolved_cost_config = cost_config or CostModelConfig()
     warmup_start = start_ts - timedelta(days=warmup_days)
     snapshots = _load_snapshots(conn, symbols=symbols, warmup_start=warmup_start, end_ts=end_ts)
     timestamps = sorted(set().union(*(set(items) for items in snapshots.values())))
@@ -367,6 +526,7 @@ def run_backtest(
     runtimes = {symbol: SymbolRuntime() for symbol in symbols}
     open_positions: list[OpenBacktestPosition] = []
     trades: list[TradeLog] = []
+    gross_trades: list[TradeLog] = []
 
     outcomes: dict[str, Counter[str]] = {symbol: Counter() for symbol in symbols}
     candidates_count: Counter[str] = Counter()
@@ -378,15 +538,16 @@ def run_backtest(
 
     for timestamp in timestamps:
         snapshots_at_time = {symbol: by_ts[timestamp] for symbol, by_ts in snapshots.items() if timestamp in by_ts}
-        trades.extend(
-            _close_positions(
-                timestamp=timestamp,
-                snapshots_at_time=snapshots_at_time,
-                open_positions=open_positions,
-                risk_engine=risk_engine,
-                runtimes=runtimes,
-            )
+        closed_net, closed_gross = _close_positions(
+            timestamp=timestamp,
+            snapshots_at_time=snapshots_at_time,
+            open_positions=open_positions,
+            risk_engine=risk_engine,
+            runtimes=runtimes,
+            cost_config=resolved_cost_config,
         )
+        trades.extend(closed_net)
+        gross_trades.extend(closed_gross)
         if timestamp < start_ts or timestamp >= end_ts:
             for symbol, snapshot in snapshots_at_time.items():
                 engines[symbol].compute(snapshot, settings.schema_version, settings.config_hash)
@@ -529,6 +690,24 @@ def run_backtest(
             )
 
     perf = summarize(trades, initial_equity=initial_equity)
+    gross_perf = summarize(gross_trades, initial_equity=initial_equity)
+    cost_breakdown = {
+        "maker_fee_pct": resolved_cost_config.maker_fee_pct,
+        "taker_fee_pct": resolved_cost_config.taker_fee_pct,
+        "slippage_bps_per_side": resolved_cost_config.slippage_bps_per_side,
+        "funding_enabled": float(1 if resolved_cost_config.funding_enabled else 0),
+        "funding_fallback_rate_per_8h": resolved_cost_config.funding_fallback_rate_per_8h,
+        "total_fees": sum(float(trade.fees) for trade in trades),
+        "total_slippage": sum(float((trade.features_at_entry_json.get("cost_breakdown") or {}).get("slippage_total", 0.0)) for trade in trades),
+        "total_funding": sum(float(trade.funding_paid) for trade in trades),
+        "total_costs_abs": sum(float((trade.features_at_entry_json.get("cost_breakdown") or {}).get("total_cost", 0.0)) for trade in trades),
+        "total_costs_r": sum(
+            float((trade.features_at_entry_json.get("cost_breakdown") or {}).get("gross_pnl_r", 0.0))
+            - float(trade.pnl_r)
+            for trade in trades
+        ),
+        "net_vs_gross_pnl_r_delta": asdict(perf)["pnl_r_sum"] - asdict(gross_perf)["pnl_r_sum"],
+    }
     result = BacktestResult(
         start_ts_utc=start_ts.isoformat(),
         end_ts_utc=end_ts.isoformat(),
@@ -543,6 +722,8 @@ def run_backtest(
         portfolio_vetoes={symbol: dict(counter) for symbol, counter in portfolio_vetoes.items()},
         trades_by_symbol=dict(Counter(trade.features_at_entry_json.get("symbol", "") for trade in trades)),
         performance=asdict(perf),
+        gross_performance=asdict(gross_perf),
+        cost_breakdown=cost_breakdown,
         data_ranges=_data_ranges(conn, symbols=symbols),
     )
     return result, trades
@@ -575,11 +756,26 @@ def _print_report(result: BacktestResult) -> None:
     print(f"Evaluation cycles: {result.evaluation_cycles}")
     print(f"Signal candidates: {sum(result.signal_candidates.values())}")
     print(f"Trades: {result.performance.get('trades_count', 0)}")
-    print(f"Expectancy R: {result.performance.get('expectancy_r', 0.0):+.3f}")
-    print(f"PnL R sum: {result.performance.get('pnl_r_sum', 0.0):+.3f}")
-    print(f"Win rate: {result.performance.get('win_rate', 0.0):.1%}")
-    print(f"Profit factor: {result.performance.get('profit_factor', 0.0)}")
-    print(f"Max DD: {result.performance.get('max_drawdown_pct', 0.0):.2%}")
+    print(
+        "Gross: "
+        f"ER {result.gross_performance.get('expectancy_r', 0.0):+.3f} | "
+        f"PnL R {result.gross_performance.get('pnl_r_sum', 0.0):+.3f} | "
+        f"PF {result.gross_performance.get('profit_factor', 0.0)}"
+    )
+    print(
+        "Net:   "
+        f"ER {result.performance.get('expectancy_r', 0.0):+.3f} | "
+        f"PnL R {result.performance.get('pnl_r_sum', 0.0):+.3f} | "
+        f"PF {result.performance.get('profit_factor', 0.0)} | "
+        f"Max DD {result.performance.get('max_drawdown_pct', 0.0):.2%}"
+    )
+    print(
+        "Costs: "
+        f"fees {result.cost_breakdown.get('total_fees', 0.0):+.4f} | "
+        f"slippage {result.cost_breakdown.get('total_slippage', 0.0):+.4f} | "
+        f"funding {result.cost_breakdown.get('total_funding', 0.0):+.4f} | "
+        f"total R {result.cost_breakdown.get('total_costs_r', 0.0):+.3f}"
+    )
     print("\nOutcome reasons")
     for symbol in result.symbols:
         print(f"  {symbol}: {result.outcome_reasons.get(symbol, {})}")
@@ -597,6 +793,11 @@ def main() -> int:
     parser.add_argument("--warmup-days", type=int, default=60)
     parser.add_argument("--initial-equity", type=float, default=1000.0)
     parser.add_argument("--settings-profile", choices=("research", "live", "experiment"), default="research")
+    parser.add_argument("--maker-fee-pct", type=float, default=0.0002)
+    parser.add_argument("--taker-fee-pct", type=float, default=0.0005)
+    parser.add_argument("--slippage-bps", type=float, default=3.0)
+    parser.add_argument("--funding-fallback-rate-per-8h", type=float, default=0.0001)
+    parser.add_argument("--disable-funding", action="store_true")
     parser.add_argument("--output-json", type=Path)
     args = parser.parse_args()
 
@@ -616,6 +817,13 @@ def main() -> int:
             end_ts=end_ts,
             warmup_days=int(args.warmup_days),
             initial_equity=float(args.initial_equity),
+            cost_config=CostModelConfig(
+                maker_fee_pct=float(args.maker_fee_pct),
+                taker_fee_pct=float(args.taker_fee_pct),
+                slippage_bps_per_side=float(args.slippage_bps),
+                funding_enabled=not bool(args.disable_funding),
+                funding_fallback_rate_per_8h=float(args.funding_fallback_rate_per_8h),
+            ),
         )
     finally:
         conn.close()
