@@ -596,10 +596,11 @@ def main() -> int:
     parser.add_argument("--symbols", default="BTCUSDT,ETHUSDT,SOLUSDT")
     parser.add_argument("--warmup-days", type=int, default=60)
     parser.add_argument("--initial-equity", type=float, default=1000.0)
+    parser.add_argument("--settings-profile", choices=("research", "live", "experiment"), default="research")
     parser.add_argument("--output-json", type=Path)
     args = parser.parse_args()
 
-    settings = load_settings()
+    settings = load_settings(profile=str(args.settings_profile))
     symbols = tuple(item.strip().upper() for item in str(args.symbols).split(",") if item.strip())
     start_ts = _parse_ts(str(args.start_date))
     end_ts = _parse_ts(str(args.end_date), end=True)
