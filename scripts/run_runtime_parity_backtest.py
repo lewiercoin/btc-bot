@@ -8,6 +8,7 @@ same core decision layers used by runtime and simulates exits on subsequent
 from __future__ import annotations
 
 import argparse
+import dataclasses
 import json
 import sqlite3
 import sys
@@ -38,7 +39,14 @@ from core.portfolio_gate import PortfolioRiskConfig, PortfolioRiskState, Portfol
 from core.regime_engine import RegimeConfig, RegimeEngine
 from core.risk_engine import RiskConfig, RiskDecision, RiskEngine
 from core.signal_engine import SignalConfig, SignalEngine
-from settings import AppSettings, StrategyConfig, build_signal_regime_direction_whitelist, load_settings, resolve_symbol_config
+from settings import (
+    AppSettings,
+    StrategyConfig,
+    SymbolStrategyOverride,
+    build_signal_regime_direction_whitelist,
+    load_settings,
+    resolve_symbol_config,
+)
 
 
 @dataclass(slots=True)
@@ -121,6 +129,49 @@ def _parse_ts(raw: str, *, end: bool = False) -> datetime:
     if end and "T" not in raw and " " not in raw:
         parsed += timedelta(days=1)
     return parsed
+
+
+def _parse_symbol_thresholds(raw_items: list[str]) -> tuple[SymbolStrategyOverride, ...]:
+    overrides: list[SymbolStrategyOverride] = []
+    seen: set[str] = set()
+    for raw in raw_items:
+        symbol, sep, value = raw.partition("=")
+        if sep != "=":
+            raise ValueError(f"Invalid symbol threshold override {raw!r}; expected SYMBOL=VALUE.")
+        normalized = symbol.strip().upper()
+        if not normalized:
+            raise ValueError(f"Invalid symbol threshold override {raw!r}; symbol is empty.")
+        if normalized in seen:
+            raise ValueError(f"Duplicate threshold override for {normalized}.")
+        seen.add(normalized)
+        overrides.append(SymbolStrategyOverride(symbol=normalized, min_sweep_depth_pct=float(value)))
+    return tuple(overrides)
+
+
+def _apply_threshold_overrides(
+    settings: AppSettings,
+    *,
+    min_sweep_depth_pct: float | None,
+    symbol_thresholds: tuple[SymbolStrategyOverride, ...],
+) -> AppSettings:
+    if min_sweep_depth_pct is None and not symbol_thresholds:
+        return settings
+
+    strategy = settings.strategy
+    if min_sweep_depth_pct is not None:
+        strategy = dataclasses.replace(strategy, min_sweep_depth_pct=float(min_sweep_depth_pct))
+
+    if not symbol_thresholds:
+        return dataclasses.replace(settings, strategy=strategy)
+
+    override_by_symbol = {item.symbol: item for item in settings.multi_asset.symbol_overrides}
+    for override in symbol_thresholds:
+        override_by_symbol[override.symbol] = override
+    multi_asset = dataclasses.replace(
+        settings.multi_asset,
+        symbol_overrides=tuple(override_by_symbol[symbol] for symbol in sorted(override_by_symbol)),
+    )
+    return dataclasses.replace(settings, strategy=strategy, multi_asset=multi_asset)
 
 
 def _signal_config(strategy: StrategyConfig) -> SignalConfig:
@@ -798,10 +849,22 @@ def main() -> int:
     parser.add_argument("--slippage-bps", type=float, default=3.0)
     parser.add_argument("--funding-fallback-rate-per-8h", type=float, default=0.0001)
     parser.add_argument("--disable-funding", action="store_true")
+    parser.add_argument("--min-sweep-depth-pct", type=float, default=None)
+    parser.add_argument(
+        "--symbol-min-sweep-depth-pct",
+        action="append",
+        default=[],
+        help="Per-symbol threshold override, e.g. ETHUSDT=0.0065. May be repeated.",
+    )
     parser.add_argument("--output-json", type=Path)
     args = parser.parse_args()
 
     settings = load_settings(profile=str(args.settings_profile))
+    settings = _apply_threshold_overrides(
+        settings,
+        min_sweep_depth_pct=args.min_sweep_depth_pct,
+        symbol_thresholds=_parse_symbol_thresholds(list(args.symbol_min_sweep_depth_pct)),
+    )
     symbols = tuple(item.strip().upper() for item in str(args.symbols).split(",") if item.strip())
     start_ts = _parse_ts(str(args.start_date))
     end_ts = _parse_ts(str(args.end_date), end=True)
