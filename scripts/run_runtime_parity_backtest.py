@@ -327,6 +327,18 @@ def _load_snapshots(
     return snapshots
 
 
+def _iter_single_symbol_snapshots(
+    conn: sqlite3.Connection,
+    *,
+    symbol: str,
+    warmup_start: datetime,
+    end_ts: datetime,
+):
+    loader = ReplayLoader(conn, ReplayLoaderConfig())
+    for snapshot in loader.iter_snapshots(start_date=warmup_start, end_date=end_ts, symbol=symbol):
+        yield snapshot.timestamp, {symbol: snapshot}
+
+
 def _state_for_symbol(runtime: SymbolRuntime, now: datetime, open_count: int) -> GovernanceRuntimeState:
     day = now.date().isoformat()
     trades_today = runtime.trades_today if runtime.current_day == day else 0
@@ -627,8 +639,21 @@ def run_backtest(
 ) -> tuple[BacktestResult, list[TradeLog]]:
     resolved_cost_config = cost_config or CostModelConfig()
     warmup_start = start_ts - timedelta(days=warmup_days)
-    snapshots = _load_snapshots(conn, symbols=symbols, warmup_start=warmup_start, end_ts=end_ts)
-    timestamps = sorted(set().union(*(set(items) for items in snapshots.values())))
+    snapshots = None
+    if len(symbols) == 1:
+        snapshot_cycles = _iter_single_symbol_snapshots(
+            conn,
+            symbol=symbols[0],
+            warmup_start=warmup_start,
+            end_ts=end_ts,
+        )
+    else:
+        snapshots = _load_snapshots(conn, symbols=symbols, warmup_start=warmup_start, end_ts=end_ts)
+        timestamps = sorted(set().union(*(set(items) for items in snapshots.values())))
+        snapshot_cycles = (
+            (timestamp, {symbol: by_ts[timestamp] for symbol, by_ts in snapshots.items() if timestamp in by_ts})
+            for timestamp in timestamps
+        )
     engines = {
         symbol: FeatureEngine(_feature_config(settings, resolve_symbol_config(settings.strategy, symbol, settings.multi_asset)))
         for symbol in symbols
@@ -653,8 +678,7 @@ def run_backtest(
     missing: Counter[str] = Counter()
     evaluation_cycles = 0
 
-    for timestamp in timestamps:
-        snapshots_at_time = {symbol: by_ts[timestamp] for symbol, by_ts in snapshots.items() if timestamp in by_ts}
+    for timestamp, snapshots_at_time in snapshot_cycles:
         closed_net, closed_gross = _close_positions(
             timestamp=timestamp,
             snapshots_at_time=snapshots_at_time,
@@ -673,7 +697,7 @@ def run_backtest(
         evaluation_cycles += 1
         generated: list[tuple[str, SignalCandidate, RiskDecision, PortfolioSignal, dict[str, Any]]] = []
         for symbol in symbols:
-            snapshot = snapshots[symbol].get(timestamp)
+            snapshot = snapshots_at_time.get(symbol)
             if snapshot is None:
                 missing[symbol] += 1
                 continue
@@ -804,7 +828,7 @@ def run_backtest(
                     risk_pct=portfolio_signal.risk_pct,
                     gross_notional_pct=portfolio_signal.gross_notional_pct,
                     entry_features=entry_features,
-                    entry_candle_index=len(snapshots[symbol][timestamp].candles_15m) - 1,
+                    entry_candle_index=len(snapshots_at_time[symbol].candles_15m) - 1,
                 )
             )
 
