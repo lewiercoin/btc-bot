@@ -1,5 +1,45 @@
 # Milestone Tracker
 
+## Research Implementation Checkpoint - 2026-05-27
+
+### Research Diagnostic: SMC_SEQUENCE_EDGE_FEASIBILITY_V1
+
+**Status:** READY_FOR_AUDIT - implementation complete, results indicate STOP
+**Builder:** Codex
+**Auditor:** Claude Code pending
+**Decision date:** 2026-05-27
+**Plan:** `docs/research/SMC_SEQUENCE_EDGE_FEASIBILITY_V1_PLAN.md`
+**Report:** `docs/analysis/SMC_SEQUENCE_EDGE_FEASIBILITY_V1_2026-05-27.md`
+
+**Scope:** Research-only diagnostic testing the minimal full-SMC sequence:
+equal-level liquidity sweep -> displacement -> simple structure-shift proxy ->
+FVG/imbalance -> mitigation/retest -> `entry_candidate_bar`. No production
+code, settings, schema, FeatureEngine, SignalEngine, Governance, Risk, or
+execution changes were made.
+
+**Validation:**
+- Focused SMC sequence pytest: 6/6 passed.
+- Compile validation passed.
+- Synthetic SQLite integration test passed.
+- BTCUSDT 15m diagnostic run completed on 195,347 local candles from
+  2020-09-01 to 2026-03-28 with 0 missing gaps and 0 OHLC violations.
+- JSON output was generated locally at
+  `research_lab/analysis_output/smc_sequence_edge_feasibility_v1_2026-05-27.json`
+  and is reproducible from the committed script. SHA256:
+  `8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4`.
+
+**Pre-audit result:** `FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED`. Full sequence
+produced 1,271 events from 14,334 sweep-only events. Entry-timed 5-bar median
+return was `0.000558`, but after the configured 0.10% round-trip cost the median
+net return was `-0.000442`. Entry-timed 5-bar PF proxy was `1.061`, far below
+the trial-00095 PF threshold of `4.0`. Median MFE before entry was `0.011565`
+versus post-entry 5-bar MFE median `0.004916`, indicating the mitigation entry
+arrives after most of the favorable move.
+
+**Decision pending audit:** No FeatureEngine or SignalEngine work is justified
+unless Claude Code rejects the invalidation interpretation. Trial-00095 remains
+the benchmark and active validated baseline.
+
 ## Research Closure Checkpoint - 2026-05-27
 
 ### Research Diagnostic: SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1
