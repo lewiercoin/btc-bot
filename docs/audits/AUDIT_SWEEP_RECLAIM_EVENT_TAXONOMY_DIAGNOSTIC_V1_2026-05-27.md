@@ -16,6 +16,16 @@ Research-only files created:
 - `research_lab/analysis_output/sweep_reclaim_event_taxonomy_diagnostic_v1_2026-05-27.json`
 - `docs/analysis/SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1_2026-05-27.md`
 
+Large output artifact note:
+
+- The JSON output was generated locally and is reproducible from the committed
+  research script.
+- Size: 115,819,135 bytes.
+- SHA256:
+  `E3DB291C510AEB58287AEA86FB1444FD255AB7B33BBF181B29C7B71825C4ADDA`
+- It is not committed to Git because `research_lab/analysis_output/` is ignored
+  as generated output and GitHub rejects normal Git blobs over 100 MB.
+
 Production boundary check:
 
 - No changes to `core/**`
@@ -83,3 +93,26 @@ Do not proceed to:
 - detection-bar-only success claims
 
 Trial-00095 remains the validated baseline.
+
+## Scope Boundary For Future Research
+
+This V1 result invalidates the isolated pivot/wick/close/reclaim taxonomy. It
+does not invalidate a full SMC sequence, because V1 did not test:
+
+- displacement after liquidity sweep,
+- CHOCH/MSS,
+- FVG or imbalance,
+- retest or mitigation,
+- order block logic,
+- premium/discount or HTF dealing range,
+- the full workflow of liquidity sweep to displacement to structure shift to
+  imbalance/FVG to mitigation/retest to realistic entry.
+
+Any future full-SMC research must be a separate planning milestone, for example
+`SMC_SEQUENCE_EDGE_FEASIBILITY_V1`, and must start with plan and audit before
+implementation.
+
+Key lesson preserved:
+
+> Delayed labels measured from `detection_bar` create fake edge. Always measure
+> from `label_available_bar` or a realistic `entry_candidate_bar`.

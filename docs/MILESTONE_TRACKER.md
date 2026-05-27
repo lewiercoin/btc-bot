@@ -23,6 +23,11 @@ FeatureEngine, SignalEngine, Governance, Risk, or execution changes were made.
 - Synthetic SQLite integration test passed.
 - BTCUSDT 5m diagnostic run completed on 447,000 local candles from
   2022-01-01 to 2026-04-02 with 0 missing gaps and 0 OHLC violations.
+- JSON output was generated locally at
+  `research_lab/analysis_output/sweep_reclaim_event_taxonomy_diagnostic_v1_2026-05-27.json`.
+  It is reproducible from the committed script and report, but is not committed
+  because the generated file is 115,819,135 bytes and GitHub rejects normal Git
+  blobs over 100 MB.
 
 **Decision:** STOP. Do not pursue V2 FeatureEngine facts, V3 SignalEngine
 interpretation, feature-flag integration, threshold rescue, or regime/session
@@ -32,6 +37,16 @@ rescue for this hypothesis.
 outperform raw wick cross, delayed reclaim edge collapsed from detection-bar to
 label-available timing, and true breakout/no-reclaim reversed negative when
 measured from knowable timing. Trial-00095 remains the validated baseline.
+
+**Boundary:** This closes only the isolated event-taxonomy hypothesis. It does
+not test or invalidate a full SMC sequence such as liquidity sweep ->
+displacement -> CHOCH/MSS -> FVG/imbalance -> mitigation/retest -> realistic
+entry. Any full-SMC work requires a separate planning milestone and audit before
+implementation.
+
+**Preserved lesson:** Delayed labels measured from `detection_bar` create fake
+edge. Future delayed-sequence research must measure from `label_available_bar`
+or a realistic `entry_candidate_bar`.
 
 ## Synchronization Checkpoint - 2026-05-16
 
