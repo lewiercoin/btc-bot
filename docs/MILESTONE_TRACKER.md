@@ -1,5 +1,38 @@
 # Milestone Tracker
 
+## Research Closure Checkpoint - 2026-05-27
+
+### Research Diagnostic: SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1
+
+**Status:** CLOSED - implementation approved, hypothesis invalidated  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-27  
+**Plan:** `docs/research/SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1_PLAN.md`  
+**Report:** `docs/analysis/SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1_2026-05-27.md`  
+**Audit:** `docs/audits/AUDIT_SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1_2026-05-27.md`
+
+**Scope:** Research-only diagnostic testing whether pivot/liquidity event
+taxonomy separates structurally different sweep/reclaim outcomes better than
+the current equal-level baseline. No production code, settings, schema,
+FeatureEngine, SignalEngine, Governance, Risk, or execution changes were made.
+
+**Validation:**
+- Focused taxonomy pytest: 7/7 passed.
+- Compile validation passed.
+- Synthetic SQLite integration test passed.
+- BTCUSDT 5m diagnostic run completed on 447,000 local candles from
+  2022-01-01 to 2026-04-02 with 0 missing gaps and 0 OHLC violations.
+
+**Decision:** STOP. Do not pursue V2 FeatureEngine facts, V3 SignalEngine
+interpretation, feature-flag integration, threshold rescue, or regime/session
+rescue for this hypothesis.
+
+**Reason:** Approved invalidation criteria were met. Immediate reclaim did not
+outperform raw wick cross, delayed reclaim edge collapsed from detection-bar to
+label-available timing, and true breakout/no-reclaim reversed negative when
+measured from knowable timing. Trial-00095 remains the validated baseline.
+
 ## Synchronization Checkpoint - 2026-05-16
 
 This section resolves status drift observed in external summaries after the
