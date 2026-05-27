@@ -4,12 +4,13 @@
 
 ### Research Diagnostic: SMC_SEQUENCE_EDGE_FEASIBILITY_V1
 
-**Status:** READY_FOR_AUDIT - implementation complete, results indicate STOP
+**Status:** CLOSED - implementation approved, hypothesis invalidated
 **Builder:** Codex
-**Auditor:** Claude Code pending
+**Auditor:** Claude Code
 **Decision date:** 2026-05-27
 **Plan:** `docs/research/SMC_SEQUENCE_EDGE_FEASIBILITY_V1_PLAN.md`
 **Report:** `docs/analysis/SMC_SEQUENCE_EDGE_FEASIBILITY_V1_2026-05-27.md`
+**Audit:** `docs/audits/AUDIT_SMC_SEQUENCE_EDGE_FEASIBILITY_V1_2026-05-27.md`
 
 **Scope:** Research-only diagnostic testing the minimal full-SMC sequence:
 equal-level liquidity sweep -> displacement -> simple structure-shift proxy ->
@@ -36,9 +37,26 @@ the trial-00095 PF threshold of `4.0`. Median MFE before entry was `0.011565`
 versus post-entry 5-bar MFE median `0.004916`, indicating the mitigation entry
 arrives after most of the favorable move.
 
-**Decision pending audit:** No FeatureEngine or SignalEngine work is justified
-unless Claude Code rejects the invalidation interpretation. Trial-00095 remains
-the benchmark and active validated baseline.
+**Decision:** STOP. Do not pursue V2 FeatureEngine facts, V3 SignalEngine
+interpretation, mitigation-timing parameter rescue, or regime/session/flow rescue
+for this hypothesis.
+
+**Reason:** Approved invalidation criteria were met. Entry-timed median return
+(0.000558) was worse than detection-bar return (0.004348). Median MFE before
+entry (0.011565) was 2.4× greater than post-entry 5-bar MFE (0.004916),
+indicating realistic mitigation entry arrives too late. Entry-timed 5-bar PF
+proxy (1.061) is 74% below trial-00095 threshold (4.0). Net expectancy after
+0.10% round-trip costs is negative (-0.000442). Trial-00095 remains the
+validated baseline.
+
+**Boundary:** This closes the full post-sweep SMC sequence hypothesis with
+realistic entry timing (mitigation_bar + 1). It does not test or invalidate
+other hypotheses such as pre-sweep imbalance detection, limit-order entry at FVG
+creation, or alternative structure definitions.
+
+**Preserved lesson:** MFE before entry vs MFE after entry is a decisive
+diagnostic for delayed-entry edges. If most favorable excursion occurs before
+realistic entry timing, the edge is not tradeable.
 
 ## Research Closure Checkpoint - 2026-05-27
 
