@@ -5056,38 +5056,67 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Verdict:** APPROVE_PLANNING_DOCUMENT (all quant research audit axes passed)
 **Commits:** 34feea3, 3331ed2
 
-### Next Milestone: LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1
-**Status:** ACTIVE (2026-05-28)
+### LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1
+**Status:** DONE (2026-05-28)
 **Builder:** Codex
 **Type:** Quant Research Diagnostic Implementation
-**Scope:** Research-only diagnostic implementation, no production changes
-**Goal:** Test whether liquidation burst after/around sweep creates realistic entry before MFE is consumed.
-**Context:** Planning document approved. First concrete mechanism from new order-flow/liquidation family.
-**Target file:** `research_lab/diagnostics/liquidation_burst_reversal_entry_feasibility_v1.py`
+**What:** Test whether liquidation burst after/around sweep creates realistic entry before MFE is consumed (15m timeframe).
+**Why:** First concrete mechanism from new order-flow/liquidation family.
+**Result:** STOP — hypothesis invalidated on 15m timeframe
+- Main cohort: 5,412 events, ER=-0.101, PF=0.584
+- Median MFE consumed before entry: 100% (fully consumed)
+- 3 of 4 control cohorts outperformed main
+- Entry delay: 45 minutes (i+3 bars on 15m)
+**Interpretation:** Liquidation burst reversals complete within 45-minute window. By entry time (bar i+3, 45 min), opportunity is fully exhausted.
+**Follow-up finding:** STOP verdict is timeframe-specific, not mechanism-specific. 100% MFE consumption is consistent with timeframe aggregation problem (reversal faster than 45 min but may be slower than 15 min).
+**Audit:** [docs/audits/AUDIT_LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1_2026-05-28.md](docs/audits/AUDIT_LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1_2026-05-28.md)
+**Follow-up audit:** [docs/audits/AUDIT_LIQUIDATION_BURST_TIMEFRAME_ACCESSIBILITY_FOLLOWUP_2026-05-28.md](docs/audits/AUDIT_LIQUIDATION_BURST_TIMEFRAME_ACCESSIBILITY_FOLLOWUP_2026-05-28.md)
+**Classification:** VALID_TIMEFRAME_ACCESSIBILITY_HYPOTHESIS (5m check approved)
+**Commits:** 265e1c3, d7926f9, ff840b2
+
+### Next Milestone: LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1
+**Status:** ACTIVE (2026-05-28)
+**Builder:** Codex
+**Type:** Quant Research Diagnostic (timeframe accessibility check)
+**Scope:** Research-only diagnostic, no production changes
+**Goal:** Test whether lowering timeframe from 15m to 5m reduces MFE consumption and improves post-entry expectancy after costs.
+**Context:** 15m diagnostic STOP verdict (ER=-0.10, 100% MFE consumed). Follow-up audit classified 5m check as VALID_TIMEFRAME_ACCESSIBILITY_HYPOTHESIS. Testing whether reversal window is < 45 min (15m too slow) but > 15 min (5m may work).
+**Target files:** `research_lab/diagnostics/liquidation_burst_reversal_5m_feasibility_v1.py`, reports, tests
 **No-touch areas:** Live execution, FeatureEngine, SignalEngine, Governance, Risk, strategy, settings, trial-00095, promotion logic, live-path coupling
-**Mechanism:** LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1
-- Sweep detection (price crosses liquidity level)
-- Liquidation burst in bars i to i+2 (forced order volume > threshold)
-- Entry at bar i+3 (realistic entry timing)
-- Return measurement from bar i+3 (no lookahead)
+**Mechanism:** UNCHANGED from 15m diagnostic
+- Sweep detection at bar i
+- Liquidation burst in bars i to i+2
+- Entry at bar i+3
+- Primary returns from entry_candidate_bar
+**Real-time delay:** CHANGED
+- 15m diagnostic: 45 minutes (STOP)
+- 5m diagnostic: 15 minutes (comparable to trial-00095 timing: 15-30 min)
+**Data requirements:**
+- Construct 5m candles from 60s aggtrade buckets (validate OHLC integrity, gap coverage)
+- Bucket force_orders to 5m windows
+- Same date range: 2022-01-01 to 2024-12-01 (force_orders coverage)
 **Deliverables:**
-1. Diagnostic implementation: `research_lab/diagnostics/liquidation_burst_reversal_entry_feasibility_v1.py`
-2. 4 deterministic controls: non-liquidation sweeps, opposite-side liquidations, shifted-entry, flow-only ablation
-3. Timing model: detection_bar, state_known_bar, confirmation_bar, entry_candidate_bar, return_start_bar
-4. MFE accessibility measurement (70% MFE-consumed gate)
-5. Comparison vs trial-00095 benchmark
-6. Hard invalidation criteria (STOP/EXPLORE/INCONCLUSIVE)
-7. Focused tests
-8. Markdown report
-9. JSON artifact
-10. One final decision only
-**Acceptance criteria:**
-- Timing discipline enforced (no lookahead)
-- MFE before/after entry measured correctly
-- 4 controls implemented and tested
-- Results analyzed vs trial-00095 benchmark
-- Invalidation criteria applied (STOP/EXPLORE/INCONCLUSIVE)
-- ONE recommendation only (not menu)
+1. 5m candle construction + validation
+2. Diagnostic implementation on 5m
+3. 4 deterministic controls (same as 15m)
+4. MFE accessibility measurement (70% threshold unchanged)
+5. Comparison: 5m vs 15m (median MFE consumed, post-entry ER, PF, win rate)
+6. Invalidation criteria (STOP/EXPLORE/INCONCLUSIVE)
+7. Markdown report
+8. JSON artifact
+9. Focused tests
+**Primary comparison:**
+- 15m: entry delay 45 min, MFE consumed 100%, ER -0.10
+- 5m: entry delay 15 min, MFE consumed ?, ER ?
+**Expected outcomes:**
+- If 5m passes EXPLORE (ER > 1.2, MFE consumed < 60%, beats all controls): mechanism validated, 15m timeframe was blocker
+- If 5m triggers STOP: mechanism fully invalidated, close liquidation/order-flow family
+**Hard rules:**
+- Do NOT reopen 15m result (15m STOP is final)
+- Do NOT relax 70% MFE threshold
+- Do NOT tune liquidation_burst_multiple based on 15m failure
+- Do NOT test 1m or 3m in this milestone
+- Primary returns MUST be from entry_candidate_bar
 **Next step after implementation:** Codex reports completion, Claude Code audits using QUANT_RESEARCH_OPERATING_MODEL.md
 
 ---
@@ -5096,6 +5125,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
-- **Order-Flow/Liquidation Edge Discovery:** Planning DONE, diagnostic implementation ACTIVE
-- **Current milestone:** LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1 (Codex, research diagnostic)
-- **Next decision point:** Claude Code audit of diagnostic implementation and results
+- **Order-Flow/Liquidation Edge Discovery:** Planning DONE, 15m diagnostic DONE (STOP), 5m timeframe check ACTIVE
+- **Current milestone:** LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1 (Codex, timeframe accessibility check)
+- **Next decision point:** Claude Code audit of 5m diagnostic implementation and results
