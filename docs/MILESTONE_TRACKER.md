@@ -5247,10 +5247,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
-## Next Milestone: REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1
+## Research Milestone: REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1
 
-**Status:** ACTIVE (2026-05-28)  
+**Status:** DONE (2026-05-28)  
 **Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Report:** `docs/research/REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1_REPORT.md` (428 lines)  
+**Audit:** `docs/audits/AUDIT_REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1_2026-05-28.md`
+
 **Type:** Quick reconnaissance (data + literature + metrics assessment)  
 **Scope:** Research-only, no implementation, no diagnostic code
 
@@ -5319,10 +5324,85 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - No trial-00095 modification
 - No implementation (reconnaissance only)
 
-**After reconnaissance:**
-- If PROCEED: Create full planning document (source research, mechanism extraction, timing model, controls, invalidation criteria)
-- If PIVOT: User selects alternative direction (funding arbitrage / trial-00095 PAPER focus / other)
-- If BLOCKED: User decides whether to invest in additional data/tools or abandon direction
+**Deliverables completed:**
+1. Data availability assessment: 195,347 BTCUSDT 15m candles, 195,150 aggtrade_buckets, funding/OI/force_orders, 0 gaps, deterministic and HMM/GARCH indicators feasible
+2. Literature review: 26 sources (10 academic/model-quality, 6 implementation, 7 TradingView/industry), explicit HMM/GARCH support, lookahead assessed per source
+3. Mechanism extraction: 5 regime families (volatility, trend/range, flow dominance, crowding/stress, HMM/GARCH), timing models defined, forbidden practices listed
+4. Metrics assessment: Standalone ER 0.8-1.5 expected, filter lift approach recommended, high methodology risk flagged
+5. Blockers: NONE for deterministic; tooling/methodology caution for HMM/GARCH
+6. Recommendation: PROCEED to planning with constraints (one mechanism, strict online knowability)
+
+**Pre-audit recommendation:** PROCEED
+
+**Audit verdict:** DONE (reconnaissance quality excellent, recommendation validity confirmed)
+
+**Decision:** User approved, selected TREND_RANGE_STATE_SHIFT as mechanism for planning
+
+**Reason:** Data sufficient, literature foundation stronger than prior families, methodology risks explicitly flagged (post-hoc labels, smoothing, relabeling forbidden). User chose deterministic approach first to avoid dependencies and lower methodology risk.
+
+**Critical strength:** Report warns against primary methodological trap: "Full-sample HMM smoothing, in-sample state relabeling, and post-hoc regime interpretation are not acceptable as trading signals."
+
+---
+
+## Next Milestone: REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING
+
+**Status:** AWAITING_DECISION (2026-05-28)  
+**Builder:** TBD (Codex or Cascade, user will select)  
+**Type:** Quant Research Planning (full planning document)  
+**Scope:** Research-only, no diagnostic code, no implementation
+
+**Goal:** Create full planning document for TREND_RANGE_STATE_SHIFT mechanism.
+
+**Context:** Regime shift detection reconnaissance DONE (recommendation: PROCEED). User selected TREND_RANGE_STATE_SHIFT as mechanism (deterministic, avoids dependencies, lower methodology risk than HMM/GARCH).
+
+**Mechanism:** `TREND_RANGE_STATE_SHIFT`
+- Combine ADX (trend strength) and Choppiness Index (range/trend classification)
+- Detect range-to-trend or trend-to-range transitions
+- Deterministic thresholds from completed bars only
+- ADX lag risk documented and controlled
+
+**User guidance:**
+- ONE mechanism only (TREND_RANGE_STATE_SHIFT)
+- No diagnostic code in planning
+- Strict timing model (detection/state_known/confirmation/entry/return_start bars)
+- MFE accessibility design (before/after entry, 70% threshold)
+- Controls defined before results (5+ controls including simple baseline)
+- One final recommendation: IMPLEMENT ONE DIAGNOSTIC or STOP
+
+**Timeline:** 3-5 days
+
+**Deliverables:**
+1. Source research (20+ sources, mechanism extraction, lookahead assessment)
+2. Mechanism selection: TREND_RANGE_STATE_SHIFT (deterministic ADX + Choppiness)
+3. Repo data surface inspection (confirm coverage, ADX/CHOP calculation feasibility)
+4. Extracted mechanism (deterministic rules, no future bars, ADX lag risk assessed)
+5. Timing model (6-bar model: pre-state/detection/state_known/confirmation/entry/return_start)
+6. MFE accessibility design (before/after entry, 70% threshold)
+7. Baseline comparison (vs trial-00095: ER/PF/trades or filter lift design)
+8. Control cohorts (5+ controls: simple volatility baseline, ADX-only, CHOP-only, shifted timing, same-state non-transition, opposite-regime)
+9. Pre-result invalidation criteria (STOP/EXPLORE/INCONCLUSIVE gates)
+10. ONE recommendation (IMPLEMENT ONE DIAGNOSTIC or STOP)
+
+**Constraints:**
+- ONE mechanism only (TREND_RANGE_STATE_SHIFT, not HMM/GARCH)
+- Do NOT rescue failed volatility breakout logic
+- Do NOT combine all regime ideas into one diagnostic
+- Returns from realistic entry only (entry_candidate_bar, not detection_bar)
+- ADX lag must be explicitly modeled (ADX uses 14-bar smoothing, late by design)
+- Simple baseline controls required (volatility percentile, ADX-only, CHOP-only)
+
+**No-touch areas:**
+- No diagnostic implementation code
+- No production strategy code
+- No FeatureEngine or SignalEngine changes
+- No Governance/Risk/execution changes
+- No settings changes
+- No trial-00095 modification
+- No dependency installation (deterministic approach, numpy/pandas sufficient)
+
+**Expected outcome:**
+- If planning approved: Proceed to diagnostic implementation (TREND_RANGE_STATE_SHIFT_FEASIBILITY_V1)
+- If planning rejected: Mechanism insufficiently justified or ADX lag risk too high, pivot to alternative
 
 ---
 
@@ -5332,5 +5412,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Quant Research Operating Model:** DONE (documentation complete)
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
 - **Volatility Breakouts Edge Discovery:** CLOSED (volume-confirmed range breakout STOP, mechanism invalidated)
-- **Current milestone:** REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1 (ACTIVE, 1-2 days)
-- **Next decision point:** Reconnaissance verdict (PROCEED / PIVOT / BLOCKED) → if PROCEED, create full planning document
+- **Regime Shift Detection Reconnaissance:** DONE (2026-05-28, recommendation: PROCEED, mechanism: TREND_RANGE_STATE_SHIFT)
+- **Current milestone:** REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING (AWAITING_DECISION, deterministic approach, 3-5 days)
+- **Next decision point:** User approval to proceed to planning → if approved, Codex creates planning document for TREND_RANGE_STATE_SHIFT
