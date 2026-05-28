@@ -5247,12 +5247,90 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
+## Next Milestone: REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1
+
+**Status:** ACTIVE (2026-05-28)  
+**Builder:** Codex  
+**Type:** Quick reconnaissance (data + literature + metrics assessment)  
+**Scope:** Research-only, no implementation, no diagnostic code
+
+**Goal:** Determine if regime shift detection edge family has sufficient data/literature foundation for full research planning.
+
+**Context:** Volatility breakouts family closed after volume-confirmed range breakout STOP result. User selected regime shift detection as next direction.
+
+**Regime shift detection concept:**
+- Volatility regimes (low volatility → high volatility transitions, volatility clustering)
+- Trend/range regime transitions (ranging market → trending market, trend exhaustion)
+- Market structure regimes (order flow dominance shifts, liquidity regime changes)
+- Detection approaches: Hidden Markov Models (HMM), volatility clustering (GARCH family), trend strength indicators, regime-conditional indicators
+
+**Reconnaissance deliverables:**
+1. **Data availability assessment:**
+   - Regime detection: Can we identify volatility regimes, trend/range transitions from historical data?
+   - Regime indicators: ATR, Bollinger Band width, ADX, market structure metrics from existing data?
+   - Historical coverage: Do we have sufficient data (2020-2026) for regime identification?
+   - Data quality: Are gaps/missing bars acceptable for regime analysis?
+
+2. **Literature review:**
+   - Academic papers on regime detection (crypto or traditional markets)
+   - Hidden Markov Models for regime identification
+   - Volatility clustering and GARCH-family models
+   - Industry research (regime-adaptive strategies, regime filters)
+   - Existing implementations (open-source regime detection libraries)
+   - Source classification: Model-quality vs opinion-based
+
+3. **Mechanism extraction (preliminary):**
+   - What are common regime shift patterns? (volatility breakouts, trend exhaustion, range compression)
+   - What are the detection signals? (volatility expansion, trend strength collapse, order flow reversals)
+   - What are the timing models? (regime identified at bar i, entry at regime confirmation)
+   - What are the edge strategies? (fade range breakout in low-vol regime, follow trend in high-vol regime)
+
+4. **Metrics assessment:**
+   - What are realistic ER/PF expectations for regime shift strategies? (from literature or comparable strategies)
+   - How does regime shift detection compare to trial-00095 baseline? (trade frequency, holding period, win rate)
+   - What are the risk characteristics? (max drawdown, regime misclassification cost, lag in detection)
+
+5. **Data gaps / blockers identification:**
+   - Missing data: Do we need additional indicators, or is OHLCV + aggtrade sufficient?
+   - Missing tools: Do we need HMM libraries, regime classification frameworks?
+   - Computational complexity: Can regime detection run in real-time (15m decision cycles)?
+   - Overfitting risk: Can we avoid curve-fitting regime definitions to historical data?
+
+6. **Recommendation:**
+   - **PROCEED:** Strong foundation, sufficient data, literature support → create full planning document
+   - **PIVOT:** Weak foundation, insufficient data → suggest alternative direction
+   - **BLOCKED:** Critical data gaps, computational infeasibility → stop this direction
+
+**Target deliverable:**
+- `docs/research/REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1_REPORT.md` (reconnaissance report, ~300-500 lines)
+- No code, no diagnostic, no backtest (reconnaissance only)
+
+**Timeline:** 1-2 days
+
+**Acceptance criteria:**
+- Data availability: clearly documented (exists / missing / requires computation)
+- Literature review: 10-20 sources inspected, classified, key mechanisms extracted
+- Metrics assessment: realistic ER/PF ranges estimated from literature or comparable strategies
+- Recommendation: clear PROCEED / PIVOT / BLOCKED verdict with reasoning
+
+**No-touch areas:**
+- No production code
+- No bot changes
+- No trial-00095 modification
+- No implementation (reconnaissance only)
+
+**After reconnaissance:**
+- If PROCEED: Create full planning document (source research, mechanism extraction, timing model, controls, invalidation criteria)
+- If PIVOT: User selects alternative direction (funding arbitrage / trial-00095 PAPER focus / other)
+- If BLOCKED: User decides whether to invest in additional data/tools or abandon direction
+
+---
+
 ## Current Status (2026-05-28)
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
-- **Volatility Breakouts Reconnaissance:** DONE (2026-05-28, recommendation: PROCEED)
-- **Volatility Breakouts Planning:** DONE (2026-05-28, recommendation: IMPLEMENT ONE DIAGNOSTIC)
-- **Volume Confirmed Range Breakout Diagnostic:** DONE (2026-05-28, result: STOP, mechanism invalidated)
-- **Next decision point:** User decision on volatility breakouts family (close family vs explore alternative mechanism) OR pivot to different edge direction (regime shifts, funding arbitrage, trial-00095 PAPER focus)
+- **Volatility Breakouts Edge Discovery:** CLOSED (volume-confirmed range breakout STOP, mechanism invalidated)
+- **Current milestone:** REGIME_SHIFT_DETECTION_RECONNAISSANCE_V1 (ACTIVE, 1-2 days)
+- **Next decision point:** Reconnaissance verdict (PROCEED / PIVOT / BLOCKED) → if PROCEED, create full planning document
