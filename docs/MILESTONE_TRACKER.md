@@ -5014,41 +5014,88 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Analysis:** [docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md](docs/analysis/POST_GRID_PORTFOLIO_PLAN_2026-05-12.md)
 **Strategic finding:** Parameter tuning cannot solve missing strategy problem. Sweep-reclaim is liquidity-response setup (fade stop-run + reclaim), not trend-continuation setup. Clean trend days require separate setup with different edge hypothesis.
 
-### Next Milestone: TREND-CONTINUATION-RESEARCH-V1
-**Status:** AWAITING_DECISION
-**Builder:** TBD (Codex or Cascade, user will select)
-**Scope:** Research-only, no production changes
-**Goal:** Determine whether `trend_continuation_long` setup has independent edge in uptrend regimes.
-**Context:** Phase 1 grid confirmed sweep-reclaim cannot capture trend days (2026-05-11: BTC +2k USD, 0 trades). Bot needs second setup for different market structure.
-**Target files:** research_lab/**, backtest/** (if needed), tests/test_research_lab*, docs/**
-**No-touch areas:** Live execution, orchestrator production path, active trial-00095 PAPER parameters, settings.py promotion
-**Hypothesis:** Setup for uptrend regime: price > trend baseline, positive slope, shallow pullback, TFI/CVD continuation confirmation, RR gate pass, no crowded-leverage veto.
+### QUANT_RESEARCH_OPERATING_MODEL_V1
+**Status:** DONE (2026-05-28)
+**Builder:** Codex
+**Type:** Documentation (quant research workflow)
+**What:** Formalize quant research / edge discovery mode with timing discipline, source research requirements, reverse engineering protocol, STOP/explore balance.
+**Why:** Current role files (AGENTS.md, CLAUDE.md, CASCADE.md) adequately govern implementation workflow but lack formal guidance for edge discovery work: reverse edge engineering, source research, earliest-knowable-signal analysis, MFE accessibility, when to explore vs stop.
 **Deliverables:**
-1. Offline research implementation for trend_continuation_long
-2. Standalone backtest report (trend-only, not mixed with sweep-reclaim)
-3. Regime-segmented metrics (uptrend, range, crowded, compression, downtrend)
-4. Walk-forward validation (2/2 windows)
-5. Comparison vs sweep-reclaim: overlap, coverage, regime ER/PF/DD, conflict analysis
-6. Claude Code audit verdict: reject / iterate / candidate for paper after Phase 2.5 contracts
+- `docs/QUANT_RESEARCH_OPERATING_MODEL.md` (315 lines, canonical authority)
+- Updated `AGENTS.md` (added Workflow Modes section)
+- Updated `CLAUDE.md` (added Quant Research Challenger Mode section)
+- Updated `CASCADE.md` (added Quant Research Builder Mode section)
+**Key codifications:**
+- Timing discipline: detection_bar, state_known_bar, entry_candidate_bar, return_start_bar separation
+- MFE accessibility: 70% MFE consumption threshold (if >70% MFE consumed before entry, edge NOT tradable)
+- Source research: when mandatory, mechanism extraction, lookahead risk assessment
+- Reverse engineering protocol: start from failure point, move earlier or stop
+- Benchmark rule: trial-00095 as benchmark not religion
+- STOP/exploration balance: when to stop vs open new edge family
+- Research verdict scale: APPROVE_PLANNING_DOCUMENT, HYPOTHESIS_PASSED, HYPOTHESIS_INVALIDATED, etc.
+**Audit:** [docs/audits/AUDIT_QUANT_RESEARCH_OPERATING_MODEL_V1_2026-05-28.md](docs/audits/AUDIT_QUANT_RESEARCH_OPERATING_MODEL_V1_2026-05-28.md)
+**Verdict:** DONE (zero production code modified, Phase 1 documentation complete)
+**Commits:** 1eb9c27, 0622aa4
 
+### ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLANNING
+**Status:** DONE (2026-05-28)
+**Builder:** Codex
+**Type:** Quant Research Planning
+**What:** Planning document for new edge family based on order-flow/liquidation/microstructure data (NOT SMC rescue).
+**Why:** Previous diagnostics (V1 taxonomy, SMC sequence) showed price-action/SMC confirmation comes too late: delayed labels create fake edge, mitigation entry too late, no post-sweep knowable state had positive expectancy. Need genuinely new hypothesis from different data family.
+**Planning document:** [docs/research/ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLAN.md](docs/research/ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLAN.md) (487 lines)
+**Source research:** 23 external sources (Binance docs, GitHub repos, TradingView scripts, academic papers) inspected
+**Mechanism extracted:** LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1 (sweep detection + liquidation burst in bars i to i+2 + entry at bar i+3)
+**Timing model:** detection at bar i, state_known at bar i+2, entry at bar i+3, return_start at bar i+3
+**MFE accessibility design:** before/after entry formulas, 70% threshold applied
+**Baseline comparison:** trial-00095 as benchmark (not religion), challenge criteria defined
+**Control cohorts:** 4 deterministic controls (non-liquidation sweeps, opposite-side liquidations, shifted-entry, flow-only ablation)
+**Invalidation criteria:** STOP/EXPLORE/INCONCLUSIVE gates defined before results
+**Novelty classification:** NEW_HYPOTHESIS (liquidation/order-flow family, NOT SMC rescue)
+**Audit:** [docs/audits/AUDIT_ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLAN_2026-05-28.md](docs/audits/AUDIT_ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLAN_2026-05-28.md)
+**Verdict:** APPROVE_PLANNING_DOCUMENT (all quant research audit axes passed)
+**Commits:** 34feea3, 3331ed2
+
+### Next Milestone: LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1
+**Status:** ACTIVE (2026-05-28)
+**Builder:** Codex
+**Type:** Quant Research Diagnostic Implementation
+**Scope:** Research-only diagnostic implementation, no production changes
+**Goal:** Test whether liquidation burst after/around sweep creates realistic entry before MFE is consumed.
+**Context:** Planning document approved. First concrete mechanism from new order-flow/liquidation family.
+**Target file:** `research_lab/diagnostics/liquidation_burst_reversal_entry_feasibility_v1.py`
+**No-touch areas:** Live execution, FeatureEngine, SignalEngine, Governance, Risk, strategy, settings, trial-00095, promotion logic, live-path coupling
+**Mechanism:** LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1
+- Sweep detection (price crosses liquidity level)
+- Liquidation burst in bars i to i+2 (forced order volume > threshold)
+- Entry at bar i+3 (realistic entry timing)
+- Return measurement from bar i+3 (no lookahead)
+**Deliverables:**
+1. Diagnostic implementation: `research_lab/diagnostics/liquidation_burst_reversal_entry_feasibility_v1.py`
+2. 4 deterministic controls: non-liquidation sweeps, opposite-side liquidations, shifted-entry, flow-only ablation
+3. Timing model: detection_bar, state_known_bar, confirmation_bar, entry_candidate_bar, return_start_bar
+4. MFE accessibility measurement (70% MFE-consumed gate)
+5. Comparison vs trial-00095 benchmark
+6. Hard invalidation criteria (STOP/EXPLORE/INCONCLUSIVE)
+7. Focused tests
+8. Markdown report
+9. JSON artifact
+10. One final decision only
 **Acceptance criteria:**
-- ER > 1.5 in uptrend regime (minimum)
-- Materially more uptrend trades than sweep-reclaim
-- Acceptable DD, no uncontrolled range/chop bleed
-- Every signal has explicit reasons[]
-- WF 2/2 pass, not fragile
-- No blocking safety flags
-- No live-path side effects
-
-**After Phase 2:** If trend-continuation validates, proceed to Phase 2.5 (multi-setup contracts). Do NOT wire into production without contracts (setup_type, per-setup reasons[], candidate pool, arbiter, per-setup metrics).
-
-**Roadmap:** [docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md](docs/ROADMAP_MULTI_SETUP_ARCHITECTURE.md)
+- Timing discipline enforced (no lookahead)
+- MFE before/after entry measured correctly
+- 4 controls implemented and tested
+- Results analyzed vs trial-00095 benchmark
+- Invalidation criteria applied (STOP/EXPLORE/INCONCLUSIVE)
+- ONE recommendation only (not menu)
+**Next step after implementation:** Codex reports completion, Claude Code audits using QUANT_RESEARCH_OPERATING_MODEL.md
 
 ---
 
-## Current Status (2026-05-12)
+## Current Status (2026-05-28)
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
-- **Phase 1 (sweep-reclaim stabilization):** CLOSED — baseline kept, grid rejected
-- **Phase 2 (trend-continuation research):** READY — awaiting user milestone approval
-- **Next decision point:** User approves Phase 2 and selects builder (Codex or Cascade)
+- **Quant Research Operating Model:** DONE (documentation complete)
+- **Order-Flow/Liquidation Edge Discovery:** Planning DONE, diagnostic implementation ACTIVE
+- **Current milestone:** LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1 (Codex, research diagnostic)
+- **Next decision point:** Claude Code audit of diagnostic implementation and results
