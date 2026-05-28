@@ -58,6 +58,71 @@ creation, or alternative structure definitions.
 diagnostic for delayed-entry edges. If most favorable excursion occurs before
 realistic entry timing, the edge is not tradeable.
 
+---
+
+### Research Diagnostic: MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1
+
+**Status:** CLOSED - implementation approved, research hypothesis invalidated
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-05-27
+**Plan:** `docs/research/MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1_PLAN.md`
+**Report:** `docs/analysis/MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1_2026-05-27.md`
+**Audit:** `docs/audits/AUDIT_MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1_2026-05-27.md`
+
+**Scope:** Meta-diagnostic mapping post-sweep MFE accessibility timeline. Tests
+28 distinct knowable states (displacement, reclaim, flow confirmation, cluster
+quality, rejection states, etc.) to determine earliest state where remaining MFE
+is tradable with positive expectancy after costs. No production code, settings,
+schema, FeatureEngine, SignalEngine, Governance, Risk, or execution changes.
+
+**Validation:**
+- Focused MFE accessibility pytest: 5/5 passed.
+- Compile validation passed.
+- Synthetic SQLite integration test passed.
+- BTCUSDT 15m diagnostic run completed on 195,347 local candles from research
+  database with comprehensive metadata (aggtrade=195,150, force_orders=146,864,
+  funding=6,105, OI=524,971).
+- JSON output generated locally at
+  `research_lab/analysis_output/mfe_accessibility_earliest_knowable_signal_v1_2026-05-27.json`
+  (16.4 MB, SHA256: `0052299664BDE07F514C834BAF8EA83A600D8D930D33951A35B95B059A17A1EA`).
+
+**Pre-audit result:** `STOP_SMC_RESEARCH_TRIAL_00095_ALREADY_OPTIMAL`. Analyzed
+14,438 sweep events, generated 212,871 state observations across 28 knowable
+states. **CRITICAL FINDING:** Not a single knowable state produced positive
+median net return after costs. Best state (`reject_no_reclaim_known`): -0.000095
+net, PF 0.879, win rate 49.48%. Displacement (k=5 bars): -0.001040 net.
+Trial-00095 candidate proxy (k=7 bars): -0.000959 net.
+
+**Decision:** STOP SMC research. Trial-00095 is already at or near optimal entry
+timing. Focus on trial-00095 PAPER validation for LIVE promotion.
+
+**Reason:** Approved invalidation criteria met. No early knowable state has
+positive median net return after costs (FAIL). Best state win rate is
+approximately random after entry timing (FAIL). Best state PF proxy too weak
+after costs (FAIL). MFE accessibility problem definitively proven: by the time
+ANY post-sweep confirmation becomes knowable (displacement, reclaim, flow,
+cluster quality), remaining MFE is either consumed or not tradable with positive
+expectancy.
+
+**Boundary:** This exhausts the post-sweep SMC/sweep-reclaim accessible state
+space. It does not test pre-sweep imbalance prediction, momentum breakout, or
+orthogonal edge families (mean-reversion, macro overlay).
+
+**Preserved lesson:** Trial-00095's entry timing (sweep+reclaim at 1-2 bars with
+TFI/CVD/cluster confluence) is already optimal or near-optimal. Later
+confirmations (displacement at 5 bars, mitigation at 8 bars) arrive after MFE is
+consumed. SMC research ROI is negative.
+
+**Invalidation gates applied:**
+1. No positive state (best: -0.000095)
+2. Random win rate (49.48% < 51%)
+3. PF too weak (0.879 < 1.2)
+
+**Walk-forward:** < 2 of 4 folds positive (FAIL).
+
+**Deterministic control:** Control cohort also negative (method validated).
+
 ## Research Closure Checkpoint - 2026-05-27
 
 ### Research Diagnostic: SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1
