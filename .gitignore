@@ -178,6 +178,7 @@ migrate_oi_to_production.py
 
 # Generated validation outputs
 validation/*.json
+validation/*/
 !validation/runtime_parity_2026q1_multi_asset.json
 !validation/runtime_parity_smoke.json
 !validation/runtime_parity_smoke_short.json
