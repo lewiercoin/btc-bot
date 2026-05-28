@@ -5074,50 +5074,70 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 **Classification:** VALID_TIMEFRAME_ACCESSIBILITY_HYPOTHESIS (5m check approved)
 **Commits:** 265e1c3, d7926f9, ff840b2
 
-### Next Milestone: LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1
-**Status:** ACTIVE (2026-05-28)
+### LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1
+**Status:** DONE (2026-05-28)
 **Builder:** Codex
 **Type:** Quant Research Diagnostic (timeframe accessibility check)
-**Scope:** Research-only diagnostic, no production changes
-**Goal:** Test whether lowering timeframe from 15m to 5m reduces MFE consumption and improves post-entry expectancy after costs.
-**Context:** 15m diagnostic STOP verdict (ER=-0.10, 100% MFE consumed). Follow-up audit classified 5m check as VALID_TIMEFRAME_ACCESSIBILITY_HYPOTHESIS. Testing whether reversal window is < 45 min (15m too slow) but > 15 min (5m may work).
-**Target files:** `research_lab/diagnostics/liquidation_burst_reversal_5m_feasibility_v1.py`, reports, tests
-**No-touch areas:** Live execution, FeatureEngine, SignalEngine, Governance, Risk, strategy, settings, trial-00095, promotion logic, live-path coupling
-**Mechanism:** UNCHANGED from 15m diagnostic
-- Sweep detection at bar i
-- Liquidation burst in bars i to i+2
-- Entry at bar i+3
-- Primary returns from entry_candidate_bar
-**Real-time delay:** CHANGED
-- 15m diagnostic: 45 minutes (STOP)
-- 5m diagnostic: 15 minutes (comparable to trial-00095 timing: 15-30 min)
-**Data requirements:**
-- Construct 5m candles from 60s aggtrade buckets (validate OHLC integrity, gap coverage)
-- Bucket force_orders to 5m windows
-- Same date range: 2022-01-01 to 2024-12-01 (force_orders coverage)
-**Deliverables:**
-1. 5m candle construction + validation
-2. Diagnostic implementation on 5m
-3. 4 deterministic controls (same as 15m)
-4. MFE accessibility measurement (70% threshold unchanged)
-5. Comparison: 5m vs 15m (median MFE consumed, post-entry ER, PF, win rate)
-6. Invalidation criteria (STOP/EXPLORE/INCONCLUSIVE)
-7. Markdown report
-8. JSON artifact
-9. Focused tests
-**Primary comparison:**
-- 15m: entry delay 45 min, MFE consumed 100%, ER -0.10
-- 5m: entry delay 15 min, MFE consumed ?, ER ?
-**Expected outcomes:**
-- If 5m passes EXPLORE (ER > 1.2, MFE consumed < 60%, beats all controls): mechanism validated, 15m timeframe was blocker
-- If 5m triggers STOP: mechanism fully invalidated, close liquidation/order-flow family
-**Hard rules:**
-- Do NOT reopen 15m result (15m STOP is final)
-- Do NOT relax 70% MFE threshold
-- Do NOT tune liquidation_burst_multiple based on 15m failure
-- Do NOT test 1m or 3m in this milestone
-- Primary returns MUST be from entry_candidate_bar
-**Next step after implementation:** Codex reports completion, Claude Code audits using QUANT_RESEARCH_OPERATING_MODEL.md
+**What:** Test whether 5m timeframe (15-minute entry delay) reduces MFE consumption vs 15m (45-minute entry delay).
+**Why:** Follow-up after 15m STOP to test whether timeframe was blocker or mechanism is fundamentally flawed.
+**Result:** STOP — mechanism fully invalidated on both 15m and 5m
+- 5m cohort: 10,302 events, ER=-0.102, PF=0.427, win rate=35.8%
+- Median MFE consumed: 100% (same as 15m)
+- Entry delay: 15 minutes (3× faster than 15m: 45 minutes)
+- 2 of 4 control cohorts outperformed main
+**Critical finding:** 3× faster entry (15 min vs 45 min) produced ZERO improvement in MFE consumption or ER
+**Interpretation:** Mechanism is fundamentally flawed (reversals complete < 15 min OR signal is noisy)
+**Timeframe hypothesis:** REJECTED — if timeframe was blocker, 5m would show partial improvement; actual result: identical failure on both timeframes
+**Family status:** CLOSED — liquidation burst reversal direction abandoned
+**Audit:** [docs/audits/AUDIT_LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1_2026-05-28.md](docs/audits/AUDIT_LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1_2026-05-28.md)
+**Commits:** 3771efa, 30d989a
+**User decision:** Close liquidation burst reversal mechanism. Move to new edge families with stronger theoretical justification.
+
+---
+
+## Order-Flow/Liquidation Edge Discovery Summary (CLOSED)
+
+**Research journey (2026-05-28):**
+1. ✅ Planning (APPROVE_PLANNING_DOCUMENT): 23 external sources, mechanism extraction, timing model design
+2. ✅ 15m diagnostic (DONE, STOP): Entry 45 min, MFE 100% consumed, ER -0.10, 3 controls outperformed
+3. ✅ Timeframe hypothesis (VALID_TIMEFRAME_ACCESSIBILITY_HYPOTHESIS): 5m check approved
+4. ✅ 5m diagnostic (DONE, STOP): Entry 15 min, MFE 100% consumed, ER -0.10, 2 controls outperformed
+5. 🛑 **Final verdict:** Mechanism fully invalidated, family closed
+
+**What was learned:**
+- Liquidation burst reversals do NOT create tradable entry opportunities
+- MFE consumption 100% on both 15m (45-min entry) and 5m (15-min entry)
+- 3× faster entry produced zero improvement
+- Control cohorts outperform or match main cohort (signal is noisy)
+- Mechanism fails fundamental accessibility test: opportunity consumed before realistic entry
+
+**Research quality:** Exemplary
+- Timing discipline enforced (detection/state_known/entry bars explicit)
+- MFE accessibility measured correctly (before/after entry, 70% threshold)
+- Control cohorts isolated correctly (4 deterministic controls)
+- Invalidation criteria applied correctly (STOP gates well-defined)
+- Timeframe hypothesis tested fairly (5m vs 15m comparison)
+
+**Strategic lesson:** Strong planning + rigorous execution can efficiently invalidate weak mechanisms. Research process worked as designed.
+
+---
+
+## Next Milestone: TBD (Awaiting User Direction)
+
+**Status:** AWAITING_DECISION  
+**Context:** Liquidation burst reversal family closed. User approved moving to new edge families with stronger theoretical justification.
+
+**User-suggested directions:**
+- **Regime shifts:** Structural regime changes (volatility, funding, open interest divergence)
+- **Volatility breakouts:** Consolidation range → breakout → position with ATR-based stops
+- **Funding rate arbitrage:** Spot/perpetual basis or cross-exchange funding differential capture
+
+**Requirements for next milestone:**
+- User must select specific edge family
+- New planning document required (source research, mechanism extraction, timing model)
+- Fresh hypothesis (not rescue of invalidated work)
+
+**No pre-implementation:** Claude Code waits for user decision on which direction to pursue.
 
 ---
 
@@ -5125,6 +5145,6 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
-- **Order-Flow/Liquidation Edge Discovery:** Planning DONE, 15m diagnostic DONE (STOP), 5m timeframe check ACTIVE
-- **Current milestone:** LIQUIDATION_BURST_REVERSAL_5M_FEASIBILITY_V1 (Codex, timeframe accessibility check)
-- **Next decision point:** Claude Code audit of 5m diagnostic implementation and results
+- **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
+- **Current milestone:** None (awaiting user direction for next edge family)
+- **Next decision point:** User selects edge family to explore (regime shifts / volatility breakouts / funding arbitrage / other)
