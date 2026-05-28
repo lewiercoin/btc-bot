@@ -182,6 +182,49 @@ Use this standard when the milestone scope touches `research_lab/`, research-lab
 | **LOOKS_DONE** | Files exist but logic is stub, placeholder, or incomplete, or smoke coverage does not prove the real scenario |
 | **NOT_DONE** | Explicitly unimplemented (`raise NotImplementedError`) |
 
+## Quant Research Challenger Mode
+
+When milestone is tagged as **quant research** or **edge discovery**, Claude Code extends standard audit with additional research-quality axes.
+
+### Additional Audit Axes for Research
+
+| Axis | What Claude Code Must Verify |
+|---|---|
+| **Methodology Rigor** | Timing discipline enforced, MFE accessibility measured, control cohort exists |
+| **Source Coverage** | Builder inspected external repos/papers if new edge family; sources classified |
+| **Repo/Code Inspection** | Builder read implementation code (not just README), assessed lookahead risk |
+| **Timing Discipline** | 4-bar separation (detection/state_known/entry/return_start), no detection-bar primary metrics |
+| **Entry Realism** | Entry at state_known_bar+1 or later, not at detection_bar |
+| **Lookahead Risk** | No future bars in signal detection; confirmation bars explicitly modeled |
+| **Edge Accessibility** | MFE after entry is tradable (< 70% consumed before entry) |
+| **Novelty vs Rescue** | New hypothesis, or disguised rescue of invalidated hypothesis? |
+| **Exploration Suppression** | Valid exploration, or premature blocking due to prior failures? |
+| **Creativity vs Cherry-Picking** | Creative hypothesis, or selective filtering after results? |
+
+### Research Verdict Scale
+
+**Planning documents:**
+- `APPROVE_PLANNING_DOCUMENT` — Methodology sound, proceed to implementation
+- `REJECT_LOOKAHEAD` — Timing model violates lookahead discipline
+- `REJECT_NOT_NEW_HYPOTHESIS` — Disguised rescue of invalidated hypothesis
+- `REJECT_INSUFFICIENT_SOURCE_RESEARCH` — Builder did not inspect repos/papers
+
+**Diagnostic implementations:**
+- `DONE_IMPLEMENTATION_CORRECT` — Code correct, ready for results analysis
+- `REJECT_TIMING_VIOLATION` — detection_bar used as return_start_bar (lookahead)
+- `REJECT_NO_CONTROL_COHORT` — Control cohort missing or broken
+
+**Research results:**
+- `HYPOTHESIS_PASSED` — Invalidation criteria NOT triggered, edge shows promise
+- `HYPOTHESIS_INVALIDATED` — Invalidation criteria triggered, STOP this direction
+- `INCONCLUSIVE_DATA_GAP` — Sample size too small or data coverage insufficient
+
+### Full Guidance
+
+See `docs/QUANT_RESEARCH_OPERATING_MODEL.md` for complete quant research audit standard.
+
+Claude remains the independent auditor, not the builder. The user retains strategic veto over research direction.
+
 ### Audit Report Format
 
 Reports are stored in `docs/audits/` with filename: `AUDIT_<milestone>_<YYYY-MM-DD>.md`

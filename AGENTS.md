@@ -154,6 +154,41 @@ This project uses a structured generator-evaluator workflow:
   - Claude Code is the ONLY auditor. Neither Codex nor Cascade audits.
   - Cascade NEVER audits its own output.
 
+## Workflow Modes
+
+This project operates in five distinct workflow modes:
+
+### 1. Implementation Mode
+- **When:** Blueprint phases, bot runtime features, execution engine, orchestrator
+- **Builder:** Implements code, writes tests, smoke tests before push
+- **Claude:** Audits layer separation, determinism, state integrity, contract compliance
+- **Output:** Production code, committed to repo
+
+### 2. Research Lab Infrastructure Mode
+- **When:** Research lab workflow improvements (optimization harness, walk-forward, store schema, autoresearch loop)
+- **Builder:** Implements research lab modules, no live-path changes
+- **Claude:** Audits methodology integrity, promotion safety, reproducibility, data isolation
+- **Output:** Research lab infrastructure, committed to repo
+
+### 3. Quant Research / Edge Discovery Mode ⭐
+- **When:** Exploring new edge families, reverse engineering failure points, validating hypotheses, source research
+- **Builder:** Source research, mechanism extraction, timing analysis, diagnostic implementation
+- **Claude:** Audits methodology rigor, source coverage, timing discipline, edge accessibility
+- **Output:** Research reports, diagnostic code, invalidation verdicts
+- **Authority:** `docs/QUANT_RESEARCH_OPERATING_MODEL.md`
+
+### 4. Promotion Mode
+- **When:** Promoting research lab candidate to paper/live settings
+- **Builder:** Generates approval bundle, applies diffs, deploys to paper
+- **Claude:** Audits promotion gate, backup existence, deployment checklist
+- **Output:** Deployed candidate in paper environment
+
+### 5. Live Operations / Incident Mode
+- **When:** Production issues, zombie processes, disaster recovery
+- **Builder:** Diagnoses issue, implements fix, verifies on server
+- **Claude:** Audits fix (no data loss), rollback readiness
+- **Output:** Incident resolved, documented in logs
+
 ### Rules for Builder (Codex or Cascade)
 
 - Before starting a milestone:
@@ -215,6 +250,7 @@ This project uses a structured generator-evaluator workflow:
 
 - `docs/BLUEPRINT_V1.md` — bot architecture, phases, acceptance criteria, data models
 - `docs/BLUEPRINT_RESEARCH_LAB.md` — research lab architecture, workflow, sandbox, promotion policy
+- `docs/QUANT_RESEARCH_OPERATING_MODEL.md` — quant research / edge discovery workflow
 - `AGENTS.md` — engineering discipline, workflow authority, role assignment, source-of-truth hierarchy (this file)
 - `CASCADE.md` — Cascade operating model (builder mode)
 - `CLAUDE.md` — Claude Code operating model (auditor mode)

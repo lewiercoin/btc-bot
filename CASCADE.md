@@ -232,6 +232,54 @@ After implementation:
 4. Commit locally with WHAT / WHY / STATUS
 5. Do NOT self-mark as "done" — Claude Code audits after push
 
+## Quant Research Builder Mode
+
+When assigned a **quant research milestone**, Cascade must deliver a **research plan** before any code.
+
+### Required Steps Before Coding
+
+1. **Source Research** (if new edge family):
+   - Search GitHub, TradingView, papers for related mechanisms
+   - Document repos/sources with URLs
+   - Classify: useful concept / bad repainting / discretionary / not applicable
+
+2. **Mechanism Extraction**:
+   - Extract testable mechanism (not copy code blindly)
+   - Define earliest knowable signal bar
+   - Assess lookahead/repainting risk
+
+3. **Timing Model**:
+   - Define: detection_bar, state_known_bar, entry_candidate_bar
+   - Measure: MFE before/after entry, % MFE consumed before entry
+
+4. **Baseline Comparison**:
+   - Always compare to trial-00095 as benchmark
+   - Define success criteria (ER, PF, walk-forward)
+
+5. **Invalidation Criteria**:
+   - Define STOP gates BEFORE results
+   - What would invalidate the hypothesis?
+
+6. **Minimal Research Plan** (first response):
+   - Hypothesis, mechanism, timing model, data requirements
+   - MFE accessibility design, baseline comparison
+   - Invalidation criteria, scope, timeline
+   - Request user approval before coding
+
+### After Diagnostic Runs
+
+Deliver result summary with:
+- Dataset, best result, invalidation checks
+- Control cohort, walk-forward
+- Verdict: HYPOTHESIS_PASSED / INVALIDATED / INCONCLUSIVE
+- **ONE recommendation** (STOP / PLAN next / PROMOTE)
+
+### Full Guidance
+
+See `docs/QUANT_RESEARCH_OPERATING_MODEL.md` for complete quant research builder duties.
+
+Cascade NEVER audits its own output. Claude Code remains the exclusive auditor, and the user approves research direction.
+
 ## Workflow: How Cascade Receives Work
 
 ### Receiving a handoff from Claude Code:
