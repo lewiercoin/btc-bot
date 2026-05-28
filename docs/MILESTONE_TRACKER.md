@@ -5122,82 +5122,140 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
-## Next Milestone: VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1
+## Research Milestone: VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1
 
-**Status:** ACTIVE (2026-05-28)  
+**Status:** DONE (2026-05-28)  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Report:** `docs/research/VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1_REPORT.md` (496 lines)  
+**Audit:** `docs/audits/AUDIT_VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1_2026-05-28.md`
+
+**Scope:** Quick reconnaissance (data + literature + metrics assessment) to determine if volatility breakouts edge family has sufficient foundation for full research planning.
+
+**Deliverables completed:**
+1. Data availability assessment: 195,347 BTCUSDT 15m candles, 0 gaps, all indicators feasible
+2. Literature review: 19 sources (11 model-quality, 8 industry/opinion), lookahead assessed per source
+3. Mechanism extraction: 6 common patterns identified (Donchian, Bollinger, BB/KC squeeze, ATR expansion, volume-confirmed)
+4. Metrics assessment: Expected ER 1.2-2.0 (below trial-00095 ER 2.1), realistic PF 1.1-1.8
+5. Blockers: NONE (prior VOLATILITY-BREAKOUT-RESEARCH-V1 failure documented as constraint, not blocker)
+6. Recommendation: PROCEED to full planning
+
+**Pre-audit recommendation:** PROCEED
+
+**Audit verdict:** DONE (reconnaissance quality excellent, recommendation validity confirmed)
+
+**Decision:** PROCEED to full planning (VOLATILITY_BREAKOUTS_EDGE_DISCOVERY_V1_PLANNING)
+
+**Reason:** Data sufficient, literature supports planning (not implementation), expected metrics marginal but potentially orthogonal to trial-00095. Prior ATR-slope expansion failure (ER 0.52, 2026-05-13) creates constraint against rescue but broader family remains viable.
+
+**Context:** Liquidation burst reversal family closed after 15m and 5m STOP. User selected volatility breakouts as next direction. Reconnaissance completed before committing to full planning.
+
+---
+
+## Research Milestone: VOLATILITY_BREAKOUTS_EDGE_DISCOVERY_V1_PLANNING
+
+**Status:** DONE (2026-05-28)  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Plan:** `docs/research/VOLATILITY_BREAKOUTS_EDGE_DISCOVERY_V1_PLAN.md` (616 lines)  
+**Audit:** `docs/audits/AUDIT_VOLATILITY_BREAKOUTS_EDGE_DISCOVERY_V1_PLAN_2026-05-28.md`
+
+**Scope:** Full planning document for volatility breakouts edge discovery V1.
+
+**Deliverables completed:**
+1. Source research: 26 sources (11 academic/benchmark, 8 industry, 4 code implementations, 3 documentation)
+2. Mechanism selection: `VOLUME_CONFIRMED_RANGE_BREAKOUT` (rejected: BB_KC_SQUEEZE_DONCHIAN_BREAKOUT, ATR-slope rescue)
+3. Repo data surface inspection: 195,347 candles + 195,150 aggtrade_buckets verified
+4. Extracted mechanism: Deterministic rule (20-bar range, compression gate, breakout + volume + TFI, entry at i+1)
+5. Timing model: Detection at i, entry at i+1, returns from i+1 (no lookahead)
+6. MFE accessibility design: 70% consumption threshold (STOP gate), target < 60%
+7. Baseline comparison: vs trial-00095 (ER 2.1, PF 4.6, 271 trades)
+8. Control cohorts: 6 controls (price-only, no-volume, opposite-flow, shifted-entry, random-offset, wide-range)
+9. Pre-result invalidation criteria: STOP/EXPLORE/INCONCLUSIVE gates pre-defined
+10. Recommendation: IMPLEMENT ONE DIAGNOSTIC (VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1)
+
+**Pre-audit recommendation:** IMPLEMENT ONE DIAGNOSTIC
+
+**Audit verdict:** APPROVE_PLANNING_DOCUMENT (planning quality excellent, recommendation justified)
+
+**Decision:** AWAITING USER APPROVAL
+
+**Reason:** Mechanism genuinely new (not ATR-slope rescue), timing realistic (1-bar entry delay), source research comprehensive (26 sources with lookahead assessment), control cohort design excellent (6 controls isolating each component), MFE accessibility properly designed (70% threshold), invalidation criteria pre-defined.
+
+**Critical findings validated:**
+- Mechanism selection rationale: `VOLUME_CONFIRMED_RANGE_BREAKOUT` chosen over `BB_KC_SQUEEZE_DONCHIAN_BREAKOUT` due to lower complexity and earlier state recognition
+- Novelty established: Uses range boundaries known before breakout, NOT ATR expansion detection; entry at i+1, NOT mid-expansion
+- Timing discipline: Range from i-20 through i-1, breakout at i, entry at i+1, returns from i+1
+- Sample size risk: Estimated 100-400 events; if < 100, hits STOP gate
+
+**Next:** User approval required to proceed to diagnostic implementation
+
+---
+
+## Next Milestone: VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1
+
+**Status:** AWAITING_DECISION (2026-05-28)  
 **Builder:** TBD (Codex or Cascade, user will select)  
-**Type:** Quick reconnaissance (data + literature + metrics assessment)  
-**Scope:** Research-only, no implementation, no diagnostic code
+**Type:** Research-only diagnostic implementation  
+**Scope:** Research-only, no production code
 
-**Goal:** Determine if volatility breakouts edge family has sufficient data/literature foundation for full research planning.
+**Goal:** Test whether BTCUSDT 15m range breakout with volume spike and TFI confirmation preserves enough post-entry MFE to be tradable after realistic next-bar entry.
 
-**Context:** Liquidation burst reversal family closed. User selected volatility breakouts as next direction. Quick recon (Option B) before committing to full planning document.
+**Mechanism:** `VOLUME_CONFIRMED_RANGE_BREAKOUT`
+- Detect completed 15m close outside prior compressed 20-bar range
+- Require breakout-bar volume spike (1.5× median) and aligned 15m TFI
+- Enter on next 15m bar (i+1), returns from i+1 only
 
-**Volatility breakouts concept:**
-- Consolidation range (low volatility compression)
-- Breakout from range (volatility expansion + directional move)
-- Entry on confirmed breakout (ATR expansion, volume confirmation)
-- Stop placement using ATR-based levels + support/resistance
+**Timing:** Detection at i, entry at i+1 (1-bar / 15-minute delay)
 
-**Reconnaissance deliverables:**
-1. **Data availability assessment:**
-   - Range detection: Can we identify consolidation ranges from historical data? (high/low levels, duration, ATR compression)
-   - Breakout confirmation: Can we measure volume spikes, ATR expansion, support/resistance levels?
-   - Historical coverage: Do we have sufficient data (2020-2026) for backtest?
-   - Data quality: Are gaps/missing bars acceptable for volatility analysis?
+**Expected MFE accessibility:** Target median MFE consumed < 60%, hard STOP > 70%
 
-2. **Literature review:**
-   - Academic papers on volatility breakouts (crypto or traditional markets)
-   - Industry research (TradingView scripts, GitHub repos, trading blogs)
-   - Existing implementations (open-source breakout strategies)
-   - Source classification: Model-quality vs opinion-based
+**Estimated sample size:** 100-400 events (2020-09-01 to 2026-03-28)
 
-3. **Mechanism extraction (preliminary):**
-   - What are the common volatility breakout patterns? (Bollinger squeeze, ATR compression, range contraction)
-   - What are the confirmation signals? (volume, ATR expansion, retest vs immediate follow-through)
-   - What are the timing models? (entry at breakout bar, retest bar, or follow-through bar)
-   - What are the stop/exit strategies? (ATR-based, support/resistance, time-based)
+**Timeline:** 1 week (per builder estimate)
 
-4. **Metrics assessment:**
-   - What are realistic ER/PF expectations for volatility breakouts in crypto? (from literature or comparable strategies)
-   - How does volatility breakouts compare to trial-00095 baseline? (trade frequency, holding period, win rate)
-   - What are the risk characteristics? (max drawdown, consecutive losses, regime dependence)
-
-5. **Data gaps / blockers identification:**
-   - Missing data: Do we need tick data, order book data, or OHLCV sufficient?
-   - Missing indicators: Do we need custom indicators (Bollinger Bands, Keltner Channels, Donchian Channels)?
-   - Computational complexity: Can volatility analysis run in real-time (15m decision cycles)?
-
-6. **Recommendation:**
-   - **PROCEED:** Strong foundation, sufficient data, literature support → create full planning document
-   - **PIVOT:** Weak foundation, insufficient data → suggest alternative direction
-   - **BLOCKED:** Critical data gaps, no literature support → stop this direction
-
-**Target deliverable:**
-- `docs/research/VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1_REPORT.md` (reconnaissance report, ~300-500 lines)
-- No code, no diagnostic, no backtest (reconnaissance only)
-
-**Timeline:** 1-2 days
+**Deliverables:**
+1. `research_lab/diagnostics/volume_confirmed_range_breakout_feasibility_v1.py` (main diagnostic)
+2. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.md` (markdown report)
+3. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.json` (machine-readable artifact)
+4. `tests/test_research_lab/test_volume_confirmed_range_breakout_feasibility_v1.py` (smoke tests)
 
 **Acceptance criteria:**
-- Data availability: clearly documented (exists / missing / requires fetch)
-- Literature review: 10-20 sources inspected, classified, key mechanisms extracted
-- Metrics assessment: realistic ER/PF ranges estimated from literature or comparable strategies
-- Recommendation: clear PROCEED / PIVOT / BLOCKED verdict with reasoning
+- Range excludes current bar
+- Breakout signal known only at bar i close
+- Entry and return start equal i+1
+- TFI alignment uses same 15m bucket only
+- MFE before and after entry calculations
+- Control cohorts are mutually classified and deterministic
+- Diagnostic reproducibility
+
+**Invalidation criteria (pre-defined):**
+- STOP gates: Median net return ≤ 0, ER < 1.2, PF < 1.2, MFE consumed > 70%, any control beats main, walk-forward < 2 of 4 folds positive, sample < 100
+- EXPLORE gates: Median net return > 0, ER > 1.5, PF > 1.5, MFE consumed < 60%, main beats all controls, walk-forward ≥ 3 of 4 folds positive, sample ≥ 200
+
+**Constraints:**
+- Do NOT rescue ATR-slope expansion (failed mechanism)
+- Do NOT reopen VOLATILITY-BREAKOUT-RESEARCH-V1 result
+- Do NOT relax timing discipline (returns from realistic entry only)
+- Do NOT tune thresholds after seeing results
+- ONE mechanism per diagnostic (focus)
 
 **No-touch areas:**
-- No production code
-- No bot changes
+- No production strategy code
+- No FeatureEngine or SignalEngine changes
+- No Governance/Risk/execution changes
+- No settings changes
 - No trial-00095 modification
-- No implementation (reconnaissance only)
+- No promotion logic
 
-**After reconnaissance:**
-- If PROCEED: Create full planning document (source research, mechanism extraction, timing model, controls, invalidation criteria)
-- If PIVOT: User selects alternative direction (regime shifts / funding arbitrage / other)
-- If BLOCKED: User decides whether to invest in data acquisition or abandon direction
+**Expected outcome:**
+- If invalidation criteria NOT triggered: Proceed to EXPLORE (further validation/walk-forward)
+- If invalidation criteria triggered: STOP this direction, pivot to alternative volatility mechanism or different edge family
 
 **Parallel track (deferred):**
-- Uptrend gap remediation: will be addressed after volatility breakouts reconnaissance completes
+- Uptrend gap remediation: will be addressed after volatility breakouts diagnostic completes
 
 ---
 
@@ -5206,5 +5264,7 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
-- **Current milestone:** VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1 (quick recon, 1-2 days)
-- **Next decision point:** Reconnaissance verdict (PROCEED / PIVOT / BLOCKED) → if PROCEED, create full planning document
+- **Volatility Breakouts Reconnaissance:** DONE (2026-05-28, recommendation: PROCEED)
+- **Volatility Breakouts Planning:** DONE (2026-05-28, recommendation: IMPLEMENT ONE DIAGNOSTIC)
+- **Current milestone:** VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1 (AWAITING_DECISION)
+- **Next decision point:** User approval to proceed to diagnostic implementation → if approved, Codex implements research-only diagnostic (1 week timeline)
