@@ -5122,22 +5122,82 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
-## Next Milestone: TBD (Awaiting User Direction)
+## Next Milestone: VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1
 
-**Status:** AWAITING_DECISION  
-**Context:** Liquidation burst reversal family closed. User approved moving to new edge families with stronger theoretical justification.
+**Status:** ACTIVE (2026-05-28)  
+**Builder:** TBD (Codex or Cascade, user will select)  
+**Type:** Quick reconnaissance (data + literature + metrics assessment)  
+**Scope:** Research-only, no implementation, no diagnostic code
 
-**User-suggested directions:**
-- **Regime shifts:** Structural regime changes (volatility, funding, open interest divergence)
-- **Volatility breakouts:** Consolidation range → breakout → position with ATR-based stops
-- **Funding rate arbitrage:** Spot/perpetual basis or cross-exchange funding differential capture
+**Goal:** Determine if volatility breakouts edge family has sufficient data/literature foundation for full research planning.
 
-**Requirements for next milestone:**
-- User must select specific edge family
-- New planning document required (source research, mechanism extraction, timing model)
-- Fresh hypothesis (not rescue of invalidated work)
+**Context:** Liquidation burst reversal family closed. User selected volatility breakouts as next direction. Quick recon (Option B) before committing to full planning document.
 
-**No pre-implementation:** Claude Code waits for user decision on which direction to pursue.
+**Volatility breakouts concept:**
+- Consolidation range (low volatility compression)
+- Breakout from range (volatility expansion + directional move)
+- Entry on confirmed breakout (ATR expansion, volume confirmation)
+- Stop placement using ATR-based levels + support/resistance
+
+**Reconnaissance deliverables:**
+1. **Data availability assessment:**
+   - Range detection: Can we identify consolidation ranges from historical data? (high/low levels, duration, ATR compression)
+   - Breakout confirmation: Can we measure volume spikes, ATR expansion, support/resistance levels?
+   - Historical coverage: Do we have sufficient data (2020-2026) for backtest?
+   - Data quality: Are gaps/missing bars acceptable for volatility analysis?
+
+2. **Literature review:**
+   - Academic papers on volatility breakouts (crypto or traditional markets)
+   - Industry research (TradingView scripts, GitHub repos, trading blogs)
+   - Existing implementations (open-source breakout strategies)
+   - Source classification: Model-quality vs opinion-based
+
+3. **Mechanism extraction (preliminary):**
+   - What are the common volatility breakout patterns? (Bollinger squeeze, ATR compression, range contraction)
+   - What are the confirmation signals? (volume, ATR expansion, retest vs immediate follow-through)
+   - What are the timing models? (entry at breakout bar, retest bar, or follow-through bar)
+   - What are the stop/exit strategies? (ATR-based, support/resistance, time-based)
+
+4. **Metrics assessment:**
+   - What are realistic ER/PF expectations for volatility breakouts in crypto? (from literature or comparable strategies)
+   - How does volatility breakouts compare to trial-00095 baseline? (trade frequency, holding period, win rate)
+   - What are the risk characteristics? (max drawdown, consecutive losses, regime dependence)
+
+5. **Data gaps / blockers identification:**
+   - Missing data: Do we need tick data, order book data, or OHLCV sufficient?
+   - Missing indicators: Do we need custom indicators (Bollinger Bands, Keltner Channels, Donchian Channels)?
+   - Computational complexity: Can volatility analysis run in real-time (15m decision cycles)?
+
+6. **Recommendation:**
+   - **PROCEED:** Strong foundation, sufficient data, literature support → create full planning document
+   - **PIVOT:** Weak foundation, insufficient data → suggest alternative direction
+   - **BLOCKED:** Critical data gaps, no literature support → stop this direction
+
+**Target deliverable:**
+- `docs/research/VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1_REPORT.md` (reconnaissance report, ~300-500 lines)
+- No code, no diagnostic, no backtest (reconnaissance only)
+
+**Timeline:** 1-2 days
+
+**Acceptance criteria:**
+- Data availability: clearly documented (exists / missing / requires fetch)
+- Literature review: 10-20 sources inspected, classified, key mechanisms extracted
+- Metrics assessment: realistic ER/PF ranges estimated from literature or comparable strategies
+- Recommendation: clear PROCEED / PIVOT / BLOCKED verdict with reasoning
+
+**No-touch areas:**
+- No production code
+- No bot changes
+- No trial-00095 modification
+- No implementation (reconnaissance only)
+
+**After reconnaissance:**
+- If PROCEED: Create full planning document (source research, mechanism extraction, timing model, controls, invalidation criteria)
+- If PIVOT: User selects alternative direction (regime shifts / funding arbitrage / other)
+- If BLOCKED: User decides whether to invest in data acquisition or abandon direction
+
+**Parallel track (deferred):**
+- Uptrend gap remediation: will be addressed after volatility breakouts reconnaissance completes
 
 ---
 
@@ -5146,5 +5206,5 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
-- **Current milestone:** None (awaiting user direction for next edge family)
-- **Next decision point:** User selects edge family to explore (regime shifts / volatility breakouts / funding arbitrage / other)
+- **Current milestone:** VOLATILITY_BREAKOUTS_RECONNAISSANCE_V1 (quick recon, 1-2 days)
+- **Next decision point:** Reconnaissance verdict (PROCEED / PIVOT / BLOCKED) → if PROCEED, create full planning document
