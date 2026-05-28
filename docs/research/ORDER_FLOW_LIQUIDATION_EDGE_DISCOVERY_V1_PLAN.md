@@ -1,594 +1,486 @@
-# ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1 Plan
-
-Date: 2026-05-28
-Status: planning only, not approved for implementation
-Builder: Codex
-Audit target: Claude Code
-
-## 1. Executive Verdict
-
-**YES: Plan `ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1`.**
-
-This is not another SMC rescue. The three closed sweep/SMC diagnostics showed
-that candle-confirmation states arrive too late. The remaining plausible source
-of a tradable post-sweep edge is earlier microstructure information:
-liquidation bursts, aggressive taker imbalance, CVD/price absorption, OI/funding
-crowding, and force-order exhaustion.
-
-The repo already has enough surface area to justify a plan:
-
-- live aggregation supports aggTrade and forceOrder streams
-  (`data/websocket_client.py:134-139`, `data/websocket_client.py:220-239`);
-- runtime snapshots carry funding, OI, aggTrade buckets, and force-order windows
-  (`core/models.py:90-124`);
-- FeatureEngine computes funding/OI/CVD/TFI/force-order facts
-  (`core/feature_engine.py:329-356`);
-- ReplayLoader can build historical snapshots with the same data families
-  (`backtest/replay_loader.py:111-151`, `backtest/replay_loader.py:201-292`);
-- the canonical research DB has rich aggTrade/OI/funding history and partial
-  liquidation history.
-
-The main gap is not architecture. It is data quality and mechanism isolation:
-force-order history is incomplete after 2024-12-01 in
-`research_lab/data/crowded_unwind_backtest.db`, and current bot logic uses flow
-mostly as direction/confluence rather than as a primary early classifier.
-
-## 2. Lessons From Failed SMC/Sweep Research
-
-Delayed price-action labels created fake edge when measured from detection time.
-The SMC mitigation/retest sequence found real movement but entered too late:
-median 8 bars from sweep to entry, with much larger MFE before entry than after
-entry. The MFE accessibility diagnostic then tested 28 post-sweep knowable
-states and found no positive median net return after costs. Therefore the next
-family must not add CHOCH/FVG/OB labels or wait for prettier candle structure.
-It must ask whether microstructure facts are knowable at or near the sweep,
-before favorable excursion is consumed. Detection-bar returns remain audit-only
-unless the flow state is genuinely known at detection-bar close.
-
-## 3. Existing Bot Order-Flow Inventory
-
-| Data Source | Available Historically? | Available Live? | Available in Replay? | Timestamp Alignment Known? | Used in Current Edge? | Currently Decisive or Metadata? |
-| --- | --- | --- | --- | --- | --- | --- |
-| aggTrades | Yes. `aggtrade_buckets` exists (`storage/schema.sql:42-51`); research DB has 3,122,272 rows, including 195,150 15m and 2,927,122 60s buckets. | Yes. WebSocket subscribes to `<symbol>@aggTrade` (`data/websocket_client.py:134-139`) and MarketData aggregates 60s/15m buckets (`data/market_data.py:26-55`, `data/market_data.py:265-272`). | Yes. Replay selects `taker_buy_volume`, `taker_sell_volume`, `tfi`, `cvd` (`backtest/replay_loader.py:241-264`). | Mostly. Buckets have `bucket_time`; snapshots persist `aggtrades_exchange_ts` (`storage/schema.sql:247-261`). Needs closed-bucket confirmation for sub-15m states. | Yes. TFI/CVD drive direction and confluence (`core/signal_engine.py:218-226`, `core/signal_engine.py:266-271`). | Decisive for direction/confluence, but not yet a standalone mechanism. |
-| CVD | Yes. Stored in `aggtrade_buckets.cvd` and `cvd_price_history` (`storage/schema.sql:49-64`); backfill script can populate history from aggTrade buckets (`scripts/backfill_cvd_history.py:183-216`). | Yes. MarketData persists CVD price bars from aggTrade buckets (`data/market_data.py:482-500`). | Yes. Replay loads 15m CVD from aggTrade buckets (`backtest/replay_loader.py:241-264`); CVD history bootstrap exists (`core/feature_engine.py:259-278`). | Medium. CVD is bucket-close aligned; divergence requires prior CVD/price history and gap checks (`core/feature_engine.py:500-571`). | Yes. CVD divergence can infer direction and add score (`core/signal_engine.py:218-223`, `core/signal_engine.py:259-264`). | Decisive if divergence is exclusive; otherwise metadata/confluence. Prior MFE diagnostic found CVD divergence weak as post-sweep state. |
-| TFI | Yes. Computed as `(taker_buy - taker_sell) / total` in bootstrap and live aggregation (`scripts/bootstrap_history.py:123-149`, `data/market_data.py:26-55`). | Yes. Live aggTrade buckets include TFI (`data/market_data.py:184-187`). | Yes. Replay returns TFI for 60s/15m buckets (`backtest/replay_loader.py:241-264`, `backtest/replay_loader.py:372-375`). | Mostly. Bucket close must be enforced for live/replay parity. | Yes. Direction thresholds and impulse scoring use TFI (`core/signal_engine.py:224-226`, `core/signal_engine.py:266-271`). | Decisive in current edge. New research must prove novelty beyond TFI thresholds. |
-| Force orders / liquidations | Partially. `force_orders` table exists (`storage/schema.sql:67-73`); research DB has 146,864 rows from 2022-01-01 to 2024-12-01 only. `param_registry.py:19` notes structural censoring and backfill limitations. | Yes. WebSocket subscribes to `<symbol>@forceOrder` (`data/websocket_client.py:134-139`) and buffers recent events (`data/websocket_client.py:100-111`, `data/websocket_client.py:232-239`). Dedicated collector exists (`scripts/server/run_force_order_collector.py:33-34`, `scripts/server/run_force_order_collector.py:267-300`). | Yes. Replay selects force orders and builds a 60s window (`backtest/replay_loader.py:276-292`, `backtest/replay_loader.py:379`). | Risky. Binance stream publishes only the largest liquidation order per symbol per 1000ms, per official docs, so burst intensity is censored. | Yes but lightly. FeatureEngine computes rate/spike/decreasing (`core/feature_engine.py:352-356`, `core/feature_engine.py:574-585`); SignalEngine adds a small score (`core/signal_engine.py:272-274`). | Metadata/small confluence today. Could become decisive only if censoring and coverage pass audit. |
-| Open interest | Yes. `open_interest` table exists (`storage/schema.sql:24-29`); research DB has 524,971 rows from 2020-09-01 to 2026-03-29. | Yes. REST fetch exists (`data/rest_client.py:347-367`) and MarketData fetches/persists samples (`data/market_data.py:123-126`). | Yes. Replay selects last-known OI (`backtest/replay_loader.py:223-237`, `backtest/replay_loader.py:346-350`). | Medium. Binance public OI stats are interval data; live current OI and historical OI must be aligned as last-known samples. | Yes. OI z-score feeds crowded leverage and features (`core/feature_engine.py:336-337`, `core/regime_engine.py:49-54`). | Mostly regime/context today, not decisive entry timing. |
-| Funding | Yes. `funding` table exists (`storage/schema.sql:16-21`); research DB has 6,105 rows from 2020-09-01 to 2026-03-28. | Yes. REST funding history fetch exists (`data/rest_client.py:332-345`) and MarketData loads a window (`data/market_data.py:119-121`, `data/market_data.py:341-376`). | Yes. Replay slices funding history (`backtest/replay_loader.py:111-114`, `backtest/replay_loader.py:201-219`). | High at 8h cadence, but not an intrabar trigger. Funding is known only at published funding timestamps or via last known rate. | Yes. Funding supports confluence and regime (`core/signal_engine.py:286-291`, `core/regime_engine.py:49-54`). | Metadata/context. Should not be used alone for timing. |
-| Regime labels | Yes, reconstructable from features. Not a stored historical label in research DB. | Yes. RegimeEngine classifies every cycle (`core/regime_engine.py:17-32`). | Yes, BacktestRunner builds RegimeEngine with strategy config (`backtest/backtest_runner.py:273-283`). | Depends on feature alignment. | Yes. SignalEngine and Governance use regime context. | Context/guardrail. Not a primary proposed edge. |
-
-### Inventory Gaps
-
-- The main research DB has empty `decision_outcomes`, `feature_snapshots`, and
-  `market_snapshots`; accepted `signal_candidates` exist but only 106 rows. This
-  limits rejected-population reconstruction from persisted live-style decisions.
-- Force-order history is partial: rows end at 2024-12-01, while candles/aggTrade,
-  funding, and OI run into 2026.
-- Binance forceOrder stream is censored by design: only the largest liquidation
-  order per symbol per 1000ms is pushed. Any burst-intensity model must treat
-  force-order count/size as lower-bound proxies, not complete liquidation flow.
-- Current Research Lab blueprint still lists `weight_force_order_spike` frozen
-  because the original v0.1 table had zero rows (`docs/BLUEPRINT_RESEARCH_LAB.md:124`),
-  while `param_registry.py:19` has the later, more accurate reason: historical
-  rows exist but are structurally censored.
-- No production code change is needed for a diagnostic. The next script can read
-  SQLite tables directly, as prior diagnostics did
-  (`research_lab/analysis_mfe_accessibility_earliest_knowable_signal_v1.py:33-34`,
-  `research_lab/analysis_mfe_accessibility_earliest_knowable_signal_v1.py:1639-1648`).
-
-## 4. External Source / Open-Source Research Synthesis
-
-### Source: Binance USD-M Liquidation Order Streams
-
-- **URL:** https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Liquidation-Order-Streams
-- **Core idea:** Binance exposes a force-order stream for symbol liquidations,
-  but it is a snapshot stream, not full tick-level liquidation history. The docs
-  state that only the largest liquidation order within each 1000ms interval is
-  pushed for a symbol.
-- **Data required:** force-order event time, side, quantity, price, symbol.
-- **Deterministic?** YES for observed snapshots; NO for full hidden liquidation
-  intensity.
-- **Lookahead risk?** LOW if event time and closed decision bar are respected.
-- **btc-bot has required data?** PARTIAL. Live stream and historical table exist,
-  but historical coverage/censoring are material issues.
-- **Suggests new edge family?** YES.
-- **Classification:** useful concept and data-source benchmark, not a strategy.
-
-### Source: Binance USD-M Aggregate Trade Streams
-
-- **URL:** https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Aggregate-Trade-Streams
-- **Core idea:** The stream provides market trade information aggregated every
-  100ms for fills with the same price and taker side. This is the natural source
-  for TFI/CVD and aggressive-flow imbalance.
-- **Data required:** trade time, price, quantity, buyer-maker flag.
-- **Deterministic?** YES after bucketization.
-- **Lookahead risk?** LOW if the bucket is closed before use.
-- **btc-bot has required data?** YES. Live aggregation and historical buckets
-  already exist.
-- **Suggests new edge family?** YES.
-- **Classification:** implementation candidate for data plumbing; mechanism must
-  still be validated.
-
-### Source: Binance Open Interest Statistics
-
-- **URL:** https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest-Statistics
-- **Core idea:** Public endpoint provides interval OI statistics at periods such
-  as 5m, 15m, 1h. The docs note public historical availability limits for recent
-  data, so long history depends on prior backfill or alternate datasets.
-- **Data required:** timestamped OI, symbol, period.
-- **Deterministic?** YES as last-known interval data.
-- **Lookahead risk?** MEDIUM if aligned to future interval close by mistake.
-- **btc-bot has required data?** YES historically in the research DB; live current
-  OI also exists.
-- **Suggests new edge family?** YES, as crowding context, not as a standalone
-  timing signal.
-- **Classification:** useful concept and implementation candidate.
-
-### Source: Binance Funding Rate History
-
-- **URL:** https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History
-- **Core idea:** Funding history gives the cost paid by crowded perp positioning
-  at discrete funding times. It identifies crowding/carry pressure, but it does
-  not time intraday reversal by itself.
-- **Data required:** funding time, funding rate, mark price if available.
-- **Deterministic?** YES.
-- **Lookahead risk?** LOW if last-known funding rate is used.
-- **btc-bot has required data?** YES.
-- **Suggests new edge family?** PARTIAL. Useful only combined with OI and force
-  orders.
-- **Classification:** useful concept; not a standalone implementation candidate.
-
-### Source: Cont, Kukanov, Stoikov - The Price Impact of Order Book Events
-
-- **URL:** https://ideas.repec.org/p/arx/papers/1011.6402.html
-- **Core idea:** Short-horizon price changes are more tightly related to order
-  flow imbalance at the best bid/ask than to raw trade volume. This supports
-  studying imbalance and depth, not just candle outcomes.
-- **Data required:** best bid/ask depth events, market orders, cancellations.
-- **Deterministic?** YES in principle.
-- **Lookahead risk?** LOW with event-time data.
-- **btc-bot has required data?** PARTIAL/NO. The bot has aggTrade-derived TFI/CVD
-  but not full order-book depth and cancellation events.
-- **Suggests new edge family?** YES, but the first btc-bot implementation must
-  use a reduced taker-flow proxy unless depth history is added later.
-- **Classification:** benchmark concept, not directly implementable with current
-  data.
-
-### Source: Bookmap Absorption Indicator / Crypto Order Flow Material
-
-- **URLs:** https://bookmap.com/absorption/ and https://bookmap.com/crypto/
-- **Core idea:** Absorption is the interaction where aggressive flow trades into
-  passive liquidity but price stops extending. The crypto examples explicitly
-  combine CVD/volume dots/liquidation indicators with visible liquidity.
-- **Data required:** executed aggressive volume, passive liquidity/DOM or iceberg
-  proxies, price response.
-- **Deterministic?** UNCLEAR in vendor form; can be reduced to a deterministic
-  proxy.
-- **Lookahead risk?** MEDIUM because visual absorption is easy to label after the
-  turn.
-- **btc-bot has required data?** PARTIAL. TFI/CVD/force orders exist, but full
-  DOM/iceberg data does not.
-- **Suggests new edge family?** YES: absorption after stop-run using available
-  taker-flow proxies.
-- **Classification:** useful concept; vendor/visual implementation is
-  discretionary, not a benchmark.
-
-### Source: hgnx/binance-liquidation-tracker
-
-- **URL:** https://github.com/hgnx/binance-liquidation-tracker
-- **Core idea:** Small Python project records Binance Futures forced liquidation
-  orders in real time and filters by notional/symbol. It demonstrates the same
-  raw data source as btc-bot's force-order collector.
-- **Data required:** Binance forceOrder WebSocket events.
-- **Deterministic?** YES for event collection.
-- **Lookahead risk?** LOW for collection, none for strategy because it does not
-  define one.
-- **btc-bot has required data?** YES/PARTIAL. btc-bot already has a better
-  integrated collector and schema.
-- **Suggests new edge family?** NO by itself.
-- **Classification:** benchmark candidate for ingestion only; not a strategy.
-
-### Source: LiveVolatile Liquidation Cascade Article
-
-- **URL:** https://www.livevolatile.com/blog/crypto-liquidation-cascades-profit-strategy-2026
-- **Core idea:** Liquidation cascades are framed as forced selling/buying loops
-  that can culminate in capitulation and reversal, with OI, funding, liquidation
-  clusters, and volatility as inputs.
-- **Data required:** liquidation clusters, OI, funding, volatility, price.
-- **Deterministic?** UNCLEAR. Several claims are marketing-style and not
-  reproducible from public code.
-- **Lookahead risk?** HIGH if "capitulation" is labeled after recovery.
-- **btc-bot has required data?** PARTIAL. It has observed force orders, OI,
-  funding, ATR, not a full liquidation heatmap.
-- **Suggests new edge family?** YES conceptually, but not as authority.
-- **Classification:** useful concept with high skepticism; not a benchmark.
-
-### Source: BloFin Funding + Open Interest Signals
-
-- **URL:** https://blofin.com/en/academy/education/funding-and-open-interest-signals
-- **Core idea:** Funding is crowding cost, OI is total active exposure, and high
-  funding is not an automatic reversal signal. The useful interpretation is
-  crowding plus forced repositioning risk, not simple contrarian entry.
-- **Data required:** funding, OI, price/volume context.
-- **Deterministic?** YES for data; interpretation must be tested.
-- **Lookahead risk?** MEDIUM if "crowding unwind" is identified after OI drops.
-- **btc-bot has required data?** YES.
-- **Suggests new edge family?** YES as a crowding/unwind classifier.
-- **Classification:** useful concept, not implementation authority.
-
-## 5. Candidate Mechanisms
-
-### Mechanism: Liquidation Exhaustion Reversal
-
-**Hypothesis:** A force-order burst through a liquidity level followed by
-declining same-direction aggressive flow predicts reversal because forced
-selling/buying has exhausted available stop-flow.
-
-**Earliest knowable bar:** Detection bar close if the force-order burst and
-sweep are both inside the closed 60s/15m window; otherwise `state_known_bar + 1`
-after burst decay is confirmed.
-
-**Required data:** Candles, ATR, equal-level sweep, force_orders, TFI, CVD, OI,
-funding.
-
-**Expected sample count:** Force-order-burst states had 1,567 post-sweep events
-in MFE V1, but the new universe should start from all force-order bursts. Expect
-several thousand pre-filter events before quality gates, with coverage only
-through 2024-12-01 unless data is extended.
-
-**Likely overlap with trial-00095:** MEDIUM. Trial-00095 has force-order score
-but small weight; it is not primarily a liquidation burst strategy.
-
-**How it could fail:** The Binance stream is censored, burst decay is known too
-late, or forced flow is continuation rather than exhaustion.
-
-### Mechanism: Absorption After Stop-Run
-
-**Hypothesis:** After a sweep, aggressive taker flow continues in the sweep
-direction but price fails to extend; this divergence identifies passive
-absorption and predicts reversal earlier than reclaim/mitigation.
-
-**Earliest knowable bar:** Earliest closed 60s or 15m bucket after the sweep
-where aggressive flow is extreme and price extension stalls.
-
-**Required data:** aggtrade_buckets 60s/15m, CVD, TFI, candles, ATR, sweep level.
-
-**Expected sample count:** High. MFE V1 produced 13,257 CVD absorption proxy
-observations, but they were post-sweep and negative; a new diagnostic must
-redefine absorption around the actual stop-run bar and test earlier timing.
-
-**Likely overlap with trial-00095:** HIGH/MEDIUM. Trial-00095 already uses TFI
-and CVD divergence; novelty must be proven by overlap and incremental metrics.
-
-**How it could fail:** CVD divergence remains interpretive/noisy, or it is just
-trial-00095 direction logic under another name.
-
-### Mechanism: Crowded Unwind
-
-**Hypothesis:** Extreme OI expansion plus one-sided funding plus a liquidation
-event predicts a forced unwind and short-horizon mean reversion after crowding
-breaks.
-
-**Earliest knowable bar:** `state_known_bar` when OI/funding are already
-last-known and a liquidation/force-order burst closes in the current bar.
-
-**Required data:** OI, funding, force_orders, price, ATR, TFI/CVD for direction.
-
-**Expected sample count:** Medium. OI/funding coverage is strong, but combining
-with force orders and sweep/cascade filters may reduce events below 300 unless
-the force-order universe is broadened beyond sweep events.
-
-**Likely overlap with trial-00095:** LOW/MEDIUM. RegimeEngine uses crowded
-leverage, but current SignalEngine is still sweep/reclaim-led.
-
-**How it could fail:** Funding/OI are slow context, not timing; the unwind may
-already be complete by the observable liquidation burst.
-
-### Mechanism: Flow-Confirmed Continuation
-
-**Hypothesis:** Some sweeps are not reversals. If sweep direction, TFI, CVD, and
-OI expansion align, the correct trade is continuation, not reclaim.
-
-**Earliest knowable bar:** Detection-bar close or next bar after closed flow
-bucket confirms direction.
-
-**Required data:** Sweep events, aggtrade_buckets, CVD, OI delta, ATR, forward
-returns.
-
-**Expected sample count:** High if all sweeps are used; lower if requiring OI
-expansion and CVD alignment.
-
-**Likely overlap with trial-00095:** MEDIUM. Current bot is LONG-dominant and
-reclaim-led; continuation/no-reclaim rejected populations are not current
-accepted trades.
-
-**How it could fail:** MFE V1 no-reclaim/reject states were negative after
-entry timing, so continuation needs genuinely earlier flow evidence, not delayed
-no-reclaim labels.
-
-### Mechanism: Volatility Expansion Failure With Flow Exhaustion
-
-**Hypothesis:** ATR/range expansion plus force-order burst and decaying TFI
-predicts short-horizon reversion because urgency failed to produce continuation.
-
-**Earliest knowable bar:** Bar close of the expansion/burst state; entry at next
-bar open.
-
-**Required data:** Candles, ATR, TFI, force_orders, sweep anchor optional.
-
-**Expected sample count:** Medium/high.
-
-**Likely overlap with trial-00095:** LOW if not requiring reclaim; MEDIUM if
-anchored to equal-level sweeps.
-
-**How it could fail:** Volatility expansion failure may be another delayed
-confirmation where the reversal already occurred inside the same candle.
-
-## 6. Reverse Engineering Question
-
-Central question:
-
-**At the moment of sweep / liquidation / aggressive flow burst, what flow facts
-are knowable before MFE is consumed?**
-
-The diagnostic should not ask whether a liquidation/flow pattern looks tradable.
-It should ask whether the decisive flow information is knowable early enough to
-trade with positive expectancy after costs.
-
-Required timeline view:
-
-```text
-Bar 0: Sweep detected, force-order burst detected
-       state: sweep_plus_force_burst_known
-       primary entry: Bar 1 open
-
-Bar 1: 60s/15m TFI impulse confirmed, price extension checked
-       state: tfi_impulse_or_absorption_known
-       primary entry: Bar 2 open
-
-Bar 2: Force-order decay or continuation confirmed
-       state: force_decay_or_continuation_known
-       primary entry: Bar 3 open
-
-Bar 3: Reclaim/current trial-00095 candidate proxy may be known
-       state: trial_00095_candidate_or_reclaim_known
-       primary entry: Bar 4 open
-
-Bar 5: Displacement confirmation states from prior diagnostics
-       audit only unless explicitly tested as early entry
-
-Bar 8: SMC mitigation/retest states
-       already proven too late for this family
-```
-
-For every state, compute remaining MFE/MAE and net returns from
-`entry_candidate_bar`, not from the original detection bar. Detection-bar
-returns remain audit-only, used to expose edge decay and lookahead illusions.
-
-## 7. Possible Minimal Diagnostic
-
-Proposed next diagnostic name:
-
-`ORDER_FLOW_LIQUIDATION_ACCESSIBILITY_V1`
-
-Goal:
-
-For each sweep, force-order burst, and crowding/liquidation event, test whether
-early flow states classify reversal versus continuation before the move is
-consumed.
-
-Candidate event universe:
-
-- all force-order bursts by 60s/15m notional z-score;
-- all equal-level sweeps with any force-order activity in the prior/current/next
-  60s window;
-- all sweeps with extreme TFI/CVD movement;
-- all OI expansion plus force-order burst windows;
-- all funding-extreme plus liquidation windows;
-- current trial-00095 accepted/reconstructed candidates as benchmark only.
-
-Candidate knowable states:
-
-- `force_order_burst_known`
-- `force_order_notional_z_known`
-- `force_order_directional_burst_known`
-- `force_order_decay_1bar_known`
-- `force_order_continuation_1bar_known`
-- `tfi_impulse_known`
-- `tfi_extreme_reversal_known`
-- `tfi_extreme_continuation_known`
-- `cvd_price_absorption_known`
-- `cvd_price_continuation_known`
-- `price_no_extension_with_aggressive_flow_known`
-- `oi_expansion_known`
-- `oi_drop_after_force_known`
-- `funding_extreme_known`
-- `funding_oi_crowding_known`
-- `crowded_liquidation_unwind_known`
-- `sweep_plus_force_burst_known`
-- `sweep_plus_absorption_known`
-- `sweep_plus_continuation_flow_known`
-- `trial_00095_candidate_overlap_known`
-
-Timing discipline:
-
-- `detection_bar`: first bar where event seed exists;
-- `state_known_bar`: bar where the flow/crowding state is fully known;
-- `entry_candidate_bar`: `state_known_bar + 1` by default;
-- `return_start_bar`: same as entry candidate unless the diagnostic explicitly
-  models next-open unavailability.
-
-Primary outputs:
-
-- state-by-state median net return after costs;
-- PF proxy, win rate, mean/median MFE and MAE;
-- MFE consumed before each state;
-- time from seed event to state;
-- time from state to MFE;
-- overlap with trial-00095 accepted/reconstructed candidates;
-- force-order coverage and censoring diagnostics;
-- deterministic shifted control;
-- 4-fold walk-forward summary.
-
-Estimated complexity:
-
-- similar to MFE accessibility V1, but with a broader event universe and stronger
-  force-order coverage validation;
-- 1-2 weeks implementation if approved, depending on how much rejected/live
-  decision reconstruction is included.
-
-## 8. Baselines and Controls
-
-Mandatory baselines:
-
-- **Trial-00095:** PF 4.6625, ER 2.1, 271 trades from WF validation
-  (`docs/analysis/WF_VALIDATION_TRIAL_00095_2026-05-08.md:50`,
-  `docs/analysis/SWEEP_RECLAIM_SINGULAR_EDGE_ASSESSMENT_2026-05-13.md:12`).
-- **Current SignalEngine accepted candidates:** reconstruct via current replay
-  where possible; do not rely on sparse `signal_candidates` rows alone.
-- **Sweep-only:** prior diagnostics already show post-sweep states were negative,
-  but sweep-only remains the relevant anchor.
-- **Force-order-burst-only:** new baseline to test whether liquidation data adds
-  value without sweep anchoring.
-- **TFI/CVD-only:** tests whether the new mechanism is just existing flow logic
-  renamed.
-- **Rejected populations:** `no_reclaim`, `sweep_too_shallow`,
-  `direction_unresolved`, and `confluence_below_min` reconstructed from
-  SignalEngine diagnostics if historical feature replay is possible.
-
-Controls:
-
-- deterministic shifted-event control using fixed bar offsets;
-- random timestamp control with fixed seed only inside research script, never in
-  live path;
-- opposite-direction control, such as testing buy-liquidation absorption for
-  SHORT when the hypothesis is LONG;
-- force-order sparse-period control to prevent pre-2025 data from dominating;
-- 4-fold time-based walk-forward minimum.
-
-## 9. Invalidation Criteria
-
-Hard STOP conditions for any implementation:
-
-- No state has positive median net expectancy after realistic costs.
-- Best state PF proxy is below 1.2 after costs.
-- Best state win rate is `<= 51%`.
-- Apparent edge exists only from `detection_bar`, not from
-  `entry_candidate_bar`.
-- Best state does not beat deterministic shifted control.
-- Best state does not beat force-order-burst-only and sweep-only baselines.
-- Best state is more than 90% overlapping with trial-00095 entries and does not
-  materially improve timing or net expectancy.
-- Best state sample is below 300 events.
-- Force-order coverage is too incomplete: less than 50% of eligible event periods
-  have force-order data, or the best result exists only before/after the
-  available force-order window.
-- Timestamp alignment is invalid: flow samples are not knowable at the claimed
-  `state_known_bar`.
-- CVD/TFI state arrives too late: median `k > 5` bars and net expectancy is not
-  positive.
-- MFE consumed before state is `>= 70%`.
-- Edge works in fewer than 2 of 4 walk-forward folds.
-- Slippage/funding/fees remove the edge.
-- Mechanism requires full order-book depth or liquidation heatmaps not present in
-  current btc-bot data, unless the result is explicitly classified as a data-gap
-  recommendation rather than a strategy signal.
-- Mechanism cannot be expressed deterministically from timestamped data.
-
-Pass threshold for opening a later strategy-family diagnostic:
-
-- sample `>= 300` events;
-- median net return after costs `> 0`;
-- PF proxy `>= 1.2`;
-- win rate `> 51%`;
-- positive in at least 2 of 4 folds;
-- overlap with trial-00095 below 90%, or a clear incremental timing/quality
-  improvement if overlap is high;
-- MFE consumed before state `< 70%`;
-- data coverage and timestamp checks pass.
-
-## 10. What To Cut / What To Preserve
-
-If order-flow/liquidation research shows promise:
-
-Preserved:
-
-- deterministic pipeline: MarketSnapshot -> Features -> Regime -> SignalEngine
-  -> Governance -> Risk -> Execution;
-- equal-level sweep as one event anchor, not the only anchor;
-- FeatureEngine's current funding/OI/CVD/TFI/force-order facts as baseline
-  primitives;
-- Research Lab isolation and approval-gated promotion;
-- trial-00095 PAPER validation as active benchmark.
-
-Replaced:
-
-- any future attempt to expand SMC price-action confirmations as primary entry;
-- naive force-order spike scoring if a richer burst/decay/absorption state proves
-  materially better;
-- static confluence-only treatment of flow if flow state becomes a first-class
-  classifier after separate approval.
-
-Moved to metadata:
-
-- regime/session cuts unless a new audited diagnostic proves timing-correct
-  incremental value;
-- funding alone;
-- CVD divergence alone if absorption state only works with price/no-extension
-  context.
-
-Removed:
-
-- no current production component should be removed in this planning milestone;
-- future removal would require a separate audited implementation plan.
-
-Instrumented more deeply:
-
-- force-order burst notional, direction, decay, and coverage/censoring metadata;
-- per-candidate flow state timeline;
-- rejected decision population in historical replay;
-- event overlap with trial-00095;
-- earliest knowable bar and MFE consumed for any proposed flow state.
-
-Trial-00095 is the benchmark, not religion. If an order-flow family later beats
-trial-00095 with ER > 2.5, PF > 5.0, cost-aware walk-forward validation, and
-acceptable frequency, it is a legitimate replacement candidate. If it fails,
-trial-00095 remains the validated strategy.
-
-## 11. Recommended Next Step
-
-**PLAN `ORDER_FLOW_LIQUIDATION_ACCESSIBILITY_V1`: full diagnostic per Section 7.**
-
-The repo has enough historical aggTrade/OI/funding data and partial force-order
-data to plan the diagnostic now, while the force-order coverage gap can be a
-hard invalidation/data-quality gate inside the plan. Expected outcome is not a
-strategy, but a decision on whether early liquidation/order-flow states contain
-any timing-correct edge after costs. If this recommendation is wrong, the most
-likely failure mode is force-order censoring/coverage proving too severe, in
-which case the diagnostic should stop with `INCONCLUSIVE_DATA_GAP` or
-`STOP_ORDER_FLOW_RESEARCH`.
-
-## Appendix A: Repo Inspection References
-
-- Core architecture: `docs/BLUEPRINT_V1.md:29-40`, `docs/BLUEPRINT_V1.md:146-166`.
-- Research Lab boundary: `docs/BLUEPRINT_RESEARCH_LAB.md:3-31`,
-  `docs/BLUEPRINT_RESEARCH_LAB.md:195-216`.
-- MarketSnapshot flow fields: `core/models.py:90-124`.
-- FeatureEngine flow/funding/OI computation: `core/feature_engine.py:329-356`.
-- FeatureEngine OI/CVD/force helpers: `core/feature_engine.py:437-585`.
-- Signal diagnostics/rejections: `core/signal_engine.py:71-120`.
-- Signal direction and confluence: `core/signal_engine.py:218-293`.
-- Regime crowding/post-liquidation: `core/regime_engine.py:49-61`.
-- Storage tables: `storage/schema.sql:16-73`,
-  `storage/schema.sql:204-221`, `storage/schema.sql:223-267`.
-- Runtime snapshot persistence: `storage/repositories.py:49-97`.
-- Decision/feature persistence: `storage/repositories.py:111`,
-  `storage/repositories.py:370`, `storage/state_store.py:900-988`.
-- Replay flow fields: `backtest/replay_loader.py:111-151`,
-  `backtest/replay_loader.py:201-292`, `backtest/replay_loader.py:346-379`.
-- Live flow ingestion: `data/websocket_client.py:134-139`,
-  `data/websocket_client.py:220-239`, `data/market_data.py:119-188`.
-- Force-order collector: `scripts/server/run_force_order_collector.py:33-34`,
-  `scripts/server/run_force_order_collector.py:267-300`.
-- Trial-00095 settings: `settings.json:4-38`.
-- Force-order registry caveat: `research_lab/param_registry.py:19`.
+# ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLAN
+
+Planning date: 2026-05-28
+Milestone: ORDER_FLOW_LIQUIDATION_EDGE_DISCOVERY_V1_PLANNING
+Mode: Quant Research / Edge Discovery Mode
+Status: PLANNING_COMPLETE - awaiting Claude audit before any implementation
+
+## Scope
+
+This is a planning-only research milestone.
+
+Allowed output:
+
+- Source research.
+- Repo data surface inspection.
+- One extracted deterministic mechanism.
+- Timing model.
+- MFE accessibility design.
+- Baseline comparison design.
+- Control cohort design.
+- Pre-result invalidation criteria.
+- One recommendation.
+
+Not allowed in this milestone:
+
+- No diagnostic scripts.
+- No backtests or experiments.
+- No result data.
+- No production code changes.
+- No FeatureEngine, SignalEngine, Governance, Risk, execution, orchestrator, or settings changes.
+- No candidate promotion.
+
+## Prior Research Context
+
+Recent diagnostics changed the research question from pattern existence to earliest knowability.
+
+| Diagnostic | Key result | Research implication |
+| --- | --- | --- |
+| `SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1` | Delayed labels measured from `detection_bar` created fake edge. | Primary returns must start from `label_available_bar` or `entry_candidate_bar`. |
+| `SMC_SEQUENCE_EDGE_FEASIBILITY_V1` | Median MFE before mitigation entry was `0.011565`; median MFE after entry was `0.004916`; net return after costs was `-0.000442`. | Full post-sweep SMC sequence arrives too late. |
+| `MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1` | 28 post-sweep knowable states were tested; none had positive median net return after costs. | Post-sweep price-action confirmation is exhausted as an edge family. |
+
+This plan therefore does not attempt to rescue SMC. It opens an orthogonal information family: order flow, liquidation, and derivatives crowding data.
+
+## Research Question
+
+Can a liquidation/order-flow state become knowable close enough to a sweep event to preserve tradable MFE, before later price-action confirmation consumes the move?
+
+Primary hypothesis:
+
+Forced liquidation flow after a liquidity sweep may mark exhaustion earlier than displacement, mitigation, or other price-action confirmation. If liquidation burst information is knowable by bar `i+2` and entry occurs at bar `i+3`, the signal may preserve more MFE than the failed SMC mitigation entry at approximately bar `i+8`.
+
+## Source Research Method
+
+Search coverage included:
+
+- GitHub: order flow imbalance, liquidation map, aggTrades, liquidation cascade, CVD.
+- TradingView/Pine: order flow, CVD, footprint imbalance, unusual volume/delta.
+- Academic and quant literature: market microstructure, OFI, order imbalance, futures order flow.
+- Exchange documentation: Binance USD-M futures aggTrade, forceOrder, open interest, funding.
+
+The goal was mechanism extraction, not copying code or accepting screenshots.
+
+## Source Coverage Matrix
+
+| Source | URL | Type | Inspected artifact | Extracted mechanism | Classification | Determinism | Lookahead | Data availability | Applicability |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| Binance USD-M Futures Aggregate Trade Streams | https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Aggregate-Trade-Streams | Exchange docs | Stream description and response fields, lines 77-110 | Aggressive trade flow can be aggregated every 100ms; `m` identifies whether buyer is maker, allowing taker buy/sell inference. | Useful concept | Deterministic from exchange messages | No lookahead; event-time stream | Partial: repo has `aggtrade_buckets`, not raw `aggtrade` | Testable only at 60s/15m bucket level unless raw trades are backfilled |
+| Binance USD-M Futures Liquidation Order Streams | https://developers.binance.com/docs/derivatives/usds-margined-futures/websocket-market-streams/Liquidation-Order-Streams | Exchange docs | Stream description and response fields, lines 77-112 | `<symbol>@forceOrder` provides forced liquidation snapshots; side, quantity, price, event time can define liquidation bursts. | Useful concept | Deterministic from exchange messages | No lookahead; snapshot caveat | Available in research DB for BTCUSDT 2022-01-01 to 2024-12-01 | Directly testable with caveat that Binance pushes only the largest liquidation order per symbol per 1000ms |
+| Binance Open Interest endpoint | https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Open-Interest | Exchange docs | API description and response fields, lines 93-117 | Current OI can define crowding state and OI delta before liquidation bursts. | Useful concept | Deterministic REST snapshot | No lookahead if sampled at or before bar close | Available as `open_interest` | Testable as context or control, not primary trigger in V1 diagnostic |
+| Binance Funding Rate endpoint | https://developers.binance.com/docs/derivatives/usds-margined-futures/market-data/rest-api/Get-Funding-Rate-History | Exchange docs | API description and response fields, lines 93-133 | Funding extremes can proxy crowded positioning before unwind. | Useful concept | Deterministic scheduled data | No lookahead if using known funding timestamps only | Available as `funding` | Testable as context; V1 should not combine with liquidation trigger until primary mechanism is validated |
+| Binance Public Data | https://github.com/binance/binance-public-data | GitHub repo / data docs | README lines 225-299 | Historical futures `aggTrades` include price, quantity, timestamp, and buyer-maker flag; supports reconstructing CVD/TFI from raw trades if imported. | Useful concept | Deterministic archive files | No lookahead if timestamp aligned | Not currently raw in local DB; bucketed equivalents exist | Useful for future raw-trade inventory/backfill, not required for liquidation V1 |
+| `aoki-h-jp/py-liquidation-map` | https://github.com/aoki-h-jp/py-liquidation-map | GitHub repo | README lines 239-348; `liqmap/mapping.py` raw lines 0-4 | Uses historical aggTrades, maps buyer-maker side, filters large notional trades, projects leverage-based liquidation levels. | Needs validation | Deterministic code | No direct future-bar signal; visualization may be descriptive | Raw aggTrades absent locally; liquidation events present separately | Useful concept for large forced-flow/crowding maps; not the V1 diagnostic |
+| `vsching/liquidation-heatmap` | https://github.com/vsching/liquidation-heatmap | GitHub repo | README lines 280-291 and 413-416; `src/data_fetcher.py` raw lines 0-6 | Computes leverage liquidation levels and estimates heatmap intensity from order book depth and price distance. | Not applicable for V1 | Deterministic formula, but order-book inference is approximate | No future bars, but requires live/depth assumptions | Repo lacks historical order book depth | Not testable with current local data; do not use as diagnostic trigger |
+| TradingView: Liquidity Structure & Order Flow [UAlgo] | https://www.tradingview.com/script/dKS9hKkg-Liquidity-Structure-Order-Flow-UAlgo/ | TradingView/Pine | Description/code excerpt lines 207-220 | Unusual volume state: volume z-score over 200 bars plus `abs(delta)/volume` threshold. | Useful concept | Deterministic if delta is available | No lookahead for current-bar close; profile rebuild on last bar is visual-only | Bucketed TFI/CVD and candle volume available | Candidate for later diagnostic, but V1 should not combine it with liquidation burst |
+| TradingView: OrderFlow IQ | https://www.tradingview.com/script/GX4WhZ8h-TradingIQ-OrderFlow-IQ/ | TradingView indicator | Description lines 38-58 and 121-136 | Footprint rows, stacked imbalances, CVD, bar VWAP, max/min delta, buy/sell volume. | Discretionary only for this repo | Deterministic only with tick/footprint data | No explicit lookahead in description, but code not auditable here | Required tick price-row data absent | Not applicable for V1; useful as vocabulary only |
+| TradingView: CVD Background | https://www.tradingview.com/script/JeRHI32w-CVD-Background-Institutional-Order-Flow-Bias-Model/ | TradingView/Pine | Description lines 37-152 | Lower-timeframe delta aggregation, CVD sign as regime filter. | Needs validation | Deterministic if lower-timeframe delta is defined | No source code visible in fetched page; repaint claim not independently verified | Repo has 60s/15m TFI/CVD buckets | Useful context; not a standalone V1 trigger |
+| TradingView: Order Flow Pro - CVD | https://www.tradingview.com/script/y9bQtJSn/ | TradingView protected script | Description lines 39-86 and 359-361 | CVD above/below CVD moving average defines bullish/bearish flow regime. | Bad/repainting risk cannot be audited; protected source | Formula concept deterministic, implementation hidden | Source closed; no independent lookahead review | Bucketed CVD available | Do not use as implementation source |
+| Tripathi, Dixit, Vipul: Information content of order imbalance | https://www.sciencedirect.com/science/article/abs/pii/S1544612320316779 | Academic paper | Abstract/highlights lines 49-67 | OIB can predict short-term returns; effect strongest in first five minutes and decays within thirty minutes. | Benchmark concept | Deterministic research variable | No direct implementation lookahead from abstract | Our 15m bars are coarser than the strongest window | Supports earlier-than-price-action timing requirement |
+| Locke and Onayev: Order flow, dealer profitability, and price formation | https://www.sciencedirect.com/science/article/abs/pii/S0304405X07000633 | Academic paper | Abstract/introduction lines 49-56 and 83-87 | Futures prices move strongly with order flow in the short run; long-run effect can reverse/slip. | Benchmark concept | Deterministic empirical variable | No implementation rule | Aggtrade bucket data approximates trade-flow state | Supports measuring short-horizon MFE/MAE and avoiding delayed entries |
+| Su et al.: The Price Impact of Generalized Order Flow Imbalance | https://arxiv.org/abs/2112.02947 | Academic paper | Abstract lines 31-40 | Generalized OFI improves explanation of short-term price changes at 30s, 1m, and 5m horizons. | Benchmark concept | Deterministic with LOB snapshots | No implementation rule | Full LOB snapshots absent | Not directly testable; supports OFI family but not V1 mechanism |
+| Anantha and Jain: Forecasting High Frequency Order Flow Imbalance | https://arxiv.org/abs/2408.03594 | Academic paper | Abstract lines 31-40 | Bid/offer event asymmetry and lagged dependence can forecast near-term OFI. | Needs validation | Model-driven; Hawkes process stochastic | No direct implementation rule | Order-book event data absent; stochastic model not allowed in core path | Not applicable for V1; future offline research only |
+| Bugaenko: Empirical Study of Market Impact Conditional on OFI | https://arxiv.org/abs/2004.08290 | Academic paper | Abstract lines 31-42 | Signed order-flow imbalance relates to market impact; ML forecast is suggested. | Useful concept but not implementation source | Deterministic for signed flow, ML component excluded | No source code in paper | Bucketed signed flow available | Use only deterministic signed-flow ideas; no ML in core decision path |
+
+## Source Research Conclusion
+
+The external source review supports order-flow/liquidation research as a genuinely new information family, but it narrows V1 to a single testable mechanism.
+
+Rejected for V1:
+
+- Footprint stacked imbalance: requires tick-level price-row bid/ask volume that the repo does not store.
+- Order-book OFI: requires L1/L2 order-book updates that the repo does not store historically.
+- Liquidation heatmap level prediction: requires inferred position distributions or order-book depth assumptions not present in local research data.
+- Protected TradingView CVD scripts: source cannot be audited for lookahead/repainting.
+- ML/Hawkes OFI forecasting: stochastic/modeling work is outside the deterministic research mechanism for this milestone.
+
+Accepted for V1 planning:
+
+- Liquidation burst reversal after sweep, because the repo has `candles` and `force_orders`, the rule is deterministic, and the state can be known by bar close without future price-action confirmation.
+
+## Repo Data Surface Inspection
+
+The requested `sqlite3` CLI is not installed in this environment, so schema and coverage were inspected read-only through Python `sqlite3`.
+
+### Expected vs Actual Database Paths
+
+| Requested surface | Actual status |
+| --- | --- |
+| `storage/market_data.db` | Missing locally. |
+| `storage/btc_bot.db` | Present; local runtime/research-sized DB. |
+| `research_lab/data/crowded_unwind_backtest.db` | Present; primary research DB for this plan. |
+
+### Actual Market Data Tables
+
+The handoff named `aggtrade` and `funding_rate`, but local schemas use:
+
+- `aggtrade_buckets`, not raw `aggtrade`.
+- `funding`, not `funding_rate`.
+- `force_orders`.
+- `open_interest`.
+- `candles`.
+
+### `research_lab/data/crowded_unwind_backtest.db` Coverage
+
+| Table | Count | Range UTC | Notes |
+| --- | ---: | --- | --- |
+| `candles` | 256,394 | 2020-09-01T00:00:00+00:00 to 2026-03-28T20:30:00+00:00 | BTCUSDT only; 15m/1h/4h. |
+| `candles` BTCUSDT 15m | 195,347 | 2020-09-01T00:00:00+00:00 to 2026-03-28T20:30:00+00:00 | 0 detected 15m gaps. |
+| `aggtrade_buckets` | 3,122,272 | 2020-09-01T00:00:00+00:00 to 2026-03-28T21:14:00+00:00 | BTCUSDT 60s and 15m buckets. |
+| `aggtrade_buckets` BTCUSDT 15m | 195,150 | 2020-09-01T00:00:00+00:00 to 2026-03-28T21:00:00+00:00 | 6 gaps larger than 15m; max 87,300 seconds. |
+| `aggtrade_buckets` BTCUSDT 60s | 2,927,122 | 2020-09-01T00:00:00+00:00 to 2026-03-28T21:14:00+00:00 | 13 gaps larger than 60s; max 86,460 seconds. |
+| `force_orders` | 146,864 | 2022-01-01T00:02:07.244000+00:00 to 2024-12-01T23:58:59.379000+00:00 | BTCUSDT only; critical coverage gap after 2024-12-01. |
+| `force_orders` BUY | 61,539 | 2022-01-01T00:02:07.244000+00:00 to 2024-12-01T23:57:15.315000+00:00 | Total qty 14,501.5175. |
+| `force_orders` SELL | 85,325 | 2022-01-01T00:11:40.894000+00:00 to 2024-12-01T23:58:59.379000+00:00 | Total qty 24,868.5311. |
+| `funding` | 6,105 | 2020-09-01T00:00:00+00:00 to 2026-03-28T16:00:00+00:00 | BTCUSDT only. |
+| `open_interest` | 524,971 | 2020-09-01T00:00:00+00:00 to 2026-03-29T00:00:00+00:00 | BTCUSDT only. |
+| `cvd_price_history` | 0 | n/a | Empty. |
+
+### `storage/btc_bot.db` Coverage
+
+| Table | Count | Range UTC | Notes |
+| --- | ---: | --- | --- |
+| `candles` | 579,280 | 2020-09-01T00:00:00+00:00 to 2026-05-25T21:45:00+00:00 | BTCUSDT, ETHUSDT, SOLUSDT. |
+| `candles` BTCUSDT 15m | 200,907 | 2020-09-01T00:00:00+00:00 to 2026-05-25T21:45:00+00:00 | 1 gap: 2026-03-28T20:30 to 2026-03-29T00:00. |
+| `aggtrade_buckets` | 7,961,948 | 2020-09-01T00:00:00+00:00 to 2026-05-24T23:59:00+00:00 | BTCUSDT, ETHUSDT, SOLUSDT; 60s and 15m buckets. |
+| `force_orders` | 0 | n/a | Not usable for liquidation research. |
+| `funding` | 15,636 | 2020-09-01T00:00:00+00:00 to 2026-05-25T16:00:00.001000+00:00 | BTC/ETH/SOL. |
+| `open_interest` | 541,649 | 2020-09-01T00:00:00+00:00 to 2026-05-25T21:50:00+00:00 | BTCUSDT only. |
+| `cvd_price_history` | 0 | n/a | Empty. |
+
+### Data Sufficiency Assessment
+
+Sufficient for V1 diagnostic planning:
+
+- BTCUSDT 15m candles with clean 2020-2026 coverage.
+- BTCUSDT force-order liquidation events from 2022-01-01 through 2024-12-01.
+- BTCUSDT OI/funding context across the research range.
+- BTCUSDT 60s/15m TFI/CVD buckets for optional metadata only.
+
+Insufficient for V1:
+
+- Raw `aggtrade` table is absent; trade-size class and true tick-level CVD reconstruction cannot be audited from current DB alone.
+- `force_orders` coverage ends 2024-12-01, so any diagnostic must use the overlapping 2022-01-01 to 2024-12-01 window for primary liquidation results.
+- Binance `forceOrder` stream is a snapshot stream, not a complete liquidation tape; the diagnostic must treat observed liquidation burst as a lower-bound proxy.
+- Local `storage/btc_bot.db` has zero force orders and must not be used as the liquidation result source.
+
+## Extracted Mechanism
+
+Mechanism name: `LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1`
+
+Definition:
+
+- Sweep detection: equal-level wick cross using the existing deterministic sweep logic concept from trial-00095 lineage.
+- Liquidation burst: observed `force_orders.qty * force_orders.price` notional in `[sweep_bar_start, sweep_bar+2_end]` exceeds a rolling baseline multiple.
+- Directional confirmation: liquidation side aligns with forced-flow exhaustion:
+  - Downward sweep of equal lows expects SELL force orders, interpreted as long liquidation pressure.
+  - Upward sweep of equal highs expects BUY force orders, interpreted as short liquidation pressure.
+- Entry candidate: bar `sweep_bar+3`, the first full bar after the 3-bar liquidation-burst window is knowable.
+- Primary returns: measured from `entry_candidate_bar`, never from `detection_bar`.
+
+Observable inputs:
+
+- `candles`: OHLCV for sweep detection and post-entry MFE/MAE.
+- `force_orders`: event time, side, quantity, price for liquidation burst.
+- `open_interest`: optional pre-event crowding context only.
+- `funding`: optional pre-event crowding context only.
+
+Deterministic rule:
+
+1. For each BTCUSDT 15m bar `i`, detect a sweep event using only candles up to and including bar `i`.
+2. Determine sweep direction:
+   - `sweep_side = LOW`: candidate direction is LONG reversal after forced selling.
+   - `sweep_side = HIGH`: candidate direction is SHORT reversal after forced buying.
+3. Compute expected liquidation notional in bars `i`, `i+1`, and `i+2`:
+   - LOW sweep: sum `qty * price` where `force_orders.side = SELL`.
+   - HIGH sweep: sum `qty * price` where `force_orders.side = BUY`.
+4. Compute baseline liquidation notional from completed pre-sweep bars only, for example a rolling 96-bar 15m median or mean absolute notional by side ending at bar `i-1`.
+5. Signal condition:
+   - `liquidation_burst_notional > 2.0 * baseline_side_notional`
+   - and baseline coverage is sufficient.
+6. If true:
+   - `state_known_bar = i+2`
+   - `entry_candidate_bar = i+3`
+   - primary return starts at bar `i+3`.
+
+Earliest knowable bar:
+
+- `i+2`, at close of the third 15m bar in the liquidation burst window.
+
+Required confirmation bars:
+
+- 2 bars after sweep detection, because bars `i`, `i+1`, and `i+2` are required to measure the burst.
+
+Required data tables:
+
+- `candles`
+- `force_orders`
+
+Optional metadata tables:
+
+- `open_interest`
+- `funding`
+- `aggtrade_buckets`
+
+Invalidation condition:
+
+- Any STOP gate in the "Pre-Result Invalidation Criteria" section triggers invalidation.
+
+Expected edge behavior:
+
+- A liquidity sweep forces crowded positions out.
+- A clustered burst of forced liquidation flow marks exhaustion rather than discretionary continuation.
+- Entry at bar `i+3` should be earlier than SMC mitigation entry and preserve enough post-entry MFE.
+- The signal should beat ordinary sweep controls and opposite-side liquidation controls.
+
+Novelty assessment:
+
+- This is not SMC rescue. The trigger is not displacement, reclaim, mitigation, FVG, order block, CHOCH, or price-action confirmation.
+- It uses an orthogonal data source: exchange liquidation events.
+- Trial-00095 may already use TFI/CVD and cluster confluence, but it does not use `force_orders` burst notional as the primary trigger.
+
+## Timing Model
+
+| Bar | Definition | Liquidation burst reversal model |
+| --- | --- | --- |
+| `detection_bar` | First bar where raw event occurs | Sweep detected at bar `i` using completed bar `i` OHLC. |
+| `state_known_bar` | First bar where state is knowable without future data | Bar `i+2`, after liquidation notional for bars `i` through `i+2` is known. |
+| `confirmation_bar` | Bar that confirms the state | Bar `i+2`, when burst notional can be compared to pre-sweep baseline. |
+| `entry_candidate_bar` | Earliest realistic entry bar | Bar `i+3`, next bar after confirmation. |
+| `label_available_bar` | Bar where outcome label is known | Not used for signal; only outcome windows such as `i+3` to `i+23` for research metrics. |
+| `return_start_bar` | Bar from which primary returns are measured | Bar `i+3`; must equal `entry_candidate_bar`. |
+
+Timing rule:
+
+- Primary returns must start at `entry_candidate_bar`.
+- Detection-bar returns may be computed only as audit-only opportunity metrics.
+- Same-bar entry on `i+2` is not allowed unless a later approved diagnostic explicitly models intrabar order timing, which this plan does not.
+
+## MFE Accessibility Design
+
+For every candidate event:
+
+- `MFE_before_entry`:
+  - LONG: `max(high[bar i : i+2]) - close[i]`
+  - SHORT: `close[i] - min(low[bar i : i+2])`
+- `MFE_after_entry`:
+  - LONG: `max(high[bar i+3 : i+23]) - close[i+3]`
+  - SHORT: `close[i+3] - min(low[bar i+3 : i+23])`
+- `MAE_after_entry`:
+  - LONG: `close[i+3] - min(low[bar i+3 : i+23])`
+  - SHORT: `max(high[bar i+3 : i+23]) - close[i+3]`
+- `% MFE consumed before entry`:
+  - `MFE_before_entry / (MFE_before_entry + MFE_after_entry) * 100`
+- Time from detection to entry:
+  - `3` bars by design.
+- Time from entry to MFE:
+  - offset from bar `i+3` to the post-entry bar where max favorable excursion occurs.
+
+Theoretical accessibility expectation:
+
+- SMC mitigation failed with median entry delay around 8 bars and 69.8% of MFE consumed before entry.
+- This mechanism enters after 3 bars. If sweep-to-entry MFE consumption scales with time, it should have a realistic chance to remain below the 70% hard failure line.
+- Prior MFE accessibility states showed `direction_resolved_known` around 2 bars with 52.3% MFE consumed, but `force_order_burst_known` as previously defined arrived too late and consumed 100%. V1 must therefore use the explicit `[i, i+2]` burst window and must not inherit the later prior state timing.
+
+Primary question:
+
+- Is the 3-bar liquidation confirmation delay short enough to leave positive net return and less than 70% MFE consumed before entry?
+
+## Baseline Comparison Design
+
+Benchmark:
+
+- trial-00095
+- ER approximately 2.1
+- PF approximately 4.6
+- Entry timing: sweep + reclaim around 1-2 bars from sweep
+- 271 historical trades
+- Walk-forward validated
+
+Comparison questions:
+
+1. Is liquidation burst reversal genuinely different from trial-00095?
+   - Yes by mechanism: `force_orders` burst notional is primary.
+   - Trial-00095 uses sweep/reclaim plus TFI/CVD/cluster confluence.
+   - V1 must measure overlap against trial-00095 event timestamps to prove portfolio distinctness.
+2. Is it worth implementing if weaker than trial-00095?
+   - Only if it has different risk profile, low overlap, and ER greater than 1.5 with PF greater than 4.0.
+   - If ER and PF both lag trial-00095 and overlap is high, stop.
+3. What would make it a serious challenger?
+   - ER greater than 2.1 or materially different risk profile with ER greater than 1.5.
+   - PF greater than 4.0.
+   - At least 3 of 4 walk-forward folds positive.
+   - MFE consumed before entry below 70%.
+   - Candidate beats deterministic controls.
+
+Metrics to compare:
+
+- Event count.
+- Median net return after costs.
+- Win rate.
+- Profit factor proxy.
+- ER proxy if diagnostic maps to R-based exits.
+- MFE before entry.
+- MFE after entry.
+- MFE consumed percentage.
+- Fold-level stability.
+- Overlap with trial-00095 events.
+
+## Control Cohort Design
+
+Controls must be deterministic and defined before results.
+
+### Control 1: Non-liquidation sweeps
+
+Definition:
+
+- Same sweep detection rule.
+- Same event direction.
+- Liquidation notional in `[i, i+2]` is less than `0.5 * baseline_side_notional`.
+- Entry at bar `i+3`.
+
+Purpose:
+
+- Tests whether liquidation burst adds information beyond ordinary sweep behavior.
+
+Invalidation:
+
+- If non-liquidation sweeps perform similarly or better, the candidate is invalid.
+
+### Control 2: Opposite-side liquidation bursts
+
+Definition:
+
+- LOW sweep with BUY force-order burst, or HIGH sweep with SELL force-order burst.
+- Same burst threshold and entry timing.
+
+Purpose:
+
+- Tests whether the direction of forced liquidation matters or whether any high liquidation activity is just noise.
+
+Invalidation:
+
+- If opposite-side bursts perform similarly or better, the directional mechanism is invalid.
+
+### Control 3: Deterministic shifted-entry control
+
+Definition:
+
+- For each candidate event, shift the entry timestamp by +137 bars when enough future bars exist.
+- Preserve direction.
+- Measure the same MFE/MAE/return windows.
+
+Purpose:
+
+- Controls for broad market drift and data-mining.
+
+Invalidation:
+
+- If shifted entries perform similarly or better, the candidate is invalid.
+
+### Control 4: Flow-only ablation
+
+Definition:
+
+- Liquidation burst threshold met without requiring a sweep event.
+- Entry at the next bar after the same 3-bar burst window.
+
+Purpose:
+
+- Tests whether the sweep is necessary or whether liquidation burst alone is the actual signal.
+
+Interpretation:
+
+- If flow-only beats sweep-plus-flow, the mechanism should be reframed before any implementation.
+- This does not authorize scope expansion in V1; it is an ablation control only.
+
+## Pre-Result Invalidation Criteria
+
+STOP gates:
+
+- Median net return after costs <= 0.
+- Win rate < 51%.
+- Profit factor proxy < 1.2.
+- MFE consumed before entry > 70%.
+- Candidate does not beat the non-liquidation sweep control.
+- Candidate does not beat the opposite-side liquidation control.
+- Candidate does not beat deterministic shifted-entry control.
+- Walk-forward has fewer than 2 of 4 folds positive.
+- Sample size < 100 events.
+- Signal requires future bars beyond `state_known_bar`.
+- Result depends on changing burst thresholds after seeing outcomes.
+- Result only works when returns start at `detection_bar`.
+- Force-order coverage gaps are silently ignored.
+
+EXPLORE gates:
+
+- Median net return after costs > 0.
+- Win rate > 55%.
+- Profit factor proxy > 1.5.
+- MFE consumed before entry < 50%.
+- Candidate beats all controls.
+- Walk-forward has at least 3 of 4 folds positive.
+- Sample size >= 200 events.
+- Overlap with trial-00095 is low enough to support independent portfolio value, or performance materially exceeds trial-00095.
+
+INCONCLUSIVE gates:
+
+- Sample size < 100 events.
+- Usable force-order overlap coverage < 2 years.
+- Required data table missing.
+- Force-order coverage quality cannot be established.
+- Baseline liquidation notional cannot be computed without large gaps.
+
+## Data Quality Rules For Future Diagnostic
+
+Any later diagnostic must:
+
+- Restrict primary liquidation analysis to the overlap window where `candles` and `force_orders` both exist: 2022-01-01 through 2024-12-01.
+- Report excluded bars and events outside force-order coverage.
+- Report force-order side counts and notional by fold.
+- Report gaps in `aggtrade_buckets` if flow metadata is included.
+- Treat Binance `forceOrder` as snapshot/liquidation proxy data, not complete liquidation tape.
+- Use UTC-normalized timestamps only.
+- Align force-order events into deterministic 15m buckets by event time.
+- Never silently drop missing force-order or candle data.
+
+## Expected Diagnostic Artifact If Approved Later
+
+If Claude approves this planning document, the next milestone should implement exactly one diagnostic:
+
+- Name: `LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1`
+- Scope: research-only.
+- Inputs: `research_lab/data/crowded_unwind_backtest.db`.
+- Outputs: one markdown report under `docs/analysis/` and one reproducible local JSON artifact under ignored analysis output.
+- Tests: deterministic unit tests for timestamp bucketing, side mapping, baseline calculation, timing bars, MFE before/after entry, and controls.
+- No production code.
+
+## Scope Boundary Confirmation
+
+This plan does not:
+
+- Modify `core/**`.
+- Modify `execution/**`.
+- Modify `orchestrator.py`.
+- Modify `settings.py`.
+- Modify research lab infrastructure.
+- Implement diagnostic code.
+- Run a backtest.
+- Generate result data.
+- Promote a candidate.
+
+## Recommendation: IMPLEMENT ONE DIAGNOSTIC
+
+**Diagnostic name:** `LIQUIDATION_BURST_REVERSAL_ENTRY_FEASIBILITY_V1`
+
+**Mechanism summary:** After an equal-level sweep, require a same-direction forced liquidation notional burst in bars `i` through `i+2`, then enter reversal at bar `i+3` and measure all primary returns from that entry bar.
+
+**Timing:** detection at bar `i`, state known at bar `i+2`, entry at bar `i+3` for a 3-bar delay.
+
+**Expected MFE accessibility:** Estimated below the 70% hard failure threshold because entry delay is 3 bars rather than the failed SMC mitigation delay of approximately 8 bars; the diagnostic must prove this and stop if measured consumption is greater than 70%.
+
+**Estimated sample size:** At least 100 events is plausible from 146,864 BTCUSDT force-order rows and prior force-order state counts above 1,000, but the diagnostic must report the actual sweep-plus-liquidation sample before any performance claim.
+
+**Estimated timeline:** 1 week for diagnostic implementation, focused tests, local run, and report.
+
+**Next:** Codex implements the single research diagnostic only after Claude audits and approves this planning document.
