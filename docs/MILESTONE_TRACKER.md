@@ -5194,68 +5194,56 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
-## Next Milestone: VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1
+## Research Diagnostic: VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1
 
-**Status:** AWAITING_DECISION (2026-05-28)  
-**Builder:** TBD (Codex or Cascade, user will select)  
-**Type:** Research-only diagnostic implementation  
-**Scope:** Research-only, no production code
+**Status:** DONE (2026-05-28)  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Plan:** `docs/research/VOLATILITY_BREAKOUTS_EDGE_DISCOVERY_V1_PLAN.md` (616 lines)  
+**Report:** `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.md` (116 lines)  
+**Audit:** `docs/audits/AUDIT_VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1_2026-05-28.md`
 
-**Goal:** Test whether BTCUSDT 15m range breakout with volume spike and TFI confirmation preserves enough post-entry MFE to be tradable after realistic next-bar entry.
+**Scope:** Research-only diagnostic testing volume-confirmed range breakout mechanism.
 
 **Mechanism:** `VOLUME_CONFIRMED_RANGE_BREAKOUT`
 - Detect completed 15m close outside prior compressed 20-bar range
 - Require breakout-bar volume spike (1.5× median) and aligned 15m TFI
 - Enter on next 15m bar (i+1), returns from i+1 only
 
-**Timing:** Detection at i, entry at i+1 (1-bar / 15-minute delay)
+**Deliverables completed:**
+1. `research_lab/diagnostics/volume_confirmed_range_breakout_feasibility_v1.py` (1,136 lines)
+2. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.md` (116 lines)
+3. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.json` (1.9 MB, SHA256: 53C27E016D7E39C343D6C7A0F6F889A00C870BA32394EBD445BCB933906E49E8)
+4. `tests/test_research_lab/test_volume_confirmed_range_breakout_feasibility_v1.py` (261 lines, 6/6 tests passed)
 
-**Expected MFE accessibility:** Target median MFE consumed < 60%, hard STOP > 70%
+**Pre-audit result:** STOP
+- Main events: 2,562 (above 100 minimum)
+- ER: -0.092 (negative, below 1.2 threshold)
+- PF: 0.857 (below 1.0, well below 1.2 threshold)
+- Win rate: 41.4% (below 45% threshold)
+- Median net return: -0.002133 (negative after costs)
+- Median MFE consumed: 14.95% (EXCELLENT, well below 70% threshold)
+- Control outperformers: 3 controls beat main (no-volume, shifted-entry, random-offset)
+- Walk-forward: 0 of 4 folds positive (below 2 minimum)
 
-**Estimated sample size:** 100-400 events (2020-09-01 to 2026-03-28)
+**Audit verdict:** DONE (implementation correct, result STOP)
 
-**Timeline:** 1 week (per builder estimate)
+**Decision:** AWAITING USER DECISION
 
-**Deliverables:**
-1. `research_lab/diagnostics/volume_confirmed_range_breakout_feasibility_v1.py` (main diagnostic)
-2. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.md` (markdown report)
-3. `research_lab/reports/volume_confirmed_range_breakout_feasibility_v1.json` (machine-readable artifact)
-4. `tests/test_research_lab/test_volume_confirmed_range_breakout_feasibility_v1.py` (smoke tests)
+**Reason:** Mechanism invalidated by multiple independent lines of evidence:
+1. Negative expectancy (ER=-0.092, PF=0.857, median net return=-0.002133)
+2. Random-offset control outperformed main (ER=-0.086 vs -0.092) - no signal content
+3. No-volume control outperformed main (ER=+0.320 vs -0.092) - volume spike is lagging, not leading
+4. Shifted-entry control outperformed main (ER=-0.068 vs -0.092) - early entry does not preserve edge
+5. Walk-forward: 0 of 4 folds positive (complete instability)
+6. Far below trial-00095 baseline (ER 2.1 vs -0.092)
 
-**Acceptance criteria:**
-- Range excludes current bar
-- Breakout signal known only at bar i close
-- Entry and return start equal i+1
-- TFI alignment uses same 15m bucket only
-- MFE before and after entry calculations
-- Control cohorts are mutually classified and deterministic
-- Diagnostic reproducibility
+**Critical insight:** MFE accessibility was EXCELLENT (14.95% consumed), yet expectancy still failed. This proves the mechanism lacks fundamental predictive power, NOT just timing issues. The favorable movement is accessible, but the mechanism cannot reliably predict which breakouts will continue.
 
-**Invalidation criteria (pre-defined):**
-- STOP gates: Median net return ≤ 0, ER < 1.2, PF < 1.2, MFE consumed > 70%, any control beats main, walk-forward < 2 of 4 folds positive, sample < 100
-- EXPLORE gates: Median net return > 0, ER > 1.5, PF > 1.5, MFE consumed < 60%, main beats all controls, walk-forward ≥ 3 of 4 folds positive, sample ≥ 200
+**Boundary:** This closes the volume-confirmed range breakout hypothesis. It does not test other volatility mechanisms (e.g., low-volume breakouts, regime shift detection, volatility term structure).
 
-**Constraints:**
-- Do NOT rescue ATR-slope expansion (failed mechanism)
-- Do NOT reopen VOLATILITY-BREAKOUT-RESEARCH-V1 result
-- Do NOT relax timing discipline (returns from realistic entry only)
-- Do NOT tune thresholds after seeing results
-- ONE mechanism per diagnostic (focus)
-
-**No-touch areas:**
-- No production strategy code
-- No FeatureEngine or SignalEngine changes
-- No Governance/Risk/execution changes
-- No settings changes
-- No trial-00095 modification
-- No promotion logic
-
-**Expected outcome:**
-- If invalidation criteria NOT triggered: Proceed to EXPLORE (further validation/walk-forward)
-- If invalidation criteria triggered: STOP this direction, pivot to alternative volatility mechanism or different edge family
-
-**Parallel track (deferred):**
-- Uptrend gap remediation: will be addressed after volatility breakouts diagnostic completes
+**Family status:** User to decide whether to close volatility breakouts family or explore alternative mechanism.
 
 ---
 
@@ -5266,5 +5254,5 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
 - **Volatility Breakouts Reconnaissance:** DONE (2026-05-28, recommendation: PROCEED)
 - **Volatility Breakouts Planning:** DONE (2026-05-28, recommendation: IMPLEMENT ONE DIAGNOSTIC)
-- **Current milestone:** VOLUME_CONFIRMED_RANGE_BREAKOUT_FEASIBILITY_V1 (AWAITING_DECISION)
-- **Next decision point:** User approval to proceed to diagnostic implementation → if approved, Codex implements research-only diagnostic (1 week timeline)
+- **Volume Confirmed Range Breakout Diagnostic:** DONE (2026-05-28, result: STOP, mechanism invalidated)
+- **Next decision point:** User decision on volatility breakouts family (close family vs explore alternative mechanism) OR pivot to different edge direction (regime shifts, funding arbitrage, trial-00095 PAPER focus)
