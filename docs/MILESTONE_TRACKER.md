@@ -5587,6 +5587,47 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
+## Research Milestone: TRIAL_00095_CONDITIONAL_EDGE_ATTRIBUTION_V1
+
+**Status:** READY_FOR_AUDIT - research diagnostic implemented
+**Builder:** Codex
+**Decision date:** 2026-05-30
+**Plan:** `docs/research/RESEARCH_LESSONS_SYNTHESIS_AND_TRIAL_00095_REVERSE_ENGINEERING_V1_PLAN.md`
+**Diagnostic:** `research_lab/diagnostics/trial_00095_conditional_edge_attribution_v1.py`
+**Report:** `research_lab/reports/trial_00095_conditional_edge_attribution_v1.md`
+**JSON:** `research_lab/reports/trial_00095_conditional_edge_attribution_v1.json`
+
+**Type:** Research-only diagnostic (accepted-trade attribution)
+**Scope:** No production code, settings, schema, FeatureEngine, SignalEngine, Governance, Risk, or execution changes.
+
+**Goal:** Understand why the validated trial-00095 accepted trades win or lose before any threshold relaxation, near-miss expansion, filter lift, exit/risk change, or multi-asset scaling decision.
+
+**Implementation:**
+- Loaded the frozen 274 accepted trial-00095 replay trades and 274 frozen intrabar entries.
+- Reconstructed deterministic pre-entry market context from the prior completed BTCUSDT 15m bar.
+- Bucketed accepted trades by depth, regime, direction, session, year, fold, exit reason, TFI alignment, ATR, volume z-score, risk, and loss archetype.
+- Explicitly reported that rejected backtest candidates are unavailable; no near-miss profitability claim is made.
+
+**Validation:**
+- Focused pytest: `5 passed`.
+- Compile validation passed.
+- `git diff --check` clean.
+- JSON artifact is lightweight (~53 KB) and committed.
+
+**Pre-audit result:** `PLAN_NEAR_MISS_RECONSTRUCTION_DIAGNOSTIC`.
+
+**Key findings:**
+- Shallowest accepted depth quartile remains positive: 69 trades, ER=1.577, PF=2.981, win rate=47.8%.
+- Near-threshold accepted trades remain positive: 63 trades, ER=1.635, PF=3.046, win rate=47.6%.
+- Direction split is asymmetric: LONG ER=2.377 across 252 trades; SHORT ER=-0.805 across 22 trades.
+- Uptrend remains strongest: ER=2.614 versus downtrend ER=0.690.
+- Prior-bar TFI alignment separates outcomes: aligned ER=2.391 versus opposed ER=0.816.
+- Most losses had at least 1R favorable excursion before closing red: 110 losses (92.4% of losses).
+
+**Decision pending:** Claude Code audit. Do not relax trial-00095 thresholds or implement near-miss expansion until rejected near-miss candidates are reconstructed and audited in a separate milestone.
+
+---
+
 ## Current Status (2026-05-30)
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
@@ -5594,11 +5635,11 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - **Order-Flow/Liquidation Edge Discovery:** CLOSED (liquidation burst reversal STOP on 15m and 5m, mechanism fully invalidated)
 - **Volatility Breakouts Edge Discovery:** CLOSED (volume-confirmed range breakout STOP, ER=-0.092, mechanism invalidated)
 - **Regime Shift Detection Edge Discovery:** CLOSED (deterministic ADX/CHOP ER=-0.027 STOP, probabilistic HMM filtered ER=-0.122 STOP, family exhausted)
-- **Current milestone:** NONE (awaiting direction decision)
-- **Next decision point:** User selects next direction
-  - **Option 1:** Trial-00095 PAPER validation for LIVE promotion (existing baseline, ER=2.1, PF=4.6)
-  - **Option 2:** New edge family exploration (funding rate arbitrage, mean-reversion, macro overlay, pre-sweep imbalance)
-  - **Option 3:** Close quant research, focus on production hardening / infrastructure
+- **Current milestone:** TRIAL_00095_CONDITIONAL_EDGE_ATTRIBUTION_V1 READY_FOR_AUDIT
+- **Next decision point:** Claude Code audits accepted-trade attribution diagnostic
+  - If approved: decide whether to plan `TRIAL_00095_NEAR_MISS_RECONSTRUCTION_DIAGNOSTIC_V1`
+  - If rejected: fix methodology/reporting issues before any next research milestone
+  - No trial-00095 threshold relaxation is approved by this diagnostic
 
 **Closed edge families (3 total):**
 1. **Liquidation burst reversal** (order-flow/liquidation): MFE 100% consumed (timing issue), ER negative on both 15m and 5m → STOP
