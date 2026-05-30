@@ -5344,10 +5344,15 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 
 ---
 
-## Next Milestone: REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING
+## Research Milestone: REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING
 
-**Status:** AWAITING_DECISION (2026-05-28)  
-**Builder:** TBD (Codex or Cascade, user will select)  
+**Status:** DONE (2026-05-28)  
+**Builder:** Codex  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Plan:** `docs/research/REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLAN.md` (620 lines)  
+**Audit:** `docs/audits/AUDIT_REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING_2026-05-28.md`
+
 **Type:** Quant Research Planning (full planning document)  
 **Scope:** Research-only, no diagnostic code, no implementation
 
@@ -5400,18 +5405,213 @@ Discarded (PF>3 = overfitted): trials #47, #56, #73, #89, #264 (raw PF=âž, o
 - No trial-00095 modification
 - No dependency installation (deterministic approach, numpy/pandas sufficient)
 
-**Expected outcome:**
-- If planning approved: Proceed to diagnostic implementation (TREND_RANGE_STATE_SHIFT_FEASIBILITY_V1)
-- If planning rejected: Mechanism insufficiently justified or ADX lag risk too high, pivot to alternative
+**Deliverables completed:**
+1. Source research: 24 sources (13 academic, 5 code implementations)
+2. Mechanism: TREND_RANGE_STATE_SHIFT (deterministic ADX + Choppiness Index)
+3. Timing model: 6-bar model with ADX lag explicitly modeled
+4. MFE accessibility design: 70% threshold, before/after entry separation
+5. Control cohorts: 7 controls (simple volatility, ADX-only, CHOP-only, shifted-entry, same-state non-transition, opposite-regime, random-offset)
+6. Invalidation criteria: STOP/EXPLORE/INCONCLUSIVE gates defined
+7. Recommendation: IMPLEMENT ONE DIAGNOSTIC
+
+**Audit verdict:** DONE (planning quality excellent, recommendation IMPLEMENT ONE DIAGNOSTIC validated)
+
+**Decision:** User approved, Cascade assigned as builder for diagnostic implementation
 
 ---
 
-## Current Status (2026-05-28)
+## Research Milestone: TREND_RANGE_STATE_SHIFT_FEASIBILITY_V1
+
+**Status:** CLOSED - implementation correct, hypothesis invalidated (2026-05-28)  
+**Builder:** Cascade  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Plan:** `docs/research/REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLAN.md`  
+**Report:** `research_lab/reports/trend_range_state_shift_feasibility_v1.md`  
+**Audit:** `docs/audits/AUDIT_TREND_RANGE_STATE_SHIFT_FEASIBILITY_V1_2026-05-28.md`
+
+**Type:** Research-only diagnostic (quant research)  
+**Scope:** No production code, settings, schema, FeatureEngine, SignalEngine, Governance, Risk, or execution changes
+
+**Mechanism:** TREND_RANGE_STATE_SHIFT
+- Latched range state: ADX ≤ 20 AND CHOP ≥ 61.8
+- Explicit trend state: ADX ≥ 25 AND CHOP ≤ 38.2 AND |+DI - -DI| ≥ 5
+- Hysteresis state machine with 12-bar staleness limit
+- Direction from +DI/-DI at transition bar
+- Entry at bar i+1
+
+**Validation:**
+- 23 smoke tests passed
+- ADX/CHOP calculation correct (Wilder smoothing, 150-candle warmup)
+- State machine deterministic and reproducible
+- Timing discipline enforced (returns from i+1, not i)
+- ADX lag audit implemented (6-bar median lag)
+
+**Result:** STOP (5 invalidation criteria triggered)
+- Main events: 321
+- ER: -0.027 (< 1.2 threshold)
+- PF: 0.954 (< 1.2 threshold)
+- Median net return: -0.18% (≤ 0)
+- Win rate: 43.0% (< 45% threshold)
+- MFE consumed before entry: 21.5% (EXCELLENT, < 70% threshold)
+- ADX lag: 6 bars median (above 3-bar threshold)
+- Lag-adjusted MFE consumed: 69.6% (below 70% STOP threshold)
+- Walk-forward: 0 of 4 folds positive (< 2 threshold)
+- Control outperformers: None (but all cohorts negative)
+
+**Critical finding:** MFE accessibility was EXCELLENT (21.5% consumed), yet expectancy still failed (ER=-0.027, PF=0.954). This proves the mechanism lacks fundamental predictive edge, NOT just timing issues. Same pattern as volume-confirmed range breakout.
+
+**ADX lag finding:** Median lag of 6 bars is significant (above 3-bar threshold), but lag-adjusted MFE consumed is 69.6% (below 70% STOP threshold). ADX lag did NOT trigger the lag-specific STOP gate, but the mechanism failed on fundamental expectancy regardless.
+
+**Audit verdict:** DONE (implementation correct, result STOP is justified)
+
+**Decision:** STOP deterministic regime shift approach. User selected option 3 (alternative regime approach - HMM/GARCH with dependencies).
+
+**Pattern:** Good MFE accessibility (< 70% consumed) is necessary but NOT sufficient. A mechanism can have excellent timing but still lack predictive edge.
+
+---
+
+## Research Milestone: FILTERED_HMM_REGIME_SHIFT_EDGE_DISCOVERY_V1_PLANNING
+
+**Status:** DONE (2026-05-28)  
+**Builder:** Cascade  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-28  
+**Plan:** `docs/research/FILTERED_HMM_REGIME_SHIFT_EDGE_DISCOVERY_V1_PLAN.md` (682 lines)  
+**Audit:** `docs/audits/AUDIT_FILTERED_HMM_REGIME_SHIFT_PLANNING_2026-05-28.md`
+
+**Type:** Quant Research Planning (full planning document)  
+**Scope:** Research-only, no diagnostic code, no implementation
+
+**Goal:** Create full planning document for FILTERED_HMM_REGIME_SHIFT mechanism (probabilistic HMM approach).
+
+**Context:** Deterministic ADX/CHOP approach STOP (ER=-0.027). User selected probabilistic alternative with HMM filtered probabilities.
+
+**Mechanism:** `FILTERED_HMM_REGIME_SHIFT`
+- 2-state Gaussian HMM on [log returns, realized vol, volume z-score]
+- Rolling 500-bar training, retrain every 100 bars
+- **Custom forward pass for filtered probabilities** (hmmlearn's predict_proba uses smoothed posteriors = lookahead)
+- Entry when P(trend_state | data_0:t) crosses 0.7 threshold
+- Direction from 20-bar momentum
+
+**Critical API finding:** hmmlearn's `predict_proba` uses forward-backward algorithm (smoothed posteriors = lookahead). Diagnostic must implement custom forward pass for true filtered probabilities P(state_t | data_0:t).
+
+**Deliverables completed:**
+1. Source research: 29 sources (12 HMM/GARCH reused from reconnaissance + 17 new)
+2. Mechanism: FILTERED_HMM_REGIME_SHIFT (2-state Gaussian HMM, filtered only)
+3. Repo inspection: Confirmed hmmlearn API requires custom forward pass
+4. Timing model: 6-bar model with filtered probabilities strictly causal
+5. Control cohorts: 6 controls (simple volatility, ADX/CHOP, wrong interpretation, shifted-entry, random-offset, smoothed-probability audit)
+6. Safeguards: State count fixed at 2, interpretation frozen per fold, seed 42, no post-result tuning
+7. Dependency gate: hmmlearn installation required
+8. Recommendation: IMPLEMENT ONE DIAGNOSTIC with dependency approval
+
+**Dependency:** `pip install hmmlearn` required
+
+**Audit verdict:** APPROVE_PLANNING_DOCUMENT with dependency gate
+
+**Decision:** User approved planning AND hmmlearn installation. Dependency installed successfully (hmmlearn 0.3.3).
+
+**Timeline:** 1-2 weeks (HMM implementation more complex than deterministic)
+
+---
+
+## Research Milestone: FILTERED_HMM_REGIME_SHIFT_FEASIBILITY_V1
+
+**Status:** CLOSED - implementation correct, hypothesis invalidated (2026-05-30)  
+**Builder:** Cascade  
+**Auditor:** Claude Code  
+**Decision date:** 2026-05-30  
+**Plan:** `docs/research/FILTERED_HMM_REGIME_SHIFT_EDGE_DISCOVERY_V1_PLAN.md`  
+**Report:** `research_lab/reports/filtered_hmm_regime_shift_feasibility_v1.md`  
+**Audit:** `docs/audits/AUDIT_FILTERED_HMM_REGIME_SHIFT_FEASIBILITY_V1_2026-05-30.md`
+
+**Type:** Research-only diagnostic (quant research)  
+**Scope:** No production code, settings, schema, FeatureEngine, SignalEngine, Governance, Risk, or execution changes
+
+**Mechanism:** FILTERED_HMM_REGIME_SHIFT
+- 2-state Gaussian HMM on [log returns, realized volatility, volume z-score]
+- Rolling 500-bar training window, retrain every 100 bars
+- **Custom forward pass implementation** for filtered probabilities P(state_t | data_0:t)
+- Probability threshold: 0.7 for trend state
+- Entry at bar i+1, direction from 20-bar momentum
+- State interpretation: trend = higher variance state
+
+**Validation:**
+- 34 smoke tests passed (including **causality verification test**)
+- Custom forward pass correctly implements filtered probabilities (no lookahead)
+- Test `test_forward_pass_is_causal` validates filtered_30 == filtered_50[:30]
+- Timing discipline enforced (detection i, entry i+1, returns from i+1)
+- 6 control cohorts properly isolated
+- Seed determinism validated
+
+**Result:** STOP (10 invalidation criteria triggered) - **CATASTROPHIC FAILURE**
+- Main events: 5,062
+- ER: -0.122 (< 1.2 threshold, **4.5× worse than deterministic ADX/CHOP**)
+- PF: 0.792 (< 1.2 threshold)
+- Median net return: -0.18% (≤ 0)
+- Win rate: 41.3%
+- MFE consumed before entry: 22.8% (EXCELLENT, < 70% threshold)
+- HMM lag: 37 bars median
+- Lag-adjusted MFE consumed: 60.8% (< 70% threshold)
+- Walk-forward: **0 of 4 folds positive** (< 2 threshold)
+- State interpretation flip rate: **40.3%** (> 30% threshold)
+- **ALL 5 primary controls beat main** (ER comparison)
+
+**Critical finding - Control cohort dominance:**
+- Control 1 (simple volatility): ER=+0.0223 (POSITIVE, beats main by 0.144)
+- Control 2 (ADX/CHOP deterministic): ER=-0.0263 (beats main by 0.096)
+- Control 3 (wrong interpretation): ER=-0.1168 (nearly identical to "correct")
+- Control 4 (shifted entry i+3): ER=-0.1134 (beats main)
+- Control 5 (random offset +137): ER=-0.0926 (random timing beats HMM)
+- Control 6 (smoothed audit): 0 events
+
+**Critical finding - State interpretation instability:**
+- 1,952 HMM retrains total
+- 787 state interpretation flips (40.3% of retrains)
+- The 2-state variance-based "trend" vs "range" labeling is arbitrary and unstable
+
+**Seed sensitivity:** Consistent STOP across seeds 0, 123, 456 (not a seed issue)
+
+**Audit verdict:** DONE (implementation correct, custom forward pass validated, result STOP is decisive)
+
+**Decision:** **CLOSE REGIME SHIFT DETECTION FAMILY**
+
+**Regime shift family summary:**
+1. Deterministic ADX/CHOP: ER=-0.027, PF=0.954, MFE 21.5% consumed → STOP
+2. Probabilistic HMM filtered: ER=-0.122, PF=0.792, MFE 22.8% consumed → STOP (worse than deterministic)
+
+**Pattern:** Neither threshold-based nor latent-state-based regime detection shows predictive edge on BTCUSDT 15m. Both approaches have acceptable timing (< 70% MFE consumed) but lack fundamental predictive power.
+
+**Lesson:** HMM complexity adds no value. Simple volatility percentile transitions (control 1, ER=+0.0223) outperform sophisticated 2-state HMM modeling (ER=-0.122). The mechanism not only lacks edge, it actively destroys edge relative to simpler baselines.
+
+---
+
+## Current Status (2026-05-30)
 
 - **Active PAPER deployment:** trial-00095 (optuna-default-v3)
 - **Quant Research Operating Model:** DONE (documentation complete)
-- **Order-Flow/Liquidation Edge Discovery:** CLOSED (mechanism fully invalidated on 15m and 5m)
-- **Volatility Breakouts Edge Discovery:** CLOSED (volume-confirmed range breakout STOP, mechanism invalidated)
-- **Regime Shift Detection Reconnaissance:** DONE (2026-05-28, recommendation: PROCEED, mechanism: TREND_RANGE_STATE_SHIFT)
-- **Current milestone:** REGIME_SHIFT_DETECTION_EDGE_DISCOVERY_V1_PLANNING (AWAITING_DECISION, deterministic approach, 3-5 days)
-- **Next decision point:** User approval to proceed to planning → if approved, Codex creates planning document for TREND_RANGE_STATE_SHIFT
+- **Order-Flow/Liquidation Edge Discovery:** CLOSED (liquidation burst reversal STOP on 15m and 5m, mechanism fully invalidated)
+- **Volatility Breakouts Edge Discovery:** CLOSED (volume-confirmed range breakout STOP, ER=-0.092, mechanism invalidated)
+- **Regime Shift Detection Edge Discovery:** CLOSED (deterministic ADX/CHOP ER=-0.027 STOP, probabilistic HMM filtered ER=-0.122 STOP, family exhausted)
+- **Current milestone:** NONE (awaiting direction decision)
+- **Next decision point:** User selects next direction
+  - **Option 1:** Trial-00095 PAPER validation for LIVE promotion (existing baseline, ER=2.1, PF=4.6)
+  - **Option 2:** New edge family exploration (funding rate arbitrage, mean-reversion, macro overlay, pre-sweep imbalance)
+  - **Option 3:** Close quant research, focus on production hardening / infrastructure
+
+**Closed edge families (3 total):**
+1. **Liquidation burst reversal** (order-flow/liquidation): MFE 100% consumed (timing issue), ER negative on both 15m and 5m → STOP
+2. **Volume-confirmed range breakout** (volatility breakouts): MFE 14.9% consumed (good timing), ER=-0.092 (no predictive power), random-offset control outperformed main → STOP
+3. **Regime shift detection** (deterministic + probabilistic): Both approaches had MFE ~22% consumed (excellent timing), but deterministic ER=-0.027 and probabilistic ER=-0.122 (worse) → STOP, ALL controls beat HMM main cohort
+
+**Critical lessons from closed families:**
+- Good MFE accessibility (< 70% consumed) is necessary but NOT sufficient for edge validity
+- Simple baselines (e.g., volatility percentile transitions) can outperform complex probabilistic models (HMM)
+- State interpretation instability (40.3% flip rate in HMM) indicates model structure doesn't align with actual market regimes
+- Control cohort dominance (all 5 controls beating main) proves mechanism lacks fundamental predictive edge
+
+**Research ROI assessment:**
+- 3 edge families tested: 3 STOP verdicts
+- Trial-00095 baseline (ER=2.1, PF=4.6) remains strongest candidate
+- MFE accessibility diagnostic (May 2026) proved trial-00095 entry timing is already optimal or near-optimal
