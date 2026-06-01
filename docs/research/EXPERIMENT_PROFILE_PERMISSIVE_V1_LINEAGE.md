@@ -1,0 +1,185 @@
+# EXPERIMENT_PROFILE_PERMISSIVE_V1_LINEAGE
+
+**Date:** 2026-06-01  
+**Candidate ID:** `experiment-profile-permissive-v1`  
+**Status:** `AWAITING_WF_VALIDATION`  
+**Type:** Lineage legalization bundle, repo-only phase A1.build  
+
+---
+
+## Executive Summary
+
+`experiment-profile-permissive-v1` is the formal identity for the configuration
+currently running on production PAPER after an out-of-chain production edit on
+2026-05-25T23:16:48Z. The runtime strategy parameters are not the frozen
+`optuna-default-v3-trial-00095` parameters because BTC
+`min_sweep_depth_pct` is `0.005` instead of `0.00649`, while ETH/SOL use
+`0.0075` overrides.
+
+This document does not approve the profile and does not validate its edge. It
+only records the lineage break, assigns a truthful candidate identity, and
+defines the metadata-only deploy path needed before offline WF validation.
+
+The prior path should not recur. Strategy and risk parameters must move through
+commit -> audit -> deploy. A backup-and-edit pattern on production runtime
+configuration is evidence of an anti-pattern, even when the parameter change is
+strategically reasonable.
+
+---
+
+## 1. Candidate Identity
+
+| Field | Value |
+| --- | --- |
+| New candidate ID | `experiment-profile-permissive-v1` |
+| Parent candidate | `optuna-default-v3-trial-00095` |
+| Runtime mode | PAPER |
+| Runtime profile | `experiment` |
+| Legalization status | `AWAITING_WF_VALIDATION` |
+| Production behavior change in A1.build | None |
+
+This candidate is a permissive-frequency derivative of trial-00095. It must not
+be reported as frozen trial-00095 until it has passed its own validation chain.
+
+---
+
+## 2. Parameter Diff Against Frozen Trial-00095
+
+All parameters are inherited from `optuna-default-v3-trial-00095` except the
+rows below.
+
+| Scope | Parameter | Frozen trial-00095 | Current runtime | Classification |
+| --- | --- | ---: | ---: | --- |
+| BTC default | `strategy.min_sweep_depth_pct` | `0.00649` | `0.005` | Permissive frequency change |
+| ETH override | `multi_asset.symbol_overrides[].min_sweep_depth_pct` | N/A | `0.0075` | Asset-specific override |
+| SOL override | `multi_asset.symbol_overrides[].min_sweep_depth_pct` | N/A | `0.0075` | Asset-specific override |
+| Risk guardrail | `risk.risk_per_trade_pct` | `0.0055` trial param | `0.005` | Paper guardrail from 2026-05-08 deployment |
+
+The ETH/SOL overrides are documented by multi-asset activation work. The BTC
+`0.005` threshold is the lineage problem: it is present on production but not
+in a committed promotion artifact for the active candidate label.
+
+### Inherited Runtime Parameters
+
+The following runtime parameters remain inherited from the 2026-05-08
+trial-00095 deployment record unless listed in the diff table above.
+
+| Group | Parameters inherited unchanged |
+| --- | --- |
+| Strategy toggles | `allow_long_in_uptrend` |
+| ATR / volatility | `atr_period`, `compression_atr_norm_max`, `wick_min_atr` |
+| Signal scoring | `confluence_min`, `weight_cvd_divergence`, `weight_ema_trend_alignment`, `weight_funding_supportive`, `weight_reclaim_confirmed`, `weight_regime_special`, `weight_sweep_detected`, `weight_tfi_impulse` |
+| Direction / flow | `direction_tfi_threshold`, `tfi_impulse_threshold`, `post_liq_tfi_abs_min` |
+| Trend / levels | `ema_trend_gap_pct`, `equal_level_lookback`, `equal_level_tol_atr`, `funding_window_days`, `oi_z_window_days` |
+| Entry / invalidation | `entry_offset_atr`, `invalidation_offset_atr`, `reclaim_buf_atr`, `sweep_buf_atr`, `min_stop_distance_pct` |
+| Targets | `tp1_atr_mult`, `tp2_atr_mult` |
+| Risk | `cooldown_minutes_after_loss`, `daily_dd_limit`, `duplicate_level_tolerance_pct`, `duplicate_level_window_hours`, `high_vol_leverage`, `high_vol_stop_distance_pct`, `max_consecutive_losses`, `max_hold_hours`, `max_leverage`, `max_open_positions`, `max_trades_per_day`, `min_rr`, `partial_exit_pct`, `trailing_atr_mult`, `weekly_dd_limit` |
+| Research-only lineage | `allow_uptrend_continuation`, `uptrend_continuation_confluence_multiplier`, `uptrend_continuation_participation_min`, `uptrend_continuation_reclaim_strength_min` |
+
+Runtime additions from the multi-asset activation are retained as part of the
+currently running profile: `multi_asset.enabled=true`, enabled symbols
+`BTCUSDT`, `ETHUSDT`, `SOLUSDT`, paper simulation enabled, and alerts metadata.
+Those additions are not changed in Phase A1.
+
+---
+
+## 3. Drift Incident Timeline
+
+| Time | Event | Evidence |
+| --- | --- | --- |
+| 2026-05-08 | trial-00095 paper deployment approved | `AUDIT_DEPLOYMENT_TRIAL_00095_2026-05-08.md` |
+| 2026-05-24T16:44:42Z | Production config snapshot captured BTC threshold `0.00649` | `storage/btc_bot.db.config_snapshots` |
+| 2026-05-25T23:16:48Z | Manual production edit changed BTC threshold to `0.005` | `settings.json` mtime and `settings.json.bak_btc_threshold_` |
+| 2026-05-25T23:16:48Z | Service received SIGTERM | `journalctl -u btc-bot.service` |
+| 2026-05-25T23:16:53Z | Service restarted | `journalctl -u btc-bot.service` |
+| 2026-05-25T23:16:54Z | Production config snapshot captured BTC threshold `0.005` | `storage/btc_bot.db.config_snapshots` |
+| 2026-06-01 | Drift discovered during `PAPER_PERFORMANCE_VALIDATION_V1` | `docs/analysis/PAPER_PERFORMANCE_VALIDATION_V1_2026-06-01.md` |
+
+User-stated motivation: increase signal frequency at the cost of lower
+historical ER. The motivation is product-rational; the deployment path was not
+process-compliant.
+
+---
+
+## 4. Discovery Scan: False Candidate ID Locations
+
+### Runtime-Effective Locations
+
+| Location | Type | Current value | Runtime-effective? | A1.deploy action |
+| --- | --- | --- | --- | --- |
+| `/home/btc-bot/btc-bot/settings.json:deployment.candidate_id` | settings file | `optuna-default-v3-trial-00095` | Yes. Restart reads this file. | Update to `experiment-profile-permissive-v1` with audited metadata-only script. |
+| `/home/btc-bot/btc-bot/settings.json:monitoring.candidate_id` | settings file | `optuna-default-v3-trial-00095` | Yes. Monitor/reporting uses this label. | Update to `experiment-profile-permissive-v1` with audited metadata-only script. |
+| `/home/btc-bot/btc-bot/logs/trial_00095_monitoring.json` | runtime monitoring artifact | `optuna-default-v3-trial-00095` | Runtime-adjacent, generated artifact. | Verify after metadata update and monitor run; do not edit directly unless runbook audit approves. |
+
+### Not Runtime-Effective / Historical Locations
+
+| Location | Type | Classification | Action |
+| --- | --- | --- | --- |
+| `/home/btc-bot/btc-bot/settings.json.bak_btc_threshold_` | backup file | Evidence of pre-edit threshold `0.00649` | Preserve. Do not edit. |
+| `storage/btc_bot.db.config_snapshots` | DB historical snapshots | Historical evidence of config hashes before and after drift | Preserve. Do not overwrite. |
+| `docs/deployments/DEPLOYMENT_TRIAL_00095_PAPER_2026-05-08.md` | deployment record | Correct historical record for original deployment | Preserve. |
+| `docs/audits/AUDIT_*TRIAL_00095*` | audit records | Historical references | Preserve. |
+| `docs/analysis/*TRIAL_00095*` | analysis reports | Historical references | Preserve. |
+| `research_lab/**trial_00095**` | research code/reports | Historical research references | Preserve. |
+| `scripts/monitor_trial_00095.py` | monitor script | Historical monitor name and static payload label | Do not modify in A1.build; future monitor rename is separate scope. |
+| `tests/test_trial_00095_deployment.py` | tests | Historical trial-00095 deployment tests | Preserve. |
+
+### Production DB Schema Correction
+
+The handoff assumed `bot_state.candidate_id` exists. Production discovery shows
+that `bot_state` has no `candidate_id` column. Its columns are runtime health
+fields only: `mode`, `healthy`, `safe_mode`, drawdown fields, `last_trade_at`,
+and error/safe-mode timestamps.
+
+Therefore A1.deploy must not attempt a DB write to `bot_state.candidate_id`.
+The runtime-effective false identity is in `settings.json`, not in `bot_state`.
+
+---
+
+## 5. Production DB Coverage Gap
+
+The 2026-05-08 to 2026-05-24 coverage gap remains unresolved in A1.build.
+Observed production DB tables start decision coverage on 2026-05-24. The likely
+classes of explanation are:
+
+- DB rotation/reset around 2026-05-24;
+- bot inactivity before 2026-05-24;
+- earlier deployment using a different DB path.
+
+This is not resolved by the candidate-id metadata update. It remains a parent
+`CONFIG_LINEAGE_RECONCILIATION_V1` item before paper-performance conclusions
+can be decision-grade.
+
+---
+
+## 6. Phase A1.deploy Implication
+
+Phase A1.deploy is a metadata legalization step, not a strategy deployment.
+
+It may update:
+
+- candidate-id metadata in production `settings.json`;
+- candidate-id metadata verification artifacts/logs.
+
+It must not update:
+
+- `strategy.*`;
+- `risk.*`;
+- `multi_asset.symbol_overrides`;
+- `config_snapshots`;
+- `trade_log`, `signal_candidates`, or any performance table;
+- historical audit/report files on production.
+
+If any runtime-effective location other than settings metadata is discovered
+during deploy, stop and return for audit rather than editing manually.
+
+---
+
+## 7. Status And Next Step
+
+`experiment-profile-permissive-v1` is now named but not validated.
+
+After A1.deploy is audited and executed, Phase A2 must run offline WF validation
+against the exact legalized parameter set. Until A2 passes, this candidate is
+not promotion-ready and paper performance must not be compared to frozen
+trial-00095 as if they were identical.
