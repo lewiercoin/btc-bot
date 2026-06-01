@@ -109,7 +109,7 @@ process-compliant.
 | --- | --- | --- | --- | --- |
 | `/home/btc-bot/btc-bot/settings.json:deployment.candidate_id` | settings file | `optuna-default-v3-trial-00095` | Yes. Restart reads this file. | Update to `experiment-profile-permissive-v1` with audited metadata-only script. |
 | `/home/btc-bot/btc-bot/settings.json:monitoring.candidate_id` | settings file | `optuna-default-v3-trial-00095` | Yes. Monitor/reporting uses this label. | Update to `experiment-profile-permissive-v1` with audited metadata-only script. |
-| `/home/btc-bot/btc-bot/logs/trial_00095_monitoring.json` | runtime monitoring artifact | `optuna-default-v3-trial-00095` | Runtime-adjacent, generated artifact. | Verify after metadata update and monitor run; do not edit directly unless runbook audit approves. |
+| `/home/btc-bot/btc-bot/logs/trial_00095_monitoring.json` | runtime monitoring artifact | `optuna-default-v3-trial-00095` | Resolved in this follow-up commit by reading candidate_id from settings.json at runtime. | Next monitor run after A1.deploy will emit the new candidate ID. |
 
 ### Not Runtime-Effective / Historical Locations
 
@@ -121,8 +121,32 @@ process-compliant.
 | `docs/audits/AUDIT_*TRIAL_00095*` | audit records | Historical references | Preserve. |
 | `docs/analysis/*TRIAL_00095*` | analysis reports | Historical references | Preserve. |
 | `research_lab/**trial_00095**` | research code/reports | Historical research references | Preserve. |
-| `scripts/monitor_trial_00095.py` | monitor script | Historical monitor name and static payload label | Do not modify in A1.build; future monitor rename is separate scope. |
+| `scripts/monitor_trial_00095.py` | monitor script | Script name is historical; candidate_id payload now reads from `monitoring.candidate_id` in settings.json at runtime (updated in A1.build follow-up) | No further action needed for candidate-id lineage. Script filename rename remains separate scope. |
 | `tests/test_trial_00095_deployment.py` | tests | Historical trial-00095 deployment tests | Preserve. |
+
+### Warning 2 Resolution
+
+The Claude Code audit (commit `262506b`) raised Warning 2: `scripts/monitor_trial_00095.py`
+line 144 hardcodes `{"candidate_id": "optuna-default-v3-trial-00095"}` in the
+`_apply_safe_mode` payload written to `alerts_errors`. After A1.deploy,
+`settings.json` would say `experiment-profile-permissive-v1` but the monitor
+would continue writing the old identity.
+
+**Resolution: Option A** — The monitor script was updated in this follow-up
+commit to pass `candidate_id` dynamically from the monitoring config (already
+loaded from `settings.json:monitoring.candidate_id`) into `_apply_safe_mode`.
+The hardcoded literal was removed. If `candidate_id` is missing from the
+monitoring config, the script exits with a non-zero code and clear error
+message instead of silently falling back.
+
+A dedicated test (`tests/test_monitor_trial_00095_candidate_id.py`) verifies
+that the monitor reads candidate_id dynamically and fails loudly when the
+field is absent.
+
+Option B (defer to a separate milestone with monitor paused) was not chosen
+because the fix is a one-parameter change with no design risk, and deferring
+would leave the lineage leak open across all monitor runs between A1.deploy
+and the deferred milestone.
 
 ### Production DB Schema Correction
 

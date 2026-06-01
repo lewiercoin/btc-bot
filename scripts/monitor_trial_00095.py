@@ -5,6 +5,7 @@ import argparse
 import json
 import math
 import sqlite3
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -107,7 +108,7 @@ def _closed_month_counts(*, since: datetime, now: datetime, trades: list[dict[st
     return counts
 
 
-def _apply_safe_mode(conn: sqlite3.Connection, *, reason: str, now: datetime, dry_run: bool) -> None:
+def _apply_safe_mode(conn: sqlite3.Connection, *, reason: str, now: datetime, dry_run: bool, candidate_id: str) -> None:
     if dry_run:
         return
     ts = now.isoformat()
@@ -141,7 +142,7 @@ def _apply_safe_mode(conn: sqlite3.Connection, *, reason: str, now: datetime, dr
             "CRITICAL",
             "trial_00095_monitor",
             reason,
-            json.dumps({"candidate_id": "optuna-default-v3-trial-00095"}, sort_keys=True),
+            json.dumps({"candidate_id": candidate_id}, sort_keys=True),
         ),
     )
     conn.commit()
@@ -229,13 +230,20 @@ def main() -> int:
     args = parser.parse_args()
 
     config = _load_monitoring_config(args.settings)
+    if "candidate_id" not in config:
+        print(
+            f"ERROR: monitoring.candidate_id is missing from {args.settings}. "
+            "Cannot run monitor without a candidate identity.",
+            file=sys.stderr,
+        )
+        return 1
     now = _now_utc()
     conn = sqlite3.connect(args.db)
     try:
         result = evaluate(conn, config, now=now)
         if result["hard_stop"] and args.apply_safe_mode:
             reason = "trial_00095_hard_stop:" + ";".join(result["alerts"])
-            _apply_safe_mode(conn, reason=reason, now=now, dry_run=args.dry_run)
+            _apply_safe_mode(conn, reason=reason, now=now, dry_run=args.dry_run, candidate_id=config["candidate_id"])
             result["safe_mode_applied"] = not args.dry_run
         else:
             result["safe_mode_applied"] = False
