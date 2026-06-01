@@ -13,6 +13,8 @@
 3. Production branch is `deploy/multi-asset-paper-v1`.
 4. Production strategy parameters already match the target runtime behavior:
    BTC `min_sweep_depth_pct=0.005`, ETH/SOL `0.0075`.
+5. Operator commits to capturing restart timestamp and post-restart log
+   evidence as part of step 6.
 
 This runbook changes metadata identity only. It does not change strategy
 parameters.
@@ -113,19 +115,39 @@ Expected:
 
 ---
 
-## 6. Restart Policy
+## 6. Service Restart (Mandatory)
 
-This metadata affects labels loaded from `settings.json`. If runtime logs or
-monitoring must immediately reflect the new ID, restart the service after the
-metadata update:
+The candidate ID is loaded from `settings.json` at process start. Until the
+service restarts, the running process continues to emit the old
+`optuna-default-v3-trial-00095` identity in every log line, monitoring write,
+and alert. The metadata update only takes effect at next process start.
+**The restart IS the deploy.**
+
+After step 5 verify-only exits 0, restart the service and capture the
+timestamp:
 
 ```powershell
 ssh -i "c:\development\btc-bot\btc-bot-deploy-v2" root@204.168.146.253 `
-  "systemctl restart btc-bot.service && sleep 5 && systemctl is-active btc-bot.service"
+  "date -u '+%Y-%m-%dT%H:%M:%SZ' && systemctl restart btc-bot.service && sleep 5 && systemctl is-active btc-bot.service"
 ```
 
-If Claude audit requires no restart, skip this step and let the next controlled
-deploy/restart pick up the metadata. Do not restart for any strategy parameter
+Record the UTC timestamp printed by the `date` command.
+
+Then confirm the first post-restart log line shows the new candidate ID:
+
+```powershell
+ssh -i "c:\development\btc-bot\btc-bot-deploy-v2" root@204.168.146.253 `
+  "journalctl -u btc-bot.service --since '5 seconds ago' --no-pager | head -20"
+```
+
+Expected log line pattern after restart:
+
+```
+deployment.candidate_id = experiment-profile-permissive-v1
+```
+
+If the log line still shows `optuna-default-v3-trial-00095`, stop and
+investigate before proceeding. Do not restart for any strategy parameter
 change; no strategy parameter change is permitted in this runbook.
 
 ---
@@ -141,7 +163,10 @@ commit containing:
 - backup path and SHA256;
 - candidate update log path and SHA256;
 - verification command outputs;
-- whether service restart was performed.
+- restart UTC timestamp (from step 6 `date -u` output);
+- `systemctl is-active btc-bot.service` output after restart;
+- first post-restart log line showing the new candidate ID
+  (`deployment.candidate_id = experiment-profile-permissive-v1`).
 
 Commit prefix:
 
