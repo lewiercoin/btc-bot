@@ -208,10 +208,12 @@ screening was executed on 2026-06-02 against the exact legalized BTC threshold
 override (`min_sweep_depth_pct=0.005`) and passed the mechanical post-hoc WF
 gate (`2/2` windows, `fragile=false`).
 
-The A2 builder verdict is still `SCREENING_ONLY`, not promotion approval. Claude
-Code audit is required, and the PC run has a data-source deviation: the
-production SSH snapshot fetch and server-side SHA check could not be completed
-because the deploy key was not present on this PC.
+The A2 builder verdict is still `SCREENING_ONLY`, not promotion approval.
+Claude Code audit is required. After the server key became available on this
+PC, Codex reran A2 against the fetched server snapshot
+`research_lab/snapshots/replay-optuna-default-v3-trial-00095.db`; server and
+local SHA256 matched:
+`ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca`.
 
 ---
 

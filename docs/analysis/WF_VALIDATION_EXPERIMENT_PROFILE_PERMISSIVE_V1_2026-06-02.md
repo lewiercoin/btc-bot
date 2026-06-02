@@ -25,30 +25,26 @@ fetch. The audit branch `origin/claude/epic-darwin-z8Moa` was present at
 
 ## Data Source
 
-Expected A2 amendment requested a read-only SSH fetch of the BTC snapshot from
-`root@204.168.146.253` and a server-side/local SHA256 comparison.
+After the server key became available on this PC, Codex completed the amended
+A2 requirement: read-only SSH discovery, server-side SHA256, local fetch, and
+post-fetch local SHA256 verification.
 
-On this PC, SSH access was blocked before data transfer:
-
-- documented key path `c:\development\btc-bot\btc-bot-deploy-v2` did not exist;
-- direct SSH with the local agent failed with `Permission denied (publickey)`;
-- no production state was modified.
-
-Because local PC already had a historical SQLite DB with BTC coverage through
-the required validation range, the run used local read-only source DB:
+The canonical A2 run in this report uses the fetched server snapshot:
 
 | Item | Value |
 |---|---|
-| Source DB | `storage/btc_bot.db` |
-| Source DB SHA256 | `4d6a3f9e8a97d095fcbf6221e24c720c516fe7373b0c4a306978b56cf54e8eba` |
-| BTCUSDT 15m coverage | `2020-09-01T00:00:00+00:00` to `2026-05-25T21:45:00+00:00` |
-| BTCUSDT 15m rows | `200,907` |
+| Server snapshot | `/home/btc-bot/btc-bot/research_lab/snapshots/replay-optuna-default-v3-trial-00095.db` |
+| Local fetched snapshot | `research_lab/snapshots/replay-optuna-default-v3-trial-00095.db` |
+| Server SHA256 | `ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca` |
+| Local SHA256 | `ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca` |
+| SHA256 verified | `true` |
+| BTCUSDT 15m coverage | `2020-09-01T00:00:00+00:00` to `2026-04-17T19:15:00+00:00` |
+| BTCUSDT 15m rows | `197,262` |
 | Validation range | `2022-01-01` to `2026-03-28` |
 | Production state modified | `false` |
 
-This data-source deviation is audit-relevant. The run validates the legalized
-parameter set against the available local historical DB, but it does not satisfy
-the amended server-side snapshot SHA requirement.
+An earlier local-PC run used `storage/btc_bot.db` because SSH was initially
+unavailable. That local run is superseded by the server-snapshot run above.
 
 ## Execution
 
@@ -70,25 +66,25 @@ Candidate construction:
 
 Local generated artifacts, not committed:
 
-- `research_lab/revalidation/experiment-profile-permissive-v1/summary.json`
-- `research_lab/revalidation/experiment-profile-permissive-v1/evaluation.json`
-- `research_lab/revalidation/experiment-profile-permissive-v1/walkforward_report.json`
-- `research_lab/revalidation/experiment-profile-permissive-v1/recommendation.json`
+- `research_lab/revalidation/experiment-profile-permissive-v1-server-snapshot/summary.json`
+- `research_lab/revalidation/experiment-profile-permissive-v1-server-snapshot/evaluation.json`
+- `research_lab/revalidation/experiment-profile-permissive-v1-server-snapshot/walkforward_report.json`
+- `research_lab/revalidation/experiment-profile-permissive-v1-server-snapshot/recommendation.json`
 
-The temporary SQLite snapshot under `research_lab/snapshots/` was removed after
-the run.
+The fetched source snapshot is retained locally under `research_lab/snapshots/`
+for audit reproduction and is ignored by git.
 
 ## Candidate Full-Range Metrics
 
 | Metric | Value |
 |---|---:|
-| Expectancy R | `1.6684` |
-| Profit factor | `3.6275` |
+| Expectancy R | `1.6590` |
+| Profit factor | `3.5310` |
 | Max drawdown | `6.13%` |
-| Trades | `500` |
-| Sharpe | `10.2509` |
-| Win rate | `52.20%` |
-| pnl_abs | `278,220.28` |
+| Trades | `496` |
+| Sharpe | `10.1650` |
+| Win rate | `51.81%` |
+| pnl_abs | `265,542.31` |
 
 Full-range minimum trade gate passed. The candidate produced materially more
 trades than frozen trial-00095, as expected from the permissive BTC threshold.
@@ -99,7 +95,7 @@ trades than frozen trial-00095, as expected from the permissive BTC threshold.
 |---|---|
 | WF passed | PASS: `2/2` windows |
 | Fragile | PASS: `false` |
-| IS degradation | `-35.80%` |
+| IS degradation | `-34.05%` |
 | Pipeline verdict | `SCREENING_ONLY` |
 | Recommendation risks | `pnl_sanity_review_required`, `oos_outperformance_review_required` |
 
@@ -108,7 +104,7 @@ trades than frozen trial-00095, as expected from the permissive BTC threshold.
 | Window | Passed | Train ER | Val ER | Degradation | Train PF | Val PF | Train DD | Val DD | Train trades | Val trades | Val Sharpe |
 |---:|---|---:|---:|---:|---:|---:|---:|---:|---:|---:|---:|
 | 1 | true | `1.3139` | `2.1188` | `-61.26%` | `2.7897` | `4.1496` | `6.13%` | `5.06%` | `238` | `177` | `12.9335` |
-| 2 | true | `1.6621` | `1.8341` | `-10.35%` | `3.8003` | `4.0733` | `6.13%` | `5.63%` | `416` | `72` | `10.4009` |
+| 2 | true | `1.6621` | `1.7757` | `-6.83%` | `3.8003` | `3.7698` | `6.13%` | `5.63%` | `416` | `68` | `9.8330` |
 
 ## Builder Verdict
 
@@ -118,7 +114,7 @@ trades than frozen trial-00095, as expected from the permissive BTC threshold.
 
 - `2/2` WF windows passed;
 - `fragile=false`;
-- validation trade counts are strong: `177` and `72`;
+- validation trade counts are strong: `177` and `68`;
 - no low-OOS-trade review flag;
 - no PF hard review flag.
 
@@ -126,15 +122,12 @@ It is not promotion-ready without Claude Code audit because:
 
 - `pnl_sanity_review_required=true` due high absolute historical pnl;
 - `oos_outperformance_review_required=true` due negative IS degradation,
-  especially window 1;
-- the amended server-side snapshot SHA requirement was not satisfied on this PC
-  because the deploy key was absent.
+  especially window 1.
 
 ## Recommended Next Step
 
-Claude Code should audit this A2 report and decide whether the PC data-source
-deviation is acceptable or whether Codex must rerun A2 after the production
-deploy key is installed on this PC.
+Claude Code should audit this A2 report, the server/local snapshot SHA evidence,
+and the persisted local revalidation artifacts.
 
 Until audit closure, `experiment-profile-permissive-v1` remains
 `SCREENING_ONLY` and must not be treated as a promotion-approved replacement for
