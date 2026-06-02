@@ -1,0 +1,79 @@
+{
+  "audit_chain": [
+    {
+      "commit": "9d99dc7",
+      "role": "builder",
+      "summary": "lineage legalization bundle"
+    },
+    {
+      "commit": "57c6cd3",
+      "role": "builder",
+      "summary": "A1.build follow-up"
+    },
+    {
+      "commit": "3330e22",
+      "role": "auditor",
+      "summary": "A1.build follow-up DONE"
+    },
+    {
+      "commit": "db9973a",
+      "role": "builder",
+      "summary": "A1.deploy candidate id metadata deploy"
+    },
+    {
+      "commit": "5cec9a0",
+      "role": "builder",
+      "summary": "A2 WF server snapshot verification"
+    },
+    {
+      "commit": "d09a255",
+      "role": "auditor",
+      "summary": "A2 WF validation PROMOTION_READY_WITH_CONDITIONS"
+    }
+  ],
+  "candidate_config_hash": "68fd6caf83ff549f1741d04585a06f6b758a87c40380bc15450d5e35b0319593",
+  "candidate_id": "experiment-profile-permissive-v1",
+  "dataset_lineage": {
+    "btc": {
+      "role": "A2 WF validation source",
+      "server_path": "/home/btc-bot/btc-bot/research_lab/snapshots/replay-optuna-default-v3-trial-00095.db",
+      "sha256": "ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca",
+      "verified_server_local_match": true
+    },
+    "eth": {
+      "role": "runtime multi-asset lineage reference",
+      "sha256_prefix": "c0358a15"
+    },
+    "fetch_method": "read-only SSH fetch from root@204.168.146.253 followed by local SHA256 verification",
+    "sol": {
+      "role": "runtime multi-asset lineage reference",
+      "sha256_prefix": "f994d98f"
+    }
+  },
+  "derived_from": "optuna-default-v3-trial-00095",
+  "frozen_overrides": {
+    "multi_asset.symbol_overrides": [
+      {
+        "min_sweep_depth_pct": 0.0075,
+        "source": "multi-asset runtime activation lineage",
+        "symbol": "ETHUSDT"
+      },
+      {
+        "min_sweep_depth_pct": 0.0075,
+        "source": "multi-asset runtime activation lineage",
+        "symbol": "SOLUSDT"
+      }
+    ],
+    "risk.risk_per_trade_pct": {
+      "source": "paper guardrail from 2026-05-08 deployment",
+      "value": 0.005
+    },
+    "strategy.min_sweep_depth_pct": {
+      "scope": "BTCUSDT default",
+      "value": 0.005
+    }
+  },
+  "legalization_status": "PROMOTION_READY_WITH_CONDITIONS",
+  "protocol_hash": "023dc84c2cd8eff7e0226a1cb74cca24ce64a896aacac7f8c4a61199fac9e1b8",
+  "wf_report_path": "docs/analysis/WF_VALIDATION_EXPERIMENT_PROFILE_PERMISSIVE_V1_2026-06-02.md"
+}
