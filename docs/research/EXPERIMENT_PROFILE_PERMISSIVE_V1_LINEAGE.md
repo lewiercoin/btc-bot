@@ -201,9 +201,78 @@ during deploy, stop and return for audit rather than editing manually.
 
 ## 7. Status And Next Step
 
-`experiment-profile-permissive-v1` is now named but not validated.
+`experiment-profile-permissive-v1` is now named and deployed.
 
-After A1.deploy is audited and executed, Phase A2 must run offline WF validation
-against the exact legalized parameter set. Until A2 passes, this candidate is
-not promotion-ready and paper performance must not be compared to frozen
-trial-00095 as if they were identical.
+Phase A1.deploy was executed on 2026-06-02. Phase A2 must run offline WF
+validation against the exact legalized parameter set. Until A2 passes, this
+candidate is not promotion-ready and paper performance must not be compared to
+frozen trial-00095 as if they were identical.
+
+---
+
+## 8. A1.deploy Completion Record
+
+**Deploy date:** 2026-06-02T04:28:26Z (restart timestamp)
+
+### Audit Chain
+
+| Item | Value |
+|---|---|
+| A1.build commit | `9d99dc7` |
+| A1.build follow-up commit | `57c6cd3` |
+| Claude audit hash (A1.build) | `3330e22` |
+| Production HEAD after pull | `57c6cd37` |
+
+### Backup
+
+| Item | Value |
+|---|---|
+| Backup path | `/home/btc-bot/backups/database/btc_bot_20260601T174425Z.db` |
+| Backup size | 7,075,704,832 bytes (7.07 GB) |
+| SHA256 | `7fca1b224ab43ffb1925c9f8cf33f99fb0a603c14c66224bfdb675ae32515a92` |
+| Integrity check | `ok` |
+| trade_log cross-check | source=1, backup=1, diff=0 |
+| decision_outcomes cross-check | source=2445, backup=2418, diff=27 (expected: 4h bot runtime after backup snapshot) |
+
+### Metadata Update
+
+| Item | Value |
+|---|---|
+| Update log | `docs/operations/CANDIDATE_ID_UPDATE_2026-06-02T042708Z0000.log` |
+| deployment.candidate_id | `experiment-profile-permissive-v1` |
+| monitoring.candidate_id | `experiment-profile-permissive-v1` |
+| strategy.min_sweep_depth_pct | `0.005` (unchanged) |
+| multi_asset ETH/SOL overrides | `0.0075` (unchanged) |
+
+### Restart Evidence
+
+| Item | Value |
+|---|---|
+| Pre-restart PID | 992005 |
+| Post-restart PID | 1078902 |
+| systemctl is-active | `active` |
+| Old candidate ID in post-restart logs | 0 occurrences |
+| First decision cycle | `2026-06-02T04:30:00` (no_signal) |
+| config_hash | `c01f7960984a256e8d720c2d27f27bb5cb35c2677dce53293bc4d41b1b7d40f7` |
+
+### Runbook Deviations
+
+1. **Backup method:** `sqlite3 .backup` WAL live-locked for ~9 hours (started
+   17:44 UTC Jun 1, completed ~02:15 UTC Jun 2). Root cause: bot actively
+   writing to WAL while backup re-reads changed pages. Backup ultimately
+   completed on its own and passed all three verification checks. See
+   "Backup Incident 2026-06-01" appendix in the deploy runbook.
+
+2. **Permission error on settings.json:** The `update_candidate_id_metadata_only.py`
+   script ran as `root` via SSH, changing file ownership from `btc-bot:btc-bot`
+   to `root:root` with mode `0600`. Bot service (running as `btc-bot` user)
+   crashed 3 times with `PermissionError` before the issue was identified and
+   fixed with `chown btc-bot:btc-bot && chmod 644`. Lesson: the metadata update
+   script should preserve file ownership, or the runbook should include a
+   post-update ownership verification step.
+
+3. **Startup log pattern:** The runbook expected a log line
+   `deployment.candidate_id = experiment-profile-permissive-v1` at startup.
+   The bot does not emit this exact line. Adapted verification used: (a) positive
+   check on settings.json values, (b) negative check for absence of old ID in
+   logs, (c) service health + decision cycle confirmation.

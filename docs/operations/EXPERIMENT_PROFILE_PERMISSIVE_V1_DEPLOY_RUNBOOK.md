@@ -176,3 +176,114 @@ ops: experiment-profile-permissive-v1 candidate id metadata deploy
 
 The commit must include WHAT / WHY / STATUS and reference the A1.build audit
 hash.
+
+---
+
+## Appendix A: Backup Incident 2026-06-01
+
+### Timeline
+
+| Time (UTC) | Event |
+|---|---|
+| Jun 1 17:44 | `sqlite3 .backup` started via `scripts/backup_production_db.sh` |
+| Jun 1 ~19:50 | File grew to 4.0 GB, then size stopped increasing |
+| Jun 1 ~19:50–Jun 2 02:15 | Process in R state, 99.6% CPU, mtime advancing but file size unchanged at 4,192,256,000 bytes |
+| Jun 2 02:15 | Backup completed on its own; file grew to 7,075,704,832 bytes (7.07 GB) |
+| Jun 2 04:22 | Diagnostics confirmed process exited; backup verified via integrity_check + row count cross-check + SHA256 |
+
+### Root Cause
+
+**WAL live-lock.** The bot was actively writing to the source DB throughout the
+backup. The source DB grew from 6.85 GB to 7.21 GB during the backup window.
+`sqlite3 .backup` on a busy WAL-mode database re-reads changed WAL pages before
+finalizing, creating a feedback loop where the backup repeatedly overwrites
+already-written pages in the target. The file size plateau at 4.0 GB with
+advancing mtime confirms in-place page rewrites without forward progress.
+
+### Forensics (captured before kill attempt)
+
+- Process state: R (running), 99.6% CPU, 27,214s elapsed
+- Source DB: 7,032,918,016 bytes (lsof), WAL: 30 MB
+- Target: 4,192,256,000 bytes (stuck)
+- No I/O errors in journalctl
+- 13 GB free disk space
+- Process had already exited by the time kill was attempted
+
+### Lessons Learned
+
+1. **Do not use `sqlite3 .backup` on a busy WAL-mode DB.** Use one of:
+   - `VACUUM INTO '<path>'` (online, no WAL contention, available since SQLite 3.27)
+   - Stop bot → file-level `cp` → start bot (3-5 min PAPER downtime)
+   - Stop bot → `PRAGMA wal_checkpoint(TRUNCATE)` → `cp` → start bot (cleanest)
+
+2. **Set a backup timeout.** If backup exceeds 30 minutes on a 7 GB DB, escalate
+   immediately rather than waiting hours.
+
+3. **Monitor file size growth, not just mtime.** Mtime advancing without size
+   growth is a WAL replay indicator, not forward progress.
+
+---
+
+## Appendix B: Permission Error Deviation
+
+### Incident
+
+The `update_candidate_id_metadata_only.py` script ran as `root` (via SSH as
+root) and wrote `settings.json` with ownership `root:root` and mode `0600`.
+The bot service runs as user `btc-bot` and crashed 3 times with
+`PermissionError: [Errno 13] Permission denied: '/home/btc-bot/btc-bot/settings.json'`
+before the issue was identified.
+
+### Fix Applied
+
+```bash
+chown btc-bot:btc-bot /home/btc-bot/btc-bot/settings.json
+chmod 644 /home/btc-bot/btc-bot/settings.json
+```
+
+### Prevention
+
+Future runbook executions must add a post-update ownership verification step
+after step 4:
+
+```bash
+# After metadata update, verify file ownership matches bot service user
+ls -la /home/btc-bot/btc-bot/settings.json
+# Expected: btc-bot btc-bot
+# If root:root, fix with: chown btc-bot:btc-bot /home/btc-bot/btc-bot/settings.json
+```
+
+Alternatively, the `update_candidate_id_metadata_only.py` script should be
+modified to preserve original file ownership after atomic write.
+
+---
+
+## Appendix C: Startup Log Pattern Correction
+
+### Issue
+
+Step 6 expected the log line:
+
+```
+deployment.candidate_id = experiment-profile-permissive-v1
+```
+
+The bot does not emit this exact line at startup. The actual startup log shows:
+
+```
+Starting bot | mode=PAPER | profile=experiment | symbol=BTCUSDT | config_hash=...
+```
+
+### Adapted Verification Used
+
+1. **Positive check:** `settings.json` confirmed both candidate_id fields set to
+   `experiment-profile-permissive-v1`
+2. **Negative check:** `grep -c 'optuna-default-v3-trial-00095'` on post-restart
+   logs returned 0
+3. **Health check:** service active, new PID (1078902 ≠ 992005), first decision
+   cycle at 04:30:00 UTC
+
+### Correction for Future Use
+
+Step 6 verification should use the adapted three-check approach rather than
+relying on a specific log line pattern that does not exist.
