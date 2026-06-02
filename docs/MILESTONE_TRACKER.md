@@ -224,14 +224,14 @@ truth; this checkpoint only clarifies their combined state.
 `min_sweep_depth_pct=0.005` override documented in the lineage bundle.
 
 **Builder result:** Mechanical WF screening passed (`2/2` windows,
-`fragile=false`, validation trades `177` and `72`), but builder verdict remains
+`fragile=false`, validation trades `177` and `68`), but builder verdict remains
 `SCREENING_ONLY`. Claude Code audit is required before this profile can be
 treated as promotion-approved.
 
-**Audit-relevant deviation:** The amended production snapshot fetch and
-server-side SHA check could not be completed on this PC because the documented
-deploy key was absent. The run used local `storage/btc_bot.db` with SHA256
-`4d6a3f9e8a97d095fcbf6221e24c720c516fe7373b0c4a306978b56cf54e8eba`.
+**Snapshot integrity:** After server SSH access became available on this PC,
+Codex fetched `/home/btc-bot/btc-bot/research_lab/snapshots/replay-optuna-default-v3-trial-00095.db`
+and verified matching server/local SHA256:
+`ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca`.
 No production state was modified.
 
 ---
