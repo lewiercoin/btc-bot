@@ -74,6 +74,43 @@ Local generated artifacts, not committed:
 The fetched source snapshot is retained locally under `research_lab/snapshots/`
 for audit reproduction and is ignored by git.
 
+## Revalidation Artifact SHA256
+
+The JSON artifacts are generated outputs under `research_lab/revalidation/` and
+are not committed. Their SHA256 hashes are recorded here so future re-runs can
+detect drift or tampering:
+
+| Artifact | SHA256 |
+|---|---|
+| `evaluation.json` | `19fc95794c58f09c043a797052e8da9bebef6ccdcc71d3a843232871218a08f9` |
+| `recommendation.json` | `670a08079d12a2b4c2f199c4b38137afa49e9f8125248e79619398627e66ee5d` |
+| `summary.json` | `35d1c66066ff7b4dbda05990b46b18d83c8616350d850e05ea7da1d037d97291` |
+| `walkforward_report.json` | `d08e713d942ff9935d543115e3a452cf8c5818f0beb211c0677eb6c5495d9830` |
+
+## Determinism Evidence
+
+This A2 run reuses the existing Research Lab walk-forward pipeline rather than
+introducing a candidate-specific runner. Determinism is inherited from the
+pipeline-level checks already present in the repository:
+
+- `tests/test_config_hash_reproducibility.py::test_config_hash_deterministic`
+  verifies identical settings produce identical `config_hash` values.
+- `tests/test_research_lab_smoke.py::test_run_walkforward_applies_multicriteria_thresholds`
+  verifies `run_walkforward()` persists `hash_protocol(protocol)` into the
+  report.
+- `tests/test_research_lab_smoke.py::test_protocol_hash_persists_through_store_and_report`
+  verifies protocol hash persistence through trials, walk-forward reports,
+  recommendations, and generated reports.
+
+The candidate-specific deterministic anchors for this run are:
+
+- protocol hash:
+  `023dc84c2cd8eff7e0226a1cb74cca24ce64a896aacac7f8c4a61199fac9e1b8`;
+- candidate config hash:
+  `68fd6caf83ff549f1741d04585a06f6b758a87c40380bc15450d5e35b0319593`;
+- server/local BTC snapshot SHA256:
+  `ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca`.
+
 ## Candidate Full-Range Metrics
 
 | Metric | Value |
