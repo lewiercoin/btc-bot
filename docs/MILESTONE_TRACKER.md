@@ -211,6 +211,31 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research Validation: EXPERIMENT_PROFILE_PERMISSIVE_V1_A2_WF
+
+**Status:** READY_FOR_CLAUDE_AUDIT  
+**Builder:** Codex  
+**Decision date:** 2026-06-02  
+**Branch:** `deploy/multi-asset-paper-v1`  
+**Report:** `docs/analysis/WF_VALIDATION_EXPERIMENT_PROFILE_PERMISSIVE_V1_2026-06-02.md`
+
+**Scope:** Offline post-hoc WF validation for the legalized
+`experiment-profile-permissive-v1` BTC PAPER profile, using the exact
+`min_sweep_depth_pct=0.005` override documented in the lineage bundle.
+
+**Builder result:** Mechanical WF screening passed (`2/2` windows,
+`fragile=false`, validation trades `177` and `72`), but builder verdict remains
+`SCREENING_ONLY`. Claude Code audit is required before this profile can be
+treated as promotion-approved.
+
+**Audit-relevant deviation:** The amended production snapshot fetch and
+server-side SHA check could not be completed on this PC because the documented
+deploy key was absent. The run used local `storage/btc_bot.db` with SHA256
+`4d6a3f9e8a97d095fcbf6221e24c720c516fe7373b0c4a306978b56cf54e8eba`.
+No production state was modified.
+
+---
+
 ### Runtime Fix: MULTI_ASSET_FEATURE_ENGINE_PERSISTENCE_V1
 
 **Status:** DONE (audited + deployed)

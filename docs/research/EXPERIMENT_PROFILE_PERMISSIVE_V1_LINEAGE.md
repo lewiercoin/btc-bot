@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-01  
 **Candidate ID:** `experiment-profile-permissive-v1`  
-**Status:** `AWAITING_WF_VALIDATION`  
+**Status:** `WF_SCREENING_PASSED_AWAITING_AUDIT`  
 **Type:** Lineage legalization bundle, repo-only phase A1.build  
 
 ---
@@ -203,10 +203,15 @@ during deploy, stop and return for audit rather than editing manually.
 
 `experiment-profile-permissive-v1` is now named and deployed.
 
-Phase A1.deploy was executed on 2026-06-02. Phase A2 must run offline WF
-validation against the exact legalized parameter set. Until A2 passes, this
-candidate is not promotion-ready and paper performance must not be compared to
-frozen trial-00095 as if they were identical.
+Phase A1.deploy was executed on 2026-06-02. Phase A2 local PC offline WF
+screening was executed on 2026-06-02 against the exact legalized BTC threshold
+override (`min_sweep_depth_pct=0.005`) and passed the mechanical post-hoc WF
+gate (`2/2` windows, `fragile=false`).
+
+The A2 builder verdict is still `SCREENING_ONLY`, not promotion approval. Claude
+Code audit is required, and the PC run has a data-source deviation: the
+production SSH snapshot fetch and server-side SHA check could not be completed
+because the deploy key was not present on this PC.
 
 ---
 
