@@ -28,6 +28,32 @@ This document describes backup strategy, disaster recovery procedures, and data 
 2. **Off-server backups:** Local development machine (manual pull)
 3. **Git repository:** Code + docs + configs (not data)
 
+### Backup Method
+
+Production database backups use SQLite `VACUUM INTO` through
+`scripts/backup_production_db.sh`.
+
+This is the canonical online backup method for the production SQLite database:
+
+- It runs while the bot remains online.
+- It writes to a new database file.
+- It avoids the busy-WAL live-lock behavior observed with `sqlite3 .backup`.
+- It produces a compact database file by omitting free pages.
+- It requires SQLite `3.27.0` or newer; the backup script checks this before
+  attempting a backup.
+
+The script applies a 30-minute wall-clock timeout. If the timeout fires, the
+script exits with code `2`, removes the partial target database, and writes a
+forensics log to:
+
+```text
+/home/btc-bot/backups/database/backup_timeout_<TIMESTAMP>.log
+```
+
+Exit code `2` is an operational escalation condition, not a generic retry
+signal. Inspect the forensics log, verify disk space and lock state, and decide
+whether to rerun online or schedule a quiesced stop/checkpoint/copy backup.
+
 ---
 
 ## Daily Backup Automation
@@ -82,6 +108,10 @@ cd /home/btc-bot/btc-bot
 - Before major bot upgrades
 - Before experiment deployments
 - Before parameter changes that affect data integrity
+
+If manual backup exits with code `2`, do not keep retrying blindly. Review the
+timeout forensics log in the destination directory and escalate to a quiesced
+backup plan if the online path remains blocked.
 
 ---
 
@@ -302,6 +332,37 @@ ls -t "$LOCAL_DIR"/btc_bot_*.db.gz | tail -n +5 | xargs -r rm
 
 ## Backup Verification
 
+### Operational Safeguards
+
+`scripts/backup_production_db.sh` enforces these safeguards:
+
+| Safeguard | Behavior |
+|---|---|
+| SQLite version preflight | Requires SQLite `>= 3.27.0` for `VACUUM INTO`; exits `1` if unavailable |
+| Wall-clock timeout | `timeout 1800 sqlite3 ...`; exits `2` if exceeded |
+| Timeout forensics | Writes `backup_timeout_<TIMESTAMP>.log` in the backup destination |
+| Partial cleanup | Removes incomplete `.db` and `.db.gz` targets before failure exit |
+| Integrity verification | Runs `PRAGMA integrity_check;` before compression |
+| Compression | Uses `gzip -9` after integrity passes |
+| Retention | Deletes `btc_bot_*.db.gz` files older than 30 days |
+| Latest pointer | Updates `btc_bot_latest.db.gz` only after a successful compressed backup |
+
+Timeout forensics include:
+
+- sqlite3 process state;
+- `lsof` output for the source and target if `lsof` is installed;
+- disk usage for the source and destination filesystems;
+- target file size and source DB size.
+
+If timeout fires:
+
+1. Confirm whether a writer or disk issue caused the stall.
+2. Preserve the timeout log for the incident/audit record.
+3. Do not treat repeated exit code `2` as normal.
+4. If online backup remains blocked, use a quiesced method:
+   stop bot, checkpoint WAL if needed, copy the DB, verify integrity, then start
+   bot.
+
 ### Daily Verification (Automated)
 
 ```bash
@@ -402,6 +463,40 @@ fi
 
 **Local machine:**
 - 4 weekly backups × 150MB = ~600MB
+
+---
+
+## Backup Method History
+
+### 2026-06-03: `VACUUM INTO` becomes canonical
+
+Backup method changed from `sqlite3 .backup` to `VACUUM INTO` in
+`BACKUP_PRODUCTION_DB_BUSY_WAL_FIX_V1`.
+
+Reason: the 2026-06-01 production backup incident. The old `.backup` method ran
+against a busy WAL-mode production database and live-locked for approximately
+9 hours. The process stayed runnable, consumed nearly a full CPU core, and kept
+rewriting target pages while the file size plateaued at 4.0 GB. The source DB
+continued receiving writes, forcing the backup API to re-read changed WAL pages
+before finalizing.
+
+Old behavior under continuous WAL writes:
+
+- online backup could make apparent progress and then plateau;
+- target mtime could advance while size stayed fixed;
+- operator had no hard timeout or forensics log;
+- repeated waiting could hide a real operational failure.
+
+New behavior:
+
+- online backup uses `VACUUM INTO`;
+- the command writes a fresh compact SQLite file;
+- busy-WAL replay feedback is avoided;
+- a 30-minute hard timeout produces exit code `2`;
+- timeout forensics are captured before partial target cleanup.
+
+The old `.backup` method should not be reintroduced for the production DB unless
+a future audit explicitly justifies it against the WAL live-lock failure mode.
 
 ---
 
@@ -515,6 +610,7 @@ scp -i "c:\development\btc-bot\btc-bot-deploy-v2" \
 |------|--------|--------|
 | 2026-04-20 | Initial DR plan created | Claude Code |
 | 2026-04-20 | Backup/restore scripts created | Claude Code |
+| 2026-06-03 | Production backup method changed from `.backup` to `VACUUM INTO`; added timeout and forensics policy | Codex |
 
 ---
 
