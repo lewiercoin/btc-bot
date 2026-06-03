@@ -287,3 +287,26 @@ Starting bot | mode=PAPER | profile=experiment | symbol=BTCUSDT | config_hash=..
 
 Step 6 verification should use the adapted three-check approach rather than
 relying on a specific log line pattern that does not exist.
+
+---
+
+## Appendix D: Production Remote Name Correction 2026-06-03
+
+Production server has 3 git remotes:
+
+- `github` -> `https://github.com/lewiercoin/btc-bot.git` (canonical)
+- `origin` -> `/home/btc-bot/btc-bot.bundle` (local bundle, main only)
+- `latest-bundle` -> `/home/btc-bot/btc-bot-latest.bundle` (local bundle)
+
+Runbook step 2 originally used `origin` which on production points to a local
+bundle without deploy branches. The correct remote name is `github`.
+
+Future deploy commands MUST use:
+
+```bash
+git fetch github
+git pull --ff-only github deploy/multi-asset-paper-v1
+```
+
+Open question: A1.deploy (2026-06-02) succeeded with the same incorrect
+command. Investigation deferred to post-mortem milestone.
