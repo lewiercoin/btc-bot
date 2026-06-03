@@ -1,0 +1,193 @@
+{
+  "audit_chain_reference": {
+    "candidate_spec": "research_lab/candidates/experiment-profile-permissive-v1.json",
+    "prior_audits": [
+      "docs/audits/AUDIT_BLUEPRINT_FOUNDATIONS_V1_2026-06-01.md",
+      "docs/audits/AUDIT_PAPER_PERFORMANCE_VALIDATION_V1_2026-06-01.md",
+      "docs/audits/AUDIT_EXPERIMENT_PROFILE_PERMISSIVE_V1_A2_FOLLOWUP_2026-06-03.md"
+    ],
+    "wf_reference_report": "docs/analysis/WF_VALIDATION_EXPERIMENT_PROFILE_PERMISSIVE_V1_2026-06-02.md"
+  },
+  "candidate_id": "experiment-profile-permissive-v1",
+  "data_source": {
+    "database": "/home/btc-bot/btc-bot/storage/btc_bot.db",
+    "method": "read-only SSH direct SQLite queries with uri mode=ro",
+    "production_state_modified": false,
+    "server": "root@204.168.146.253"
+  },
+  "decision_window": {
+    "cycle_timestamp_gte": "2026-06-02T04:28:26Z",
+    "first_decision_cycle": "2026-06-02T04:30:00.002372+00:00",
+    "last_decision_cycle": "2026-06-03T03:15:00.001904+00:00"
+  },
+  "reference_metrics": {
+    "expectancy_r": 1.659,
+    "profit_factor": 3.531,
+    "win_rate_pct": 51.81,
+    "source": "experiment-profile-permissive-v1 WF full-range metrics"
+  },
+  "runtime_state": {
+    "branch": "deploy/multi-asset-paper-v1",
+    "candidate_id_source": "settings.json deployment.candidate_id",
+    "head": "d3bee883 ops: make backup_production_db.sh executable",
+    "mode": "PAPER",
+    "profile": "experiment",
+    "service_started_at": "2026-06-02 04:29:34 UTC",
+    "settings_candidate_id": "experiment-profile-permissive-v1",
+    "settings_candidate_id_is_legacy_trial_00095": false
+  },
+  "config_lineage": {
+    "candidate_config_hash": "68fd6caf83ff549f1741d04585a06f6b758a87c40380bc15450d5e35b0319593",
+    "protocol_hash": "023dc84c2cd8eff7e0226a1cb74cca24ce64a896aacac7f8c4a61199fac9e1b8",
+    "runtime_config_hash": "c01f7960984a256e8d720c2d27f27bb5cb35c2677dce53293bc4d41b1b7d40f7",
+    "runtime_hash_note": "Runtime config hash includes production runtime/config snapshot surfaces and is not expected to equal the A2 research candidate_config_hash.",
+    "frozen_override_checks": {
+      "BTCUSDT.strategy.min_sweep_depth_pct": {
+        "expected": 0.005,
+        "observed": 0.005,
+        "pass": true
+      },
+      "ETHUSDT.min_sweep_depth_pct": {
+        "expected": 0.0075,
+        "observed": 0.0075,
+        "pass": true
+      },
+      "SOLUSDT.min_sweep_depth_pct": {
+        "expected": 0.0075,
+        "observed": 0.0075,
+        "pass": true
+      },
+      "risk.risk_per_trade_pct": {
+        "expected": 0.005,
+        "observed": 0.005,
+        "pass": true
+      }
+    }
+  },
+  "coverage": {
+    "daily_metrics": {
+      "first_date": "2026-06-02",
+      "last_date": "2026-06-03",
+      "window_rows": 2
+    },
+    "decision_outcomes": {
+      "window_rows": 276
+    },
+    "signal_candidates": {
+      "window_rows": 0
+    },
+    "trade_log": {
+      "first_trade_close": null,
+      "first_trade_open": null,
+      "last_trade_close": null,
+      "last_trade_open": null,
+      "window_closed_rows": 0,
+      "window_opened_rows": 0
+    }
+  },
+  "paper_trade_metrics": {
+    "BTCUSDT": {
+      "expectancy_r": null,
+      "median_r": null,
+      "mdd_r": 0.0,
+      "pnl_r_sum": 0.0,
+      "profit_factor": null,
+      "trades": 0,
+      "win_rate_pct": null
+    },
+    "ETHUSDT": {
+      "expectancy_r": null,
+      "median_r": null,
+      "mdd_r": 0.0,
+      "pnl_r_sum": 0.0,
+      "profit_factor": null,
+      "trades": 0,
+      "win_rate_pct": null
+    },
+    "SOLUSDT": {
+      "expectancy_r": null,
+      "median_r": null,
+      "mdd_r": 0.0,
+      "pnl_r_sum": 0.0,
+      "profit_factor": null,
+      "trades": 0,
+      "win_rate_pct": null
+    }
+  },
+  "decision_funnel": {
+    "BTCUSDT": {
+      "no_reclaim": 5,
+      "no_sweep": 67,
+      "signal_generated": 0,
+      "sweep_too_shallow": 20,
+      "symbol_cycle_failed": 0,
+      "total": 92
+    },
+    "ETHUSDT": {
+      "no_reclaim": 0,
+      "no_sweep": 81,
+      "signal_generated": 0,
+      "sweep_too_shallow": 3,
+      "symbol_cycle_failed": 8,
+      "total": 92
+    },
+    "SOLUSDT": {
+      "no_reclaim": 0,
+      "no_sweep": 82,
+      "signal_generated": 0,
+      "sweep_too_shallow": 2,
+      "symbol_cycle_failed": 8,
+      "total": 92
+    }
+  },
+  "infrastructure_health": {
+    "alerts_errors_since_window_start": 39,
+    "critical_multi_asset_429_errors": {
+      "by_endpoint": {
+        "/fapi/v1/aggTrades": 8,
+        "/fapi/v1/klines": 8
+      },
+      "by_symbol": {
+        "ETHUSDT": 8,
+        "SOLUSDT": 8
+      },
+      "total": 16
+    },
+    "health_check_failed_warnings": 8,
+    "runtime_health": {
+      "bot_healthy": true,
+      "open_positions_count": 0,
+      "safe_mode": false
+    }
+  },
+  "tier_classification": {
+    "BTCUSDT": {
+      "confidence": "Investigate why bot isn't trading; structural issue likely",
+      "matrix_verdict": "TIER_DEGRADATION",
+      "matrix_verdict_note": "Fail-closed structural no-data classification; ER/PF comparison is not computable at 0 trades.",
+      "trades": 0,
+      "verdict_tier": "NO_DATA"
+    },
+    "ETHUSDT": {
+      "confidence": "Investigate why bot isn't trading; structural issue likely",
+      "matrix_verdict": "TIER_DEGRADATION",
+      "matrix_verdict_note": "Fail-closed structural no-data classification; ER/PF comparison is not computable at 0 trades.",
+      "trades": 0,
+      "verdict_tier": "NO_DATA"
+    },
+    "SOLUSDT": {
+      "confidence": "Investigate why bot isn't trading; structural issue likely",
+      "matrix_verdict": "TIER_DEGRADATION",
+      "matrix_verdict_note": "Fail-closed structural no-data classification; ER/PF comparison is not computable at 0 trades.",
+      "trades": 0,
+      "verdict_tier": "NO_DATA"
+    }
+  },
+  "aggregate_verdict": {
+    "matrix_verdict": "TIER_DEGRADATION",
+    "summary": "NO_DATA across all active assets; no realized PAPER trades exist in the legalized V2 window.",
+    "verdict_tier": "NO_DATA",
+    "worst_tier_rule": "Worst tier across BTCUSDT, ETHUSDT, SOLUSDT per fail-closed principle"
+  },
+  "recommended_next_step": "Investigate no-trade/no-signal condition and persistent ETH/SOL 429 rate limits before rerunning PAPER_PERFORMANCE_VALIDATION_V2 after new closed trades accumulate."
+}

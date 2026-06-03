@@ -211,6 +211,33 @@ truth; this checkpoint only clarifies their combined state.
 
 ## Current Active Milestones
 
+### Research Validation: PAPER_PERFORMANCE_VALIDATION_V2
+
+**Status:** READY_FOR_CLAUDE_AUDIT
+**Builder:** Codex
+**Decision date:** 2026-06-03
+**Branch:** `deploy/multi-asset-paper-v1`
+**Report:** `docs/analysis/PAPER_PERFORMANCE_VALIDATION_V2_2026-06-03.md`
+**JSON:** `docs/analysis/PAPER_PERFORMANCE_VALIDATION_V2_2026-06-03.json`
+
+**Scope:** Read-only production PAPER performance validation for legalized
+`experiment-profile-permissive-v1` using staged Path B confidence tiers. Query
+window starts at A1.deploy restart timestamp `2026-06-02T04:28:26Z`. No
+production writes, restarts, settings changes, or candidate parameter changes.
+
+**Builder result:** `NO_DATA / TIER_DEGRADATION` fail-closed operational label.
+All active assets (BTCUSDT, ETHUSDT, SOLUSDT) have `0` closed trades in the V2
+window, so realized ER/PF cannot be compared to the WF reference. Decision
+funnel shows all symbols cycling (`92` cycles each), no `signal_generated`
+rows, and persistent ETH/SOL Binance 429 failures (`16` total critical
+multi_asset errors).
+
+**Next:** Claude Code audit. Do not treat this as statistical degradation; it
+is a structural no-data/no-signal finding requiring investigation before V2 can
+provide `ANECDOTAL`, `EARLY_SIGNAL`, or higher-confidence performance evidence.
+
+---
+
 ### Research Validation: EXPERIMENT_PROFILE_PERMISSIVE_V1_A2_WF
 
 **Status:** READY_FOR_CLAUDE_AUDIT  
