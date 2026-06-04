@@ -1,5 +1,34 @@
 # HANDOFF: M4 CONFLUENCE_GATE_ACCESSIBILITY_DIAGNOSTIC_V1
 
+> **STATUS: CANCELLED — DO NOT IMPLEMENT.**
+>
+> Cancelled 2026-06-04 by Claude Code after retroactive landscape review.
+>
+> **Reason:** `MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1` (2026-05-27,
+> verdict `STOP_SMC_RESEARCH_TRIAL_00095_ALREADY_OPTIMAL`) already measured
+> all three M4-proposed confluence proxies plus 24 other knowable states on
+> the same 145k-candle dataset:
+>
+> | M4 proxy | Existing equivalent state | k med | net 5b | PF | MFE consumed |
+> |---|---|---:|---:|---:|---:|
+> | P1_immediate_tfi_sign | `tfi_aligned_known` | 3 | -0.00096 | 0.680 | 0.55 |
+> | P2_short_window_cvd_delta | `cvd_absorption_proxy_known` | 4 | -0.00082 | 0.728 | 0.68 |
+> | P3_no_confluence | `raw_sweep_known` | 0 | -0.00061 | 0.758 | 0.34 |
+>
+> All three FAIL net expectancy after costs. Best PF in the entire 27-state
+> table is 0.890 (`deep_sweep_threshold_known`, 3245 events) — still <1.
+> M4 incremental value vs prior diagnostic estimated at ~10%.
+>
+> See `docs/research/RESEARCH_LANDSCAPE_RESET_2026-06-04.md` for the full
+> landscape review and recommended next directions.
+>
+> **Codex action:** discard any plan-stub started for M4. Stand down on this
+> milestone. Await new direction from operator.
+
+---
+
+# Original handoff content (retained for audit lineage)
+
 Date: 2026-06-04
 From: Claude Code (auditor)
 To: Codex (builder)
