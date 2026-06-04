@@ -31,6 +31,131 @@
 
 ---
 
+### M3: RECLAIM_REJECTION_DIAGNOSTIC_V1
+
+**Status:** CLOSED - implementation DONE, hypothesis INVALIDATED
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-06-04
+**Plan commit:** `b39e606` (`docs/research/RECLAIM_REJECTION_DIAGNOSTIC_V1_PLAN.md`)
+**Implementation commits:** `faf7b80` (initial run, wrong DB) -> `683d0ca` (re-run on canonical DB)
+**Report:** `research_lab/analysis_output/reclaim_rejection_feasibility_v1_report.md`
+**Audit:** `docs/audits/AUDIT_M3_RECLAIM_REJECTION_DIAGNOSTIC_V1_2026-06-04.md`
+
+**Scope:** Research-only diagnostic testing earliest-knowable wick-rejection
+at confirmed swing extremes + reclaim + TFI/CVD confluence + level_scanner
+provenance. 4-bar timing separation
+(detection -> state_known -> entry_candidate -> return_start). Hard
+falsification gates F-1 through F-6. Plan audit resolutions Q1-Q4
+empirically honored. Hard-fail guard added on canonical DB resolution
+(prevents silent fallback regression).
+
+**Validation:**
+- 13/13 pytest (10 plan-mandated + 3 guard/regression).
+- Compileall passed.
+- Diagnostic run on canonical `F:\crowded_unwind_backtest.db` (operator
+  pendrive), 145,921 BTCUSDT 15m candles, 4-year study window, 0 OHLC
+  violations, 0 missing gaps. Aggtrade flow source: 2,185,799 60s rows
+  aggregated to 15m. Lineage equivalence with prior fallback DB verified
+  (row SHA256 match).
+- JSON SHA256: `CE18C680C2875947A7A74A66E77C8AC71A147B0D2805CA2DA3D4931F16A39F1E`.
+
+**Falsification results:**
+
+| Rule | Value | Threshold | Status |
+|---|---:|---:|---|
+| F-1 timing-correct PF | 0.624 | >= 1.5 | FAIL |
+| F-2 median net expectancy | -0.281% | >= 0 | FAIL |
+| F-3 median(MFE_before)/median(MFE_post_5bar) | 1.226 | <= 0.70 | FAIL |
+| F-4 throughput delta vs baseline | +1.35 trades/day | >= 0.2 | PASS |
+| F-5 monthly P&L Pearson vs baseline | -0.114 | <= 0.5 | PASS |
+| F-6 detection-bar vs timing-correct edge | det_pf=0.669 / tim_pf=0.624 | <= 30% better | PASS |
+
+**Decision:** STOP. Do not pursue reclaim_rejection V2, no parameter relaxation,
+no regime/session filter rescue.
+
+**Reason:** Three independent gates fail with strong margin. PF 0.624 implies
+~38% loss on gross+cost basis. Median expectancy solidly negative. F-3 ratio
+1.23 with median consumed-share ~0.84 indicates 84% of favorable opportunity
+is consumed before realistic entry. **Same structural failure mode as
+SMC_SEQUENCE_EDGE_FEASIBILITY_V1** (ratio 2.35 there). Two consecutive setup
+families have failed F-3 for the same reason: TFI/CVD confluence wait
+destroys MFE accessibility.
+
+**Preserved lesson:** The bottleneck is the **confluence-gate wait**, not
+the trigger geometry. A third setup hypothesis built on the same confluence
+primitive will likely fail the same way. Diagnose the gate itself before
+proposing another setup.
+
+**Side findings:**
+- `level_scanner` provenance is **decorative**, not load-bearing for this
+  candidate family. Primary cohort (with provenance) PF 0.624 vs ablation
+  (without provenance) PF 0.611 — 2% event reduction, +0.013 PF
+  improvement. Future setups should not assume level-overlap is a strong
+  filter.
+- F-6 PASS is informationally weak when no positive detection-bar edge
+  exists; future F-6 v2 could require detection_pf > 1.0 as a precondition.
+
+**Boundary:** Closes the wick-rejection-at-swing-extreme + confluence-wait
+hypothesis. Does not invalidate alternative entry primitives that avoid the
+confluence-gate wait (e.g., limit-order at rejection candle close, faster
+flow proxies).
+
+---
+
+### M4: CONFLUENCE_GATE_ACCESSIBILITY_DIAGNOSTIC_V1
+
+**Status:** ACTIVE
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-06-04
+**Decided by:** User approved Claude Code recommendation after M3 audit.
+**Active branch:** TBD by builder (suggested: `research/m4-confluence-gate-accessibility`)
+**Plan:** TBD (Codex commit 1)
+**Implementation:** TBD (Codex commit 2)
+
+**Scope:** Research-only diagnostic of the TFI/CVD confluence-gate wait
+itself, not another setup geometry. M3 + SMC both invalidated by F-3
+accessibility (consumed-share ~0.84 and ~0.70 respectively); root cause is
+the wait between state-knowable trigger and confluence agreement, during
+which most of the favorable excursion escapes.
+
+Research questions:
+
+1. Per trigger family (sweep_only, wick_rejection_at_extreme, displacement,
+   reclaim_swing), what is the distribution of bars from
+   `state_known_bar` to first confluence agreement?
+2. What fraction of MFE is consumed during that wait?
+3. Is there a faster confluence proxy that preserves lookahead safety
+   (e.g., single-bar TFI sign on `state_known_bar`, last-N-second CVD
+   delta, bar-close-only check on `state_known_bar`, or skip-confluence
+   variant) that recovers a meaningful share of MFE?
+4. For each candidate proxy, what does its own F-3 gate read on a
+   reference trigger family?
+
+Out of scope: production module changes, signal_engine modifications,
+parameter optimization campaigns, new setup geometry hypotheses.
+
+**Acceptance criteria (Claude-set):**
+- Plan committed and Claude-audited before implementation.
+- Wait-time distribution histograms per trigger family.
+- MFE-consumed-share distribution as function of wait length.
+- At least 3 candidate faster-proxy specs with explicit lookahead safety
+  argument per spec.
+- F-3 gate evaluated per candidate proxy on at least one trigger family.
+- Deterministic JSON + SHA256 + report artifacts.
+- Smoke tests including timing-discipline regression.
+- No production code or settings touched.
+
+**Builder selection rationale:** Codex stays as builder. Same canonical DB
+on pendrive, same path-sensitive Windows environment as M3. Cascade is not
+needed unless Codex path issues block progress.
+
+**Handoff:** Issued 2026-06-04, see "M4 Handoff" section below or take it
+directly from this checkpoint into Codex.
+
+---
+
 ## Research Implementation Checkpoint - 2026-05-27
 
 ### Research Diagnostic: SMC_SEQUENCE_EDGE_FEASIBILITY_V1
