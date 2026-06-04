@@ -105,8 +105,18 @@ flow proxies).
 
 ### M4: CONFLUENCE_GATE_ACCESSIBILITY_DIAGNOSTIC_V1
 
-**Status:** ACTIVE
-**Builder:** Codex
+**Status:** CANCELLED (2026-06-04, before any commits)
+**Cancelled by:** Claude Code after retroactive landscape review
+**Cancellation reason:** `MFE_ACCESSIBILITY_EARLIEST_KNOWABLE_SIGNAL_V1`
+(2026-05-27, verdict `STOP_SMC_RESEARCH_TRIAL_00095_ALREADY_OPTIMAL`) already
+measured all three M4-proposed confluence proxies (`tfi_aligned_known`,
+`cvd_absorption_proxy_known`, `raw_sweep_known`) plus 24 other knowable
+states on the same canonical dataset. All FAIL net expectancy after costs.
+Best PF in the 27-state table is 0.890, still <1. M4 incremental value
+estimated at ~10% — ROI too low to justify 20-36h budget.
+**Reset memo:** `docs/research/RESEARCH_LANDSCAPE_RESET_2026-06-04.md`
+
+**Builder:** Codex (stood down before plan commit)
 **Auditor:** Claude Code
 **Decision date:** 2026-06-04
 **Decided by:** User approved Claude Code recommendation after M3 audit.
