@@ -1063,14 +1063,34 @@ def evaluate_gates(primary: dict[str, Any], baseline: dict[str, Any], monthly_co
     return {"final_verdict": final, "rules": gates}
 
 
-def resolve_default_db() -> tuple[Path, dict[str, Any]]:
+def resolve_default_db(*, allow_fallback: bool = False) -> tuple[Path, dict[str, Any]]:
     if CANONICAL_DB_PATH.exists():
         return CANONICAL_DB_PATH, {"canonical_db_present": True, "fallback_used": False}
-    return FALLBACK_RESEARCH_SNAPSHOT, {
-        "canonical_db_present": False,
-        "fallback_used": True,
-        "fallback_reason": "research_lab/data/crowded_unwind_backtest.db is absent on this PC; using local research snapshot, not storage/btc_bot.db",
-    }
+    if allow_fallback:
+        if not FALLBACK_RESEARCH_SNAPSHOT.exists():
+            raise SystemExit(
+                "CANONICAL_DB_MISSING: research_lab/data/crowded_unwind_backtest.db is absent "
+                "and fallback snapshot is also missing; attach pendrive or pass --db-path"
+            )
+        return FALLBACK_RESEARCH_SNAPSHOT, {
+            "canonical_db_present": False,
+            "fallback_used": True,
+            "fallback_allowed": True,
+            "fallback_reason": "explicit --allow-fallback used because research_lab/data/crowded_unwind_backtest.db is absent",
+        }
+    raise SystemExit(
+        "CANONICAL_DB_MISSING: research_lab/data/crowded_unwind_backtest.db is absent; "
+        "attach pendrive or pass --db-path"
+    )
+
+
+def is_canonical_db_path(db_path: Path) -> bool:
+    try:
+        if db_path.resolve() == CANONICAL_DB_PATH.resolve():
+            return True
+    except OSError:
+        pass
+    return db_path.name == CANONICAL_DB_PATH.name
 
 
 def build_payload(
@@ -1239,17 +1259,18 @@ def write_artifacts(payload: dict[str, Any], json_path: Path, sha_path: Path, re
 def run_diagnostic(
     *,
     db_path: Path | None,
+    allow_fallback: bool = False,
     output_json: Path,
     output_sha: Path,
     report_path: Path,
     config: DiagnosticConfig,
 ) -> dict[str, Any]:
     if db_path is None:
-        resolved_db, db_resolution = resolve_default_db()
+        resolved_db, db_resolution = resolve_default_db(allow_fallback=allow_fallback)
     else:
         resolved_db = db_path
         db_resolution = {
-            "canonical_db_present": CANONICAL_DB_PATH.exists(),
+            "canonical_db_present": is_canonical_db_path(resolved_db),
             "fallback_used": False,
             "operator_supplied_db": True,
         }
@@ -1319,6 +1340,11 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--output-sha", type=Path, default=DEFAULT_OUTPUT_SHA)
     parser.add_argument("--report-path", type=Path, default=DEFAULT_REPORT)
     parser.add_argument("--max-json-events", type=int, default=50000)
+    parser.add_argument(
+        "--allow-fallback",
+        action="store_true",
+        help="Opt in to the local fallback research snapshot when the canonical DB is absent.",
+    )
     return parser
 
 
@@ -1333,6 +1359,7 @@ def main(argv: list[str] | None = None) -> int:
     )
     payload = run_diagnostic(
         db_path=args.db_path,
+        allow_fallback=args.allow_fallback,
         output_json=args.output_json,
         output_sha=args.output_sha,
         report_path=args.report_path,

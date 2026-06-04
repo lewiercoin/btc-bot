@@ -213953,11 +213953,11 @@
       "wick_range_share_min": 0.6,
       "wick_to_body_min": 2.0
     },
-    "db_path": "C:\\Users\\lewie\\Projects\\btc-bot\\research_lab\\snapshots\\replay-optuna-default-v3-trial-00095.db",
+    "db_path": "F:\\crowded_unwind_backtest.db",
     "db_resolution": {
-      "canonical_db_present": false,
-      "fallback_reason": "research_lab/data/crowded_unwind_backtest.db is absent on this PC; using local research snapshot, not storage/btc_bot.db",
-      "fallback_used": true
+      "canonical_db_present": true,
+      "fallback_used": false,
+      "operator_supplied_db": true
     },
     "deterministic_generation": true,
     "event_study_baseline_defaults": {
