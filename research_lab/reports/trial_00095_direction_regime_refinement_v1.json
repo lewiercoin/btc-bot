@@ -1,0 +1,410 @@
+{
+  "accepted_population": {
+    "count": 274,
+    "expected_count": 274,
+    "source": "C:\\Users\\lewie\\Projects\\btc-bot\\research_lab\\analysis_output\\trial_00095_trades.json"
+  },
+  "cohort_definitions": {
+    "A1_long_only": "trade.direction == 'LONG'",
+    "A2_uptrend_only": "trade.regime == 'uptrend'",
+    "A3_long_and_uptrend": "trade.direction == 'LONG' and trade.regime == 'uptrend'",
+    "BASELINE_all_274": "all accepted trial-00095 trades"
+  },
+  "depth_threshold": 0.00649,
+  "diagnostic": "TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1",
+  "falsification_gates": {
+    "data_quality_status": "OK",
+    "final_verdict": "HYPOTHESIS_INVALIDATED",
+    "missing_a3_folds": [],
+    "rules": [
+      {
+        "measurement": "A3 full-sample ER vs baseline ER",
+        "rule": "G-1",
+        "status": "FAIL",
+        "threshold": ">= 2.621",
+        "value": 2.6144564406086452
+      },
+      {
+        "measurement": "A3 full-sample PF vs baseline PF",
+        "rule": "G-2",
+        "status": "PASS",
+        "threshold": ">= 4.638",
+        "value": 6.033845437634939
+      },
+      {
+        "measurement": "A3 per-fold sign stability",
+        "rule": "G-3",
+        "status": "PASS",
+        "threshold": "A3 ER > 0 in all 3 folds",
+        "value": {
+          "fold_1_2022_2023H1": 2.29725008103397,
+          "fold_2_2023H2_2024": 2.6309533879147495,
+          "fold_3_2025_2026Q1": 3.227771692358091
+        }
+      },
+      {
+        "measurement": "A3 per-fold consistency",
+        "rule": "G-4",
+        "status": "PASS",
+        "threshold": "No per-fold A3 ER more than 50% below A3 full-sample ER",
+        "value": {
+          "fold_er": {
+            "fold_1_2022_2023H1": 2.29725008103397,
+            "fold_2_2023H2_2024": 2.6309533879147495,
+            "fold_3_2025_2026Q1": 3.227771692358091
+          },
+          "minimum_allowed_fold_er": 1.3072282203043226
+        }
+      },
+      {
+        "measurement": "A3 max drawdown R",
+        "rule": "G-5",
+        "status": "INFO",
+        "threshold": "reported, informational only",
+        "value": 10.88273721245605
+      }
+    ],
+    "sign_stability_vs_baseline_fraction": 1.0
+  },
+  "folds": [
+    "fold_1_2022_2023H1",
+    "fold_2_2023H2_2024",
+    "fold_3_2025_2026Q1"
+  ],
+  "full_sample": {
+    "A1_long_only": {
+      "cohort": "A1_long_only",
+      "count": 252,
+      "delta_vs_baseline": {
+        "count_removed": 22,
+        "count_retained": 252,
+        "er_delta": 0.25546663537269554,
+        "max_drawdown_r_delta": -3.793811953668495,
+        "pf_delta": 0.7123658956754593,
+        "retained_share": 0.9197080291970803,
+        "total_r_delta": 17.71264704756277,
+        "wr_delta": 0.037481172517668804
+      },
+      "expectancy_r": 2.3766005020252563,
+      "max_drawdown_r": 10.88273721245605,
+      "median_r": 2.800911544703475,
+      "profit_factor": 4.928821406272456,
+      "total_r": 598.9033265103641,
+      "win_rate": 0.6031746031746031
+    },
+    "A2_uptrend_only": {
+      "cohort": "A2_uptrend_only",
+      "count": 205,
+      "delta_vs_baseline": {
+        "count_removed": 69,
+        "count_retained": 205,
+        "er_delta": 0.4933225739560845,
+        "max_drawdown_r_delta": -3.793811953668495,
+        "pf_delta": 1.8173899270379428,
+        "retained_share": 0.7481751824817519,
+        "total_r_delta": -45.227109138029164,
+        "wr_delta": 0.09772120348940716
+      },
+      "expectancy_r": 2.6144564406086452,
+      "max_drawdown_r": 10.88273721245605,
+      "median_r": 3.0299950379874616,
+      "profit_factor": 6.033845437634939,
+      "total_r": 535.9635703247721,
+      "win_rate": 0.6634146341463415
+    },
+    "A3_long_and_uptrend": {
+      "cohort": "A3_long_and_uptrend",
+      "count": 205,
+      "delta_vs_baseline": {
+        "count_removed": 69,
+        "count_retained": 205,
+        "er_delta": 0.4933225739560845,
+        "max_drawdown_r_delta": -3.793811953668495,
+        "pf_delta": 1.8173899270379428,
+        "retained_share": 0.7481751824817519,
+        "total_r_delta": -45.227109138029164,
+        "wr_delta": 0.09772120348940716
+      },
+      "expectancy_r": 2.6144564406086452,
+      "max_drawdown_r": 10.88273721245605,
+      "median_r": 3.0299950379874616,
+      "profit_factor": 6.033845437634939,
+      "total_r": 535.9635703247721,
+      "win_rate": 0.6634146341463415
+    },
+    "BASELINE_all_274": {
+      "cohort": "BASELINE_all_274",
+      "count": 274,
+      "expectancy_r": 2.1211338666525608,
+      "max_drawdown_r": 14.676549166124545,
+      "median_r": 2.6567965596872654,
+      "profit_factor": 4.2164555105969965,
+      "total_r": 581.1906794628013,
+      "win_rate": 0.5656934306569343
+    }
+  },
+  "manifest": {
+    "deterministic_generation": true,
+    "generated_at_utc": "DETERMINISTIC_NO_WALL_CLOCK",
+    "no_new_entries": true,
+    "no_production_changes": true,
+    "no_threshold_changes": true,
+    "research_only": true,
+    "reused_primitives": [
+      "DEPTH_THRESHOLD",
+      "TRIAL_ID",
+      "AttributedTrade",
+      "Candle",
+      "DiagnosticConfig",
+      "FrozenEntry",
+      "TradeRecord",
+      "attribute_trades",
+      "fold_bucket",
+      "load_aggtrade_prev_tfi",
+      "load_candles",
+      "load_frozen_entries",
+      "load_funding",
+      "load_open_interest",
+      "load_trade_records",
+      "max_drawdown",
+      "merge_entries",
+      "summarize_metrics"
+    ],
+    "trial_id": "optuna-default-v3-trial-00095"
+  },
+  "per_fold": {
+    "fold_1_2022_2023H1": {
+      "A1_long_only": {
+        "cohort": "A1_long_only",
+        "count": 94,
+        "delta_vs_baseline": {
+          "count_removed": 16,
+          "count_retained": 94,
+          "er_delta": 0.36751868912050245,
+          "max_drawdown_r_delta": -4.294931590361202,
+          "pf_delta": 0.7415363009735714,
+          "retained_share": 0.8545454545454545,
+          "total_r_delta": 9.203900738961778,
+          "wr_delta": 0.050096711798839455
+        },
+        "expectancy_r": 1.9514471915183447,
+        "fold": "fold_1_2022_2023H1",
+        "max_drawdown_r": 10.381617575763343,
+        "median_r": 2.402324747316851,
+        "profit_factor": 3.765970650186185,
+        "total_r": 183.43603600272445,
+        "win_rate": 0.5319148936170213
+      },
+      "A2_uptrend_only": {
+        "cohort": "A2_uptrend_only",
+        "count": 62,
+        "delta_vs_baseline": {
+          "count_removed": 48,
+          "count_retained": 62,
+          "er_delta": 0.713321578636128,
+          "max_drawdown_r_delta": -10.145353609424806,
+          "pf_delta": 2.388623882995085,
+          "retained_share": 0.5636363636363636,
+          "total_r_delta": -31.80263023965648,
+          "wr_delta": 0.17947214076246332
+        },
+        "expectancy_r": 2.29725008103397,
+        "fold": "fold_1_2022_2023H1",
+        "max_drawdown_r": 4.53119555669974,
+        "median_r": 3.1696947644092432,
+        "profit_factor": 5.413058232207699,
+        "total_r": 142.4295050241062,
+        "win_rate": 0.6612903225806451
+      },
+      "A3_long_and_uptrend": {
+        "cohort": "A3_long_and_uptrend",
+        "count": 62,
+        "delta_vs_baseline": {
+          "count_removed": 48,
+          "count_retained": 62,
+          "er_delta": 0.713321578636128,
+          "max_drawdown_r_delta": -10.145353609424806,
+          "pf_delta": 2.388623882995085,
+          "retained_share": 0.5636363636363636,
+          "total_r_delta": -31.80263023965648,
+          "wr_delta": 0.17947214076246332
+        },
+        "expectancy_r": 2.29725008103397,
+        "fold": "fold_1_2022_2023H1",
+        "max_drawdown_r": 4.53119555669974,
+        "median_r": 3.1696947644092432,
+        "profit_factor": 5.413058232207699,
+        "total_r": 142.4295050241062,
+        "win_rate": 0.6612903225806451
+      },
+      "BASELINE_all_274": {
+        "cohort": "BASELINE_all_274",
+        "count": 110,
+        "expectancy_r": 1.5839285023978422,
+        "fold": "fold_1_2022_2023H1",
+        "max_drawdown_r": 14.676549166124545,
+        "median_r": -1.260608720266362,
+        "profit_factor": 3.024434349212614,
+        "total_r": 174.23213526376267,
+        "win_rate": 0.4818181818181818
+      }
+    },
+    "fold_2_2023H2_2024": {
+      "A1_long_only": {
+        "cohort": "A1_long_only",
+        "count": 120,
+        "delta_vs_baseline": {
+          "count_removed": 3,
+          "count_retained": 120,
+          "er_delta": 0.09526903012144805,
+          "max_drawdown_r_delta": 0.0,
+          "pf_delta": 0.2946968158764509,
+          "retained_share": 0.975609756097561,
+          "total_r_delta": 3.9546050881563133,
+          "wr_delta": 0.015243902439024404
+        },
+        "expectancy_r": 2.5878285389272486,
+        "fold": "fold_2_2023H2_2024",
+        "max_drawdown_r": 10.88273721245605,
+        "median_r": 2.9858864864256653,
+        "profit_factor": 5.470804966480258,
+        "total_r": 310.5394246712698,
+        "win_rate": 0.625
+      },
+      "A2_uptrend_only": {
+        "cohort": "A2_uptrend_only",
+        "count": 114,
+        "delta_vs_baseline": {
+          "count_removed": 9,
+          "count_retained": 114,
+          "er_delta": 0.13839387910894896,
+          "max_drawdown_r_delta": 0.0,
+          "pf_delta": 0.43473104237788274,
+          "retained_share": 0.926829268292683,
+          "total_r_delta": -6.656133360831973,
+          "wr_delta": 0.02182284980744542
+        },
+        "expectancy_r": 2.6309533879147495,
+        "fold": "fold_2_2023H2_2024",
+        "max_drawdown_r": 10.88273721245605,
+        "median_r": 3.1552758779487045,
+        "profit_factor": 5.61083919298169,
+        "total_r": 299.9286862222815,
+        "win_rate": 0.631578947368421
+      },
+      "A3_long_and_uptrend": {
+        "cohort": "A3_long_and_uptrend",
+        "count": 114,
+        "delta_vs_baseline": {
+          "count_removed": 9,
+          "count_retained": 114,
+          "er_delta": 0.13839387910894896,
+          "max_drawdown_r_delta": 0.0,
+          "pf_delta": 0.43473104237788274,
+          "retained_share": 0.926829268292683,
+          "total_r_delta": -6.656133360831973,
+          "wr_delta": 0.02182284980744542
+        },
+        "expectancy_r": 2.6309533879147495,
+        "fold": "fold_2_2023H2_2024",
+        "max_drawdown_r": 10.88273721245605,
+        "median_r": 3.1552758779487045,
+        "profit_factor": 5.61083919298169,
+        "total_r": 299.9286862222815,
+        "win_rate": 0.631578947368421
+      },
+      "BASELINE_all_274": {
+        "cohort": "BASELINE_all_274",
+        "count": 123,
+        "expectancy_r": 2.4925595088058006,
+        "fold": "fold_2_2023H2_2024",
+        "max_drawdown_r": 10.88273721245605,
+        "median_r": 2.918909719346988,
+        "profit_factor": 5.176108150603807,
+        "total_r": 306.5848195831135,
+        "win_rate": 0.6097560975609756
+      }
+    },
+    "fold_3_2025_2026Q1": {
+      "A1_long_only": {
+        "cohort": "A1_long_only",
+        "count": 38,
+        "delta_vs_baseline": {
+          "count_removed": 3,
+          "count_retained": 38,
+          "er_delta": 0.31312000249423066,
+          "max_drawdown_r_delta": 0.0,
+          "pf_delta": 1.5667135582533955,
+          "retained_share": 0.926829268292683,
+          "total_r_delta": 4.554141220444762,
+          "wr_delta": 0.051989730423619984
+        },
+        "expectancy_r": 2.761259627272902,
+        "fold": "fold_3_2025_2026Q1",
+        "max_drawdown_r": 7.511329052447678,
+        "median_r": 2.9043300782304406,
+        "profit_factor": 7.298132500932782,
+        "total_r": 104.92786583637026,
+        "win_rate": 0.7105263157894737
+      },
+      "A2_uptrend_only": {
+        "cohort": "A2_uptrend_only",
+        "count": 29,
+        "delta_vs_baseline": {
+          "count_removed": 12,
+          "count_retained": 29,
+          "er_delta": 0.7796320675794197,
+          "max_drawdown_r_delta": -4.412738824447672,
+          "pf_delta": 5.499989557774226,
+          "retained_share": 0.7073170731707317,
+          "total_r_delta": -6.768345537540881,
+          "wr_delta": 0.1345668629100084
+        },
+        "expectancy_r": 3.227771692358091,
+        "fold": "fold_3_2025_2026Q1",
+        "max_drawdown_r": 3.098590228000006,
+        "median_r": 2.907250561408979,
+        "profit_factor": 11.231408500453613,
+        "total_r": 93.60537907838462,
+        "win_rate": 0.7931034482758621
+      },
+      "A3_long_and_uptrend": {
+        "cohort": "A3_long_and_uptrend",
+        "count": 29,
+        "delta_vs_baseline": {
+          "count_removed": 12,
+          "count_retained": 29,
+          "er_delta": 0.7796320675794197,
+          "max_drawdown_r_delta": -4.412738824447672,
+          "pf_delta": 5.499989557774226,
+          "retained_share": 0.7073170731707317,
+          "total_r_delta": -6.768345537540881,
+          "wr_delta": 0.1345668629100084
+        },
+        "expectancy_r": 3.227771692358091,
+        "fold": "fold_3_2025_2026Q1",
+        "max_drawdown_r": 3.098590228000006,
+        "median_r": 2.907250561408979,
+        "profit_factor": 11.231408500453613,
+        "total_r": 93.60537907838462,
+        "win_rate": 0.7931034482758621
+      },
+      "BASELINE_all_274": {
+        "cohort": "BASELINE_all_274",
+        "count": 41,
+        "expectancy_r": 2.4481396247786713,
+        "fold": "fold_3_2025_2026Q1",
+        "max_drawdown_r": 7.511329052447678,
+        "median_r": 2.784145070269906,
+        "profit_factor": 5.731418942679387,
+        "total_r": 100.3737246159255,
+        "win_rate": 0.6585365853658537
+      }
+    }
+  },
+  "reference_baseline": {
+    "expectancy_r": 2.121,
+    "profit_factor": 4.216,
+    "source": "TRIAL_00095_CONDITIONAL_EDGE_ATTRIBUTION_V1"
+  }
+}
