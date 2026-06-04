@@ -7,7 +7,9 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pandas as pd
+import pytest
 
+import research_lab.diagnostics.reclaim_rejection_feasibility_v1 as rr
 from research_lab.diagnostics.reclaim_rejection_feasibility_v1 import (
     Candle,
     DiagnosticConfig,
@@ -22,6 +24,7 @@ from research_lab.diagnostics.reclaim_rejection_feasibility_v1 import (
     find_level_provenance,
     fixed_exit_return,
     load_flow_15m,
+    resolve_default_db,
     run_diagnostic,
 )
 
@@ -254,6 +257,27 @@ def test_deterministic_output_two_runs_produce_identical_json_sha256(tmp_path: P
 
     assert hashlib.sha256(first_json.read_bytes()).hexdigest() == hashlib.sha256(second_json.read_bytes()).hexdigest()
     assert json.loads(first_json.read_text(encoding="utf-8")) == json.loads(second_json.read_text(encoding="utf-8"))
+
+
+def test_default_db_resolution_hard_fails_when_canonical_db_missing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(rr, "CANONICAL_DB_PATH", tmp_path / "missing_canonical.db")
+    monkeypatch.setattr(rr, "FALLBACK_RESEARCH_SNAPSHOT", tmp_path / "fallback.db")
+
+    with pytest.raises(SystemExit, match="CANONICAL_DB_MISSING"):
+        resolve_default_db()
+
+
+def test_default_db_resolution_uses_fallback_only_when_allowed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    fallback = tmp_path / "fallback.db"
+    fallback.write_bytes(b"placeholder")
+    monkeypatch.setattr(rr, "CANONICAL_DB_PATH", tmp_path / "missing_canonical.db")
+    monkeypatch.setattr(rr, "FALLBACK_RESEARCH_SNAPSHOT", fallback)
+
+    resolved, metadata = resolve_default_db(allow_fallback=True)
+
+    assert resolved == fallback
+    assert metadata["fallback_used"] is True
+    assert metadata["fallback_allowed"] is True
 
 
 def test_fixed_exit_uses_supplied_entry_price() -> None:

@@ -6,9 +6,9 @@ Research-only diagnostic. No production code, execution path, settings, schema, 
 
 ## Dataset
 
-- DB: `C:\Users\lewie\Projects\btc-bot\research_lab\snapshots\replay-optuna-default-v3-trial-00095.db`
-- Canonical DB present: `False`
-- Fallback used: `True`
+- DB: `F:\crowded_unwind_backtest.db`
+- Canonical DB present: `True`
+- Fallback used: `False`
 - Symbol/timeframe: `BTCUSDT` `15m`
 - Study window: `2022-01-01` to `2026-03-01`
 - Rows: 145921
@@ -53,4 +53,4 @@ Research-only diagnostic. No production code, execution path, settings, schema, 
 
 ## Artifacts
 
-- JSON SHA256: `69D38896E19777511CE1ED9734911ACD192AEE7F1C390972003B666F57EB846A`
+- JSON SHA256: `CE18C680C2875947A7A74A66E77C8AC71A147B0D2805CA2DA3D4931F16A39F1E`
