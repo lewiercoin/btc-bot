@@ -4,6 +4,77 @@ This file records operator decisions and their rationale. It is not a live statu
 document. Runtime facts live in the production database and should be checked with
 `python scripts/db_status.py` on the production server.
 
+## 2026-06-04 - M1 Diagnostic: Setup Scarcity Confirmed, Setup Portfolio Approved
+
+**Decision:** Approve setup portfolio expansion path (level_scanner → reclaim_rejection → setup candidates) based on M1 diagnostic evidence.
+
+**Evidence:** Production query (60 days, 3,120 decision cycles):
+- 97.9% `signal_engine_no_candidate` (setup scarcity)
+- 74.9% `no_sweep` (waiting for equal level sweep)
+- 21.8% `sweep_too_shallow` (sweep detected but insufficient depth)
+- 0% regime veto, 0% risk veto, 0% governance veto
+
+**Root cause:** Current `reclaim_swing` is extremely selective (1 signal in 3,120 cycles = 0.03% hit rate). Throughput bottleneck is NOT veto rate, but lack of setup triggers.
+
+**Strategic decision:** Setup portfolio expansion (adding more level types + setup families) is correct lever. MODELING-V1 (RegimeEngine V2) would NOT address this bottleneck.
+
+**Approved sequencing:**
+- M1: `level_scanner` foundation (DONE, commit cfe7e8f)
+- M2: F010 blueprint fix (parallel, 1h)
+- M3: `reclaim_rejection` diagnostic (first new setup candidate)
+- Future: `reclaim_session` (level-provenance only), `reclaim_breaker`, `ote_pullback`
+
+**Deferred:** `reclaim_mitigation` (MFE accessibility risk high, confidence 1/5)
+
+## 2026-06-04 - joshyattridge Framing Correction (Multi-Agent Reconciliation)
+
+**Context:** Claude (browser) initially framed joshyattridge/smart-money-concepts as "🎯 ZŁOTO dla reclaim_session."
+
+**Correction:** Codex (with repo access) + Claude Code (Windsurf auditor) disagreed. Evidence: `SESSION_SWEEP_SPECIALIST_AUDIT_PACKAGE.md` exists (prior session-sweep specialist was REJECTED).
+
+**Revised framing (agreed across all agents):**
+- joshyattridge = **reference implementation** for cross-validation (sessions, liquidity clustering)
+- joshyattridge ≠ **edge generator** or proven setup source
+- joshyattridge ≠ "gold" — prior session-sweep specialist failed
+
+**Multi-agent workflow note:** This is designed behavior — independent perspectives (Codex, Windsurf auditor) caught over-optimism in initial brief. Claude (browser) accepted correction in meta-audit.
+
+**Impact on `reclaim_session`:** Approved as **(A) level-provenance metadata only** (tags existing `reclaim_swing` levels with session provenance for attribution), NOT **(B) new setup family** (which would repeat prior failure).
+
+## 2026-06-04 - Session Boundary Convention: [start,end) (Start-Inclusive, End-Exclusive)
+
+**Decision:** All `level_scanner` sessions use `[start,end)` interval convention (start-inclusive, end-exclusive).
+
+**Rationale:**
+- Avoids double-assignment of boundary bars in adjacent sessions (e.g., 08:00 bar belongs to Asia OR London, not both)
+- Standard interval convention (Python `range()`, pandas slicing)
+- Deterministic replay (boundary bar belongs to exactly one session)
+
+**Alternative rejected:** End-inclusive (used by joshyattridge/smart-money-concepts library)
+- Causes overlap: 08:00 bar belongs to both Asia (ends 08:00) and London (starts 08:00)
+- Ambiguous for attribution ("which session caused this level?")
+
+**Implementation:** `level_scanner.py` sessions (Asia 00:00-08:00, London 07:00-16:00, NY 13:00-22:00) are `[start,end)` by design.
+
+**Cross-validation impact:** SMC comparison must exclude end-boundary bars when comparing active bar counts.
+
+**Evidence:** M1 validation report documents exact match after end-boundary exclusion (Asia: 96 local bars = 96 SMC after exclusion).
+
+## 2026-06-04 - Portfolio Correlation Gate for Setup Candidates
+
+**Decision:** All future RUN_xx acceptance criteria must include portfolio diversification check.
+
+**New acceptance criteria field:**
+```python
+max_correlation_with_reclaim_swing_pnl: 0.5
+```
+
+**Rationale:** Setup with PF 1.3 and correlation 0.9 vs `reclaim_swing` adds throughput but NOT diversification. Correlated drawdowns degrade portfolio stability even if throughput increases.
+
+**Example rejection:** Candidate passes PF > 1.5, max_dd < 20%, throughput > +0.2 trades/day, but P&L correlation with `reclaim_swing` = 0.92 → REJECT (correlation > 0.5).
+
+**Impact:** Prioritizes setup candidates that are uncorrelated with existing edge (diversification benefit > throughput cost).
+
 ## 2026-05-22 - Defer multi-symbol WebSocket to post-FeatureEngine milestone
 
 **Decision:** Accept REST aggTrades for ETH/SOL in PAPER as conscious simplification.
