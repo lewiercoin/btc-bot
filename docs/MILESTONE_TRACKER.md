@@ -1,5 +1,36 @@
 # Milestone Tracker
 
+## Research Implementation Checkpoint - 2026-06-04
+
+### M1: LEVEL_SCANNER_FOUNDATION_V1
+
+**Status:** DONE  
+**Builder:** Codex  
+**Auditor:** Claude Code (Windsurf)  
+**Decision date:** 2026-06-04  
+**Commit:** `cfe7e8f` (remote: origin/deploy/multi-asset-paper-v1)  
+**Plan:** `research_lab/blueprints/level_scanner_foundation_v1_milestone.md`  
+**Report:** `research_lab/validation_report_level_scanner.md`  
+**Audit:** `research_lab/AUDITS/` (compliance, per-deliverable, findings register)
+
+**Context:** M1 diagnostic confirmed setup scarcity (97.9% `signal_engine_no_candidate`, 74.9% `no_sweep`, 21.8% `sweep_too_shallow`). Setup portfolio expansion approved. `level_scanner` is prerequisite factory for all future setup candidates.
+
+**Scope:** Research-only module `research_lab/level_scanner.py` with 26-column parquet schema. Six level categories: session extremes, PDH/PDL/PWH/PWL, EQH/EQL clusters, anchored VWAP, round numbers, liquidation placeholder. Deterministic `level_id` SHA256 hash (F014 fix). Explicit empty liquidation stub (F015 fix). Layer separation enforced (no signal/governance/risk imports).
+
+**Validation:**
+- Focused unit tests: 9/9 passed
+- Compileall: exit code 0
+- 6m BTCUSDT smoke: 9,230 levels emitted, 0 duplicate `level_id`
+- SMC cross-validation: session boundaries documented (`[start,end)` vs end-inclusive), PDH/PDL values match
+
+**Audit verdict:** MVP_DONE (3 minor advisory recommendations, non-blocking)
+
+**Decision:** APPROVE. `level_scanner` ready for consumption by M3 `reclaim_rejection` diagnostic.
+
+**Next milestone:** M3 `reclaim_rejection` diagnostic (14-24h + 4-8h audit), M2 F010 blueprint fix (parallel, 1h)
+
+---
+
 ## Research Implementation Checkpoint - 2026-05-27
 
 ### Research Diagnostic: SMC_SEQUENCE_EDGE_FEASIBILITY_V1
@@ -210,58 +241,6 @@ truth; this checkpoint only clarifies their combined state.
   offline research evidence only.
 
 ## Current Active Milestones
-
-### Research Validation: PAPER_PERFORMANCE_VALIDATION_V2
-
-**Status:** READY_FOR_CLAUDE_AUDIT
-**Builder:** Codex
-**Decision date:** 2026-06-03
-**Branch:** `deploy/multi-asset-paper-v1`
-**Report:** `docs/analysis/PAPER_PERFORMANCE_VALIDATION_V2_2026-06-03.md`
-**JSON:** `docs/analysis/PAPER_PERFORMANCE_VALIDATION_V2_2026-06-03.json`
-
-**Scope:** Read-only production PAPER performance validation for legalized
-`experiment-profile-permissive-v1` using staged Path B confidence tiers. Query
-window starts at A1.deploy restart timestamp `2026-06-02T04:28:26Z`. No
-production writes, restarts, settings changes, or candidate parameter changes.
-
-**Builder result:** `NO_DATA / TIER_DEGRADATION` fail-closed operational label.
-All active assets (BTCUSDT, ETHUSDT, SOLUSDT) have `0` closed trades in the V2
-window, so realized ER/PF cannot be compared to the WF reference. Decision
-funnel shows all symbols cycling (`92` cycles each), no `signal_generated`
-rows, and persistent ETH/SOL Binance 429 failures (`16` total critical
-multi_asset errors).
-
-**Next:** Claude Code audit. Do not treat this as statistical degradation; it
-is a structural no-data/no-signal finding requiring investigation before V2 can
-provide `ANECDOTAL`, `EARLY_SIGNAL`, or higher-confidence performance evidence.
-
----
-
-### Research Validation: EXPERIMENT_PROFILE_PERMISSIVE_V1_A2_WF
-
-**Status:** READY_FOR_CLAUDE_AUDIT  
-**Builder:** Codex  
-**Decision date:** 2026-06-02  
-**Branch:** `deploy/multi-asset-paper-v1`  
-**Report:** `docs/analysis/WF_VALIDATION_EXPERIMENT_PROFILE_PERMISSIVE_V1_2026-06-02.md`
-
-**Scope:** Offline post-hoc WF validation for the legalized
-`experiment-profile-permissive-v1` BTC PAPER profile, using the exact
-`min_sweep_depth_pct=0.005` override documented in the lineage bundle.
-
-**Builder result:** Mechanical WF screening passed (`2/2` windows,
-`fragile=false`, validation trades `177` and `68`), but builder verdict remains
-`SCREENING_ONLY`. Claude Code audit is required before this profile can be
-treated as promotion-approved.
-
-**Snapshot integrity:** After server SSH access became available on this PC,
-Codex fetched `/home/btc-bot/btc-bot/research_lab/snapshots/replay-optuna-default-v3-trial-00095.db`
-and verified matching server/local SHA256:
-`ad8c5e7b4f541d5c34b2d6dde83aa0110f885a9eb4e0fa2d67c6705167363bca`.
-No production state was modified.
-
----
 
 ### Runtime Fix: MULTI_ASSET_FEATURE_ENGINE_PERSISTENCE_V1
 
