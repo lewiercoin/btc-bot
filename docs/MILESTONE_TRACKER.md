@@ -1,4 +1,4 @@
-﻿# Milestone Tracker
+# Milestone Tracker
 
 ## Research Implementation Checkpoint - 2026-06-04
 
