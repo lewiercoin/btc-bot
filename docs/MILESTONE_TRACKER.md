@@ -31,8 +31,6 @@
 
 ---
 
----
-
 ## Research Implementation Checkpoint - 2026-05-27
 
 ### Research Diagnostic: SMC_SEQUENCE_EDGE_FEASIBILITY_V1
