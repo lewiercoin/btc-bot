@@ -120,6 +120,50 @@ estimated at ~10% — ROI too low to justify 20-36h budget.
 **Auditor:** Claude Code
 **Decision date:** 2026-06-04
 **Decided by:** User approved Claude Code recommendation after M3 audit.
+
+---
+
+### M5: TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1
+
+**Status:** ACTIVE
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-06-04
+**Decided by:** User picked option D1 from
+`docs/research/RESEARCH_LANDSCAPE_RESET_2026-06-04.md`.
+**Handoff:** `docs/handoffs/HANDOFF_M5_TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1_2026-06-04.md`
+
+**Scope:** Research-only deterministic replay of the validated trial-00095
+274-trade accepted population with three frozen amendment cohorts:
+A1 LONG-only, A2 uptrend-only, A3 LONG ∧ uptrend. Walk-forward across the
+existing 3-fold structure from attribution
+(`fold_1_2022_2023H1`, `fold_2_2023H2_2024`, `fold_3_2025_2026Q1`).
+No threshold changes, no new entries generated, no settings touched.
+
+**Pre-data hypotheses (frozen):**
+- H1 — A1 (LONG-only, N=252): ER lifts from baseline 2.121 toward 2.377
+  on a 8% smaller sample.
+- H2 — A2 (uptrend-only, N=205): ER lifts toward 2.614 on a 25% smaller
+  sample.
+- H3 — A3 (LONG ∧ uptrend, sample size estimated from attribution
+  ~190-200): ER expected ≥ 2.6 with PF ≥ 5.0.
+
+**Pre-data acceptance criteria (frozen):**
+- A3 ER ≥ baseline ER + 0.5R on the full sample.
+- A3 PF ≥ baseline PF * 1.10 on the full sample.
+- A3 ER > 0 in every one of the 3 walk-forward folds (sign stability).
+- Per-fold ER for A3 not more than 50% below A3 full-sample ER (consistency).
+- Drawdown impact reported but not gated (informational).
+
+If A3 fails any criterion, the milestone returns HYPOTHESIS_INVALIDATED
+and direction/regime amendments are NOT promoted. Falsification cannot be
+softened post-data.
+
+**Builder selection rationale:** Codex stays as builder. Same canonical DB,
+same trial-00095 frozen artifacts. Fast turnaround, no environment issues
+expected.
+
+**Budget:** 6-10h implementation + 2-4h audit. Single milestone.
 **Active branch:** TBD by builder (suggested: `research/m4-confluence-gate-accessibility`)
 **Plan:** TBD (Codex commit 1)
 **Implementation:** TBD (Codex commit 2)
