@@ -123,19 +123,85 @@ estimated at ~10% — ROI too low to justify 20-36h budget.
 
 ---
 
+### M6: RED_TEAM_REPLICATION_V1
+
+**Status:** DONE_WITH_CRITICAL_CAVEAT (2026-06-05)
+**Builder:** Codex
+**Auditor:** Claude Code (adversarial framing)
+**Plan commit:** `6668576` → amendment `0476435`
+**Implementation commit:** `23990e8`
+**Audits:**
+- Plan: `docs/audits/AUDIT_M6_RED_TEAM_REPLICATION_V1_PLAN_2026-06-05.md` (REJECT_FIX_REQUIRED)
+- Amendment: `docs/audits/AUDIT_M6_RED_TEAM_REPLICATION_V1_PLAN_AMENDMENT_2026-06-05.md` (APPROVE)
+- Implementation: `docs/audits/AUDIT_M6_RED_TEAM_REPLICATION_V1_IMPLEMENTATION_2026-06-05.md` (DONE_WITH_CRITICAL_CAVEAT)
+
+**Outcome summary:**
+- Part A mechanical verdict: `BASELINE_NOT_REPRODUCIBLE` — fired by
+  apples-vs-oranges SHA comparison (prior raw-file SHA vs M6 stabilized
+  SHA), NOT by actual non-reproduction. Analytical content reproduced
+  byte-perfect (event count 1271, PF 1.061059, median -0.000442, MFE
+  ratio 2.352473 — identical to prior 2026-05-27 run). Perturbations
+  P1-P5 + A.3 skipped due to hard-stop on broken comparison.
+- Part B verdict: `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`. SL-subset
+  Pearson 0.954 (passes), TP_TRAIL-subset 0.612 (fails). Stratified
+  verdict from F-M6P-001 plan amendment **successfully prevented a
+  false `VALIDATED_EDGE_NOT_REPRODUCIBLE` production-pause alarm** —
+  the amendment was vindicated by reality.
+- Audit chain caught one real false-alarm (F-M6P-001 amendment) and
+  surfaced one new methodology gap (F-M6I-001 SHA protocol). Both
+  findings have direct value.
+
+**Trust impact:** Partial restoration of audit-chain confidence; one
+follow-up (M6.1) required for substantive closure of Part A.
+
+---
+
+### M6.1: RED_TEAM_REPLICATION_V1_PART_A_SHA_FIX
+
+**Status:** ACTIVE
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-06-05
+**Decided by:** Operator after M6 implementation audit. M6.1 obligatory
+for substantive M6 closure; M6.2 trail recovery deferred to optional
+follow-up.
+**Handoff:** `docs/handoffs/HANDOFF_M6.1_PART_A_SHA_FIX_2026-06-05.md`
+
+**Scope:** Single-purpose fix to M6 Part A SHA hard-stop. Replace
+opaque-hash baseline check with analytical-content baseline check.
+Re-run A.1 baseline + P1-P5 perturbations + A.3 ablation. Apply
+existing locked verdict rules to perturbation results. Final Part A
+verdict per plan §6 (`SMC_SEQUENCE_INVALIDATION_ROBUST` /
+`SMC_SEQUENCE_VERDICT_NOT_ROBUST` / `SMC_SEQUENCE_EDGE_IS_GROSS_ONLY` /
+`SMC_GATES_DESTROYED_RAW_EDGE`).
+
+Part B unchanged — keeps `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`
+verdict from M6 run unless re-run for determinism check.
+
+**Budget:** 4-8h implementation + 2-4h audit. Single commit on
+existing branch `research/m6-red-team-replication`.
+
+**Resumption gate for M5:** M6.1 must complete and return a
+substantive Part A verdict before M5 resumes.
+
+---
+
+### M6.2: TRAIL_RULE_RECOVERY_FOR_PART_B
+
+**Status:** DEFERRED (operator may activate after M6.1 completes)
+**Reason for deferral:** Part B already produced useful answer
+(SL-subset reproduces, TP_TRAIL requires trail logic recovery). Full
+trial-00095 reproduction is high-value but not blocking for trust
+restoration. Operator decides post-M6.1 whether to proceed.
+
+---
+
 ### M5: TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1
 
 **Status:** PAUSED (2026-06-04) at end of plan-approval phase
-**Reason for pause:** Operator escalated meta-level concern about audit
-trustworthiness. M6 RED_TEAM_REPLICATION_V1 takes priority to verify the
-soundness of prior invalidation verdicts before any further work builds
-on them. M5 resumes only if M6 confirms prior verdicts are robust.
-**Builder:** Codex (stood down at end of plan phase, db03609)
-**Auditor:** Claude Code
-**Plan audit:** APPROVE_PLANNING_DOCUMENT, commit 98a9bb7 on
-`claude/festive-maxwell-iciBo`
-**Resumption gate:** M6 returns `REPLICATION_VERIFIES_PRIOR_VERDICTS`
-(or operator overrides).
+**Resumption gate (revised):** M6.1 must return a substantive Part A
+verdict before M5 resumes. M6 alone was insufficient because Part A
+substantive question was not answered.
 
 ---
 
