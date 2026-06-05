@@ -230,18 +230,41 @@ Exit simulation design:
   tolerance must be listed by `trade_id`, baseline value, replicated value,
   absolute delta, direction, entry time, and exit reason.
 
+Trail rule reconnaissance:
+
+- Before implementing the exit simulator, the implementation must inspect the
+  full frozen trade and entry artifacts and list every field present.
+- The implementation must explicitly classify whether a closed-form TP_TRAIL
+  rule is derivable from those fields alone.
+- If the trail rule is derivable, the report must document the exact rule and
+  continue with full-population reproduction.
+- If the trail rule is not derivable, Part B must use the stratified verdict
+  rules in Section 6. Simulator incompleteness on TP_TRAIL trades is then
+  reported as `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`, not as edge
+  falsification.
+- Recovering trail logic from bot or strategy source is an action item only
+  after the stratified result; it is not allowed as an import or hidden
+  dependency in this independent simulator.
+
 This is not a re-derivation of the edge. It is a reproduction check that the
 recorded trades behave as recorded.
 
 Database choice for Part B:
 
-- Primary: canonical DB path supplied explicitly, expected on PC as
-  `F:\crowded_unwind_backtest.db`.
-- Fallback only if documented: `research_lab/snapshots/replay-run13-regime-aware-trial-00063.db`.
-- The fallback snapshot may be used only if the canonical DB lacks data needed
-  for trial replay or if timestamp alignment demonstrably requires it. The
-  report must state which DB was used and why.
-- Silent substitution is forbidden.
+- Primary: canonical DB at the explicit path supplied via CLI, expected on PC
+  as `F:\crowded_unwind_backtest.db`. All Part B verdict computation is bound
+  to canonical-DB results.
+- Comparison: replay-run13 snapshot at
+  `research_lab/snapshots/replay-run13-regime-aware-trial-00063.db`. The
+  simulator may also run against the snapshot to produce a side-by-side
+  comparison table, but the snapshot result never substitutes for the
+  canonical result in verdict computation.
+- If canonical-DB Part B produces `VALIDATED_EDGE_NOT_REPRODUCIBLE` while
+  snapshot-DB Part B passes acceptance, the report classifies the divergence as
+  `DATABASE_LINEAGE_MISMATCH`. The canonical verdict still stands as the M6
+  result.
+- Silent substitution is forbidden. The simulator must record which DB produced
+  which result in the JSON output.
 
 ## 6. Pre-Data Verdict Rules
 
@@ -259,6 +282,9 @@ Part A verdict rules:
   `SMC_SEQUENCE_EDGE_IS_GROSS_ONLY`.
 - If A.3 flips but A.1-P5 do not, Part A returns
   `SMC_GATES_DESTROYED_RAW_EDGE`.
+- If contradictory perturbations such as P1 and P2 both flip, the report must
+  add `METRIC_HYPERSENSITIVE` as a diagnostic note alongside the primary Part A
+  verdict.
 
 Part B acceptance rules:
 
@@ -270,8 +296,25 @@ Part B acceptance rules:
 | WR | 56.57% | within +/- 3pp, range 53.5% to 59.5% |
 | Per-trade `pnl_r` Pearson | 1.0 | >= 0.95 |
 
-If any Part B criterion fails, Part B returns
-`VALIDATED_EDGE_NOT_REPRODUCIBLE`.
+Part B must compute Pearson correlation for:
+
+- full population;
+- SL-exit subset;
+- TP_TRAIL-exit subset.
+
+Part B stratified verdict rules:
+
+- If full population, SL subset, and TP_TRAIL subset all have Pearson >=
+  `0.95`, and count/ER/PF/WR remain inside acceptance bounds, Part B returns
+  full reproduction and contributes to `REPLICATION_VERIFIES_PRIOR_VERDICTS`.
+- If SL-subset Pearson >= `0.95` and TP_TRAIL-subset Pearson < `0.95`, Part B
+  returns `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`. This is an actionable
+  simulator/artifact limitation, not edge falsification.
+- If SL-subset Pearson < `0.95`, Part B returns
+  `VALIDATED_EDGE_NOT_REPRODUCIBLE`, because the unambiguous stop-loss subset
+  failed independently of trailing-stop ambiguity.
+- If count, ER, PF, or WR fail acceptance while subset correlations pass, Part
+  B returns `VALIDATED_EDGE_NOT_REPRODUCIBLE` and reports the failing metric.
 
 Final M6 verdict:
 
@@ -280,7 +323,15 @@ Final M6 verdict:
 - `PRIOR_VERDICT_NOT_ROBUST`: Part A returns
   `SMC_SEQUENCE_VERDICT_NOT_ROBUST`, `SMC_SEQUENCE_EDGE_IS_GROSS_ONLY`, or
   `SMC_GATES_DESTROYED_RAW_EDGE`.
-- `VALIDATED_EDGE_NOT_REPRODUCIBLE`: Part B fails any acceptance rule.
+- `VALIDATED_EDGE_NOT_REPRODUCIBLE`: Part B fails canonical count/ER/PF/WR
+  acceptance or the SL-exit subset fails Pearson >= `0.95`.
+- `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`: Part B reproduces the SL subset but
+  cannot reproduce TP_TRAIL trades from the frozen artifact fields. This does
+  not trigger edge falsification or production-pause verdict by itself; it
+  triggers trail-rule recovery and a follow-up reproduction pass.
+- `DATABASE_LINEAGE_MISMATCH`: canonical-DB and snapshot-DB Part B results
+  materially disagree. The canonical-DB result binds the M6 verdict, and the
+  mismatch is reported as lineage evidence.
 - `BASELINE_NOT_REPRODUCIBLE`: A.1 SHA mismatch prevents meaningful Part A
   replication.
 
@@ -310,6 +361,17 @@ Part B tests:
 - Acceptance evaluator passes when metrics are inside frozen bounds.
 - Acceptance evaluator fails count, ER, PF, WR, and correlation independently.
 - Pearson correlation handles exact reproduction and divergent reproduction.
+- SL-subset Pearson is computed independently from full-population Pearson.
+- TP_TRAIL-subset Pearson is computed independently from full-population
+  Pearson.
+- Stratified verdict evaluator returns full reproduction when full, SL, and
+  TP_TRAIL correlations all pass.
+- Stratified verdict evaluator returns
+  `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL` when SL passes and TP_TRAIL fails.
+- Stratified verdict evaluator returns `VALIDATED_EDGE_NOT_REPRODUCIBLE` when
+  SL-subset Pearson fails.
+- DB-binding test verifies canonical-DB results control verdict computation and
+  snapshot results are comparison-only.
 
 Validation commands for commit 2:
 
