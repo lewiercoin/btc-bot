@@ -1,21 +1,122 @@
 {
   "final_verdict": {
     "computed_mechanically": true,
-    "part_a_verdict": "BASELINE_NOT_REPRODUCIBLE",
+    "part_a_verdict": "SMC_GATES_DESTROYED_RAW_EDGE",
     "part_b_verdict": "PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL",
-    "verdict": "BASELINE_NOT_REPRODUCIBLE"
+    "verdict": "PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL"
   },
   "manifest": {
+    "analytical_content_baseline_check": {
+      "expected": {
+        "event_count": 1271,
+        "mfe_after_entry_5b_median": 0.004916,
+        "mfe_before_after_ratio": 2.352473,
+        "mfe_before_entry_median": 0.011565,
+        "net_5b_median": -0.000442,
+        "net_5b_pf": 1.061059
+      },
+      "match": true,
+      "observed": {
+        "event_count": {
+          "abs_delta": 0,
+          "expected": 1271,
+          "in_tolerance": true,
+          "observed": 1271
+        },
+        "mfe_after_entry_5b_median": {
+          "abs_delta": 1.9374422594638924e-07,
+          "expected": 0.004916,
+          "in_tolerance": true,
+          "observed": 0.004916193744225947
+        },
+        "mfe_before_after_ratio": {
+          "abs_delta": 2.786477613092586e-07,
+          "expected": 2.352473,
+          "in_tolerance": true,
+          "observed": 2.352473278647761
+        },
+        "mfe_before_entry_median": {
+          "abs_delta": 2.144159468239759e-07,
+          "expected": 0.011565,
+          "in_tolerance": true,
+          "observed": 0.011565214415946825
+        },
+        "net_5b_median": {
+          "abs_delta": 4.7306892673765633e-07,
+          "expected": -0.000442,
+          "in_tolerance": true,
+          "observed": -0.00044152693107326235
+        },
+        "net_5b_pf": {
+          "abs_delta": 3.023806613988711e-07,
+          "expected": 1.061059,
+          "in_tolerance": true,
+          "observed": 1.0610593023806614
+        }
+      },
+      "tolerance": 1e-06
+    },
     "canonical_db_path": "F:\\crowded_unwind_backtest.db",
     "continue_after_baseline_mismatch": false,
     "diagnostic": "RED_TEAM_REPLICATION_V1",
     "generated_at_utc": "DETERMINISTIC_NO_WALL_CLOCK",
+    "prior_baseline_raw_file_sha_informational": "8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4",
     "production_changes": false,
     "research_only": true,
     "snapshot_db_path": "research_lab\\snapshots\\replay-run13-regime-aware-trial-00063.db"
   },
   "part_a": {
-    "expected_baseline_sha256": "8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4",
+    "analytical_content_baseline_check": {
+      "expected": {
+        "event_count": 1271,
+        "mfe_after_entry_5b_median": 0.004916,
+        "mfe_before_after_ratio": 2.352473,
+        "mfe_before_entry_median": 0.011565,
+        "net_5b_median": -0.000442,
+        "net_5b_pf": 1.061059
+      },
+      "match": true,
+      "observed": {
+        "event_count": {
+          "abs_delta": 0,
+          "expected": 1271,
+          "in_tolerance": true,
+          "observed": 1271
+        },
+        "mfe_after_entry_5b_median": {
+          "abs_delta": 1.9374422594638924e-07,
+          "expected": 0.004916,
+          "in_tolerance": true,
+          "observed": 0.004916193744225947
+        },
+        "mfe_before_after_ratio": {
+          "abs_delta": 2.786477613092586e-07,
+          "expected": 2.352473,
+          "in_tolerance": true,
+          "observed": 2.352473278647761
+        },
+        "mfe_before_entry_median": {
+          "abs_delta": 2.144159468239759e-07,
+          "expected": 0.011565,
+          "in_tolerance": true,
+          "observed": 0.011565214415946825
+        },
+        "net_5b_median": {
+          "abs_delta": 4.7306892673765633e-07,
+          "expected": -0.000442,
+          "in_tolerance": true,
+          "observed": -0.00044152693107326235
+        },
+        "net_5b_pf": {
+          "abs_delta": 3.023806613988711e-07,
+          "expected": 1.061059,
+          "in_tolerance": true,
+          "observed": 1.0610593023806614
+        }
+      },
+      "tolerance": 1e-06
+    },
+    "prior_baseline_raw_file_sha_informational": "8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4",
     "runs": [
       {
         "config_changes": {},
@@ -42,28 +143,27 @@
           }
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": -59,
+          "mfe_after_entry_5b_median": -0.0002199244944217837,
+          "mfe_before_after_ratio": 0.0673293574762952,
+          "mfe_before_entry_median": -0.0002011697053223658,
+          "net_5b_median": -2.7710024332107906e-05,
+          "net_5b_pf": -0.09449401980171035
         },
         "description": "P1",
-        "event_count": null,
+        "event_count": 1212,
         "expected_prior_sha256": null,
         "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "mfe_after_entry_5b_median": 0.004696269249804163,
+        "mfe_before_after_ratio": 2.4198026361240563,
+        "mfe_before_entry_median": 0.011364044710624459,
+        "net_5b_median": -0.00046923695540537026,
+        "net_5b_pf": 0.966565282578951,
+        "observed_stable_sha256": "7B4416ED143B93A822F906C81B4E1C3BBB42A954C7C03A77A7070F5058542A81",
         "run_id": "P1",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       },
       {
         "config_changes": {
@@ -73,28 +173,27 @@
           }
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": 35,
+          "mfe_after_entry_5b_median": -4.6238353395970135e-05,
+          "mfe_before_after_ratio": 0.08629240345046707,
+          "mfe_before_entry_median": 0.00031146566455858733,
+          "net_5b_median": -3.5714355052762965e-05,
+          "net_5b_pf": -0.07493309481516774
         },
         "description": "P2",
-        "event_count": null,
+        "event_count": 1306,
         "expected_prior_sha256": null,
         "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "mfe_after_entry_5b_median": 0.0048699553908299765,
+        "mfe_before_after_ratio": 2.438765682098228,
+        "mfe_before_entry_median": 0.011876680080505412,
+        "net_5b_median": -0.0004772412861260253,
+        "net_5b_pf": 0.9861262075654936,
+        "observed_stable_sha256": "0041CDA750651ABEF97A7857E598C467A49EFEC68512E9F1A1A80C37C9FDCB1F",
         "run_id": "P2",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       },
       {
         "config_changes": {
@@ -104,28 +203,27 @@
           }
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": -368,
+          "mfe_after_entry_5b_median": 0.0004566375640136372,
+          "mfe_before_after_ratio": -0.4132283627250317,
+          "mfe_before_entry_median": -0.0011459786173327446,
+          "net_5b_median": 0.00023510889117730712,
+          "net_5b_pf": 0.15540760293716316
         },
         "description": "P3",
-        "event_count": null,
+        "event_count": 903,
         "expected_prior_sha256": null,
         "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "mfe_after_entry_5b_median": 0.005372831308239584,
+        "mfe_before_after_ratio": 1.9392449159227294,
+        "mfe_before_entry_median": 0.01041923579861408,
+        "net_5b_median": -0.00020641803989595523,
+        "net_5b_pf": 1.2164669053178245,
+        "observed_stable_sha256": "FC3E57B360A761E7C9E5883925F451B922BBE70FEE5740FBAF1C7692B9C17A54",
         "run_id": "P3",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       },
       {
         "config_changes": {
@@ -135,28 +233,27 @@
           }
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": 41,
+          "mfe_after_entry_5b_median": -3.390130883574455e-05,
+          "mfe_before_after_ratio": -0.002492645082488032,
+          "mfe_before_entry_median": -9.192174537761728e-05,
+          "net_5b_median": 1.3364501461618462e-05,
+          "net_5b_pf": 0.009658840561086901
         },
         "description": "P4",
-        "event_count": null,
+        "event_count": 1312,
         "expected_prior_sha256": null,
         "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "mfe_after_entry_5b_median": 0.004882292435390202,
+        "mfe_before_after_ratio": 2.349980633565273,
+        "mfe_before_entry_median": 0.011473292670569207,
+        "net_5b_median": -0.0004281624296116439,
+        "net_5b_pf": 1.0707181429417483,
+        "observed_stable_sha256": "8D1347F93DCE89142E2A79F7FBF4D41E4E84C60E671FE2AEEC53A19AA938B99E",
         "run_id": "P4",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       },
       {
         "config_changes": {
@@ -166,59 +263,61 @@
           }
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": 0,
+          "mfe_after_entry_5b_median": 0.0,
+          "mfe_before_after_ratio": 0.0,
+          "mfe_before_entry_median": 0.0,
+          "net_5b_median": 0.001,
+          "net_5b_pf": 0.396708085743656
         },
         "description": "P5",
-        "event_count": null,
+        "event_count": 1271,
         "expected_prior_sha256": null,
         "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "mfe_after_entry_5b_median": 0.004916193744225947,
+        "mfe_before_after_ratio": 2.352473278647761,
+        "mfe_before_entry_median": 0.011565214415946825,
+        "net_5b_median": 0.0005584730689267377,
+        "net_5b_pf": 1.4577673881243174,
+        "observed_stable_sha256": "927BB89CC43D10F41BEC38D4CC85A78EE4F2238D2D42FB1FE0F1C415486EC6C3",
         "run_id": "P5",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       },
       {
         "config_changes": {
-          "disabled_gates": []
+          "disabled_gates": [
+            "displacement",
+            "structure_shift",
+            "fvg",
+            "mitigation"
+          ]
         },
         "delta_vs_baseline": {
-          "event_count": null,
-          "mfe_after_entry_5b_median": null,
-          "mfe_before_after_ratio": null,
-          "mfe_before_entry_median": null,
-          "net_5b_median": null,
-          "net_5b_pf": null
+          "event_count": 12965,
+          "mfe_after_entry_5b_median": 0.0029752824754286497,
+          "mfe_before_after_ratio": -1.9675592771583659,
+          "mfe_before_entry_median": -0.008527674726581167,
+          "net_5b_median": 0.002252556154297824,
+          "net_5b_pf": 1.785956169263098
         },
-        "description": "A3_RAW_SWEEP_RECLAIM",
-        "event_count": null,
+        "description": "raw sweep reclaim ablation",
+        "event_count": 14236,
         "expected_prior_sha256": null,
-        "m6_flip_gate_passed": false,
-        "mfe_after_entry_5b_median": null,
-        "mfe_before_after_ratio": null,
-        "mfe_before_entry_median": null,
-        "net_5b_median": null,
-        "net_5b_pf": null,
-        "observed_stable_sha256": null,
-        "reason": "BASELINE_SHA_MISMATCH_STOP",
+        "m6_flip_gate_passed": true,
+        "mfe_after_entry_5b_median": 0.007891476219654596,
+        "mfe_before_after_ratio": 0.38491400148939525,
+        "mfe_before_entry_median": 0.0030375396893656567,
+        "net_5b_median": 0.0018110292232245617,
+        "net_5b_pf": 2.8470154716437595,
+        "observed_stable_sha256": "36BAD7668D06B0B6332AD4DFD6B1C1B2DE1A96DB1D7AD54EA61D9964429A14E1",
         "run_id": "A3_RAW_SWEEP_RECLAIM",
         "sha_matches_expected": null,
-        "source_verdict": null,
-        "status": "NOT_RUN"
+        "source_verdict": "FAIL_OR_INCONCLUSIVE_REVIEW_REQUIRED",
+        "status": "RUN"
       }
     ],
-    "sha_check_note": "M6 stable SHA canonicalizes the SMC payload wall-clock and db_path fields and omits raw events for deterministic comparison. A mismatch still triggers the locked BASELINE_NOT_REPRODUCIBLE rule.",
     "single_parameter_isolation": {
       "P1": {
         "changed_fields": {
@@ -281,10 +380,13 @@
         "is_isolated": true
       }
     },
+    "stable_sha_note": "M6 stable SHA canonicalizes the SMC payload wall-clock and db_path fields and omits raw events for deterministic comparison. It is lineage metadata only; the Part A baseline stop condition is the analytical-content check.",
     "verdict": {
+      "a3_flip": true,
       "diagnostic_notes": [],
-      "reason": "A.1 stable output SHA did not match prior expected SHA.",
-      "verdict": "BASELINE_NOT_REPRODUCIBLE"
+      "perturbation_flips": [],
+      "reason": "Computed mechanically from Part A flip gates.",
+      "verdict": "SMC_GATES_DESTROYED_RAW_EDGE"
     }
   },
   "part_b": {

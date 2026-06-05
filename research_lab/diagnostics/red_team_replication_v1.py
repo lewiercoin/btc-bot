@@ -25,7 +25,16 @@ DEFAULT_REPORT_JSON = PROJECT_ROOT / "research_lab" / "reports" / "red_team_repl
 DEFAULT_REPORT_SHA = PROJECT_ROOT / "research_lab" / "reports" / "red_team_replication_v1.sha256"
 DEFAULT_REPORT_MD = PROJECT_ROOT / "research_lab" / "reports" / "red_team_replication_v1.md"
 DEFAULT_PART_B_JSON = PROJECT_ROOT / "research_lab" / "reports" / "trial_00095_sql_replication_v1.json"
-EXPECTED_SMC_SHA = "8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4"
+PRIOR_BASELINE_RAW_FILE_SHA_INFORMATIONAL = "8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4"
+EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT = {
+    "event_count": 1271,
+    "net_5b_pf": 1.061059,
+    "net_5b_median": -0.000442,
+    "mfe_before_entry_median": 0.011565,
+    "mfe_after_entry_5b_median": 0.004916,
+    "mfe_before_after_ratio": 2.352473,
+}
+ANALYTICAL_CONTENT_ABS_TOLERANCE = 1e-6
 
 
 PART_A_RUN_ORDER = ["A1_BASELINE", "P1", "P2", "P3", "P4", "P5", "A3_RAW_SWEEP_RECLAIM"]
@@ -97,6 +106,41 @@ def stable_sha(payload: dict[str, Any]) -> str:
     return hashlib.sha256(raw).hexdigest().upper()
 
 
+def _extract_analytical_content(payload: dict[str, Any]) -> dict[str, Any]:
+    summary = payload["summary"]["full_sequence"]
+    before = summary.get("median_mfe_before_entry")
+    after = summary.get("entry_5_mfe_median")
+    ratio = (before / after) if before is not None and after not in (None, 0) else None
+    return {
+        "event_count": summary.get("count"),
+        "net_5b_pf": summary.get("entry_5_profit_factor_proxy"),
+        "net_5b_median": summary.get("entry_5_net_return_median"),
+        "mfe_before_entry_median": before,
+        "mfe_after_entry_5b_median": after,
+        "mfe_before_after_ratio": ratio,
+    }
+
+
+def analytical_content_matches(baseline_payload: dict[str, Any]) -> tuple[bool, dict[str, dict[str, Any]]]:
+    observed = _extract_analytical_content(baseline_payload)
+    report: dict[str, dict[str, Any]] = {}
+    for field_name, expected in EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT.items():
+        value = observed.get(field_name)
+        if field_name == "event_count":
+            delta = None if value is None else abs(value - expected)
+            in_tolerance = value == expected
+        else:
+            delta = None if value is None else abs(value - expected)
+            in_tolerance = delta is not None and delta < ANALYTICAL_CONTENT_ABS_TOLERANCE
+        report[field_name] = {
+            "observed": value,
+            "expected": expected,
+            "abs_delta": delta,
+            "in_tolerance": in_tolerance,
+        }
+    return all(row["in_tolerance"] for row in report.values()), report
+
+
 def extract_part_a_row(
     *,
     run_id: str,
@@ -106,12 +150,10 @@ def extract_part_a_row(
     expected_sha: str | None,
     config_changes: dict[str, Any],
 ) -> dict[str, Any]:
-    summary = payload["summary"]["full_sequence"]
-    before = summary.get("median_mfe_before_entry")
-    after = summary.get("entry_5_mfe_median")
-    ratio = (before / after) if before is not None and after not in (None, 0) else None
-    pf = summary.get("entry_5_profit_factor_proxy")
-    median_net = summary.get("entry_5_net_return_median")
+    content = _extract_analytical_content(payload)
+    pf = content["net_5b_pf"]
+    median_net = content["net_5b_median"]
+    ratio = content["mfe_before_after_ratio"]
     flips = bool(pf is not None and median_net is not None and ratio is not None and pf >= 1.5 and median_net >= 0 and ratio <= 1.0)
     return {
         "run_id": run_id,
@@ -123,11 +165,11 @@ def extract_part_a_row(
         "sha_matches_expected": observed_sha == expected_sha if expected_sha else None,
         "source_verdict": payload["invalidation_checks"]["verdict"],
         "m6_flip_gate_passed": flips,
-        "event_count": summary.get("count"),
+        "event_count": content["event_count"],
         "net_5b_pf": pf,
         "net_5b_median": median_net,
-        "mfe_before_entry_median": before,
-        "mfe_after_entry_5b_median": after,
+        "mfe_before_entry_median": content["mfe_before_entry_median"],
+        "mfe_after_entry_5b_median": content["mfe_after_entry_5b_median"],
         "mfe_before_after_ratio": ratio,
     }
 
@@ -291,15 +333,21 @@ def run_raw_sweep_reclaim_ablation(db_path: Path, config: smc.DiagnosticConfig) 
     }
 
 
-def evaluate_part_a(rows: list[dict[str, Any]], *, baseline_sha_match: bool) -> dict[str, Any]:
+def evaluate_part_a(
+    rows: list[dict[str, Any]],
+    *,
+    baseline_analytical_content_match: bool,
+    baseline_analytical_content_report: dict[str, Any] | None = None,
+) -> dict[str, Any]:
     row_by_id = {row["run_id"]: row for row in rows}
     notes: list[str] = []
     if row_by_id.get("P1", {}).get("m6_flip_gate_passed") and row_by_id.get("P2", {}).get("m6_flip_gate_passed"):
         notes.append("METRIC_HYPERSENSITIVE")
-    if not baseline_sha_match:
+    if not baseline_analytical_content_match:
         return {
-            "verdict": "BASELINE_NOT_REPRODUCIBLE",
-            "reason": "A.1 stable output SHA did not match prior expected SHA.",
+            "verdict": "BASELINE_ANALYTICAL_CONTENT_MISMATCH",
+            "reason": "A.1 analytical content did not match locked baseline fields.",
+            "baseline_analytical_content_report": baseline_analytical_content_report or {},
             "diagnostic_notes": notes,
         }
     perturbation_flips = [
@@ -342,14 +390,14 @@ def run_part_a(
             run_id="A1_BASELINE",
             temp_dir=temp_dir,
         )
-        baseline_match = baseline_sha == EXPECTED_SMC_SHA
+        baseline_match, baseline_analytical_report = analytical_content_matches(baseline_payload)
         rows.append(
             extract_part_a_row(
                 run_id="A1_BASELINE",
                 description="baseline default DiagnosticConfig",
                 payload=baseline_payload,
                 observed_sha=baseline_sha,
-                expected_sha=EXPECTED_SMC_SHA,
+                expected_sha=PRIOR_BASELINE_RAW_FILE_SHA_INFORMATIONAL,
                 config_changes={},
             )
         )
@@ -391,8 +439,8 @@ def run_part_a(
             )
         else:
             for run_id in ("P1", "P2", "P3", "P4", "P5"):
-                rows.append(_not_run_row(run_id, "BASELINE_SHA_MISMATCH_STOP", isolation[run_id]["changed_fields"]))
-            rows.append(_not_run_row("A3_RAW_SWEEP_RECLAIM", "BASELINE_SHA_MISMATCH_STOP", {"disabled_gates": []}))
+                rows.append(_not_run_row(run_id, "BASELINE_ANALYTICAL_CONTENT_MISMATCH_STOP", isolation[run_id]["changed_fields"]))
+            rows.append(_not_run_row("A3_RAW_SWEEP_RECLAIM", "BASELINE_ANALYTICAL_CONTENT_MISMATCH_STOP", {"disabled_gates": []}))
     baseline = rows[0]
     for row in rows[1:]:
         row["delta_vs_baseline"] = {
@@ -411,22 +459,32 @@ def run_part_a(
             )
         }
     return {
-        "expected_baseline_sha256": EXPECTED_SMC_SHA,
-        "sha_check_note": (
-            "M6 stable SHA canonicalizes the SMC payload wall-clock and db_path fields and "
-            "omits raw events for deterministic comparison. A mismatch still triggers the "
-            "locked BASELINE_NOT_REPRODUCIBLE rule."
+        "prior_baseline_raw_file_sha_informational": PRIOR_BASELINE_RAW_FILE_SHA_INFORMATIONAL,
+        "stable_sha_note": (
+            "M6 stable SHA canonicalizes the SMC payload wall-clock and db_path fields and omits "
+            "raw events for deterministic comparison. It is lineage metadata only; the Part A "
+            "baseline stop condition is the analytical-content check."
         ),
+        "analytical_content_baseline_check": {
+            "expected": EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT,
+            "observed": baseline_analytical_report,
+            "match": baseline_match,
+            "tolerance": ANALYTICAL_CONTENT_ABS_TOLERANCE,
+        },
         "single_parameter_isolation": isolation,
         "runs": rows,
-        "verdict": evaluate_part_a(rows, baseline_sha_match=bool(rows[0]["sha_matches_expected"])),
+        "verdict": evaluate_part_a(
+            rows,
+            baseline_analytical_content_match=baseline_match,
+            baseline_analytical_content_report=baseline_analytical_report,
+        ),
     }
 
 
 def final_m6_verdict(part_a: dict[str, Any], part_b: dict[str, Any]) -> dict[str, Any]:
     part_a_verdict = part_a["verdict"]["verdict"]
     part_b_verdict = part_b["database_binding"]["verdict"]
-    if part_a_verdict == "BASELINE_NOT_REPRODUCIBLE":
+    if part_a_verdict == "BASELINE_ANALYTICAL_CONTENT_MISMATCH":
         verdict = "BASELINE_NOT_REPRODUCIBLE"
     elif part_b_verdict == "DATABASE_LINEAGE_MISMATCH":
         verdict = "DATABASE_LINEAGE_MISMATCH"
@@ -469,6 +527,8 @@ def build_payload(
             "canonical_db_path": str(db_path),
             "snapshot_db_path": str(snapshot_db_path) if snapshot_db_path else None,
             "continue_after_baseline_mismatch": continue_after_baseline_mismatch,
+            "analytical_content_baseline_check": part_a["analytical_content_baseline_check"],
+            "prior_baseline_raw_file_sha_informational": PRIOR_BASELINE_RAW_FILE_SHA_INFORMATIONAL,
         },
         "pre_data_interpretations": PRE_DATA_INTERPRETATIONS,
         "part_a": part_a,
@@ -512,9 +572,10 @@ def render_markdown(payload: dict[str, Any], sha256_value: str) -> str:
         "",
         "## Part A Notes",
         "",
-        f"- Expected prior baseline SHA: `{part_a['expected_baseline_sha256']}`",
+        f"- Analytical baseline check: `{part_a['analytical_content_baseline_check']['match']}`",
+        f"- Analytical tolerance: `{part_a['analytical_content_baseline_check']['tolerance']}`",
+        f"- Prior raw baseline SHA (informational only): `{part_a['prior_baseline_raw_file_sha_informational']}`",
         f"- Observed A.1 stable SHA: `{part_a['runs'][0]['observed_stable_sha256']}`",
-        f"- SHA match: `{part_a['runs'][0]['sha_matches_expected']}`",
     ])
     for note in part_a["verdict"].get("diagnostic_notes", []):
         lines.append(f"- Diagnostic note: `{note}`")

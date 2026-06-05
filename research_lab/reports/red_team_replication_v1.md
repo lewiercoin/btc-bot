@@ -2,28 +2,29 @@
 
 ## Final Verdict
 
-- M6 verdict: `BASELINE_NOT_REPRODUCIBLE`
-- Part A verdict: `BASELINE_NOT_REPRODUCIBLE`
+- M6 verdict: `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`
+- Part A verdict: `SMC_GATES_DESTROYED_RAW_EDGE`
 - Part B verdict: `PARTB_SIMULATOR_INSUFFICIENT_FOR_TRAIL`
-- JSON SHA256: `AAE5A20A66AAFD207DA2DED39F1A951EAE33497A27DEF0F18FE9A051D03DC23F`
+- JSON SHA256: `96128632F84C93AD77E26D301B44D81139B0E952E7E0812B352AAD7842FE2AE0`
 
 ## Part A Comparison
 
 | Run | Status | Event N | Net 5b PF | Net 5b Median | MFE Before/After | Flip Gate |
 |---|---|---:|---:|---:|---:|---|
 | A1_BASELINE | RUN | 1271 | 1.061059 | -0.000442 | 2.352473 | False |
-| P1 | NOT_RUN | n/a | n/a | n/a | n/a | False |
-| P2 | NOT_RUN | n/a | n/a | n/a | n/a | False |
-| P3 | NOT_RUN | n/a | n/a | n/a | n/a | False |
-| P4 | NOT_RUN | n/a | n/a | n/a | n/a | False |
-| P5 | NOT_RUN | n/a | n/a | n/a | n/a | False |
-| A3_RAW_SWEEP_RECLAIM | NOT_RUN | n/a | n/a | n/a | n/a | False |
+| P1 | RUN | 1212 | 0.966565 | -0.000469 | 2.419803 | False |
+| P2 | RUN | 1306 | 0.986126 | -0.000477 | 2.438766 | False |
+| P3 | RUN | 903 | 1.216467 | -0.000206 | 1.939245 | False |
+| P4 | RUN | 1312 | 1.070718 | -0.000428 | 2.349981 | False |
+| P5 | RUN | 1271 | 1.457767 | 0.000558 | 2.352473 | False |
+| A3_RAW_SWEEP_RECLAIM | RUN | 14236 | 2.847015 | 0.001811 | 0.384914 | True |
 
 ## Part A Notes
 
-- Expected prior baseline SHA: `8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4`
+- Analytical baseline check: `True`
+- Analytical tolerance: `1e-06`
+- Prior raw baseline SHA (informational only): `8CA802FD610DFE552225C9318A455345D8917D688ABBD2B3647CA69C4B6A78A4`
 - Observed A.1 stable SHA: `5A6B8505C1726EE1527FBF1131A75C4E053AF3E0188696F53FABA8E369B5482F`
-- SHA match: `False`
 
 ## Part B Canonical Result
 

@@ -18,6 +18,93 @@ def _candle(idx: int, open_: float, high: float, low: float, close: float) -> sm
     )
 
 
+def _baseline_payload(**overrides: float | int) -> dict[str, dict[str, dict[str, float | int]]]:
+    summary: dict[str, float | int] = {
+        "count": m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["event_count"],
+        "entry_5_profit_factor_proxy": m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["net_5b_pf"],
+        "entry_5_net_return_median": m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["net_5b_median"],
+        "median_mfe_before_entry": m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["mfe_before_entry_median"],
+        "entry_5_mfe_median": (
+            m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["mfe_before_entry_median"]
+            / m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["mfe_before_after_ratio"]
+        ),
+    }
+    summary.update(overrides)
+    return {"summary": {"full_sequence": summary}}
+
+
+def _part_a_rows(*, p1: bool = False, p2: bool = False, p3: bool = False, p4: bool = False, p5: bool = False, a3: bool = False) -> list[dict[str, bool | str]]:
+    return [
+        {"run_id": "A1_BASELINE", "m6_flip_gate_passed": False},
+        {"run_id": "P1", "m6_flip_gate_passed": p1},
+        {"run_id": "P2", "m6_flip_gate_passed": p2},
+        {"run_id": "P3", "m6_flip_gate_passed": p3},
+        {"run_id": "P4", "m6_flip_gate_passed": p4},
+        {"run_id": "P5", "m6_flip_gate_passed": p5},
+        {"run_id": "A3_RAW_SWEEP_RECLAIM", "m6_flip_gate_passed": a3},
+    ]
+
+
+def test_analytical_content_matches_passes_on_exact_baseline() -> None:
+    matches, report = m6.analytical_content_matches(_baseline_payload())
+
+    assert matches is True
+    assert all(row["in_tolerance"] for row in report.values())
+
+
+def test_analytical_content_matches_passes_on_floating_point_roundoff() -> None:
+    payload = _baseline_payload(entry_5_profit_factor_proxy=m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["net_5b_pf"] + 5e-7)
+
+    matches, report = m6.analytical_content_matches(payload)
+
+    assert matches is True
+    assert report["net_5b_pf"]["abs_delta"] < m6.ANALYTICAL_CONTENT_ABS_TOLERANCE
+
+
+def test_analytical_content_matches_fails_on_event_count_off_by_one() -> None:
+    payload = _baseline_payload(count=m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["event_count"] + 1)
+
+    matches, report = m6.analytical_content_matches(payload)
+
+    assert matches is False
+    assert report["event_count"]["in_tolerance"] is False
+
+
+def test_analytical_content_matches_fails_on_pf_outside_tolerance() -> None:
+    payload = _baseline_payload(entry_5_profit_factor_proxy=m6.EXPECTED_SMC_BASELINE_ANALYTICAL_CONTENT["net_5b_pf"] + 2e-6)
+
+    matches, report = m6.analytical_content_matches(payload)
+
+    assert matches is False
+    assert report["net_5b_pf"]["in_tolerance"] is False
+
+
+def test_evaluate_part_a_returns_baseline_mismatch_verdict_label() -> None:
+    verdict = m6.evaluate_part_a(
+        [{"run_id": "A1_BASELINE", "m6_flip_gate_passed": False}],
+        baseline_analytical_content_match=False,
+        baseline_analytical_content_report={"event_count": {"in_tolerance": False}},
+    )
+
+    assert verdict["verdict"] == "BASELINE_ANALYTICAL_CONTENT_MISMATCH"
+    assert "baseline_analytical_content_report" in verdict
+
+
+def test_evaluate_part_a_proceeds_to_perturbation_logic_when_baseline_matches() -> None:
+    verdict = m6.evaluate_part_a(_part_a_rows(p5=True), baseline_analytical_content_match=True)
+
+    assert verdict["verdict"] == "SMC_SEQUENCE_EDGE_IS_GROSS_ONLY"
+
+
+def test_final_m6_verdict_maps_baseline_mismatch_to_baseline_not_reproducible() -> None:
+    part_a = {"verdict": {"verdict": "BASELINE_ANALYTICAL_CONTENT_MISMATCH"}}
+    part_b = {"database_binding": {"verdict": "FULL_REPRODUCTION"}}
+
+    verdict = m6.final_m6_verdict(part_a, part_b)
+
+    assert verdict["verdict"] == "BASELINE_NOT_REPRODUCIBLE"
+
+
 def test_perturbations_each_mutate_exactly_one_config_field() -> None:
     base = smc.DiagnosticConfig()
     isolation = m6.verify_single_parameter_isolation(base)
@@ -73,54 +160,26 @@ def test_raw_sweep_reclaim_ablation_uses_reclaim_entry_without_smc_gates() -> No
 
 
 def test_part_a_verdict_flags_metric_hypersensitive_when_p1_and_p2_flip() -> None:
-    rows = [
-        {"run_id": "A1_BASELINE", "m6_flip_gate_passed": False},
-        {"run_id": "P1", "m6_flip_gate_passed": True},
-        {"run_id": "P2", "m6_flip_gate_passed": True},
-        {"run_id": "P3", "m6_flip_gate_passed": False},
-        {"run_id": "P4", "m6_flip_gate_passed": False},
-        {"run_id": "P5", "m6_flip_gate_passed": False},
-        {"run_id": "A3_RAW_SWEEP_RECLAIM", "m6_flip_gate_passed": False},
-    ]
+    rows = _part_a_rows(p1=True, p2=True)
 
-    verdict = m6.evaluate_part_a(rows, baseline_sha_match=True)
+    verdict = m6.evaluate_part_a(rows, baseline_analytical_content_match=True)
 
     assert verdict["verdict"] == "SMC_SEQUENCE_VERDICT_NOT_ROBUST"
     assert "METRIC_HYPERSENSITIVE" in verdict["diagnostic_notes"]
 
 
 def test_part_a_verdict_returns_gross_only_when_only_p5_flips() -> None:
-    rows = [
-        {"run_id": "A1_BASELINE", "m6_flip_gate_passed": False},
-        {"run_id": "P1", "m6_flip_gate_passed": False},
-        {"run_id": "P2", "m6_flip_gate_passed": False},
-        {"run_id": "P3", "m6_flip_gate_passed": False},
-        {"run_id": "P4", "m6_flip_gate_passed": False},
-        {"run_id": "P5", "m6_flip_gate_passed": True},
-        {"run_id": "A3_RAW_SWEEP_RECLAIM", "m6_flip_gate_passed": False},
-    ]
-
-    assert m6.evaluate_part_a(rows, baseline_sha_match=True)["verdict"] == "SMC_SEQUENCE_EDGE_IS_GROSS_ONLY"
+    assert m6.evaluate_part_a(_part_a_rows(p5=True), baseline_analytical_content_match=True)["verdict"] == "SMC_SEQUENCE_EDGE_IS_GROSS_ONLY"
 
 
 def test_part_a_verdict_returns_raw_edge_when_only_a3_flips() -> None:
-    rows = [
-        {"run_id": "A1_BASELINE", "m6_flip_gate_passed": False},
-        {"run_id": "P1", "m6_flip_gate_passed": False},
-        {"run_id": "P2", "m6_flip_gate_passed": False},
-        {"run_id": "P3", "m6_flip_gate_passed": False},
-        {"run_id": "P4", "m6_flip_gate_passed": False},
-        {"run_id": "P5", "m6_flip_gate_passed": False},
-        {"run_id": "A3_RAW_SWEEP_RECLAIM", "m6_flip_gate_passed": True},
-    ]
-
-    assert m6.evaluate_part_a(rows, baseline_sha_match=True)["verdict"] == "SMC_GATES_DESTROYED_RAW_EDGE"
+    assert m6.evaluate_part_a(_part_a_rows(a3=True), baseline_analytical_content_match=True)["verdict"] == "SMC_GATES_DESTROYED_RAW_EDGE"
 
 
-def test_part_a_baseline_sha_mismatch_hard_stops_verdict() -> None:
+def test_part_a_baseline_analytical_mismatch_hard_stops_verdict() -> None:
     rows = [{"run_id": "A1_BASELINE", "m6_flip_gate_passed": False}]
 
-    assert m6.evaluate_part_a(rows, baseline_sha_match=False)["verdict"] == "BASELINE_NOT_REPRODUCIBLE"
+    assert m6.evaluate_part_a(rows, baseline_analytical_content_match=False)["verdict"] == "BASELINE_ANALYTICAL_CONTENT_MISMATCH"
 
 
 def test_stable_sha_is_deterministic_for_same_payload() -> None:
