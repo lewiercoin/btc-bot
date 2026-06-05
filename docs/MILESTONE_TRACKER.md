@@ -125,13 +125,78 @@ estimated at ~10% — ROI too low to justify 20-36h budget.
 
 ### M5: TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1
 
+**Status:** PAUSED (2026-06-04) at end of plan-approval phase
+**Reason for pause:** Operator escalated meta-level concern about audit
+trustworthiness. M6 RED_TEAM_REPLICATION_V1 takes priority to verify the
+soundness of prior invalidation verdicts before any further work builds
+on them. M5 resumes only if M6 confirms prior verdicts are robust.
+**Builder:** Codex (stood down at end of plan phase, db03609)
+**Auditor:** Claude Code
+**Plan audit:** APPROVE_PLANNING_DOCUMENT, commit 98a9bb7 on
+`claude/festive-maxwell-iciBo`
+**Resumption gate:** M6 returns `REPLICATION_VERIFIES_PRIOR_VERDICTS`
+(or operator overrides).
+
+---
+
+### M6: RED_TEAM_REPLICATION_V1
+
 **Status:** ACTIVE
 **Builder:** Codex
-**Auditor:** Claude Code
+**Auditor:** Claude Code (with adversarial framing)
 **Decision date:** 2026-06-04
-**Decided by:** User picked option D1 from
-`docs/research/RESEARCH_LANDSCAPE_RESET_2026-06-04.md`.
-**Handoff:** `docs/handoffs/HANDOFF_M5_TRIAL_00095_DIRECTION_REGIME_REFINEMENT_V1_2026-06-04.md`
+**Decided by:** Operator after expressing distrust in prior audit/research
+outputs.
+**Handoff:** `docs/handoffs/HANDOFF_M6_RED_TEAM_REPLICATION_V1_2026-06-04.md`
+
+**Scope:** Two-part research-only audit-of-the-audits.
+
+**Part A — SMC_SEQUENCE adversarial replication.** Replay the existing
+`research_lab/analysis_smc_sequence_edge_feasibility_v1.py` diagnostic
+deterministically (verify SHA stability vs prior run), then run 5
+single-parameter perturbations and 1 ablation on the same artifact. Goal:
+determine whether the `HYPOTHESIS_INVALIDATED` verdict (2026-05-27)
+survives bounded methodology variation, or whether the verdict is an
+artifact of one specific parameter or gate choice.
+
+**Part B — Trial-00095 independent SQL replication.** Reproduce
+the PF=4.216 / ER=2.121 / WR=56.57% baseline metrics from the 274
+accepted trades using pure SQL queries against the canonical DB plus a
+minimal independent Python entry/exit simulator. Goal: confirm the
+validated production edge actually exists in the data, independent of
+the bot codebase that produced it.
+
+**Pre-data acceptance criteria (frozen):**
+
+- A-baseline: SHA256 of the SMC_SEQUENCE output JSON equals prior commit
+  if no perturbations applied. PASS / FAIL.
+- A-perturbations: per-perturbation verdict (INVALIDATED stays, or flips).
+  If any single perturbation flips the verdict to a positive edge,
+  flag as `PRIOR_VERDICT_NOT_ROBUST` and stop research-lab progression
+  on closed families until reconciliation.
+- A-ablation: confluence-off raw sweep+reclaim baseline reported with
+  full F-1..F-3 gate evaluation. PASS = ablation behaves consistently
+  with SWEEP_RECLAIM_EVENT_TAXONOMY closure.
+- B-replication: independent SQL replication produces ER within ±5% of
+  2.121 and PF within ±5% of 4.216 on the same 274-trade window. If
+  divergence > 5%, flag as `VALIDATED_EDGE_NOT_REPRODUCIBLE`.
+
+**Final M6 verdict:**
+
+- `REPLICATION_VERIFIES_PRIOR_VERDICTS` — all perturbations confirm
+  invalidation + trial-00095 baseline reproducible. M5 may resume.
+- `PRIOR_VERDICT_NOT_ROBUST` — at least one perturbation flips an
+  invalidate. Operator and Claude Code review which prior closures need
+  re-opening before any further research.
+- `VALIDATED_EDGE_NOT_REPRODUCIBLE` — trial-00095 baseline cannot be
+  reproduced independently. Critical investigation, all production
+  decisions paused.
+
+**Builder selection rationale:** Codex stays as builder for both parts.
+Same canonical DB, same path-sensitive Windows environment.
+
+**Budget:** Part A 8-14h + Part B 3-5h = 11-19h total implementation.
+Audit 4-8h. Total milestone 15-27h.
 
 **Scope:** Research-only deterministic replay of the validated trial-00095
 274-trade accepted population with three frozen amendment cohorts:
