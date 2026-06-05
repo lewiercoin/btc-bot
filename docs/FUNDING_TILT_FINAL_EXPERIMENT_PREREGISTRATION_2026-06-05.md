@@ -110,6 +110,43 @@ does not describe). Before this experiment is trusted:
 
 ---
 
+## Clarifications locked 2026-06-05 (pre-result, strengthen-only)
+
+These resolve underspecified points in Codex's confirmed plan. All are locked
+BEFORE any result is observed; they only make PASS harder. No outcome threshold
+is relaxed.
+
+1. **Selection protocol (nested — prevents OOS contamination).** The 27-cell grid
+   (W∈{30,60,90}, Z∈{1.5,2.0,2.5}, H∈{3,7,14}) is selected by best mean OOS ER
+   across **folds 1–3 only**. **Fold 4 (2025-01-01 → 2026-06-05) is an untouched
+   confirmation holdout** and plays NO role in selection. The "passes in EVERY
+   fold" gate then applies to the single selected cell across all 4 folds.
+   Selecting the best cell by all-fold OOS and reporting that same OOS as the
+   verdict is forbidden — that is the trial-00095 "best of N" overfit.
+
+2. **Grid-robustness gate (anti-lucky-cell).** Report the full 27-cell OOS ER
+   table. If the selected cell is a lone positive in a sea of negatives —
+   **fewer than 1/3 of cells (< 9/27) with positive mean OOS ER across folds 1–3**
+   — the result is FAIL regardless of the selected cell's metrics. A real edge is
+   not a single lucky parameter.
+
+3. **Funding P&L sign convention (correctness-critical, must be unit-tested).**
+   Funding is the edge's TAILWIND, not a cost. A SHORT opened on extreme-positive
+   funding RECEIVES funding each settlement; a LONG on extreme-negative funding
+   RECEIVES funding. The cost model must credit/debit funding by
+   `position_side × funding_sign` accrued over the hold, plus taker fees
+   (entry+exit) and slippage. A dedicated unit test must assert the sign on a
+   hand-computed example before any backtest number is trusted.
+
+4. **No stop-loss ⇒ tail risk must be visible.** Time-based exit means a single
+   trade can run deeply against the position. Report worst-trade R, max drawdown,
+   and the full OOS per-trade return distribution per fold. A PASS that conceals a
+   ruin-sized single loss is not a PASS — surface it so the verdict is honest.
+
+5. **Controls matched to the selected cell.** random-entry / time-shifted-funding
+   / inverse-signal cohorts use the same selected (W,Z,H) trade structure and the
+   same cost model; report the time-shift magnitude used and the random seed.
+
 ## How the result is reported
 
 The diagnostic prints a single JSON ending in `"verdict": "PASS" | "FAIL"`,
