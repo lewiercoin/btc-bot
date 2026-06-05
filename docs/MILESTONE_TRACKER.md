@@ -186,6 +186,123 @@ substantive Part A verdict before M5 resumes.
 
 ---
 
+### M6.1: RED_TEAM_REPLICATION_V1_PART_A_SHA_FIX
+
+**Status:** DONE_WITH_MAJOR_FINDING (2026-06-05)
+**Builder:** Codex
+**Auditor:** Claude Code (adversarial framing)
+**Implementation commit:** `2375b39`
+**Audit:** `docs/audits/AUDIT_M6.1_PART_A_SHA_FIX_2026-06-05.md`
+
+**Outcome summary:**
+
+Implementation correct per all locked rules (27/27 tests, deterministic
+SHA `96128632...` stable across 2 runs). Analytical-content baseline
+check correctly replaced broken SHA hard-stop and is strictly stricter
+than prior protocol (six independent numeric fields with exact-int +
+1e-6 float tolerance).
+
+**Major substantive finding (F-M6.1I-001):** A.3 raw sweep+reclaim
+ablation **flipped the verdict by wide margin** — PF 2.847, net 5b
+median +0.001811, MFE before/after ratio 0.385. Locked pre-data
+interpretation triggered: *"the SMC gates destroyed a simpler raw edge
+and prior sweep-reclaim closure must be reconciled."*
+
+Part A verdict: `SMC_GATES_DESTROYED_RAW_EDGE`.
+
+Confidence on finding: 4/5. The flip is mechanically correct under M6
+locked rules and M6's A.3 implementation, but methodology equivalence
+with prior `SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1` closure
+(2026-05-27) is unverified. Two outcomes possible after M7:
+- Real reopening of closed SWEEP_RECLAIM family
+- Methodology artifact (A.3 tests primitive prior didn't)
+
+Either outcome is research progress.
+
+---
+
+### M7: SWEEP_RECLAIM_METHODOLOGY_RECONCILIATION_V1
+
+**Status:** ACTIVE
+**Builder:** Codex
+**Auditor:** Claude Code
+**Decision date:** 2026-06-05
+**Decided by:** Operator after M6.1 audit. Path A selected with
+explicit reconciliation-not-rescue framing.
+**Handoff:** `docs/handoffs/HANDOFF_M7_SWEEP_RECLAIM_METHODOLOGY_RECONCILIATION_V1_2026-06-05.md`
+
+**Operator-locked constraints (mandatory, cannot be softened):**
+
+1. M6.1 A.3 numbers (`14,236 events, PF 2.847, net median +0.001811,
+   MFE ratio 0.385`) are LOCKED. M7 cannot rerun A.3 with different
+   parameters and report different numbers as "the same finding."
+2. Prior `SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1` closure is
+   QUESTIONED, not OBALONA. M7 may not assume the closure was wrong.
+3. First question of M7 is methodology, not edge. Phase 1 (methodology
+   mapping) must complete and be audited before any Phase 2 empirical
+   comparison runs.
+4. Edge verdict is conditional on methodology classification result —
+   M7 verdicts are pre-data-locked per classification path.
+
+**Scope:** Three-phase deterministic reconciliation diagnostic.
+
+**Phase 1 — Methodology mapping (no data run yet).**
+
+- Read and document M6 A.3 exact methodology from
+  `research_lab/diagnostics/red_team_replication_v1.py` (sweep
+  detection function + parameters, direction logic, entry timing,
+  forward window, cost).
+- Read and document prior
+  `SWEEP_RECLAIM_EVENT_TAXONOMY_DIAGNOSTIC_V1` methodology from
+  `research_lab/analysis_sweep_reclaim_event_taxonomy_diagnostic_v1.py`.
+- Build a per-axis classification table: for each definitional axis
+  (sweep detection, direction logic, entry timing, forward window,
+  cost), classify A.3 vs prior as one of:
+  - EQUIVALENT
+  - NARROWER (A.3 is a subset of prior)
+  - WIDER (A.3 is a superset of prior)
+  - DISJOINT
+  - INCOMPARABLE
+
+**Phase 2 — Empirical reconciliation runs (data-bearing).**
+
+- For each axis where A.3 differs from prior, run a prior-equivalent
+  variant under M6.1's exact cost + forward-window settings.
+- Tabulate metrics side-by-side: A.3 (locked from M6.1), prior
+  original (locked from 2026-05-27), prior-rerun-with-M6.1-settings,
+  for each variant.
+- Mechanical comparison only. No threshold tuning. No additional
+  perturbations beyond the prior taxonomy's defined variants.
+
+**Phase 3 — Stability check on A.3.**
+
+- Independent walk-forward of M6.1's A.3 implementation across 2-3
+  disjoint sub-windows of the same canonical DB.
+- Verify the A.3 flip survives sub-period split.
+- This is sanity, not new edge discovery.
+
+**Pre-data verdict labels (frozen):**
+
+| Verdict | Triggered when |
+|---|---|
+| `METHODOLOGY_ARTIFACT_PRIOR_CLOSURE_STANDS` | A.3 differs from prior in ways that explain the flip; rerunning prior under M6.1 settings reproduces prior's invalidation; A.3 stability check passes but A.3 is testing a primitive prior intentionally excluded. Prior closure stands as scoped. |
+| `METHODOLOGY_GAP_PRIOR_CLOSURE_INCOMPLETE` | A.3 differs from prior in ways prior did not cover (DISJOINT or WIDER axis); rerunning prior variants under M6.1 settings still produces invalidation. A.3 represents an untested primitive. Prior closure was narrow, not wrong. Recommends new setup-candidate research milestone. |
+| `METHODOLOGY_EQUIVALENT_PRIOR_CLOSURE_WAS_WRONG` | A.3 methodology aligns with at least one prior variant on all five axes; rerunning that prior variant under M6.1 settings produces A.3 metrics or compatible; A.3 stability check passes. Prior closure must be REOPENED. |
+| `RECONCILIATION_INCONCLUSIVE` | Comparison not feasible (e.g., prior taxonomy artifacts missing on PC, prior code uses removed dependencies, sample windows fundamentally incompatible). |
+
+**Final M7 verdict mechanically computed from Phase-1 axis
+classification + Phase-2 empirical results + Phase-3 stability.**
+
+**M5 status:** REMAINS PAUSED until M7 completes. Operator may
+reconsider M5 priority once M7 verdict is known.
+
+**Budget:** Phase 1 ~3-5h, Phase 2 ~6-10h, Phase 3 ~3-5h = 12-20h
+total impl + 4-8h audit.
+
+**Builder:** Codex. Adversarial framing inherited from M6.
+
+---
+
 ### M6.2: TRAIL_RULE_RECOVERY_FOR_PART_B
 
 **Status:** DEFERRED (operator may activate after M6.1 completes)
