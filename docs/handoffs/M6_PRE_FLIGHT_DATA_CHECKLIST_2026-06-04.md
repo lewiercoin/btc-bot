@@ -75,7 +75,7 @@ missing, operator copies from laptop via pendrive.
 
 ```powershell
 cd c:\development\btc-bot
-.\.venv\Scripts\python.exe -c "import sqlite3; c=sqlite3.connect('research_lab/data/crowded_unwind_backtest.db'); print('aggtrade cvd non-null:', c.execute('SELECT COUNT(*) FROM aggtrade_buckets WHERE cvd IS NOT NULL').fetchone()[0]); print('cvd_price_history:', c.execute('SELECT COUNT(*) FROM cvd_price_history').fetchone()[0]); print('candles 15m BTCUSDT in window:', c.execute(\"SELECT COUNT(*) FROM candles WHERE symbol='BTCUSDT' AND timeframe='15m' AND open_time >= '2022-01-01' AND open_time <= '2026-03-01'\").fetchone()[0])"
+.\.venv\Scripts\python.exe -c "import sqlite3; c=sqlite3.connect('research_lab/data/crowded_unwind_backtest.db'); print('aggtrade cvd non-null:', c.execute('SELECT COUNT(*) FROM aggtrade_buckets WHERE cvd IS NOT NULL').fetchone()[0]); print('cvd_price_history:', c.execute('SELECT COUNT(*) FROM cvd_price_history').fetchone()[0]); print('candles 15m BTCUSDT in window:', c.execute(\"SELECT COUNT(*) FROM candles WHERE symbol='BTCUSDT' AND timeframe='15m' AND open_time >= '2022-01-01T00:00:00+00:00' AND open_time <= '2026-03-01T00:00:00+00:00'\").fetchone()[0])"
 ```
 
 Expected output (exact):
@@ -85,6 +85,13 @@ aggtrade cvd non-null: 3122272
 cvd_price_history: 0
 candles 15m BTCUSDT in window: 145921
 ```
+
+> **Note on the inclusive bound:** the comparison MUST use ISO-8601
+> format `'2026-03-01T00:00:00+00:00'` for the upper bound. SQLite
+> compares timestamps as strings lexicographically; `'2026-03-01'` is
+> lexicographically less than `'2026-03-01T00:00:00+00:00'`, which
+> would exclude the final bar and produce 145920 instead of 145921.
+> A prior revision of this checklist had this off-by-one.
 
 If any number differs, STOP. Wrong DB attached. Escalate to operator.
 
