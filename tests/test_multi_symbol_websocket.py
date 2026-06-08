@@ -14,7 +14,7 @@ from data.websocket_client import (
 )
 
 
-NOW = datetime(2026, 5, 23, 10, 0, tzinfo=timezone.utc)
+NOW = datetime.now(timezone.utc)
 
 
 def _make_config() -> WebsocketClientConfig:
@@ -66,18 +66,19 @@ def test_market_stream_url_multi_symbol() -> None:
     config = _make_config()
     client = BinanceFuturesWebsocketClient(config, symbols=["BTCUSDT", "ETHUSDT"])
     url = client._build_market_stream_url()
+    assert url.startswith("wss://fstream.binance.com/market/stream?streams=")
     assert "btcusdt@aggTrade" in url
     assert "btcusdt@forceOrder" in url
     assert "ethusdt@aggTrade" in url
     assert "ethusdt@forceOrder" in url
-    assert "/stream?streams=" in url
 
 
 def test_legacy_stream_url_multi_symbol() -> None:
-    """Legacy stream URL includes all symbols."""
+    """Legacy builder stays pinned to the live market endpoint."""
     config = _make_config()
     client = BinanceFuturesWebsocketClient(config, symbols=["BTCUSDT", "SOLUSDT"])
     url = client._build_legacy_stream_url()
+    assert url.startswith("wss://fstream.binance.com/market/stream?streams=")
     assert "btcusdt@aggTrade" in url
     assert "btcusdt@forceOrder" in url
     assert "solusdt@aggTrade" in url

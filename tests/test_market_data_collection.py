@@ -90,7 +90,7 @@ def test_market_websocket_url_normalizes_market_base_to_combined_stream() -> Non
 
     assert (
         client._build_market_stream_url()
-        == "wss://fstream.binance.com/stream?streams=btcusdt@aggTrade/btcusdt@forceOrder"
+        == "wss://fstream.binance.com/market/stream?streams=btcusdt@aggTrade/btcusdt@forceOrder"
     )
 
 
