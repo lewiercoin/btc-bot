@@ -31,7 +31,7 @@ from storage.db import connect, init_db, transaction
 LOG = logging.getLogger(__name__)
 
 BINANCE_FORCE_ORDERS_URL = "https://fapi.binance.com/fapi/v1/forceOrders"
-BINANCE_FORCE_ORDER_STREAM_URL = "wss://fstream.binance.com/stream?streams=btcusdt@forceOrder"
+BINANCE_FORCE_ORDER_STREAM_URL = "wss://fstream.binance.com/market/stream?streams=btcusdt@forceOrder"
 DEFAULT_BOOTSTRAP_DAYS = 7
 DEFAULT_FORCE_ORDER_LIMIT = 100
 MAX_FORCE_ORDER_LIMIT = 100

@@ -125,12 +125,11 @@ class BinanceFuturesWebsocketClient:
 
     def _build_market_stream_url(self) -> str:
         base = self.config.ws_market_base_url.rstrip("/")
-        if base.endswith("/market"):
-            base = base[: -len("/market")] + "/stream"
-        elif base.endswith("/ws"):
-            base = base[: -len("/ws")] + "/stream"
-        elif not base.endswith("/stream"):
-            base = f"{base}/stream"
+        for suffix in ("/stream", "/ws", "/market"):
+            if base.endswith(suffix):
+                base = base[: -len(suffix)]
+                break
+        base = f"{base}/market/stream"
         # Build streams for all symbols: btcusdt@aggTrade/ethusdt@aggTrade/...
         streams = []
         for sym in self._symbols:
@@ -140,31 +139,15 @@ class BinanceFuturesWebsocketClient:
         return f"{base}?streams={'/'.join(streams)}"
 
     def _build_legacy_stream_url(self) -> str:
-        base = self.config.ws_base_url.rstrip("/")
-
-        if base.endswith("/ws"):
-            root = base[: -len("/ws")]
-        elif base.endswith("/stream"):
-            root = base
-        else:
-            root = f"{base}/stream"
-        # Build streams for all symbols
-        streams = []
-        for sym in self._symbols:
-            sym_lower = sym.lower()
-            streams.append(f"{sym_lower}@aggTrade")
-            streams.append(f"{sym_lower}@forceOrder")
-        return f"{root}?streams={'/'.join(streams)}"
+        return self._build_market_stream_url()
 
     def _build_stream_url(self) -> str:
         return self._build_market_stream_url()
 
     async def _run_forever(self) -> None:
-        use_market = True
-
         while not self._stop_event.is_set():
-            stream_url = self._build_market_stream_url() if use_market else self._build_legacy_stream_url()
-            url_type = "market" if use_market else "legacy"
+            stream_url = self._build_market_stream_url()
+            url_type = "market"
 
             try:
                 async with websockets.connect(
@@ -181,11 +164,7 @@ class BinanceFuturesWebsocketClient:
                 if self._stop_event.is_set():
                     break
 
-                if use_market:
-                    LOG.info("Falling back to legacy /stream/ path")
-                    use_market = False
-                else:
-                    await asyncio.sleep(self.config.reconnect_seconds)
+                await asyncio.sleep(self.config.reconnect_seconds)
 
     async def _consume(self, socket: websockets.ClientConnection) -> None:
         while not self._stop_event.is_set():
